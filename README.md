@@ -1,4 +1,4 @@
-# Napoleonic RTS — v0.6.7
+# Napoleonic RTS — v0.6.8
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -8,38 +8,65 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Nieuw in v0.6.7 — rivier, bruggen en doorwaadbare plaats
+## Nieuw in v0.6.8 — verkeersdrukte bij bruggen
 
-Het wegenstelsel uit v0.6.6 wordt nu doorsneden door de **Ruisseau de la Campagne**, een meanderende waterloop die van noord naar zuid over het slagveld loopt. De rivier is een echte navigatiebarrière: troepen kunnen niet meer willekeurig dwars door diep water lopen en moeten een geschikte oversteek zoeken.
+De rivierovergangen uit v0.6.7 zijn nu echte tactische bottlenecks. Regimenten kunnen niet langer onbeperkt tegelijk over hetzelfde smalle brugdek bewegen.
 
-### Vier strategische oversteekpunten
+### Bruggen hebben capaciteit
 
-De kaart bevat nu:
+- **Pont de la Chaussée:** maximaal 1 bataljon tegelijk
+- **Pont de la Crête:** maximaal 1 bataljon tegelijk
+- **Pont des Fermes:** maximaal 1 bataljon tegelijk
+- **Gué de la Colline:** maximaal 2 bataljons tegelijk, omdat de voorde breder is
 
-**3 bruggen**
-- **Pont de la Chaussée** — stenen brug op de Grande Chaussée
-- **Pont de la Crête** — houten brug bij de heuvel-/kamroutes
-- **Pont des Fermes** — houten brug bij de zuidelijke boerderijwegen
+Een regiment reserveert een passage pas wanneer het de oversteek nadert. Andere regimenten die dezelfde passage willen gebruiken komen in een wachtrij.
 
-**1 voorde**
-- **Gué de la Colline** — brede doorwaadbare plaats waar eenheden wel kunnen oversteken, maar duidelijk langzamer dan over een brug
+### Automatisch versmallen naar marscolonne
 
-Hierdoor zijn bruggen en voorden echte tactische knooppunten. Een leger dat de belangrijkste brug beheerst kan beweging tussen beide oevers sterk beïnvloeden.
+Bij nadering van een oversteek schakelt een infanterie- of cavalerieregiment tijdelijk naar een smalle marscolonne. De gekozen eindformatie wordt niet verloren: Linie, Colonne of Carré blijft de gewenste veldformatie en wordt na de passage weer door het normale formatiesysteem gebruikt.
 
-### Water is een echte terreinbarrière
+### Wachtrijen op de oever
 
-De rivier is gekoppeld aan dezelfde navigatielogica die formaties en losse eenheden gebruiken:
-- het terrein-A* beschouwt diep water als onbegaanbaar
-- wegsegmenten die illegaal door de rivier zouden snijden worden uit het wegennet-graafmodel geweerd
-- groepsankers mogen bij scherpe bochten niet door een rivierbocht heen snijden
-- losse eenheden en arbeiders zoeken bij een oeverwissel een legale brug of voorde
-- een klik midden in diep water wordt naar een bruikbaar oversteekpunt verplaatst
+Wachtende bataljons krijgen een eigen stoppositie vóór de brug. Elke volgende groep staat verder terug, zodat formaties niet op exact hetzelfde punt stapelen. Zodra de passage vrij is schuift de eerste groep uit de wachtrij door.
 
-De game tekent de rivier dus niet alleen: de waterloop verandert daadwerkelijk welke routes mogelijk zijn.
+De brug wordt pas vrijgegeven wanneer ook de achterste soldaten van het passerende bataljon van het brugdek af zijn. Hierdoor kan een volgend regiment niet door de staart van zijn voorganger heen bewegen.
 
-### Brug of voorde is een echte keuze
+### Verkeersstatus zichtbaar op de kaart
 
-Oversteken kost snelheid. Bruggen zijn relatief efficiënt; de voorde veroorzaakt een veel grotere vertraging.
+Bij een gebruikte oversteek verschijnt een compacte status, bijvoorbeeld:
+
+`1/1 bezet · wacht 2`
+
+Daarmee is direct zichtbaar of een brug vrij, bezet of geblokkeerd door meerdere wachtende regimenten.
+
+### Tactisch effect
+
+Bruggen zijn nu echte choke points. Een lange colonne kan zich voor een brug ophopen, een tegenstander kan een passage blokkeren en de bredere voorde kan aantrekkelijk worden wanneer een hoofdbrug overbelast is. De bestaande route-, rivier- en snelheidsregels uit v0.6.6 en v0.6.7 blijven actief.
+
+## Tests voor v0.6.8
+
+De releasegate bevat **20 Chromium-tests**. Naast economie, formaties, artillerie, AI, wegen, rivierroutering, de 520-unit stresstest en de versnelde 10-minuten soak-test wordt nu specifiek gecontroleerd dat:
+- v0.6.8 zonder JavaScript-fouten laadt
+- bruggen capaciteit 1 hebben
+- de voorde capaciteit 2 heeft
+- twee bataljons voor dezelfde brug werkelijk een wachtrij vormen
+- regimenten bij de brug tijdelijk in brug-/marscolonne gaan
+- nooit twee bataljons tegelijk hetzelfde smalle brugdek bezetten
+- beide bataljons uiteindelijk de overzijde bereiken
+- beide bataljons na de passage weer in hun gekozen Linie eindigen
+- F3-snapshots en bugrapporten v0.6.8 rapporteren
+
+GitHub Pages wordt alleen gepubliceerd wanneer de volledige Chromium-gate slaagt.
+
+## v0.6.7 — rivier, bruggen en voorde
+
+De **Ruisseau de la Campagne** doorsnijdt het slagveld als echte navigatiebarrière. De kaart bevat drie bruggen en één voorde:
+- Pont de la Chaussée
+- Pont de la Crête
+- Pont des Fermes
+- Gué de la Colline
+
+Diep water is onbegaanbaar. Terrein-A*, het wegennet, groepsankers en losse eenheden gebruiken dezelfde legale oversteekregels. Bruggen zijn sneller dan de voorde; artillerie wordt in de voorde het sterkst vertraagd.
 
 Indicatieve maximumsnelheid tijdens de passage:
 
@@ -48,49 +75,16 @@ Indicatieve maximumsnelheid tijdens de passage:
 | Brug | 38 | 52 | 18 |
 | Voorde | 28 | 36 | 12 |
 
-Daarnaast telt de routeplanner een extra passagevertraging mee. Voor artillerie is een voorde bewust het zwaarst. Daardoor kan een iets langere route naar een brug sneller zijn dan de kortere route door de voorde.
-
-### Gecombineerd met het wegennet
-
-Lange marsorders combineren nu twee strategische systemen:
-1. veldverplaatsing naar een geschikte route
-2. chaussées, lokale wegen en karrensporen uit v0.6.6
-3. een legale rivieroversteek
-4. eventueel een andere wegklasse aan de overzijde
-5. ontplooiing in Linie, Colonne of Carré bij het einddoel
-
-Een bataljon dat van west naar oost over de Grande Chaussée wordt gestuurd kiest bijvoorbeeld de **Pont de la Chaussée** en blijft tijdens de hele route buiten diep water.
-
-### Rivier op de minimap
-
-Verkende delen van de rivier worden op de minimap weergegeven. Bruggen en de voorde krijgen kleine markeringen, zodat belangrijke passages ook tijdens het manoeuvreren op grotere schaal herkenbaar blijven.
-
-## Tests voor v0.6.7
-
-De releasegate draait nu **18 effectieve Chromium-tests**. Daarin blijven de bestaande economie-, formatie-, artillerie-, AI-, wegen-, 520-unit stress- en 10-minuten soak-regressies actief. Daarbovenop controleert v0.6.7 specifiek dat:
-- de release exact als v0.6.7 laadt zonder JavaScript-fouten
-- de rivier precies drie bruggen en één voorde bevat
-- diep water als geblokkeerd terrein wordt herkend
-- brug- en voordegebieden wel passeerbaar zijn
-- een brug sneller is dan de voorde
-- een bataljon dat de rivier moet kruisen een legale passage in zijn route heeft
-- de route-audit nul illegale watersegmenten vindt
-- het bewegende groepsanker nooit in diep water terechtkomt
-- het bataljon de Pont de la Chaussée daadwerkelijk passeert en aan de andere oever aankomt
-- F3-snapshots en bugrapporten v0.6.7 rapporteren
-
-De gameplaybuild behaalde **18/18 geslaagde Chromium-tests** en werd succesvol naar GitHub Pages gedeployed voordat deze definitieve releasebeschrijving werd toegevoegd. Deze README-commit gaat opnieuw door dezelfde gate voordat hij als definitieve v0.6.7-release geldt.
+De rivier en oversteekpunten zijn ook zichtbaar op de minimap.
 
 ## v0.6.6 — Napoleontisch wegenstelsel
 
-De oude enkele rechte weg werd vervangen door een netwerk met **13 wegen in drie klassen**:
+Het slagveld bevat **13 wegen in drie klassen**:
 - 4 hoofdwegen / chaussées
 - 5 lokale wegen
 - 4 karrensporen
 
-Zes gehuchten/kruispunten vormen natuurlijke knooppunten, waaronder **Les Quatre Chemins**. Lange orders gebruiken een apart wegennet-graafmodel om de snelste combinatie van wegen te kiezen; korte tactische orders blijven rechtstreeks door het veld gaan.
-
-Wegkwaliteit beïnvloedt de snelheid:
+Zes gehuchten/kruispunten vormen natuurlijke knooppunten, waaronder **Les Quatre Chemins**. Lange orders gebruiken een wegennet-graafmodel om de snelste combinatie van wegen te kiezen; korte tactische orders blijven rechtstreeks door het veld gaan.
 
 | Terrein | Infanterie | Cavalerie | Artillerie |
 | --- | ---: | ---: | ---: |
@@ -145,6 +139,7 @@ Een boer onthoudt zijn grondstoftype en zoekt automatisch een volgende boom of v
 - wegen versnellen en activeren bataljonsmarcheren
 - rivierwater blokkeert gewone passage
 - bruggen en voorden maken gecontroleerde rivieroversteek mogelijk
+- bruggen kunnen wachtrijen en verkeersdrukte veroorzaken
 - bossen vertragen maar beschermen
 - heuvels vertragen en geven aanvalbonus
 - verkend terrein blijft onthouden
@@ -184,4 +179,4 @@ npm run test:soak
 
 ## Richting v0.7
 
-Na verdere handmatige feedback kan v0.7 zich richten op firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, verkeersdrukte en bottlenecks bij bruggen/kruispunten, mogelijke vernietigbare bruggen, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.
+Na verdere handmatige feedback kan v0.7 zich richten op firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, passageprioriteit voor artillerie, vernietigbare bruggen, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.

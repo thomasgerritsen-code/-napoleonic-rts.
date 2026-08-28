@@ -12,10 +12,10 @@ async function openGame(page) {
   return pageErrors;
 }
 
-test('v0.6.7 loads with river systems, simulation facade and no JavaScript errors', async ({ page }, testInfo) => {
+test('v0.6.8 loads with river systems, simulation facade and no JavaScript errors', async ({ page }, testInfo) => {
   const errors = await openGame(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.7/);
-  await expect(page.locator('.version')).toHaveText('v0.6.7');
+  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.8/);
+  await expect(page.locator('.version')).toHaveText('v0.6.8');
   await expect(page.locator('#minimap')).toBeVisible();
   const facade = await page.evaluate(() => ({
     version: window.RTS_SIM.version,
@@ -23,7 +23,7 @@ test('v0.6.7 loads with river systems, simulation facade and no JavaScript error
     hasDispatch: typeof window.RTS_SIM.dispatch === 'function',
     hasAudit: typeof window.RTS_SIM.audit === 'function'
   }));
-  expect(facade).toEqual({ version:'0.6.7', hasSnapshot:true, hasDispatch:true, hasAudit:true });
+  expect(facade).toEqual({ version:'0.6.8', hasSnapshot:true, hasDispatch:true, hasAudit:true });
   const water = await page.evaluate(() => window.__RTS_DEBUG__.waterSystemV067());
   expect(water.name).toBe('Ruisseau de la Campagne');
   expect(water.bridges).toBe(3);
@@ -46,7 +46,7 @@ test('v0.6.7 loads with river systems, simulation facade and no JavaScript error
     ford: window.__RTS_DEBUG__.crossingSpeedV067('infantry','gue-colline')
   }));
   expect(speeds.bridge).toBeGreaterThan(speeds.ford);
-  await testInfo.attach('v067-river-crossings', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  await testInfo.attach('v068-river-crossings', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
 
@@ -64,31 +64,31 @@ test('a battalion crossing the river uses a legal crossing and never cuts throug
   expect(audit.blockedSegments).toBe(0);
 
   const samples=[];
-  for(let i=0;i<30;i++){
+  for(let i=0;i<40;i++){
     await page.evaluate(() => window.RTS_SIM.step(1));
     samples.push(await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id));
   }
   expect(samples.every(s => s.anchorWater === false)).toBe(true);
-  expect(samples.some(s => s.anchorCrossing === 'Pont de la Chaussée')).toBe(true);
+  expect(samples.some(s => s.anchorCrossing === 'Pont de la Chaussée' || s.crossingTraffic?.crossingName === 'Pont de la Chaussée')).toBe(true);
   expect(samples.some(s => (s.anchor?.x ?? s.centroid?.x ?? 0) > 1600)).toBe(true);
   const final = samples[samples.length-1];
   expect(final.phase).toBe('formed');
   expect(final.centroid.x).toBeGreaterThan(1600);
-  await testInfo.attach('v067-bridge-march', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  await testInfo.attach('v068-bridge-march', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
 
-test('F3 test lab and bug reports expose v0.6.7', async ({ page }) => {
+test('F3 test lab and bug reports expose v0.6.8', async ({ page }) => {
   const errors = await openGame(page);
   await page.keyboard.press('F3');
   await expect(page.locator('#debugPanel')).toBeVisible();
   await page.selectOption('#debugScenario','artillery-3');
   await page.locator('[data-debug-action="run"]').click();
   const snap = await page.evaluate(() => window.__RTS_DEBUG__.simulationSnapshot());
-  expect(snap.version).toBe('0.6.7');
+  expect(snap.version).toBe('0.6.8');
   expect(snap.groups.filter(g=>g.kind==='artillery'&&!g.destroyed)).toHaveLength(3);
   const report = await page.evaluate(() => JSON.parse(window.__RTS_DEBUG__.createBugReport()));
-  expect(report.version).toBe('0.6.7');
+  expect(report.version).toBe('0.6.8');
   expect(report.scenario).toBe('artillery-3');
   expect(report.audit).toBeTruthy();
   expect(errors).toEqual([]);
