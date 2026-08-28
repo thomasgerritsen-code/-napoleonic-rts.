@@ -1,8 +1,8 @@
 'use strict';
-// ---------- v0.6.2 simulation facade + performance layer ----------
+// ---------- v0.6.3 simulation facade + performance layer ----------
 // Keeps game-state commands separate from Canvas so a future renderer can consume the same simulation.
 
-const RTS_VERSION = '0.6.2';
+const RTS_VERSION = '0.6.3';
 document.title = `Napoleonic RTS v${RTS_VERSION}`;
 const simVersionBadge = document.querySelector('.version');
 if (simVersionBadge) simVersionBadge.textContent = `v${RTS_VERSION}`;
@@ -67,7 +67,6 @@ nearestEnemyEntity = function nearestEnemyEntityV062(unit, maxRange) {
     }
   }
 
-  // Building counts are small, so keeping this linear is cheaper than maintaining another index.
   for (const b of buildings) {
     if (b.dead || b.side !== otherSide || !b.complete) continue;
     simulationMetrics.combatCandidateChecks++;
@@ -138,7 +137,22 @@ function serializeUnitV062(u) {
   return { id:u.id, side:u.side, type:u.type, x:+u.x.toFixed(2), y:+u.y.toFixed(2), targetX:+u.targetX.toFixed(2), targetY:+u.targetY.toFixed(2), hp:+u.hp.toFixed(1), morale:+u.morale.toFixed(1), routing:!!u.routing, regimentId:u.regimentId || null, task:u.task || null };
 }
 function serializeGroupV062(reg) {
-  return { id:reg.id, side:reg.side, kind:groupKindV06(reg), name:reg.name, formation:reg.formation, morale:+(reg.morale || 0).toFixed(1), facing:+(reg.facing || 0).toFixed(4), destroyed:!!reg.destroyed, brokenReason:reg.brokenReason || null, members:regimentMembers(reg).map(serializeUnitV062), pathIndex:reg.pathIndex || 0, pathLength:reg.path?.length || 0 };
+  return {
+    id:reg.id,
+    side:reg.side,
+    kind:groupKindV06(reg),
+    name:reg.name,
+    formation:reg.formation,
+    morale:+(reg.morale || 0).toFixed(1),
+    facing:+(reg.facing || 0).toFixed(4),
+    finalFacing:Number.isFinite(reg.finalFacing) ? +reg.finalFacing.toFixed(4) : null,
+    movementPhase:reg.movementPhaseV063 || reg.marchV063?.phase || 'idle',
+    destroyed:!!reg.destroyed,
+    brokenReason:reg.brokenReason || null,
+    members:regimentMembers(reg).map(serializeUnitV062),
+    pathIndex:reg.pathIndex || 0,
+    pathLength:reg.path?.length || 0
+  };
 }
 function snapshotSimulationV062() {
   return {
@@ -150,7 +164,7 @@ function snapshotSimulationV062() {
     buildings:buildings.filter(b=>!b.dead).map(b=>({id:b.id,side:b.side,type:b.type,x:+b.x.toFixed(1),y:+b.y.toFixed(1),complete:b.complete,hp:+b.hp.toFixed(1),queue:b.queue.map(q=>q.type),production:+b.production.toFixed(3)})),
     groups:regiments.map(serializeGroupV062),
     selection:{unitIds:[...selectedUnits].filter(u=>!u.dead).map(u=>u.id),buildingId:selectedBuilding?.id || null},
-    ai:{plan:aiPlan,strategy:typeof aiStrategyV06 === 'string' ? aiStrategyV06 : null},
+    ai:{plan:aiPlan,strategy:typeof aiStrategyV06 === 'string' ? aiStrategyV06 : null,wave:typeof aiWaveNumberV063 === 'number' ? aiWaveNumberV063 : 0},
     metrics:{...simulationMetrics},
     audit:auditSimulationV062()
   };
