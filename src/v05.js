@@ -87,10 +87,11 @@ issueMove = function issueMoveV05(x, y) {
     const spacing = 125;
     regs.forEach((reg, i) => {
       const c = centroid(regimentMembers(reg));
-      const dx = x - c.x, dy = y + (i - (regs.length - 1) / 2) * spacing - c.y;
+      const targetY = y + (i - (regs.length - 1) / 2) * spacing;
+      const dx = x - c.x, dy = targetY - c.y;
       if (Math.hypot(dx, dy) > 20) reg.facing = Math.atan2(dy, dx);
       reg.targetFacing = reg.facing;
-      arrangeRegiment(reg, x, y + (i - (regs.length - 1) / 2) * spacing, reg.formation);
+      arrangeRegiment(reg, x, targetY, reg.formation);
     });
   }
 
@@ -169,16 +170,26 @@ aiDevelop = function aiDevelopV05() {
   const regs = activeRegiments('britain');
   const stable = livingBuildings('britain').filter(b => b.type === 'stable');
   const foundry = livingBuildings('britain').filter(b => b.type === 'foundry');
+  const completeStable = stable.find(b => b.complete);
+  const completeFoundry = foundry.find(b => b.complete);
+
+  // Expansion buildings are finished sequentially so builders cannot abandon one project for the next.
+  if (stable.some(b => !b.complete)) {
+    aiPlan = 'Stable afbouwen';
+    return;
+  }
+  if (foundry.some(b => !b.complete)) {
+    aiPlan = 'Artillery Foundry afbouwen';
+    return;
+  }
 
   if (regs.length >= 1 && !stable.length && e.wood >= BUILDINGS.stable.cost.wood) {
     if (aiBuild('stable')) return;
   }
-  if (regs.length >= 1 && !foundry.length && e.wood >= BUILDINGS.foundry.cost.wood) {
+  if (regs.length >= 1 && completeStable && !foundry.length && e.wood >= BUILDINGS.foundry.cost.wood) {
     if (aiBuild('foundry')) return;
   }
 
-  const completeStable = stable.find(b => b.complete);
-  const completeFoundry = foundry.find(b => b.complete);
   const cavalry = livingUnits('britain').filter(u => u.type === 'cavalry').length;
   const artillery = livingUnits('britain').filter(u => u.type === 'artillery').length;
 
@@ -212,7 +223,6 @@ drawBuilding = function drawBuildingV05(b) {
   drawBuildingV04(b);
 };
 
-const drawRegimentMarkersV04 = drawRegimentMarkers;
 drawRegimentMarkers = function drawRegimentMarkersV05() {
   for (const reg of regiments) {
     if (reg.destroyed) continue;
