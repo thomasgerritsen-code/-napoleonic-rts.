@@ -1,4 +1,4 @@
-# Napoleonic RTS — v0.6.5
+# Napoleonic RTS — v0.6.6
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -8,95 +8,121 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Nieuw in v0.6.5 — wegen worden echte marsroutes
+## Nieuw in v0.6.6 — Napoleontisch wegenstelsel
 
-### Bataljons zoeken bij lange verplaatsingen bewust een weg op
-Een lange verplaatsingsorder wordt niet meer alleen op afstand beoordeeld. De routeplanner vergelijkt de verwachte reistijd van een gewone veldverplaatsing met een route die een bruikbaar deel over de weg loopt.
+De oude enkele rechte weg is vervangen door een compleet, historisch geïnspireerd wegennet. De kaart is opgebouwd rond het type netwerk dat voor Napoleontische legers strategisch belangrijk was: een beperkt aantal belangrijke chaussées tussen plaatsen, aangevuld met smallere lokale wegen en eenvoudige karrensporen. Grote kruispunten en gehuchten vormen natuurlijke knooppunten.
 
-Daardoor kan een bataljon:
-- eerst vanuit open terrein naar de weg bewegen
-- daarna versneld over de weg marcheren
-- bij het juiste punt de weg weer verlaten
-- vervolgens in veldformatie naar de eindpositie bewegen en daar ontplooien
+### 13 wegen in drie klassen
 
-De weg is niet verplicht. Een wegroute wordt alleen gekozen wanneer:
-- de order lang genoeg is om de omweg zinvol te maken
-- een voldoende groot deel van de route daadwerkelijk over de weg loopt
-- de extra afstand niet buitensporig groot wordt
-- de hogere wegmars-snelheid de omweg qua geschatte reistijd voldoende terugverdient
+**4 hoofdwegen / chaussées**
+- Grande Chaussée
+- Route du Nord
+- Route du Sud-Ouest
+- Route du Nord-Est
 
-Korte positioneringsorders blijven daarom rechtstreeks door het veld gaan.
+**5 lokale wegen**
+- Chemin de la Crête Ouest
+- Chemin de la Crête Est
+- Chemin du Bois
+- Chemin des Fermes Est
+- Chemin des Fermes Sud
 
-### Duidelijk sneller op de weg
-De groepssnelheden zijn bewust verder uit elkaar gezet zodat wegen tactisch merkbaar worden:
+**4 karrensporen**
+- Voie du Moulin
+- Voie de la Ferme
+- Voie du Verger
+- Voie de la Lisière
 
-**Infanteriebataljon**
-- veld: 36
-- weg: 54
-- ongeveer 50% hogere groepssnelheid op de weg
+Op de kaart zijn daarnaast zes kleine gehuchten/kruispunten gemarkeerd, waaronder **Les Quatre Chemins** als centraal strategisch knooppunt.
 
-**Cavalerieregiment**
-- veld: 64
-- weg: 88
-- ongeveer 38% hogere groepssnelheid op de weg
+### Wegkwaliteit heeft invloed op snelheid
 
-De bestaande cohesieregeling blijft actief: een formatie kan tijdelijk iets vertragen wanneer leden achterlopen. De overgang naar de hogere of lagere snelheid blijft gesmoothd, zodat het bataljon bij het op- en afgaan van een weg niet plotseling verspringt.
+De verschillende wegklassen zijn niet alleen visueel anders; ze hebben verschillende marskwaliteiten.
 
-### Marsgedrag blijft gekoppeld aan terrein
-De regel uit v0.6.4 blijft gelden:
-- **op de weg:** compacte marscolonne + marsstatus + hogere snelheid
-- **buiten de weg:** de gekozen Linie, Colonne of Carré blijft behouden als bewegende veldformatie, zonder marsstatus
+| Terrein | Infanterie | Cavalerie | Artillerie |
+| --- | ---: | ---: | ---: |
+| Open veld | 36 | 64 | 22 |
+| Karrenspoor | 42 | 70 | 22 |
+| Lokale weg | 49 | 80 | 26 |
+| Chaussée | 56 | 90 | 30 |
 
-De overgang tussen marscolonne en veldformatie verloopt geleidelijk.
+Een chaussée is dus de beste route voor een lange strategische verplaatsing. Een karrenspoor kan nuttig zijn, maar levert veel minder voordeel op.
 
-## Tests voor v0.6.5
+### Echte kruispuntroutering
 
-De regressiesuite bevat nu **15 Chromium-tests**. Nieuw is een route- en snelheidstest die onder andere controleert dat:
-- een lange order vanaf open terrein een zinvolle wegroute kiest
-- die route meerdere waypoints op de weg bevat
-- de weg voldoende deel van de totale route vormt
-- de omweg binnen de ingestelde grens blijft
-- de geschatte wegroute sneller is dan dezelfde afstand op veldsnelheid
-- een korte veldorder geen onnodige wegomweg maakt
-- een infanteriebataljon op de weg duidelijk sneller beweegt dan een vergelijkbaar bataljon in het veld
+Lange bataljonsorders gebruiken nu naast de gewone terrein-A* een apart **wegennet-graafmodel**. De planner kent de echte knooppunten van het netwerk en berekent de snelste combinatie van wegen op basis van:
+- afstand naar de weg
+- type weg
+- werkelijke marsnelheid van het geselecteerde groepstype
+- lengte van de omweg
+- geschatte totale reistijd
 
-De v0.6.5-code behaalde **15/15 geslaagde Chromium-tests** vóór deployment.
+Een bataljon kan daardoor bijvoorbeeld:
+1. in veldformatie naar een lokale weg lopen
+2. via een kruispunt een chaussée nemen
+3. versneld over de hoofdweg marcheren
+4. bij een volgend kruispunt afslaan
+5. de weg verlaten en in veldformatie naar zijn eindpositie gaan
+6. daar ontplooien in de gekozen Linie, Colonne of Carré
 
-## v0.6.4 — alleen marcheren op wegen en vloeiendere formaties
+Korte tactische verplaatsingen blijven rechtstreeks door het veld gaan. De planner stuurt een bataljon dus niet onnodig naar een weg als dat geen voordeel oplevert.
 
-v0.6.4 introduceerde het onderscheid tussen echte wegmars en veldverplaatsing. Op wegen vormen bataljons een compactere marscolonne; daarbuiten bewegen ze in hun gekozen veldformatie zonder marsstatus.
+### Marsregels blijven intact
 
-De schokkerige groepsbeweging werd verminderd met:
-- continu gesmoothde groepssnelheid
-- geleidelijke draaiing van het groepsanker
-- directe beweging naar vloeiend bewegende formatieposities
-- zachte vertraging bij het eindpunt
-- afgeronde routehoeken
+- **Op een weg:** het bataljon gebruikt marscolonne/marsstatus.
+- **Buiten een weg:** het bataljon beweegt in de gekozen veldformatie en marcheert niet formeel.
+- Rechts vasthouden + slepen blijft de uiteindelijke front-richting bepalen.
+- Overgangen tussen wegmars en veldformatie blijven gesmoothd.
 
-Rechts vasthouden + slepen blijft de bestemming en uiteindelijke front-richting van een geselecteerd bataljon bepalen.
+### Wegennet op de minimap
 
-## v0.6.3 — blijvende Britse versterkingen
+Verkende delen van het wegennet worden ook op de minimap getekend. Hoofdwegen zijn duidelijker zichtbaar dan lokale wegen en tracks, zodat kruispunten en strategische marsassen ook op grotere schaal leesbaar zijn.
 
-De Britse AI beoordeelt zijn leger op **werkelijke levende gevechtssterkte + reeds bestelde versterkingen** in plaats van alleen op het aantal nog bestaande regimenten. Daardoor blijft de tegenstander na de eerste aanval infanterie, cavalerie en artillerie aanvullen en nieuwe aanvalsgolven opbouwen.
+### Performance
 
-Verloren zware eenheden krijgen na een veldslag extra prioriteit, officieren en drummers worden als aparte noodzakelijke reserve onderhouden en de AI breidt huisvesting en productiecapaciteit uit wanneer dat nodig is.
+Omdat wegdetectie bij honderden soldaten zeer vaak wordt aangeroepen, gebruikt v0.6.6 een **spatial index voor wegsegmenten**. Een unit controleert daardoor alleen wegsegmenten in zijn directe kaartcel in plaats van steeds alle wegen te doorzoeken.
+
+## Tests voor v0.6.6
+
+De regressiesuite bevat **17 Chromium-tests**. Naast alle bestaande gameplaycontroles wordt nu onder andere getest dat:
+- het netwerk exact 4 chaussées, 5 lokale wegen en 4 tracks bevat
+- meerdere wegen samenkomen bij het centrale kruispunt
+- chaussée > lokale weg > track > veld geldt voor infanteriesnelheid
+- een bataljon vloeiend en versneld over de Grande Chaussée marcheert
+- een lange verplaatsing het wegennet kiest wanneer dat sneller is
+- een korte veldorder geen onnodige omweg maakt
+- een lange route meerdere wegverbindingen kan combineren
+- rechtsklik-vasthouden + slepen op open terrein nog steeds bestemming en front bepaalt
+- 520 units structureel geldig blijven
+- een versnelde simulatie van 10 speelminuten geen corrupte state, ghost groups of vastgelopen productie veroorzaakt
+
+De gameplaycommit van v0.6.6 behaalde **17/17 geslaagde Chromium-tests** voordat deze releasebeschrijving werd toegevoegd. De uiteindelijke releasecommit moet dezelfde gate opnieuw passeren voordat GitHub Pages hem publiceert.
+
+## Eerdere verbeteringen
+
+### v0.6.5 — wegen bewust opzoeken
+Lange orders vergelijken veldtijd met wegmars-tijd. Wegen worden alleen gekozen wanneer de hogere snelheid de omweg voldoende terugverdient.
+
+### v0.6.4 — wegmars versus veldformatie
+Alleen op wegen wordt formeel gemarcheerd. Buiten de weg blijft het bataljon geordend in Linie, Colonne of Carré. Groepssnelheid, draaiing en aankomst zijn gesmoothd om schokkerig bewegen te verminderen.
+
+### v0.6.3 — blijvende Britse versterkingen
+De Britse AI kijkt naar daadwerkelijke levende gevechtssterkte en blijft na verliezen infanterie, cavalerie en artillerie aanvullen en nieuwe aanvalsgolven opbouwen.
 
 ## Testlab en performance
 
 Druk tijdens het spelen op **F3** voor het test/debugpaneel. Het toont onder andere FPS, frametime, update- en rendertijd, aantallen units en groepen, collision-correcties, combat-targetingbelasting, vastgelopen routes en Britse AI-status.
 
-Directe testscenario's omvatten onder andere regiment versus regiment, cavaleriecharge, drie bemande kanonnen, lage moraal, lage regimentsterkte, 520 musketiers en een vooruitgesimuleerde Britse basis.
-
 De knop **Kopieer bugrapport** maakt een JSON-rapport met gameversie, speeltijd, selectie, economie, AI, units, gebouwen, groepen, performance en auditresultaten.
 
-Combat-targeting gebruikt een **combat spatial hash**. De renderer-onafhankelijke `window.RTS_SIM` interface biedt `snapshot()`, `dispatch(command)`, `step(seconds)`, `audit()` en `getMetrics()` als voorbereiding op verdere schaalvergroting en een latere 3D-renderer.
+Combat-targeting gebruikt een spatial hash. De renderer-onafhankelijke `window.RTS_SIM`-interface biedt `snapshot()`, `dispatch(command)`, `step(seconds)`, `audit()` en `getMetrics()` als voorbereiding op verdere schaalvergroting en een latere 3D-renderer.
 
 ## Bestaande gameplay
 
 ### Rallypoints en productie
 - Town Center, Barracks, Stable en Artillery Foundry hebben een verzamelpunt
-- geproduceerde eenheden verschijnen verspreid en lopen naar willekeurige vrije plekken rond het rallypoint
-- geselecteerde productiegebouwen tonen hun complete wachtrij en voortgang
+- geproduceerde eenheden verschijnen verspreid rond het rallypoint
+- geselecteerde productiegebouwen tonen hun wachtrij en voortgang
 
 ### Regimenten breken
 - infanterie onder 32% groepsmoraal
@@ -104,16 +130,15 @@ Combat-targeting gebruikt een **combat spatial hash**. De renderer-onafhankelijk
 - formele gevechtsgroepen breken ook wanneer maximaal één derde van de oorspronkelijke sterkte overblijft
 
 ### Artillerie
-- 1 kanon vereist 2 toegewezen vrije musketiers
+- 1 kanon vereist 2 toegewezen musketiers
 - kanon + bemanning bewegen visueel als één samengestelde eenheid
 - zonder twee levende bemanningsleden kan het kanon niet bewegen of vuren
-- verlies van een bemanningslid breekt de batterij
 
 ### Boeren
 Een boer onthoudt zijn grondstoftype en zoekt automatisch een volgende boom of voedselbron wanneer de huidige bron leeg is.
 
 ### Terrein en fog of war
-- wegen versnellen, activeren bataljonsmarcheren en kunnen bewust als snellere marsroute worden gekozen
+- wegen versnellen en activeren bataljonsmarcheren
 - bossen vertragen maar beschermen
 - heuvels vertragen en geven aanvalbonus
 - verkend terrein blijft onthouden
@@ -153,4 +178,4 @@ npm run test:soak
 
 ## Richting v0.7
 
-Na verdere handmatige feedback kan v0.7 zich richten op meerdere wegverbindingen en kruispunten, firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, betere interactie tussen meerdere bataljons tijdens manoeuvres, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.
+Na verdere handmatige feedback kan v0.7 zich richten op firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, verkeersdrukte en passage bij smalle kruispunten, bruggen/doorwaadbare plaatsen, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.
