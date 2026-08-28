@@ -52,6 +52,63 @@ function roadsAtJunctionV069(h) {
   return roads;
 }
 
+function roadsideHouseCandidateV069(h, base, i, state, w, height) {
+  const laneOffset = base.road.width / 2;
+  const randomAlong = (randV069(state) - .5) * 18;
+  const randomOffset = randV069(state) * 12;
+  const direction = i % 2 === 0 ? -1 : 1;
+  const initialSide = (Math.floor(i / 2) % 2 === 0) ? -1 : 1;
+  const row = Math.floor(i / 2);
+  const footprint = Math.hypot(w, height) / 2;
+  let best = null;
+
+  // Villages sit around a junction, not on top of it. Search farther along the selected
+  // road and on both verges until the complete house footprint is outside every road.
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const side = attempt < 40 ? initialSide : -initialSide;
+    const alongBand = attempt % 10;
+    const outwardBand = Math.floor((attempt % 40) / 10);
+    const along = direction * (74 + row * 46 + alongBand * 15) + randomAlong;
+    const offset = laneOffset + 34 + randomOffset + outwardBand * 18;
+    const x = h.x + base.tx * along - base.ty * side * offset;
+    const y = h.y + base.ty * along + base.tx * side * offset;
+    if (x < 35 || y < 35 || x > WORLD.width - 35 || y > WORLD.height - 35) continue;
+    const nearest = nearestRoadGeometryV069(x, y);
+    if (!nearest) continue;
+    const clearance = nearest.edgeClearance;
+    const footprintClearance = clearance - footprint;
+    const score = footprintClearance >= 12 && clearance <= 105
+      ? Math.abs(clearance - (footprint + 24)) + Math.abs(alongBand - 2) * 1.5
+      : Infinity;
+    if (score < (best?.score ?? Infinity)) best = {x,y,side,clearance,score};
+  }
+
+  // Dense multi-road junctions can invalidate a whole side of the primary road. A broad
+  // deterministic fallback samples both verges farther from the crossroads and still only
+  // accepts positions that are clearly beside, but not on, some road.
+  if (!best) {
+    for (let attempt = 0; attempt < 120; attempt++) {
+      const side = attempt % 2 ? 1 : -1;
+      const direction2 = Math.floor(attempt / 2) % 2 ? 1 : -1;
+      const ring = Math.floor(attempt / 4);
+      const along = direction2 * (105 + ring * 13 + row * 22);
+      const offset = laneOffset + 48 + (ring % 5) * 15;
+      const x = h.x + base.tx * along - base.ty * side * offset;
+      const y = h.y + base.ty * along + base.tx * side * offset;
+      if (x < 35 || y < 35 || x > WORLD.width - 35 || y > WORLD.height - 35) continue;
+      const nearest = nearestRoadGeometryV069(x, y);
+      if (!nearest) continue;
+      const clearance = nearest.edgeClearance;
+      if (clearance - footprint >= 12 && clearance <= 110) {
+        best = {x,y,side,clearance,score:0};
+        break;
+      }
+    }
+  }
+
+  return best;
+}
+
 function buildVillageSceneryV069() {
   const villages = [];
   for (const h of ROAD_HAMLETS_V066) {
@@ -61,27 +118,19 @@ function buildVillageSceneryV069() {
     const count = 5 + Math.floor(randV069(state) * 3);
     const houses = [];
     for (let i = 0; i < count; i++) {
-      const side = i % 2 ? 1 : -1;
-      const along = (i - (count - 1) / 2) * (38 + randV069(state) * 12) + (randV069(state) - .5) * 22;
-      let offset = base.road.width / 2 + 34 + randV069(state) * 34;
-      let x = h.x + base.tx * along - base.ty * side * offset;
-      let y = h.y + base.ty * along + base.tx * side * offset;
-      let clearance = nearestRoadGeometryV069(x, y)?.edgeClearance ?? 999;
-      let attempts = 0;
-      while (clearance < 16 && attempts++ < 6) {
-        offset += 18;
-        x = h.x + base.tx * along - base.ty * side * offset;
-        y = h.y + base.ty * along + base.tx * side * offset;
-        clearance = nearestRoadGeometryV069(x, y)?.edgeClearance ?? 999;
-      }
+      const w = 20 + randV069(state) * 10;
+      const height = 14 + randV069(state) * 7;
+      const angleJitter = (randV069(state) - .5) * .16;
+      const candidate = roadsideHouseCandidateV069(h, base, i, state, w, height);
+      if (!candidate) continue;
       houses.push({
-        x,
-        y,
-        w:20 + randV069(state) * 10,
-        h:14 + randV069(state) * 7,
-        angle:Math.atan2(base.ty, base.tx) + (randV069(state) - .5) * .16,
-        side,
-        roadClearance:clearance
+        x:candidate.x,
+        y:candidate.y,
+        w,
+        h:height,
+        angle:Math.atan2(base.ty, base.tx) + angleJitter,
+        side:candidate.side,
+        roadClearance:candidate.clearance
       });
     }
     villages.push({
