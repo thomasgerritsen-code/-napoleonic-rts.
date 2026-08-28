@@ -11,11 +11,12 @@ const ROAD_SEEK_MIN_DISTANCE_V065 = 700;
 const ROAD_MAX_DETOUR_RATIO_V065 = 1.55;
 const ROAD_MAX_TIME_RATIO_V065 = 1.06;
 const ROAD_MIN_SHARE_V065 = 0.28;
+let planningGroupKindV065 = 'infantry';
 
 function groupTravelSpeedsV065(kind = 'infantry') {
-  return kind === 'cavalry'
-    ? { field: 64, road: 88 }
-    : { field: 36, road: 54 };
+  if (kind === 'cavalry') return { field: 64, road: 88 };
+  if (kind === 'artillery') return { field: 22, road: 28 };
+  return { field: 36, road: 54 };
 }
 
 // v0.6.4 already smooths toward this desired speed. v0.6.5 makes the road bonus
@@ -99,14 +100,16 @@ function attachPlanV065(points, meta) {
 
 const buildRegimentPathV064ForV065 = buildRegimentPathV06;
 buildRegimentPathV06 = function buildRegimentPathV065(start, goal) {
+  const kind = planningGroupKindV065;
   const direct = dedupePathV065(buildRegimentPathV064ForV065(start, goal));
   const directDistance = Math.hypot(goal.x - start.x, goal.y - start.y);
-  const directStats = pathStatsV065(start, direct);
+  const directStats = pathStatsV065(start, direct, kind);
 
   if (directDistance < ROAD_SEEK_MIN_DISTANCE_V065) {
     return attachPlanV065(direct, {
       choice: 'direct',
       reason: 'short-order',
+      kind,
       directTime: directStats.time,
       chosenTime: directStats.time,
       detourRatio: 1,
@@ -120,7 +123,7 @@ buildRegimentPathV06 = function buildRegimentPathV065(start, goal) {
   const alongRoad = buildRegimentPathV064ForV065(roadAtV064(start.x, start.y) ? start : entry, roadAtV064(goal.x, goal.y) ? goal : exit);
   const fromRoad = roadAtV064(goal.x, goal.y) ? [] : buildRegimentPathV064ForV065(exit, goal);
   const roadCandidate = dedupePathV065([...toRoad, ...alongRoad, ...fromRoad]);
-  const roadStats = pathStatsV065(start, roadCandidate);
+  const roadStats = pathStatsV065(start, roadCandidate, kind);
   const distanceBase = Math.max(1, directStats.distance);
   const detourRatio = roadStats.distance / distanceBase;
   const enoughRoad = roadStats.roadShare >= ROAD_MIN_SHARE_V065 && roadStats.roadDistance >= 360;
@@ -133,6 +136,7 @@ buildRegimentPathV06 = function buildRegimentPathV065(start, goal) {
   return attachPlanV065(chosen, {
     choice: chooseRoad ? 'road' : 'direct',
     reason: chooseRoad ? 'faster-road-route' : !reasonableDetour ? 'detour-too-large' : !enoughRoad ? 'too-little-road' : 'direct-faster',
+    kind,
     directTime: directStats.time,
     roadTime: roadStats.time,
     chosenTime: chosenStats.time,
@@ -144,7 +148,13 @@ buildRegimentPathV06 = function buildRegimentPathV065(start, goal) {
 
 const orderGroupPathV064ForV065 = orderGroupPathV06;
 orderGroupPathV06 = function orderGroupPathV065(reg, x, y, formation = reg.formation, finalFacing = null) {
-  orderGroupPathV064ForV065(reg, x, y, formation, finalFacing);
+  const previousKind = planningGroupKindV065;
+  planningGroupKindV065 = groupKindV06(reg);
+  try {
+    orderGroupPathV064ForV065(reg, x, y, formation, finalFacing);
+  } finally {
+    planningGroupKindV065 = previousKind;
+  }
   if (!reg || reg.destroyed) return;
   const plan = reg.path?.v065Plan || null;
   if (reg.marchV063?.v064) reg.marchV063.routePlanV065 = plan;
