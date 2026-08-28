@@ -4,66 +4,74 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="theme-color" content="#111713" />
-  <title>Napoleonic RTS v0.3.1</title>
+  <title>Napoleonic RTS v0.4</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="app">
-    <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
+<div id="app">
+  <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
 
-    <header class="hud topbar">
-      <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v0.3.1</span></div>
-      <div class="resources">
-        <span>🍞 <strong id="food">0</strong></span>
-        <span>🪵 <strong id="wood">0</strong></span>
-        <span>👥 <strong id="population">0/0</strong></span>
-      </div>
-      <div id="status">Bouw je leger op.</div>
-      <button id="resetBtn" type="button">Nieuwe slag</button>
-    </header>
+  <header class="hud topbar">
+    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v0.4</span></div>
+    <div class="resources">
+      <span>🇫🇷 🍞 <strong id="food">0</strong></span>
+      <span>🪵 <strong id="wood">0</strong></span>
+      <span>👥 <strong id="population">0/0</strong></span>
+    </div>
+    <div id="status">Vorm een regiment en bouw je leger op.</div>
+    <button id="resetBtn" type="button">Nieuwe slag</button>
+  </header>
 
-    <aside class="hud help">
-      <strong>Besturing</strong>
-      <span>Sleep: selecteren</span>
-      <span>Rechtsklik: lopen / verzamelen</span>
-      <span>Klik gebouw: productie</span>
-      <span>Formatieknop: direct herschikken</span>
-      <span>WASD / pijltjes: camera</span>
-      <span>Muiswiel: zoom</span>
-    </aside>
+  <aside class="hud help">
+    <strong>Besturing</strong>
+    <span>Sleep: selecteren</span>
+    <span>Klik regimentslid: heel regiment</span>
+    <span>Rechtsklik: lopen / verzamelen</span>
+    <span>Formatieknop: direct herschikken</span>
+    <span>WASD / pijltjes: camera</span>
+    <span>Muiswiel: zoom</span>
+  </aside>
 
-    <aside class="hud objective">
-      <strong>Doel</strong>
-      <span>Verzamel hout en voedsel.</span>
-      <span>Bouw een Barracks.</span>
-      <span>Train musketiers.</span>
-      <span>Breek de Britse morale.</span>
-    </aside>
+  <aside class="hud objective">
+    <strong>Britse ontwikkeling</strong>
+    <span id="aiEconomy">Economie: —</span>
+    <span id="aiBuildings">Gebouwen: —</span>
+    <span id="aiRegiments">Regimenten: —</span>
+    <span id="aiPlan">Plan: opbouwen</span>
+  </aside>
 
-    <section class="hud bottombar">
-      <div class="selection-panel">
-        <span class="label">Selectie</span>
-        <strong id="selectionTitle">Niets geselecteerd</strong>
-        <span id="selectionDetails">Selecteer troepen of een gebouw.</span>
-      </div>
+  <section class="hud bottombar">
+    <div class="selection-panel">
+      <span class="label">Selectie</span>
+      <strong id="selectionTitle">Niets geselecteerd</strong>
+      <span id="selectionDetails">Selecteer troepen of een gebouw.</span>
+    </div>
 
-      <div class="actions" id="actions">
-        <button type="button" data-action="build-barracks">Barracks<br><small>300 🪵</small></button>
-        <button type="button" data-action="build-house">House<br><small>120 🪵</small></button>
-        <button type="button" data-formation="line">Linie</button>
-        <button type="button" data-formation="column">Colonne</button>
-        <button type="button" data-formation="square">Carré</button>
-      </div>
+    <div class="actions" id="actions">
+      <button type="button" data-action="build-barracks">Barracks<br><small>300 🪵</small></button>
+      <button type="button" data-action="build-house">House<br><small>120 🪵</small></button>
+      <button type="button" data-formation="line">Linie</button>
+      <button type="button" data-formation="column">Colonne</button>
+      <button type="button" data-formation="square">Carré</button>
+    </div>
 
-      <div class="army-counts">
-        <span>🇫🇷 <strong id="frenchCount">0</strong></span>
-        <span>🇬🇧 <strong id="britishCount">0</strong></span>
-      </div>
-    </section>
+    <div class="army-counts">
+      <span>🇫🇷 <strong id="frenchCount">0</strong></span>
+      <span>🇬🇧 <strong id="britishCount">0</strong></span>
+      <span>🎖️ <strong id="frenchRegiments">0</strong></span>
+    </div>
+  </section>
 
-    <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div>
-    <div id="message" class="message hidden"></div>
-  </div>
-  <script src="game.js"></script>
+  <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div>
+  <div id="message" class="message hidden"></div>
+</div>
+<script src="src/core.js"></script>
+<script src="src/economy.js"></script>
+<script src="src/regiments.js"></script>
+<script src="src/combat-ai.js"></script>
+<script src="src/hud.js"></script>
+<script src="src/selection.js"></script>
+<script src="src/simulation-render.js"></script>
+<script src="src/input.js"></script>
 </body>
 </html>
