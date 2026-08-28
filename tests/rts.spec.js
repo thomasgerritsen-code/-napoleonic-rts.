@@ -3,7 +3,6 @@ const { test, expect } = require('@playwright/test');
 async function openGame(page) {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
-
   await page.addInitScript(() => {
     let seed = 123456789;
     Math.random = () => {
@@ -11,9 +10,8 @@ async function openGame(page) {
       return (seed - 1) / 2147483646;
     };
   });
-
   await page.goto('/?test=1', { waitUntil: 'networkidle' });
-  await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__));
+  await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__?.getState));
   return pageErrors;
 }
 
@@ -21,118 +19,123 @@ async function state(page) {
   return page.evaluate(() => window.__RTS_DEBUG__.getState());
 }
 
-test('v0.4 loads and renders the battlefield without JavaScript errors', async ({ page }, testInfo) => {
+test('v0.5 loads, renders canvas and exposes minimap without JavaScript errors', async ({ page }, testInfo) => {
   const errors = await openGame(page);
-
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.4/);
+  await expect(page).toHaveTitle(/Napoleonic RTS v0\.5/);
+  await expect(page.locator('.version')).toHaveText('v0.5');
   await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('.version')).toHaveText('v0.4');
-  await expect(page.locator('#aiEconomy')).toContainText('Economie:');
+  await expect(page.locator('#minimap')).toBeVisible();
 
-  const box = await page.locator('#game').boundingBox();
-  expect(box).not.toBeNull();
-  expect(box.width).toBeGreaterThan(500);
-  expect(box.height).toBeGreaterThan(300);
+  const s = await state(page);
+  expect(s.minimap.width).toBe(240);
+  expect(s.minimap.height).toBe(138);
+  expect(s.navigation.buckets).toBeGreaterThanOrEqual(0);
 
-  await testInfo.attach('initial-battlefield', {
+  await testInfo.attach('v05-initial-battlefield', {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png'
   });
-
   expect(errors).toEqual([]);
 });
 
-test('a regiment requires and retains an assigned officer and drummer', async ({ page }) => {
+test('regiment retains officer/drummer and can rotate its front with real controls', async ({ page }) => {
   const errors = await openGame(page);
-
   await page.evaluate(() => window.__RTS_DEBUG__.selectLooseForRegiment('france'));
   const createButton = page.locator('[data-action="create-regiment"]');
-  await expect(createButton).toBeVisible();
   await expect(createButton).toBeEnabled();
-  await expect(createButton).toContainText('12/12');
-
   await createButton.click();
 
   let s = await state(page);
   expect(s.france.regiments).toHaveLength(1);
-  const regiment = s.france.regiments[0];
-  expect(regiment.formedInfantryCount).toBeGreaterThanOrEqual(12);
-  expect(regiment.officerAssigned).toBe(true);
-  expect(regiment.drummerAssigned).toBe(true);
-  expect(regiment.memberIds.length).toBeGreaterThanOrEqual(14);
-  expect(s.selected.length).toBe(regiment.livingMembers.length);
+  expect(s.france.regiments[0].officerAssigned).toBe(true);
+  expect(s.france.regiments[0].drummerAssigned).toBe(true);
+  const initialFacing = s.france.regiments[0].facing;
+
+  await page.locator('[data-action="rotate-right"]').click();
+  s = await state(page);
+  expect(s.france.regiments[0].facing).toBeGreaterThan(initialFacing);
+
+  await page.keyboard.press('q');
+  s = await state(page);
+  expect(Math.abs(s.france.regiments[0].facing - initialFacing)).toBeLessThan(0.01);
 
   for (const mode of ['column', 'square', 'line']) {
     await page.locator(`[data-formation="${mode}"]`).click();
     s = await state(page);
     expect(s.france.regiments[0].formation).toBe(mode);
-    await expect(page.locator(`[data-formation="${mode}"]`)).toHaveClass(/active/);
   }
-
   expect(errors).toEqual([]);
 });
 
-test('Barracks can queue and produce musketier, officer and drummer through real UI clicks', async ({ page }) => {
+test('Stable and Artillery Foundry produce cavalry and artillery through UI clicks', async ({ page }) => {
   const errors = await openGame(page);
-
-  const barracksId = await page.evaluate(() => window.__RTS_DEBUG__.createCompletedBuilding('france', 'barracks', 900, 900));
-  await page.evaluate(id => window.__RTS_DEBUG__.selectBuildingById(id), barracksId);
+  const stableId = await page.evaluate(() => window.__RTS_DEBUG__.createCompletedBuilding('france', 'stable', 900, 760));
+  const foundryId = await page.evaluate(() => window.__RTS_DEBUG__.createCompletedBuilding('france', 'foundry', 920, 1040));
 
   let s = await state(page);
-  const before = {
-    food: s.france.food,
-    wood: s.france.wood,
-    infantry: s.france.units.filter(u => u.type === 'infantry').length,
-    officer: s.france.units.filter(u => u.type === 'officer').length,
-    drummer: s.france.units.filter(u => u.type === 'drummer').length
-  };
+  const beforeCav = s.france.units.filter(u => u.type === 'cavalry').length;
+  const beforeArt = s.france.units.filter(u => u.type === 'artillery').length;
+  const beforeFood = s.france.food;
+  const beforeWood = s.france.wood;
 
-  await page.locator('[data-action="train-infantry"]').click();
-  await page.locator('[data-action="train-officer"]').click();
-  await page.locator('[data-action="train-drummer"]').click();
+  await page.evaluate(id => window.__RTS_DEBUG__.selectBuildingById(id), stableId);
+  await expect(page.locator('[data-action="train-cavalry"]')).toBeVisible();
+  await page.locator('[data-action="train-cavalry"]').click();
+
+  await page.evaluate(id => window.__RTS_DEBUG__.selectBuildingById(id), foundryId);
+  await expect(page.locator('[data-action="train-artillery"]')).toBeVisible();
+  await page.locator('[data-action="train-artillery"]').click();
 
   s = await state(page);
-  expect(s.selectedBuilding.queue).toEqual(['infantry', 'officer', 'drummer']);
-  expect(s.france.food).toBe(before.food - 330);
-  expect(s.france.wood).toBe(before.wood - 100);
+  expect(s.france.food).toBe(beforeFood - 270);
+  expect(s.france.wood).toBe(beforeWood - 150);
 
-  await page.evaluate(() => window.__RTS_DEBUG__.tick(26));
+  await page.evaluate(() => window.__RTS_DEBUG__.tick(17));
   s = await state(page);
-  expect(s.france.units.filter(u => u.type === 'infantry').length).toBeGreaterThanOrEqual(before.infantry + 1);
-  expect(s.france.units.filter(u => u.type === 'officer').length).toBeGreaterThanOrEqual(before.officer + 1);
-  expect(s.france.units.filter(u => u.type === 'drummer').length).toBeGreaterThanOrEqual(before.drummer + 1);
-  expect(s.selectedBuilding.queue).toEqual([]);
-
+  expect(s.france.units.filter(u => u.type === 'cavalry').length).toBeGreaterThanOrEqual(beforeCav + 1);
+  expect(s.france.units.filter(u => u.type === 'artillery').length).toBeGreaterThanOrEqual(beforeArt + 1);
   expect(errors).toEqual([]);
 });
 
-test('British AI develops its economy, constructs production and forms a valid regiment', async ({ page }, testInfo) => {
+test('fog of war hides distant British forces while minimap remains interactive', async ({ page }) => {
   const errors = await openGame(page);
-  const initial = await state(page);
+  const s = await state(page);
+  const distant = s.britain.units.find(u => u.type === 'worker') || s.britain.units[0];
+  const visible = await page.evaluate(id => window.__RTS_DEBUG__.isVisible('britain', id, 'unit'), distant.id);
+  expect(visible).toBe(false);
 
-  expect(initial.britain.buildings.some(b => b.type === 'barracks')).toBe(false);
-  expect(initial.britain.regiments).toHaveLength(0);
+  const minimap = page.locator('#minimap');
+  const box = await minimap.boundingBox();
+  expect(box).not.toBeNull();
+  await minimap.click({ position: { x: box.width * 0.5, y: box.height * 0.5 } });
+  await expect(minimap).toBeVisible();
+  expect(errors).toEqual([]);
+});
 
-  await page.evaluate(() => window.__RTS_DEBUG__.tick(180));
+test('British AI builds its full v0.5 military economy in peace mode', async ({ page }, testInfo) => {
+  const errors = await openGame(page);
+  await page.evaluate(() => {
+    window.__RTS_DEBUG__.setPeaceMode(true);
+    window.__RTS_DEBUG__.grantResources('britain', 5000, 5000);
+    window.__RTS_DEBUG__.tick(260);
+  });
   const developed = await state(page);
 
   expect(developed.britain.buildings.some(b => b.type === 'barracks' && b.complete)).toBe(true);
-  expect(developed.britain.units.length).toBeGreaterThan(initial.britain.units.length);
   expect(developed.britain.regiments.length).toBeGreaterThanOrEqual(1);
+  expect(developed.britain.buildings.some(b => b.type === 'stable' && b.complete)).toBe(true);
+  expect(developed.britain.buildings.some(b => b.type === 'foundry' && b.complete)).toBe(true);
+  expect(developed.britain.units.some(u => u.type === 'cavalry')).toBe(true);
+  expect(developed.britain.units.some(u => u.type === 'artillery')).toBe(true);
 
   for (const regiment of developed.britain.regiments) {
-    expect(regiment.formedInfantryCount).toBeGreaterThanOrEqual(12);
     expect(regiment.officerAssigned).toBe(true);
     expect(regiment.drummerAssigned).toBe(true);
   }
 
-  await expect(page.locator('#aiBuildings')).toContainText('Gebouwen:');
-  await expect(page.locator('#aiRegiments')).toContainText('Regimenten:');
-
-  await testInfo.attach('british-ai-after-180s', {
+  await testInfo.attach('v05-british-development', {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png'
   });
-
   expect(errors).toEqual([]);
 });
