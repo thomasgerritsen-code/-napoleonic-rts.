@@ -5,16 +5,18 @@ async function openGame(page) {
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.addInitScript(() => { let seed = 123456789; Math.random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; });
   await page.goto('/?test=1', { waitUntil: 'networkidle' });
-  await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__?.getState));
+  await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__?.getState && window.__RTS_DEBUG__?.audit && window.RTS_SIM));
   return pageErrors;
 }
 const state = page => page.evaluate(() => window.__RTS_DEBUG__.getState());
 
-test('v0.6.1 loads with enlarged map, minimap and no JavaScript errors', async ({ page }, testInfo) => {
+test('v0.6.2 loads with simulation facade, minimap and no JavaScript errors', async ({ page }, testInfo) => {
   const errors = await openGame(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.1/); await expect(page.locator('.version')).toHaveText('v0.6.1'); await expect(page.locator('#minimap')).toBeVisible();
+  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.2/); await expect(page.locator('.version')).toHaveText('v0.6.2'); await expect(page.locator('#minimap')).toBeVisible();
   const s = await state(page); expect(s.world.width).toBe(3800); expect(s.world.height).toBe(2200); expect(s.exploredCells).toBeGreaterThan(0); expect(['aggressive','balanced','defensive']).toContain(s.aiStrategy);
-  await testInfo.attach('v061-initial', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' }); expect(errors).toEqual([]);
+  const facade = await page.evaluate(() => ({version:window.RTS_SIM.version,hasSnapshot:typeof window.RTS_SIM.snapshot==='function',hasDispatch:typeof window.RTS_SIM.dispatch==='function',hasAudit:typeof window.RTS_SIM.audit==='function'}));
+  expect(facade).toEqual({version:'0.6.2',hasSnapshot:true,hasDispatch:true,hasAudit:true});
+  await testInfo.attach('v062-initial', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' }); expect(errors).toEqual([]);
 });
 
 test('rally point and visible queue distribute completed troops instead of stacking them', async ({ page }) => {
@@ -48,22 +50,11 @@ test('gun crew stays rigidly attached and visibly moves as one battery', async (
   const errors = await openGame(page); await page.evaluate(() => window.__RTS_DEBUG__.selectForBattery('france'));
   await page.locator('[data-action="create-battery"]').click();
   let s = await state(page); const battery = s.france.batteries[0]; expect(battery).toBeTruthy();
-
-  await page.evaluate(() => window.__RTS_DEBUG__.orderSelectedWithFacing(1450,1180,0));
-  await page.evaluate(() => window.__RTS_DEBUG__.tick(1));
-  const first = await page.evaluate(id => window.__RTS_DEBUG__.batteryCohesion(id), battery.id);
-  await page.evaluate(() => window.__RTS_DEBUG__.tick(1));
-  const second = await page.evaluate(id => window.__RTS_DEBUG__.batteryCohesion(id), battery.id);
-
+  await page.evaluate(() => window.__RTS_DEBUG__.orderSelectedWithFacing(1450,1180,0)); await page.evaluate(() => window.__RTS_DEBUG__.tick(1));
+  const first = await page.evaluate(id => window.__RTS_DEBUG__.batteryCohesion(id), battery.id); await page.evaluate(() => window.__RTS_DEBUG__.tick(1)); const second = await page.evaluate(id => window.__RTS_DEBUG__.batteryCohesion(id), battery.id);
   expect(first).not.toBeNull(); expect(second).not.toBeNull(); expect(first.moving).toBe(true); expect(second.moving).toBe(true);
-  for (const pose of [first, second]) {
-    expect(pose.crew).toHaveLength(2);
-    pose.crew.forEach(member => { expect(Math.abs(member.local.x + 28)).toBeLessThan(0.75); expect(Math.abs(Math.abs(member.local.y) - 14)).toBeLessThan(0.75); });
-    expect(Math.abs(pose.crewSpread - 28)).toBeLessThan(1);
-  }
-  expect(Math.hypot(second.cannon.x-first.cannon.x,second.cannon.y-first.cannon.y)).toBeGreaterThan(5);
-  await testInfo.attach('v061-moving-battery', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' });
-  expect(errors).toEqual([]);
+  for (const pose of [first, second]) { expect(pose.crew).toHaveLength(2); pose.crew.forEach(member => { expect(Math.abs(member.local.x + 28)).toBeLessThan(0.75); expect(Math.abs(Math.abs(member.local.y) - 14)).toBeLessThan(0.75); }); expect(Math.abs(pose.crewSpread - 28)).toBeLessThan(1); }
+  expect(Math.hypot(second.cannon.x-first.cannon.x,second.cannon.y-first.cannon.y)).toBeGreaterThan(5); await testInfo.attach('v062-moving-battery', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
 });
 
 test('worker automatically continues with a nearby resource of the same type', async ({ page }) => {
@@ -86,5 +77,27 @@ test('explored terrain remains remembered and terrain types are active', async (
 test('British AI develops infantry, cavalry and crewed artillery groups', async ({ page }, testInfo) => {
   const errors = await openGame(page); await page.evaluate(() => { window.__RTS_DEBUG__.setPeaceMode(true); window.__RTS_DEBUG__.grantResources('britain',9000,9000); window.__RTS_DEBUG__.tick(360); }); const s = await state(page);
   expect(s.britain.buildings.some(b=>b.type==='barracks'&&b.complete)).toBe(true); expect(s.britain.buildings.some(b=>b.type==='stable'&&b.complete)).toBe(true); expect(s.britain.buildings.some(b=>b.type==='foundry'&&b.complete)).toBe(true); expect(s.britain.regiments.some(r=>r.kind==='infantry')).toBe(true); expect(s.britain.regiments.some(r=>r.kind==='cavalry')).toBe(true); expect(s.britain.batteries.length).toBeGreaterThanOrEqual(1); s.britain.batteries.forEach(b=>expect(b.operational).toBe(true)); expect(s.britain.units.filter(u=>u.type==='artillery').length).toBeGreaterThan(1);
-  await testInfo.attach('v061-british-development', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
+  await testInfo.attach('v062-british-development', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
+});
+
+test('F3 test lab exposes diagnostics, scenarios and copyable bug report', async ({ page }) => {
+  const errors = await openGame(page); await page.keyboard.press('F3'); await expect(page.locator('#debugPanel')).toBeVisible();
+  await expect(page.locator('#debugScenario')).toBeVisible(); await page.selectOption('#debugScenario','artillery-3'); await page.locator('[data-debug-action="run"]').click();
+  const snap = await page.evaluate(() => window.__RTS_DEBUG__.simulationSnapshot()); expect(snap.version).toBe('0.6.2'); expect(snap.groups.filter(g=>g.kind==='artillery'&&!g.destroyed)).toHaveLength(3);
+  const report = await page.evaluate(() => JSON.parse(window.__RTS_DEBUG__.createBugReport())); expect(report.version).toBe('0.6.2'); expect(report.scenario).toBe('artillery-3'); expect(report.metrics).toBeTruthy(); expect(report.audit).toBeTruthy(); expect(errors).toEqual([]);
+});
+
+test('520-unit stress scenario uses spatial combat index and remains structurally valid', async ({ page }, testInfo) => {
+  const errors = await openGame(page); await page.evaluate(() => window.__RTS_DEBUG__.runScenario('performance-520')); await page.evaluate(() => window.RTS_SIM.step(20));
+  const snap = await page.evaluate(() => window.RTS_SIM.snapshot()); const metrics = await page.evaluate(() => window.RTS_SIM.getMetrics());
+  expect(snap.units.length).toBeGreaterThanOrEqual(520); expect(snap.audit.ok).toBe(true); expect(metrics.combatQueries).toBeGreaterThan(0); expect(Number.isFinite(metrics.updateMs)).toBe(true); expect(metrics.combatBuckets).toBeGreaterThan(2); expect(metrics.avgCombatCandidates).toBeLessThan(40);
+  await testInfo.attach('v062-520-units', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
+});
+
+test('10-minute accelerated soak has no corrupt state, ghost groups or broken production', async ({ page }) => {
+  test.setTimeout(60000);
+  const errors = await openGame(page); await page.evaluate(() => { window.__RTS_DEBUG__.setPeaceMode(true); window.__RTS_DEBUG__.grantResources('britain',15000,15000); window.__RTS_DEBUG__.grantResources('france',8000,8000); window.RTS_SIM.step(600); });
+  const audit = await page.evaluate(() => window.RTS_SIM.audit()); const snap = await page.evaluate(() => window.RTS_SIM.snapshot());
+  expect(audit.ok, audit.errors.join('\n')).toBe(true); expect(audit.errors).toEqual([]); expect(audit.metrics.stalledGroups).toBe(0); expect(snap.buildings.every(b=>Number.isFinite(b.production)&&b.production>=0&&b.production<=1.01)).toBe(true);
+  expect(snap.groups.filter(g=>!g.destroyed).every(g=>g.members.length>0)).toBe(true); expect(snap.groups.filter(g=>!g.destroyed&&g.kind==='artillery').every(g=>g.members.filter(m=>m.type==='infantry').length===2)).toBe(true); expect(snap.buildings.some(b=>b.side==='britain'&&b.type==='barracks'&&b.complete)).toBe(true); expect(errors).toEqual([]);
 });
