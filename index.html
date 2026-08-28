@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta name="theme-color" content="#111713" />
+  <title>Napoleonic RTS v0.1</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
+
+    <header class="hud topbar">
+      <div>
+        <strong>NAPOLEONIC RTS</strong>
+        <span class="version">v0.1</span>
+      </div>
+      <div id="status">Selecteer Franse troepen</div>
+      <button id="resetBtn" type="button">Nieuwe slag</button>
+    </header>
+
+    <aside class="hud help">
+      <strong>Besturing</strong>
+      <span>Sleep: selecteren</span>
+      <span>Rechtsklik: verplaatsen</span>
+      <span>WASD / pijltjes: camera</span>
+      <span>Muiswiel: zoom</span>
+      <span>Mobiel: tik unit → tik terrein</span>
+    </aside>
+
+    <section class="hud bottombar">
+      <div class="selection">
+        <span>Geselecteerd</span>
+        <strong id="selectedCount">0</strong>
+      </div>
+      <div class="formation-buttons">
+        <button type="button" data-formation="line">Linie</button>
+        <button type="button" data-formation="column">Colonne</button>
+        <button type="button" data-formation="square">Carré</button>
+      </div>
+      <div class="army-counts">
+        <span>🇫🇷 <strong id="frenchCount">0</strong></span>
+        <span>🇬🇧 <strong id="britishCount">0</strong></span>
+      </div>
+    </section>
+
+    <div id="message" class="message hidden"></div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
