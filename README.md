@@ -1,6 +1,6 @@
-# Napoleonic RTS — v0.3.1
+# Napoleonic RTS — v0.4
 
-Browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait volledig in HTML5 Canvas + JavaScript.
+Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait volledig in HTML5 Canvas + JavaScript en heeft geen externe dependencies.
 
 ## ▶ Speel nu
 
@@ -8,51 +8,97 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Bugfix v0.3.1
+## Wat is nieuw in v0.4
 
-Deze versie repareert twee belangrijke gameplayproblemen uit v0.3:
+### Echte regimenten
+- Een infanterieregiment vereist minimaal **12 vrije musketiers + 1 vrije officier + 1 vrije drummer**
+- De officier en drummer worden bij het vormen permanent aan het regiment toegewezen
+- Klikken op één lid van een regiment selecteert het volledige regiment
+- Sleepselectie die een regiment raakt selecteert eveneens het hele regiment
+- Regimenten bewaren hun eigen formatie en bewegen als groep
+- Linie, Colonne en Carré worden direct op het regiment toegepast
+- Regimenten kunnen maximaal 36 musketiers bevatten
 
-- Barracks-productieknoppen blijven nu stabiel bestaan en worden niet meer ieder frame vervangen.
-- Startende population cap verhoogd van 20 naar 40; de startpopulatie is 30/40, waardoor je direct nieuwe musketiers kunt trainen.
-- House verhoogt de population cap met 15.
-- Formatieknoppen hebben nu een duidelijke actieve status.
-- Linie, colonne en carré worden direct op de geselecteerde eenheden toegepast, in plaats van pas merkbaar te worden bij een later bevel.
-- De Barracks toont na voltooiing expliciet dat je erop kunt klikken om productie te starten.
+### Officier en drummer
+- Nieuwe trainbare eenheden in de Barracks
+- Officier kost 160 voedsel + 60 hout
+- Drummer kost 90 voedsel + 20 hout
+- Een regiment kan niet worden gevormd zonder beide rollen
+- Verlies van de officier veroorzaakt een grote morale-schok
+- Verlies van de drummer vermindert de morale-ondersteuning
 
-## Getest
+### Britse ontwikkel-AI
+De Britse tegenstander speelt nu niet meer met alleen een vooraf geplaatst leger:
+- Britse boeren verzamelen zelfstandig voedsel en hout
+- De AI traint extra boeren
+- De AI bouwt zelfstandig een Barracks
+- De AI bouwt Houses wanneer de population cap krap wordt
+- Later kan de AI een tweede Barracks bouwen
+- De AI produceert musketiers, officieren en drummers
+- De AI vormt alleen regimenten wanneer een officier én drummer beschikbaar zijn
+- De AI kan meerdere regimenten opbouwen
+- Het eerste regiment verdedigt de basis tijdens de opbouwfase
+- Daarna trekken Britse regimenten in formaties naar de Franse positie
+- De Britse ontwikkelstatus is rechtsboven zichtbaar
 
-De volgende flow is geautomatiseerd getest:
+### Bestaande systemen
+- Hout- en voedseleconomie
+- Boeren en gebouwen
+- Barracks en Houses
+- Population cap
+- Morale en vluchtgedrag
+- Musketvuur en salvo-cyclus
+- Bajonetaanval
+- Cavaleriecharge
+- Artillerie met ronde kogel en grapeshot
 
-1. Barracks selecteren.
-2. Musketierknop blijft bestaan tijdens meerdere game-updates tussen `mousedown` en `click`.
-3. Musketier in de productiequeue plaatsen.
-4. Kosten van 80 voedsel en 20 hout worden afgeschreven.
-5. Na de productietijd verschijnt daadwerkelijk een extra Franse musketier.
-6. Colonne selecteren: status, actieve knop en formatieposities veranderen direct.
-7. Carré selecteren: status en actieve knop veranderen correct.
+## Regiment vormen
 
-## Gameplay
+1. Selecteer minstens 12 losse musketiers.
+2. Voeg 1 losse officier toe.
+3. Voeg 1 losse drummer toe.
+4. Klik **Maak regiment**.
+5. Kies Linie, Colonne of Carré.
 
-- Town Center en Barracks
-- boeren, hout en voedsel
-- gebouwen bouwen
-- musketiers produceren
-- population cap en Houses
-- linie, colonne en carré
-- musket-salvo's en herladen
-- morale en vluchtgedrag
-- bajonetaanval
-- cavaleriecharge
-- ronde kogel en grapeshot voor artillerie
-- Britse AI
+De startpositie bevat precies genoeg infanterie, een officier en een drummer om het systeem direct te proberen.
 
-## Besturing
+## Productie
 
-- Linkermuisknop slepen: eenheden selecteren
-- Klik op eigen gebouw: gebouw selecteren
-- Rechtermuisknop: bewegen of grondstof verzamelen
-- Barracks/House: selecteer boeren, kies gebouw en klik op de kaart
-- Formatieknoppen: geselecteerde groep direct herschikken
-- WASD / pijltjestoetsen: camera
-- Muiswiel: zoom
-- Esc: bouwen annuleren
+**Town Center**
+- Boer: 50 voedsel
+
+**Barracks**
+- Musketier: 80 voedsel + 20 hout
+- Officier: 160 voedsel + 60 hout
+- Drummer: 90 voedsel + 20 hout
+
+## Testresultaten v0.4
+
+Voor publicatie zijn alle bronmodules door een JavaScript-syntaxcontrole gehaald en is een geautomatiseerde DOM/integratietest uitgevoerd op dezelfde v0.4-code.
+
+Getest:
+- regimentknop blijft stabiel tijdens game-updates
+- Frans regiment kan alleen geldig worden gevormd
+- officier en drummer worden structureel toegewezen
+- Linie, Colonne en Carré
+- Barracks-productie van musketier, officier en drummer
+- grondstofkosten en productiequeue
+- Britse AI bouwt zelfstandig een complete Barracks
+- Britse AI traint nieuwe eenheden
+- Britse AI vormt zelfstandig regimenten
+- elk AI-regiment heeft bij vorming een officier en drummer
+- Britse basis groeit gedurende een 150 seconden versnelde simulatie
+
+De integratietest eindigde met `FINAL PASS`.
+
+Een echte headless-Chromium-run kon in de ontwikkelcontainer niet betrouwbaar starten door de GPU/DBus-omgeving; daarom is daarvoor niet ten onrechte een browser-pass geclaimd.
+
+## Roadmap v0.5
+
+- Regimentsrotatie en richting/front
+- Betere collision en pathfinding tussen regimenten
+- Minimap en fog of war
+- Stable en cavalerieproductie
+- Artillery Foundry en artillerieproductie
+- Meerdere nationale AI-strategieën
+- Meer terreinsoorten en kaartobjecten
