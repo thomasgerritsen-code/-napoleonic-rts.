@@ -83,7 +83,8 @@
   document.getElementById('resetBtn').addEventListener('click', resetGame);
 
   // ---------- Test/debug hooks ----------
-  if (new URLSearchParams(location.search).has('test')) {
+  const TEST_MANUAL_SIMULATION = new URLSearchParams(location.search).has('test');
+  if (TEST_MANUAL_SIMULATION) {
     window.__RTS_DEBUG__ = {
       getState() {
         const serializeReg = r => ({
@@ -153,10 +154,15 @@
   }
 
   // ---------- Loop ----------
+  // Regression pages advance the simulation explicitly via tick()/RTS_SIM.step().
+  // Keep requestAnimationFrame rendering alive for screenshots/UI assertions, but
+  // never let wall-clock frames add hidden simulation time on top of those steps.
   function frame(now) {
     const dt = Math.min(0.033, (now - lastTime) / 1000);
     lastTime = now;
-    update(dt); draw(); requestAnimationFrame(frame);
+    if (!TEST_MANUAL_SIMULATION) update(dt);
+    draw();
+    requestAnimationFrame(frame);
   }
 
   resetGame();
