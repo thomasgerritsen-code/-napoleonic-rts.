@@ -70,7 +70,10 @@ test('a battalion crossing the river uses a legal crossing and never cuts throug
   }
   expect(samples.every(s => s.anchorWater === false)).toBe(true);
   expect(samples.some(s => s.anchorCrossing === 'Pont de la Chaussée')).toBe(true);
-  expect(samples[samples.length-1].anchor.x).toBeGreaterThan(1550);
+  expect(samples.some(s => (s.anchor?.x ?? s.centroid?.x ?? 0) > 1600)).toBe(true);
+  const final = samples[samples.length-1];
+  expect(final.phase).toBe('formed');
+  expect(final.centroid.x).toBeGreaterThan(1600);
   await testInfo.attach('v067-bridge-march', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
