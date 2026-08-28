@@ -10,13 +10,13 @@ async function openGame(page) {
 }
 const state = page => page.evaluate(() => window.__RTS_DEBUG__.getState());
 
-test('v0.6.3 loads with simulation facade, minimap and no JavaScript errors', async ({ page }, testInfo) => {
+test('v0.6.4 loads with simulation facade, minimap and no JavaScript errors', async ({ page }, testInfo) => {
   const errors = await openGame(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.3/); await expect(page.locator('.version')).toHaveText('v0.6.3'); await expect(page.locator('#minimap')).toBeVisible();
+  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.4/); await expect(page.locator('.version')).toHaveText('v0.6.4'); await expect(page.locator('#minimap')).toBeVisible();
   const s = await state(page); expect(s.world.width).toBe(3800); expect(s.world.height).toBe(2200); expect(s.exploredCells).toBeGreaterThan(0); expect(['aggressive','balanced','defensive']).toContain(s.aiStrategy);
   const facade = await page.evaluate(() => ({version:window.RTS_SIM.version,hasSnapshot:typeof window.RTS_SIM.snapshot==='function',hasDispatch:typeof window.RTS_SIM.dispatch==='function',hasAudit:typeof window.RTS_SIM.audit==='function'}));
-  expect(facade).toEqual({version:'0.6.3',hasSnapshot:true,hasDispatch:true,hasAudit:true});
-  await testInfo.attach('v063-initial', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' }); expect(errors).toEqual([]);
+  expect(facade).toEqual({version:'0.6.4',hasSnapshot:true,hasDispatch:true,hasAudit:true});
+  await testInfo.attach('v064-initial', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' }); expect(errors).toEqual([]);
 });
 
 test('rally point and visible queue distribute completed troops instead of stacking them', async ({ page }) => {
@@ -54,7 +54,7 @@ test('gun crew stays rigidly attached and visibly moves as one battery', async (
   const first = await page.evaluate(id => window.__RTS_DEBUG__.batteryCohesion(id), battery.id); await page.evaluate(() => window.__RTS_DEBUG__.tick(1)); const second = await page.evaluate(id => window.__RTS_DEBUG__.batteryCohesion(id), battery.id);
   expect(first).not.toBeNull(); expect(second).not.toBeNull(); expect(first.moving).toBe(true); expect(second.moving).toBe(true);
   for (const pose of [first, second]) { expect(pose.crew).toHaveLength(2); pose.crew.forEach(member => { expect(Math.abs(member.local.x + 28)).toBeLessThan(0.75); expect(Math.abs(Math.abs(member.local.y) - 14)).toBeLessThan(0.75); }); expect(Math.abs(pose.crewSpread - 28)).toBeLessThan(1); }
-  expect(Math.hypot(second.cannon.x-first.cannon.x,second.cannon.y-first.cannon.y)).toBeGreaterThan(5); await testInfo.attach('v063-moving-battery', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
+  expect(Math.hypot(second.cannon.x-first.cannon.x,second.cannon.y-first.cannon.y)).toBeGreaterThan(5); await testInfo.attach('v064-moving-battery', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
 });
 
 test('worker automatically continues with a nearby resource of the same type', async ({ page }) => {
@@ -63,19 +63,45 @@ test('worker automatically continues with a nearby resource of the same type', a
   expect(worker.preferredResourceType).toBe('wood'); expect(worker.resourceTargetId).not.toBe(assignment.resourceId); expect(worker.resourceTargetId).not.toBeNull(); expect(errors).toEqual([]);
 });
 
-test('right-drag orders a battalion through march-column, movement and final deployment facing', async ({ page }, testInfo) => {
+test('right-drag on open ground moves in field formation and preserves final facing', async ({ page }, testInfo) => {
   const errors = await openGame(page); await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
   const id = await page.evaluate(() => window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1200,1050)); await page.evaluate(id => window.__RTS_DEBUG__.selectRegiment(id), id);
   const start = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1450,1050));
   const end = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1450,1170));
   await page.mouse.move(start.x,start.y); await page.mouse.down({button:'right'}); await page.mouse.move(end.x,end.y,{steps:8}); await page.mouse.up({button:'right'});
   let fs = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id);
-  expect(fs.pathLength).toBeGreaterThan(0); expect(fs.finalFacing).not.toBeNull(); expect(Math.abs(fs.finalFacing-Math.PI/2)).toBeLessThan(.08); expect(['forming-column','marching-column']).toContain(fs.phase);
-  await page.evaluate(() => window.RTS_SIM.step(4)); fs = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id); expect(['marching-column','deploying','formed']).toContain(fs.phase);
+  expect(fs.pathLength).toBeGreaterThan(0); expect(fs.finalFacing).not.toBeNull(); expect(Math.abs(fs.finalFacing-Math.PI/2)).toBeLessThan(.08);
+  expect(fs.phase).toBe('field-moving'); expect(fs.locomotion).toBe('field-formation'); expect(fs.roadMarch).toBe(false); expect(fs.marchingMembers).toBe(0); expect(fs.anchorTerrain).not.toBe('road');
+  await page.evaluate(() => window.RTS_SIM.step(4)); fs = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id); expect(['field-moving','deploying','formed']).toContain(fs.phase);
   await page.evaluate(() => window.RTS_SIM.step(24)); fs = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id);
   expect(fs.phase).toBe('formed'); expect(Math.abs(fs.facing-Math.PI/2)).toBeLessThan(.12); expect(fs.readiness).toBeGreaterThan(.7);
   const xs=fs.members.map(m=>m.x), ys=fs.members.map(m=>m.y), xSpread=Math.max(...xs)-Math.min(...xs), ySpread=Math.max(...ys)-Math.min(...ys); expect(xSpread).toBeGreaterThan(ySpread*1.25);
-  await testInfo.attach('v063-final-deployment', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
+  await testInfo.attach('v064-field-deployment', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
+});
+
+test('battalion marches only on the road and road movement is smooth', async ({ page }, testInfo) => {
+  const errors = await openGame(page); await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
+  const id = await page.evaluate(() => window.__RTS_DEBUG__.createFreshInfantryRegiment('france',650,900)); await page.evaluate(id => window.__RTS_DEBUG__.selectRegiment(id), id);
+  await page.evaluate(() => window.__RTS_DEBUG__.orderSelectedWithFacing(1350,900,0));
+  let fs = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id);
+  expect(fs.anchorTerrain).toBe('road'); expect(fs.roadMarch).toBe(true); expect(fs.locomotion).toBe('road-march'); expect(['road-forming','road-marching']).toContain(fs.phase); expect(fs.marchingMembers).toBe(fs.members.length);
+
+  await page.evaluate(() => window.RTS_SIM.step(1.6));
+  const samples = [];
+  for (let i=0;i<12;i++) {
+    await page.evaluate(() => window.RTS_SIM.step(.2));
+    samples.push(await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id));
+  }
+  samples.forEach(s => { expect(s.anchorTerrain).toBe('road'); expect(s.roadMarch).toBe(true); expect(s.motionSpeed).toBeGreaterThan(20); });
+  const increments = [];
+  for (let i=1;i<samples.length;i++) increments.push(Math.hypot(samples[i].anchor.x-samples[i-1].anchor.x,samples[i].anchor.y-samples[i-1].anchor.y));
+  const mean = increments.reduce((a,b)=>a+b,0)/increments.length;
+  const variance = increments.reduce((a,b)=>a+(b-mean)*(b-mean),0)/increments.length;
+  expect(mean).toBeGreaterThan(4); expect(Math.sqrt(variance)/mean).toBeLessThan(.22); expect(Math.min(...increments)).toBeGreaterThan(2.5);
+
+  await page.evaluate(() => window.RTS_SIM.step(22)); fs = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id);
+  expect(fs.phase).toBe('formed'); expect(fs.readiness).toBeGreaterThan(.7);
+  await testInfo.attach('v064-road-march', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
 });
 
 test('explored terrain remains remembered and terrain types are active', async ({ page }) => {
@@ -86,7 +112,7 @@ test('explored terrain remains remembered and terrain types are active', async (
 test('British AI develops infantry, cavalry and crewed artillery groups', async ({ page }, testInfo) => {
   const errors = await openGame(page); await page.evaluate(() => { window.__RTS_DEBUG__.setPeaceMode(true); window.__RTS_DEBUG__.grantResources('britain',12000,12000); window.__RTS_DEBUG__.tick(360); }); const s = await state(page);
   expect(s.britain.buildings.some(b=>b.type==='barracks'&&b.complete)).toBe(true); expect(s.britain.buildings.some(b=>b.type==='stable'&&b.complete)).toBe(true); expect(s.britain.buildings.some(b=>b.type==='foundry'&&b.complete)).toBe(true); expect(s.britain.regiments.some(r=>r.kind==='infantry')).toBe(true); expect(s.britain.regiments.some(r=>r.kind==='cavalry')).toBe(true); expect(s.britain.batteries.length).toBeGreaterThanOrEqual(1); s.britain.batteries.forEach(b=>expect(b.operational).toBe(true)); expect(s.britain.units.filter(u=>u.type==='artillery').length).toBeGreaterThan(1);
-  await testInfo.attach('v063-british-development', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
+  await testInfo.attach('v064-british-development', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
 });
 
 test('British AI replaces infantry, cavalry and artillery after heavy established-army losses', async ({ page }) => {
@@ -108,15 +134,15 @@ test('British AI replaces infantry, cavalry and artillery after heavy establishe
 test('F3 test lab exposes diagnostics, scenarios and copyable bug report', async ({ page }) => {
   const errors = await openGame(page); await page.keyboard.press('F3'); await expect(page.locator('#debugPanel')).toBeVisible();
   await expect(page.locator('#debugScenario')).toBeVisible(); await page.selectOption('#debugScenario','artillery-3'); await page.locator('[data-debug-action="run"]').click();
-  const snap = await page.evaluate(() => window.__RTS_DEBUG__.simulationSnapshot()); expect(snap.version).toBe('0.6.3'); expect(snap.groups.filter(g=>g.kind==='artillery'&&!g.destroyed)).toHaveLength(3);
-  const report = await page.evaluate(() => JSON.parse(window.__RTS_DEBUG__.createBugReport())); expect(report.version).toBe('0.6.3'); expect(report.scenario).toBe('artillery-3'); expect(report.metrics).toBeTruthy(); expect(report.audit).toBeTruthy(); expect(errors).toEqual([]);
+  const snap = await page.evaluate(() => window.__RTS_DEBUG__.simulationSnapshot()); expect(snap.version).toBe('0.6.4'); expect(snap.groups.filter(g=>g.kind==='artillery'&&!g.destroyed)).toHaveLength(3);
+  const report = await page.evaluate(() => JSON.parse(window.__RTS_DEBUG__.createBugReport())); expect(report.version).toBe('0.6.4'); expect(report.scenario).toBe('artillery-3'); expect(report.metrics).toBeTruthy(); expect(report.audit).toBeTruthy(); expect(errors).toEqual([]);
 });
 
 test('520-unit stress scenario uses spatial combat index and remains structurally valid', async ({ page }, testInfo) => {
   const errors = await openGame(page); await page.evaluate(() => window.__RTS_DEBUG__.runScenario('performance-520')); await page.evaluate(() => window.RTS_SIM.step(20));
   const snap = await page.evaluate(() => window.RTS_SIM.snapshot()); const metrics = await page.evaluate(() => window.RTS_SIM.getMetrics());
   expect(snap.units.length).toBeGreaterThanOrEqual(520); expect(snap.audit.ok).toBe(true); expect(metrics.combatQueries).toBeGreaterThan(0); expect(Number.isFinite(metrics.updateMs)).toBe(true); expect(metrics.combatBuckets).toBeGreaterThan(2); expect(metrics.avgCombatCandidates).toBeLessThan(40);
-  await testInfo.attach('v063-520-units', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
+  await testInfo.attach('v064-520-units', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
 });
 
 test('10-minute accelerated soak has no corrupt state, ghost groups or broken production', async ({ page }) => {
