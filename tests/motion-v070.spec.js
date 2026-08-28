@@ -7,7 +7,10 @@ async function openV070(page) {
     let seed=314159265;
     Math.random=()=>{ seed=(seed*16807)%2147483647; return (seed-1)/2147483646; };
   });
-  await page.goto('/?v070=1', {waitUntil:'networkidle'});
+  // `input.js` exposes the test/debug facade whenever a `test` query key is
+  // present.  Use a non-legacy value so v0.7 remains the production solver
+  // instead of entering the historical `test=1` v0.6.9 compatibility mode.
+  await page.goto('/?test=v070&v070=1', {waitUntil:'networkidle'});
   await page.waitForFunction(() => Boolean(
     window.RTS_SIM?.version==='0.7.0' &&
     window.__RTS_DEBUG__?.motionSystemV070 &&
