@@ -91,7 +91,7 @@ window.addEventListener('mouseup', e => {
     const facePoint = screenToWorld(d.ex, d.ey);
     const angle = Math.atan2(facePoint.y - destination.y, facePoint.x - destination.x);
     issueMoveWithFacingV06(destination.x, destination.y, angle);
-    statusEl.textContent = `Bataljon marcheert en ontplooit naar front ${Math.round((((angle * 180 / Math.PI) + 360) % 360))}°.`;
+    statusEl.textContent = `Bataljon verplaatst zich en neemt bij aankomst front ${Math.round((((angle * 180 / Math.PI) + 360) % 360))}° in.`;
     return;
   }
 
