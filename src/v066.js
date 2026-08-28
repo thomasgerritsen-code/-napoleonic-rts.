@@ -1,0 +1,353 @@
+'use strict';
+// ---------- Napoleonic RTS v0.6.6: historically inspired road network ----------
+
+const V066_VERSION = '0.6.6';
+document.title = `Napoleonic RTS v${V066_VERSION}`;
+const v066VersionBadge = document.querySelector('.version');
+if (v066VersionBadge) v066VersionBadge.textContent = `v${V066_VERSION}`;
+
+// A Napoleonic battlefield rarely had a uniform grid of roads. The useful network was normally
+// a small number of important chaussées between towns, crossed by narrower local roads and farm
+// tracks. The geometry below deliberately concentrates strategic value at junctions and hamlets.
+const ROAD_NETWORK_V066 = Object.freeze([
+  {
+    id: 'grande-chaussee', name: 'Grande Chaussée', roadClass: 'chaussee', width: 78,
+    points: [[70,930],[420,915],[700,900],[1050,895],[1350,900],[1620,895],[1900,890],[2200,895],[2500,900],[2820,895],[3150,900],[3450,920],[3740,955]]
+  },
+  {
+    id: 'route-du-nord', name: 'Route du Nord', roadClass: 'chaussee', width: 66,
+    points: [[1910,55],[1885,300],[1875,540],[1885,720],[1900,890],[1930,1120],[1980,1390],[2040,1640],[2110,1900],[2180,2160]]
+  },
+  {
+    id: 'route-sud-ouest', name: 'Route du Sud-Ouest', roadClass: 'chaussee', width: 60,
+    points: [[180,2040],[410,1840],[650,1650],[900,1510],[1160,1430],[1390,1360],[1600,1240],[1760,1080],[1900,890]]
+  },
+  {
+    id: 'route-nord-est', name: 'Route du Nord-Est', roadClass: 'chaussee', width: 60,
+    points: [[1900,890],[2140,775],[2390,665],[2640,565],[2920,470],[3220,360],[3500,270],[3760,205]]
+  },
+  {
+    id: 'chemin-de-la-crete-ouest', name: 'Chemin de la Crête Ouest', roadClass: 'secondary', width: 48,
+    points: [[120,1165],[390,1145],[690,1125],[990,1105],[1260,1085],[1510,1065],[1760,1045],[1850,980],[1900,890]]
+  },
+  {
+    id: 'chemin-de-la-crete-est', name: 'Chemin de la Crête Est', roadClass: 'secondary', width: 48,
+    points: [[1900,890],[2070,990],[2320,1040],[2600,1070],[2890,1090],[3170,1120],[3450,1160],[3720,1210]]
+  },
+  {
+    id: 'chemin-du-bois', name: 'Chemin du Bois', roadClass: 'secondary', width: 44,
+    points: [[700,900],[620,790],[560,665],[545,545],[590,430],[690,330],[830,250]]
+  },
+  {
+    id: 'chemin-des-fermes-est', name: 'Chemin des Fermes Est', roadClass: 'secondary', width: 44,
+    points: [[2820,895],[2910,1040],[3000,1210],[3110,1390],[3240,1580],[3410,1750],[3630,1920],[3780,2020]]
+  },
+  {
+    id: 'chemin-des-fermes-sud', name: 'Chemin des Fermes Sud', roadClass: 'secondary', width: 42,
+    points: [[650,1650],[930,1680],[1220,1690],[1510,1710],[1780,1690],[2040,1640],[2300,1650],[2580,1660],[2870,1640],[3240,1580]]
+  },
+  {
+    id: 'voie-du-moulin', name: 'Voie du Moulin', roadClass: 'track', width: 26,
+    points: [[390,1145],[330,1320],[350,1490],[470,1640],[650,1650]]
+  },
+  {
+    id: 'voie-de-la-ferme', name: 'Voie de la Ferme', roadClass: 'track', width: 26,
+    points: [[1260,1085],[1170,920],[1090,760],[1000,620],[890,520]]
+  },
+  {
+    id: 'voie-du-verger', name: 'Voie du Verger', roadClass: 'track', width: 24,
+    points: [[2320,1040],[2440,1210],[2500,1390],[2520,1540],[2580,1660]]
+  },
+  {
+    id: 'voie-de-la-lisiere', name: 'Voie de la Lisière', roadClass: 'track', width: 24,
+    points: [[2390,665],[2530,790],[2650,900],[2760,1010],[2890,1090]]
+  }
+].map(r => Object.freeze({ ...r, points: Object.freeze(r.points.map(([x,y]) => Object.freeze({x,y}))) })));
+
+const ROAD_CLASS_SPEEDS_V066 = Object.freeze({
+  chaussée: Object.freeze({ infantry: 56, cavalry: 90, artillery: 30 }),
+  secondary: Object.freeze({ infantry: 49, cavalry: 80, artillery: 26 }),
+  track: Object.freeze({ infantry: 42, cavalry: 70, artillery: 22 })
+});
+// ASCII alias so code does not depend on an accented object key.
+ROAD_CLASS_SPEEDS_V066.chaussee = ROAD_CLASS_SPEEDS_V066['chaussée'];
+
+const ROAD_CLASS_PRIORITY_V066 = Object.freeze({ chaussée: 3, chaussee: 3, secondary: 2, track: 1 });
+const ROAD_HAMLETS_V066 = Object.freeze([
+  { name: 'Les Quatre Chemins', x: 1900, y: 890 },
+  { name: 'St.-Martin', x: 700, y: 900 },
+  { name: 'La Croix', x: 2820, y: 895 },
+  { name: 'Bois-Hameau', x: 590, y: 430 },
+  { name: 'Ferme du Sud', x: 650, y: 1650 },
+  { name: 'Ferme de l’Est', x: 3240, y: 1580 }
+]);
+
+function clampV066(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function closestPointOnSegmentV066(px, py, a, b) {
+  const vx = b.x - a.x, vy = b.y - a.y;
+  const len2 = vx * vx + vy * vy;
+  if (len2 <= 0.0001) return { x: a.x, y: a.y, t: 0, distance: Math.hypot(px-a.x, py-a.y) };
+  const t = clampV066(((px-a.x)*vx + (py-a.y)*vy) / len2, 0, 1);
+  const x = a.x + vx * t, y = a.y + vy * t;
+  return { x, y, t, distance: Math.hypot(px-x, py-y) };
+}
+
+function roadNetworkAtV066(x, y) {
+  let best = null;
+  for (const road of ROAD_NETWORK_V066) {
+    for (let i = 1; i < road.points.length; i++) {
+      const hit = closestPointOnSegmentV066(x, y, road.points[i-1], road.points[i]);
+      if (hit.distance > road.width / 2) continue;
+      const priority = ROAD_CLASS_PRIORITY_V066[road.roadClass] || 0;
+      const score = hit.distance / Math.max(1, road.width / 2) - priority * 0.08;
+      if (!best || score < best.score) best = { ...hit, road, segmentIndex: i-1, score };
+    }
+  }
+  return best;
+}
+
+function nearestStrategicRoadPointV066(point, kind = 'infantry') {
+  const already = roadNetworkAtV066(point.x, point.y);
+  if (already) return { x: point.x, y: point.y, road: already.road, distance: 0 };
+
+  let best = null;
+  for (const road of ROAD_NETWORK_V066) {
+    if (road.roadClass === 'track') continue;
+    const speed = roadSpeedV066(kind, road);
+    for (let i = 1; i < road.points.length; i++) {
+      const hit = closestPointOnSegmentV066(point.x, point.y, road.points[i-1], road.points[i]);
+      // Faster chaussées may justify a slightly longer approach than a local road.
+      const approachScore = hit.distance / Math.max(1, speed);
+      if (!best || approachScore < best.score) best = { x: hit.x, y: hit.y, road, distance: hit.distance, score: approachScore };
+    }
+  }
+  return best || { x: point.x, y: point.y, road: null, distance: 0 };
+}
+
+function roadSpeedV066(kind, roadOrClass) {
+  const roadClass = typeof roadOrClass === 'string' ? roadOrClass : roadOrClass?.roadClass;
+  const speeds = ROAD_CLASS_SPEEDS_V066[roadClass] || ROAD_CLASS_SPEEDS_V066.secondary;
+  if (kind === 'cavalry') return speeds.cavalry;
+  if (kind === 'artillery') return speeds.artillery;
+  return speeds.infantry;
+}
+
+function fieldSpeedFactorV066(x, y, kind) {
+  if (TERRAIN_WOODS.some(w => pointInRectV06(x, y, w))) {
+    if (kind === 'cavalry') return 0.66;
+    if (kind === 'artillery') return 0.70;
+    return 0.88;
+  }
+  if (TERRAIN_HILLS.some(h => pointInEllipseV06(x, y, h))) return kind === 'artillery' ? 0.80 : 0.90;
+  return 1;
+}
+
+// Replace the former single horizontal road band with the full network while preserving the
+// public terrain labels used throughout combat, fog and tests.
+terrainAtV06 = function terrainAtV066(x, y) {
+  if (roadNetworkAtV066(x, y)) return 'road';
+  if (TERRAIN_HILLS.some(h => pointInEllipseV06(x, y, h))) return 'hill';
+  if (TERRAIN_WOODS.some(w => pointInRectV06(x, y, w))) return 'woods';
+  return 'open';
+};
+
+roadAtV064 = function roadAtV066(x, y) { return Boolean(roadNetworkAtV066(x, y)); };
+
+terrainSpeedMultiplierV06 = function terrainSpeedMultiplierV066(u) {
+  const road = roadNetworkAtV066(u.x, u.y)?.road;
+  if (road) {
+    if (road.roadClass === 'chaussee') return 1.24;
+    if (road.roadClass === 'secondary') return 1.13;
+    return 1.05;
+  }
+  if (TERRAIN_WOODS.some(w => pointInRectV06(u.x, u.y, w))) {
+    if (u.type === 'cavalry') return 0.66;
+    if (u.type === 'artillery') return 0.70;
+    if (u.type === 'worker') return 0.94;
+    return 0.88;
+  }
+  if (TERRAIN_HILLS.some(h => pointInEllipseV06(u.x, u.y, h))) return u.type === 'artillery' ? 0.80 : 0.90;
+  return 1;
+};
+
+// v0.6.5 compares travel time. Make that comparison road-quality aware: a paved chaussée is faster
+// than a local road, while a farm track gives only a modest advantage over open ground.
+pathStatsV065 = function pathStatsV066(start, points, kind = 'infantry') {
+  const fieldSpeed = groupTravelSpeedsV065(kind).field;
+  let previous = { x: start.x, y: start.y };
+  let distance = 0, roadDistance = 0, time = 0;
+  const roadNames = new Set();
+  const classDistance = { chaussee: 0, secondary: 0, track: 0 };
+
+  for (const p of points) {
+    const dx = p.x - previous.x, dy = p.y - previous.y;
+    const segment = Math.hypot(dx, dy);
+    if (segment < 0.001) { previous = p; continue; }
+    const samples = Math.max(1, Math.ceil(segment / 32));
+    const sampleDistance = segment / samples;
+    for (let i = 0; i < samples; i++) {
+      const t = (i + 0.5) / samples;
+      const sx = previous.x + dx * t, sy = previous.y + dy * t;
+      const roadHit = roadNetworkAtV066(sx, sy);
+      distance += sampleDistance;
+      if (roadHit) {
+        roadDistance += sampleDistance;
+        roadNames.add(roadHit.road.name);
+        classDistance[roadHit.road.roadClass] = (classDistance[roadHit.road.roadClass] || 0) + sampleDistance;
+        time += sampleDistance / roadSpeedV066(kind, roadHit.road);
+      } else {
+        time += sampleDistance / Math.max(1, fieldSpeed * fieldSpeedFactorV066(sx, sy, kind));
+      }
+    }
+    previous = p;
+  }
+
+  return {
+    distance,
+    roadDistance,
+    roadShare: distance > 0 ? roadDistance / distance : 0,
+    time,
+    roadNames: [...roadNames],
+    classDistance
+  };
+};
+
+roadAccessPointV065 = function roadAccessPointV066(point) {
+  const access = nearestStrategicRoadPointV066(point, planningGroupKindV065 || 'infantry');
+  return { x: access.x, y: access.y };
+};
+
+// Give the formation anchor the speed of the road quality directly under it.
+desiredGroupSpeedV064 = function desiredGroupSpeedV066(reg, march, roadMarch) {
+  const members = regimentMembers(reg);
+  if (!members.length) return 0;
+  const kind = groupKindV06(reg);
+  const roadHit = roadNetworkAtV066(march.anchorX, march.anchorY);
+  let base;
+  if (roadHit) base = roadSpeedV066(kind, roadHit.road);
+  else base = groupTravelSpeedsV065(kind).field * fieldSpeedFactorV066(march.anchorX, march.anchorY, kind);
+
+  let meanError = 0;
+  for (const u of members) meanError += Math.hypot(u.x - u.targetX, u.y - u.targetY);
+  meanError /= members.length;
+  const cohesion = clampV064(1 - Math.max(0, meanError - 18) / 170, 0.58, 1);
+  return base * cohesion;
+};
+
+function roadsUsedByPathV066(path) {
+  const result = new Map();
+  if (!path?.length) return [];
+  for (const p of path) {
+    const hit = roadNetworkAtV066(p.x, p.y);
+    if (hit) result.set(hit.road.id, hit.road);
+  }
+  return [...result.values()].map(r => ({ id: r.id, name: r.name, roadClass: r.roadClass }));
+}
+
+const orderGroupPathV065ForV066 = orderGroupPathV06;
+orderGroupPathV06 = function orderGroupPathV066(reg, x, y, formation = reg.formation, finalFacing = null) {
+  orderGroupPathV065ForV066(reg, x, y, formation, finalFacing);
+  if (!reg || reg.destroyed) return;
+  reg.routeRoadsV066 = roadsUsedByPathV066(reg.path);
+};
+
+const issueMoveWithFacingV065ForV066 = issueMoveWithFacingV06;
+issueMoveWithFacingV06 = function issueMoveWithFacingV066(x, y, finalFacing = null) {
+  issueMoveWithFacingV065ForV066(x, y, finalFacing);
+  const groups = selectedRegiments();
+  if (!groups.length) return;
+  const roadNames = [...new Set(groups.flatMap(reg => (reg.routeRoadsV066 || []).map(r => r.name)))];
+  if (roadNames.length > 1) statusEl.textContent = `Marsroute gebruikt ${roadNames.slice(0,3).join(' → ')}${roadNames.length > 3 ? '…' : ''}.`;
+  else if (roadNames.length === 1) statusEl.textContent = `Marsroute volgt ${roadNames[0]}.`;
+};
+
+function drawRoadPolylineV066(road) {
+  const pts = road.points;
+  if (pts.length < 2) return;
+  const trace = () => {
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  };
+
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (road.roadClass === 'chaussee') {
+    ctx.strokeStyle = 'rgba(75,64,48,.58)'; ctx.lineWidth = road.width + 12; trace(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(196,181,145,.92)'; ctx.lineWidth = road.width; trace(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(235,222,186,.28)'; ctx.lineWidth = 2; ctx.setLineDash([22,18]); trace(); ctx.stroke();
+  } else if (road.roadClass === 'secondary') {
+    ctx.strokeStyle = 'rgba(89,70,48,.48)'; ctx.lineWidth = road.width + 7; trace(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(170,143,100,.80)'; ctx.lineWidth = road.width; trace(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(112,84,55,.22)'; ctx.lineWidth = 3; ctx.setLineDash([30,22]); trace(); ctx.stroke();
+  } else {
+    ctx.strokeStyle = 'rgba(118,84,52,.58)'; ctx.lineWidth = road.width; ctx.setLineDash([24,10]); trace(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(202,167,112,.30)'; ctx.lineWidth = Math.max(2, road.width * .28); ctx.setLineDash([18,16]); trace(); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawHamletsV066() {
+  ctx.save();
+  for (const h of ROAD_HAMLETS_V066) {
+    ctx.fillStyle = 'rgba(92,70,48,.80)';
+    ctx.fillRect(h.x-17,h.y-13,12,10); ctx.fillRect(h.x+4,h.y-9,14,11); ctx.fillRect(h.x-3,h.y+5,11,9);
+    ctx.fillStyle = 'rgba(226,210,170,.62)';
+    ctx.font = `${Math.max(9, 11/camera.zoom)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(h.name, h.x, h.y - 22);
+  }
+  ctx.restore(); ctx.textAlign = 'start';
+}
+
+// Fully redraw terrain so the obsolete straight 130 px road band from the original renderer is gone.
+drawTerrain = function drawTerrainV066() {
+  ctx.fillStyle = COLORS.grass; ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+  ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1 / camera.zoom;
+  for (let x = 0; x < WORLD.width; x += 100) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,WORLD.height); ctx.stroke(); }
+  for (let y = 0; y < WORLD.height; y += 100) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(WORLD.width,y); ctx.stroke(); }
+
+  // Landform first, roads second: roads remain visible when they pass through woodland or across slopes.
+  ctx.save();
+  for (const w of TERRAIN_WOODS) { ctx.fillStyle = 'rgba(37,67,38,.18)'; ctx.fillRect(w.x,w.y,w.w,w.h); }
+  for (const h of TERRAIN_HILLS) {
+    ctx.fillStyle = 'rgba(171,151,101,.17)'; ctx.beginPath(); ctx.ellipse(h.x,h.y,h.rx,h.ry,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(210,193,143,.24)'; ctx.lineWidth = 8; ctx.beginPath(); ctx.ellipse(h.x,h.y,h.rx*.72,h.ry*.72,0,0,Math.PI*2); ctx.stroke();
+  }
+  ctx.restore();
+
+  // Tracks first, then secondary roads and finally chaussées, so strategic roads dominate junctions.
+  for (const cls of ['track','secondary','chaussee']) {
+    for (const road of ROAD_NETWORK_V066) if (road.roadClass === cls) drawRoadPolylineV066(road);
+  }
+  drawHamletsV066();
+};
+
+// Overlay explored road segments on the existing fog-aware minimap.
+const drawMinimapV065ForV066 = drawMinimap;
+drawMinimap = function drawMinimapV066() {
+  drawMinimapV065ForV066();
+  miniCtx.save(); miniCtx.lineCap = 'round'; miniCtx.lineJoin = 'round';
+  for (const road of ROAD_NETWORK_V066) {
+    miniCtx.strokeStyle = road.roadClass === 'chaussee' ? 'rgba(224,207,163,.72)' : road.roadClass === 'secondary' ? 'rgba(188,153,103,.55)' : 'rgba(159,118,73,.42)';
+    miniCtx.lineWidth = road.roadClass === 'chaussee' ? 1.7 : road.roadClass === 'secondary' ? 1.1 : .7;
+    for (let i = 1; i < road.points.length; i++) {
+      const a = road.points[i-1], b = road.points[i], mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+      if (typeof isExploredV06 === 'function' && !isExploredV06(mx,my)) continue;
+      const ma=miniPoint(a.x,a.y), mb=miniPoint(b.x,b.y);
+      miniCtx.beginPath(); miniCtx.moveTo(ma.x,ma.y); miniCtx.lineTo(mb.x,mb.y); miniCtx.stroke();
+    }
+  }
+  // Re-emphasize the camera frame after drawing road lines over the existing minimap.
+  const viewW = innerWidth / camera.zoom / WORLD.width * minimap.width;
+  const viewH = innerHeight / camera.zoom / WORLD.height * minimap.height;
+  const c = miniPoint(camera.x,camera.y);
+  miniCtx.strokeStyle = '#f3df83'; miniCtx.lineWidth = 1.4;
+  miniCtx.strokeRect(c.x-viewW/2,c.y-viewH/2,viewW,viewH);
+  miniCtx.restore();
+};
+
+const resetGameV065ForV066 = resetGame;
+resetGame = function resetGameV066() {
+  resetGameV065ForV066();
+  statusEl.textContent = 'v0.6.6: Napoleontisch wegenstelsel met chaussées, lokale wegen, kruispunten en karrensporen.';
+};
