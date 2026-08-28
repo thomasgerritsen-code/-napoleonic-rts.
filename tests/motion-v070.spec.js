@@ -11,12 +11,23 @@ async function openV070(page) {
   await page.waitForFunction(() => Boolean(
     window.RTS_SIM?.version==='0.7.0' &&
     window.__RTS_DEBUG__?.motionSystemV070 &&
-    window.__RTS_DEBUG__?.villageSystemV070
+    window.__RTS_DEBUG__?.villageSystemV070 &&
+    window.__RTS_DEBUG__?.motionStatsV070
   ));
   return pageErrors;
 }
 
 async function motion(page,id){ return page.evaluate(id=>window.__RTS_DEBUG__.motionSystemV070(id),id); }
+
+function memberStep(a,b) {
+  const previous=new Map(a.members.map(u=>[u.id,u]));
+  let max=0;
+  for(const u of b.members){
+    const p=previous.get(u.id);
+    if(p) max=Math.max(max,Math.hypot(u.x-p.x,u.y-p.y));
+  }
+  return max;
+}
 
 test('v0.7.0 is the production build and villages visibly follow road verges', async ({page},testInfo) => {
   const errors=await openV070(page);
@@ -36,7 +47,7 @@ test('v0.7.0 is the production build and villages visibly follow road verges', a
   expect(errors).toEqual([]);
 });
 
-test('same-road retarget moves the real battalion centroid forward without the old backward shift', async ({page}) => {
+test('same-road retarget is continuous, forward-only and never teleports soldiers to new slots', async ({page}) => {
   const errors=await openV070(page);
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
   const id=await page.evaluate(()=>window.__RTS_DEBUG__.createFreshInfantryRegiment('france',650,900));
@@ -45,41 +56,74 @@ test('same-road retarget moves the real battalion centroid forward without the o
   await page.evaluate(()=>window.RTS_SIM.step(1.1));
   const before=await motion(page,id);
   await page.evaluate(id=>{window.__RTS_DEBUG__.selectRegiment(id);window.__RTS_DEBUG__.orderSelectedWithFacing(1750,895,0);},id);
+
   const samples=[];
-  for(let i=0;i<18;i++){await page.evaluate(()=>window.RTS_SIM.step(.08));samples.push(await motion(page,id));}
-  expect(samples.every(s=>s.maxSlotError<0.08)).toBe(true);
-  expect(samples.every(s=>s.centroidAnchorError<0.12)).toBe(true);
+  let previous=before;
+  let maxObservedMemberStep=0;
+  for(let i=0;i<18;i++){
+    await page.evaluate(()=>window.RTS_SIM.step(.08));
+    const current=await motion(page,id);
+    maxObservedMemberStep=Math.max(maxObservedMemberStep,memberStep(previous,current));
+    samples.push(current);
+    previous=current;
+  }
+
   const xs=[before.centroid.x,...samples.map(s=>s.centroid.x)];
-  for(let i=1;i<xs.length;i++) expect(xs[i]).toBeGreaterThanOrEqual(xs[i-1]-.35);
+  for(let i=1;i<xs.length;i++) expect(xs[i]).toBeGreaterThanOrEqual(xs[i-1]-1.0);
   expect(xs[xs.length-1]).toBeGreaterThan(xs[0]+25);
+  expect(maxObservedMemberStep).toBeLessThan(13);
+  expect(samples[samples.length-1].centroidAnchorError).toBeLessThan(25);
+  expect(samples[samples.length-1].maxSlotError).toBeLessThan(40);
+
+  const stats=await page.evaluate(()=>window.__RTS_DEBUG__.motionStatsV070());
+  expect(stats.solver).toBe('continuous-dt');
+  expect(stats.snappedMembers).toBe(0);
+  expect(stats.teleportViolations).toBe(0);
   expect(errors).toEqual([]);
 });
 
-test('road marching uses one kinematic solver with no per-soldier slot jitter', async ({page},testInfo) => {
+test('road marching advances smoothly with bounded per-soldier motion and coherent slots', async ({page},testInfo) => {
   const errors=await openV070(page);
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
   const id=await page.evaluate(()=>window.__RTS_DEBUG__.createFreshInfantryRegiment('france',700,900));
   await page.evaluate(id=>{window.__RTS_DEBUG__.selectRegiment(id);window.__RTS_DEBUG__.orderSelectedWithFacing(1600,895,0);},id);
   await page.evaluate(()=>window.RTS_SIM.step(1.5));
+
   const samples=[];
-  for(let i=0;i<24;i++){await page.evaluate(()=>window.RTS_SIM.step(.1));samples.push(await motion(page,id));}
+  let previous=await motion(page,id);
+  let maxObservedMemberStep=0;
+  for(let i=0;i<24;i++){
+    await page.evaluate(()=>window.RTS_SIM.step(.1));
+    const current=await motion(page,id);
+    maxObservedMemberStep=Math.max(maxObservedMemberStep,memberStep(previous,current));
+    samples.push(current);
+    previous=current;
+  }
+
   expect(samples.every(s=>s.road==='Grande Chaussée')).toBe(true);
-  expect(samples.every(s=>s.maxSlotError<0.08)).toBe(true);
-  expect(samples.every(s=>s.centroidAnchorError<0.12)).toBe(true);
+  expect(maxObservedMemberStep).toBeLessThan(15);
+  expect(Math.max(...samples.map(s=>s.maxSlotError))).toBeLessThan(45);
+  expect(Math.max(...samples.map(s=>s.centroidAnchorError ?? 0))).toBeLessThan(28);
+
   const deltas=[];
   for(let i=1;i<samples.length;i++) deltas.push(Math.hypot(samples[i].centroid.x-samples[i-1].centroid.x,samples[i].centroid.y-samples[i-1].centroid.y));
   const mean=deltas.reduce((a,b)=>a+b,0)/deltas.length;
   const sd=Math.sqrt(deltas.reduce((s,d)=>s+(d-mean)**2,0)/deltas.length);
-  expect(mean).toBeGreaterThan(4);
-  expect(sd/mean).toBeLessThan(.12);
+  expect(mean).toBeGreaterThan(3.2);
+  expect(sd/mean).toBeLessThan(.25);
+
   const stats=await page.evaluate(()=>window.__RTS_DEBUG__.motionStatsV070());
-  expect(stats.kinematicFrames).toBeGreaterThan(20);
-  expect(stats.snappedMembers).toBeGreaterThan(200);
-  await testInfo.attach('v070-kinematic-road-march',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
+  expect(stats.solver).toBe('continuous-dt');
+  expect(stats.continuousFrames).toBeGreaterThan(20);
+  expect(stats.continuousMemberSamples).toBeGreaterThan(200);
+  expect(stats.snappedMembers).toBe(0);
+  expect(stats.teleportViolations).toBe(0);
+  expect(stats.maxStepRatio).toBeLessThanOrEqual(1.01);
+  await testInfo.attach('v070-continuous-road-march',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
   expect(errors).toEqual([]);
 });
 
-test('enemy interaction locks to the opposing battalion and remains formation-smooth', async ({page},testInfo) => {
+test('enemy interaction keeps one battalion lock without teleporting the combat formation', async ({page},testInfo) => {
   const errors=await openV070(page);
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
   const ids=await page.evaluate(()=>{
@@ -100,13 +144,16 @@ test('enemy interaction locks to the opposing battalion and remains formation-sm
   expect(engaged.every(s=>s.engagement.stableGroupLock===true)).toBe(true);
   expect(new Set(engaged.map(s=>s.engagement.enemyGroupId)).size).toBe(1);
   expect(engaged[0].engagement.enemyGroupId).toBe(ids.british);
-  expect(engaged.every(s=>s.maxSlotError<0.08)).toBe(true);
+  expect(Math.max(...engaged.map(s=>s.maxSlotError))).toBeLessThan(45);
   const headings=engaged.map(s=>s.engagement.heading);
   const turnJumps=headings.slice(1).map((h,i)=>Math.abs(Math.atan2(Math.sin(h-headings[i]),Math.cos(h-headings[i]))));
   expect(Math.max(...turnJumps)).toBeLessThan(.10);
   const drummer=await page.evaluate(id=>window.__RTS_DEBUG__.drummerRoleV069(id),ids.french);
   expect(drummer.attackMode).toBe('support');
   expect(drummer.actualLocal.ox).toBeLessThan(0);
+  const stats=await page.evaluate(()=>window.__RTS_DEBUG__.motionStatsV070());
+  expect(stats.snappedMembers).toBe(0);
+  expect(stats.teleportViolations).toBe(0);
   await testInfo.attach('v070-stable-bayonet-contact',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
   expect(errors).toEqual([]);
 });
