@@ -3,139 +3,66 @@ const { test, expect } = require('@playwright/test');
 async function openGame(page) {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
-  await page.addInitScript(() => {
-    let seed = 123456789;
-    Math.random = () => {
-      seed = (seed * 16807) % 2147483647;
-      return (seed - 1) / 2147483646;
-    };
-  });
+  await page.addInitScript(() => { let seed = 123456789; Math.random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; });
   await page.goto('/?test=1', { waitUntil: 'networkidle' });
   await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__?.getState));
   return pageErrors;
 }
+const state = page => page.evaluate(() => window.__RTS_DEBUG__.getState());
 
-async function state(page) {
-  return page.evaluate(() => window.__RTS_DEBUG__.getState());
-}
-
-test('v0.5 loads, renders canvas and exposes minimap without JavaScript errors', async ({ page }, testInfo) => {
+test('v0.6 loads with enlarged map, minimap and no JavaScript errors', async ({ page }, testInfo) => {
   const errors = await openGame(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.5/);
-  await expect(page.locator('.version')).toHaveText('v0.5');
-  await expect(page.locator('#game')).toBeVisible();
-  await expect(page.locator('#minimap')).toBeVisible();
-
-  const s = await state(page);
-  expect(s.minimap.width).toBe(240);
-  expect(s.minimap.height).toBe(138);
-  expect(s.navigation.buckets).toBeGreaterThanOrEqual(0);
-
-  await testInfo.attach('v05-initial-battlefield', {
-    body: await page.screenshot({ fullPage: true }),
-    contentType: 'image/png'
-  });
-  expect(errors).toEqual([]);
+  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6/); await expect(page.locator('.version')).toHaveText('v0.6'); await expect(page.locator('#minimap')).toBeVisible();
+  const s = await state(page); expect(s.world.width).toBe(3800); expect(s.world.height).toBe(2200); expect(s.exploredCells).toBeGreaterThan(0); expect(['aggressive','balanced','defensive']).toContain(s.aiStrategy);
+  await testInfo.attach('v06-initial', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' }); expect(errors).toEqual([]);
 });
 
-test('regiment retains officer/drummer and can rotate its front with real controls', async ({ page }) => {
+test('rally point and visible queue distribute completed troops instead of stacking them', async ({ page }) => {
   const errors = await openGame(page);
-  await page.evaluate(() => window.__RTS_DEBUG__.selectLooseForRegiment('france'));
-  const createButton = page.locator('[data-action="create-regiment"]');
-  await expect(createButton).toBeEnabled();
-  await createButton.click();
-
-  let s = await state(page);
-  expect(s.france.regiments).toHaveLength(1);
-  expect(s.france.regiments[0].officerAssigned).toBe(true);
-  expect(s.france.regiments[0].drummerAssigned).toBe(true);
-  const initialFacing = s.france.regiments[0].facing;
-
-  await page.locator('[data-action="rotate-right"]').click();
-  s = await state(page);
-  expect(s.france.regiments[0].facing).toBeGreaterThan(initialFacing);
-
-  await page.keyboard.press('q');
-  s = await state(page);
-  expect(Math.abs(s.france.regiments[0].facing - initialFacing)).toBeLessThan(0.01);
-
-  for (const mode of ['column', 'square', 'line']) {
-    await page.locator(`[data-formation="${mode}"]`).click();
-    s = await state(page);
-    expect(s.france.regiments[0].formation).toBe(mode);
-  }
-  expect(errors).toEqual([]);
+  const barracksId = await page.evaluate(() => window.__RTS_DEBUG__.createCompletedBuilding('france','barracks',900,800));
+  await page.evaluate(id => window.__RTS_DEBUG__.selectBuildingById(id), barracksId); await expect(page.locator('#productionQueuePanel')).toBeVisible(); await page.locator('[data-action="set-rally"]').click();
+  const target = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1080,760)); await page.mouse.click(target.x,target.y);
+  let s = await state(page), b = s.france.buildings.find(x => x.id === barracksId); expect(Math.abs(b.rallyX-1080)).toBeLessThan(5); expect(Math.abs(b.rallyY-760)).toBeLessThan(5);
+  const beforeIds = new Set(s.france.units.filter(u => u.type==='infantry').map(u => u.id));
+  await page.locator('[data-action="train-infantry"]').click(); await page.locator('[data-action="train-infantry"]').click(); await page.locator('[data-action="train-infantry"]').click(); await expect(page.locator('#productionQueuePanel li')).toHaveCount(3);
+  await page.evaluate(() => window.__RTS_DEBUG__.tick(22)); s = await state(page); const made = s.france.units.filter(u => u.type==='infantry'&&!beforeIds.has(u.id)); expect(made).toHaveLength(3);
+  const distances=[]; for(let i=0;i<made.length;i++)for(let j=i+1;j<made.length;j++)distances.push(Math.hypot(made[i].x-made[j].x,made[i].y-made[j].y)); expect(Math.min(...distances)).toBeGreaterThan(8); made.forEach(u=>expect(Math.hypot(u.x-b.rallyX,u.y-b.rallyY)).toBeLessThan(115)); expect(errors).toEqual([]);
 });
 
-test('Stable and Artillery Foundry produce cavalry and artillery through UI clicks', async ({ page }) => {
+test('infantry regiment dissolves on broken morale or one-third strength', async ({ page }) => {
   const errors = await openGame(page);
-  const stableId = await page.evaluate(() => window.__RTS_DEBUG__.createCompletedBuilding('france', 'stable', 900, 760));
-  const foundryId = await page.evaluate(() => window.__RTS_DEBUG__.createCompletedBuilding('france', 'foundry', 920, 1040));
-
-  let s = await state(page);
-  const beforeCav = s.france.units.filter(u => u.type === 'cavalry').length;
-  const beforeArt = s.france.units.filter(u => u.type === 'artillery').length;
-  const beforeFood = s.france.food;
-  const beforeWood = s.france.wood;
-
-  await page.evaluate(id => window.__RTS_DEBUG__.selectBuildingById(id), stableId);
-  await expect(page.locator('[data-action="train-cavalry"]')).toBeVisible();
-  await page.locator('[data-action="train-cavalry"]').click();
-
-  await page.evaluate(id => window.__RTS_DEBUG__.selectBuildingById(id), foundryId);
-  await expect(page.locator('[data-action="train-artillery"]')).toBeVisible();
-  await page.locator('[data-action="train-artillery"]').click();
-
-  s = await state(page);
-  expect(s.france.food).toBe(beforeFood - 270);
-  expect(s.france.wood).toBe(beforeWood - 150);
-
-  await page.evaluate(() => window.__RTS_DEBUG__.tick(17));
-  s = await state(page);
-  expect(s.france.units.filter(u => u.type === 'cavalry').length).toBeGreaterThanOrEqual(beforeCav + 1);
-  expect(s.france.units.filter(u => u.type === 'artillery').length).toBeGreaterThanOrEqual(beforeArt + 1);
-  expect(errors).toEqual([]);
+  const moraleId = await page.evaluate(() => window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1200,1050)); await page.evaluate(id => window.__RTS_DEBUG__.setGroupMorale(id,20), moraleId);
+  let s = await state(page), g = s.france.groups.find(x => x.id===moraleId); expect(g.destroyed).toBe(true); expect(g.brokenReason).toContain('moraal');
+  const strengthId = await page.evaluate(() => window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1450,1050)); await page.evaluate(id => window.__RTS_DEBUG__.reduceGroupTo(id,2), strengthId);
+  s = await state(page); g = s.france.groups.find(x => x.id===strengthId); expect(g.destroyed).toBe(true); expect(g.brokenReason).toContain('over'); expect(errors).toEqual([]);
 });
 
-test('fog of war hides distant British forces while minimap remains interactive', async ({ page }) => {
-  const errors = await openGame(page);
-  const s = await state(page);
-  const distant = s.britain.units.find(u => u.type === 'worker') || s.britain.units[0];
-  const visible = await page.evaluate(id => window.__RTS_DEBUG__.isVisible('britain', id, 'unit'), distant.id);
-  expect(visible).toBe(false);
-
-  const minimap = page.locator('#minimap');
-  const box = await minimap.boundingBox();
-  expect(box).not.toBeNull();
-  await minimap.click({ position: { x: box.width * 0.5, y: box.height * 0.5 } });
-  await expect(minimap).toBeVisible();
-  expect(errors).toEqual([]);
+test('a cannon requires exactly two assigned musketiers and battery breaks when crew is lost', async ({ page }) => {
+  const errors = await openGame(page); await page.evaluate(() => window.__RTS_DEBUG__.selectForBattery('france'));
+  const button = page.locator('[data-action="create-battery"]'); await expect(button).toBeVisible(); await expect(button).toBeEnabled(); await button.click();
+  let s = await state(page); expect(s.france.batteries.length).toBe(1); const battery = s.france.batteries[0]; expect(battery.crewIds).toHaveLength(2); expect(battery.operational).toBe(true);
+  await page.evaluate(id => window.__RTS_DEBUG__.killBatteryCrew(id,1), battery.id); s = await state(page); const historical = s.france.groups.find(x=>x.id===battery.id); expect(historical.destroyed).toBe(true); expect(historical.brokenReason).toContain('bemanning'); expect(s.france.batteries).toHaveLength(0); expect(errors).toEqual([]);
 });
 
-test('British AI builds its full v0.5 military economy in peace mode', async ({ page }, testInfo) => {
-  const errors = await openGame(page);
-  await page.evaluate(() => {
-    window.__RTS_DEBUG__.setPeaceMode(true);
-    window.__RTS_DEBUG__.grantResources('britain', 5000, 5000);
-    window.__RTS_DEBUG__.tick(260);
-  });
-  const developed = await state(page);
+test('worker automatically continues with a nearby resource of the same type', async ({ page }) => {
+  const errors = await openGame(page); const assignment = await page.evaluate(() => window.__RTS_DEBUG__.assignWorkerToNearest('france','wood')); expect(assignment).not.toBeNull();
+  await page.evaluate(id => window.__RTS_DEBUG__.depleteResource(id,0), assignment.resourceId); await page.evaluate(() => window.__RTS_DEBUG__.tick(.3)); const s = await state(page), worker = s.france.units.find(u=>u.id===assignment.workerId);
+  expect(worker.preferredResourceType).toBe('wood'); expect(worker.resourceTargetId).not.toBe(assignment.resourceId); expect(worker.resourceTargetId).not.toBeNull(); expect(errors).toEqual([]);
+});
 
-  expect(developed.britain.buildings.some(b => b.type === 'barracks' && b.complete)).toBe(true);
-  expect(developed.britain.regiments.length).toBeGreaterThanOrEqual(1);
-  expect(developed.britain.buildings.some(b => b.type === 'stable' && b.complete)).toBe(true);
-  expect(developed.britain.buildings.some(b => b.type === 'foundry' && b.complete)).toBe(true);
-  expect(developed.britain.units.some(u => u.type === 'cavalry')).toBe(true);
-  expect(developed.britain.units.some(u => u.type === 'artillery')).toBe(true);
+test('right-drag orders a regiment through pathfinding and fixes its final facing', async ({ page }) => {
+  const errors = await openGame(page); const id = await page.evaluate(() => window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1200,1050)); await page.evaluate(id => window.__RTS_DEBUG__.selectRegiment(id), id); await page.evaluate(() => window.__RTS_DEBUG__.createCompletedBuilding('france','barracks',1050,1050));
+  const start = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(900,1050)), end = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(990,1050)); await page.mouse.move(start.x,start.y); await page.mouse.down({button:'right'}); await page.mouse.move(end.x,end.y,{steps:5}); await page.mouse.up({button:'right'});
+  let s = await state(page), g = s.france.groups.find(x=>x.id===id); expect(g.pathLength).toBeGreaterThan(1); expect(Math.abs(g.finalFacing)).toBeLessThan(.05); await page.evaluate(() => window.__RTS_DEBUG__.tick(14)); s = await state(page); g = s.france.groups.find(x=>x.id===id); expect(Math.abs(g.facing)).toBeLessThan(.12); expect(errors).toEqual([]);
+});
 
-  for (const regiment of developed.britain.regiments) {
-    expect(regiment.officerAssigned).toBe(true);
-    expect(regiment.drummerAssigned).toBe(true);
-  }
+test('explored terrain remains remembered and terrain types are active', async ({ page }) => {
+  const errors = await openGame(page); let s = await state(page); const scout = s.france.units.find(u=>u.type==='cavalry'); await page.evaluate(id => window.__RTS_DEBUG__.teleportUnit(id,3200,900), scout.id); expect(await page.evaluate(() => window.__RTS_DEBUG__.isExplored(3200,900))).toBe(true); await page.evaluate(id => window.__RTS_DEBUG__.teleportUnit(id,700,900), scout.id); expect(await page.evaluate(() => window.__RTS_DEBUG__.isExplored(3200,900))).toBe(true);
+  expect(await page.evaluate(() => window.__RTS_DEBUG__.terrainAt(700,900))).toBe('road'); expect(await page.evaluate(() => window.__RTS_DEBUG__.terrainAt(400,500))).toBe('woods'); expect(await page.evaluate(() => window.__RTS_DEBUG__.terrainAt(1540,1160))).toBe('hill'); expect(errors).toEqual([]);
+});
 
-  await testInfo.attach('v05-british-development', {
-    body: await page.screenshot({ fullPage: true }),
-    contentType: 'image/png'
-  });
-  expect(errors).toEqual([]);
+test('British AI develops infantry, cavalry and crewed artillery groups', async ({ page }, testInfo) => {
+  const errors = await openGame(page); await page.evaluate(() => { window.__RTS_DEBUG__.setPeaceMode(true); window.__RTS_DEBUG__.grantResources('britain',9000,9000); window.__RTS_DEBUG__.tick(360); }); const s = await state(page);
+  expect(s.britain.buildings.some(b=>b.type==='barracks'&&b.complete)).toBe(true); expect(s.britain.buildings.some(b=>b.type==='stable'&&b.complete)).toBe(true); expect(s.britain.buildings.some(b=>b.type==='foundry'&&b.complete)).toBe(true); expect(s.britain.regiments.some(r=>r.kind==='infantry')).toBe(true); expect(s.britain.regiments.some(r=>r.kind==='cavalry')).toBe(true); expect(s.britain.batteries.length).toBeGreaterThanOrEqual(1); s.britain.batteries.forEach(b=>expect(b.operational).toBe(true)); expect(s.britain.units.filter(u=>u.type==='artillery').length).toBeGreaterThan(1);
+  await testInfo.attach('v06-british-development', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' }); expect(errors).toEqual([]);
 });
