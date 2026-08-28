@@ -71,9 +71,13 @@ function updateMotionSpeedV064(reg, march, roadMarch) {
   return march.speedV064;
 }
 
-function turnTowardV064(current, target, roadMarch) {
+function turnTowardV064(current, target, roadMarch, distance = Infinity) {
   const delta = normalizeAngleV063(target - current);
-  const maxTurnRate = roadMarch ? 1.22 : 1.48;
+  const baseTurnRate = roadMarch ? 1.22 : 1.48;
+  // Tight final corrections are made at lower forward speed, so allow a progressively
+  // smaller turning radius instead of orbiting a nearby waypoint.
+  const proximity = Number.isFinite(distance) ? clampV064((78 - distance) / 78, 0, 1) : 0;
+  const maxTurnRate = baseTurnRate * (1 + proximity * 1.65);
   const maxTurn = maxTurnRate * formationDtV063;
   return normalizeAngleV063(current + clampV064(delta, -maxTurn, maxTurn));
 }
@@ -150,7 +154,6 @@ function beginFinalDeploymentV064(reg, march) {
   reg.movementPhaseV063 = 'deploying';
 }
 
-const updateGroupPathsV063ForV064 = updateGroupPathsV06;
 updateGroupPathsV06 = function updateGroupPathsV064() {
   for (const reg of regiments) {
     if (reg.destroyed) continue;
@@ -161,10 +164,9 @@ updateGroupPathsV06 = function updateGroupPathsV064() {
     }
 
     const march = reg.marchV063;
-    if (!march || !march.v064) {
-      if (reg.path) updateGroupPathsV063ForV064();
-      continue;
-    }
+    // Every new infantry/cavalry path created by v0.6.4 gets this state. Static groups
+    // and legacy groups without it need no path processing here.
+    if (!march || !march.v064) continue;
 
     if (march.phase === 'deploying') {
       const facing = reg.finalFacing ?? march.marchFacing;
@@ -193,11 +195,11 @@ updateGroupPathsV06 = function updateGroupPathsV064() {
     let dx = waypoint.x - march.anchorX;
     let dy = waypoint.y - march.anchorY;
     let distance = Math.hypot(dx, dy);
-    const isLastWaypoint = reg.pathIndex >= path.length - 1;
+    let isLastWaypoint = reg.pathIndex >= path.length - 1;
 
-    // Round intermediate path corners before reaching the exact cell centre. The final target,
-    // however, is approached precisely so deployment never jumps the last few dozen pixels.
-    const advanceDistance = isLastWaypoint ? 8 : 38;
+    // Round intermediate path corners before reaching the exact cell centre. The final target
+    // is approached slowly and precisely, so deployment no longer requires a visible position jump.
+    const advanceDistance = isLastWaypoint ? 10 : 38;
     if (distance <= advanceDistance) {
       if (isLastWaypoint) {
         beginFinalDeploymentV064(reg, march);
@@ -208,15 +210,21 @@ updateGroupPathsV06 = function updateGroupPathsV064() {
       dx = waypoint.x - march.anchorX;
       dy = waypoint.y - march.anchorY;
       distance = Math.hypot(dx, dy);
+      isLastWaypoint = reg.pathIndex >= path.length - 1;
     }
 
     const roadMarch = roadAtV064(march.anchorX, march.anchorY);
     updateRoadBlendV064(march, roadMarch);
 
     const desiredHeading = Math.atan2(dy, dx);
-    march.marchFacing = turnTowardV064(march.marchFacing, desiredHeading, roadMarch);
+    march.marchFacing = turnTowardV064(march.marchFacing, desiredHeading, roadMarch, distance);
     const speed = updateMotionSpeedV064(reg, march, roadMarch);
-    const step = Math.min(distance, speed * formationDtV063);
+    // Smooth arrival prevents the anchor from circling a close waypoint. Intermediate corners
+    // retain most of their speed, while the exact final position gets a gentle deceleration.
+    const arrivalFactor = isLastWaypoint
+      ? clampV064(distance / 82, 0.16, 1)
+      : clampV064(distance / 52, 0.58, 1);
+    const step = Math.min(distance, speed * arrivalFactor * formationDtV063);
     march.anchorX += Math.cos(march.marchFacing) * step;
     march.anchorY += Math.sin(march.marchFacing) * step;
     setLocomotionTargetsV064(reg, march, roadMarch);
