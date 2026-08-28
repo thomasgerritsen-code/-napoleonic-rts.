@@ -4,21 +4,22 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="theme-color" content="#111713" />
-  <title>Napoleonic RTS v0.4</title>
+  <title>Napoleonic RTS v0.5</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="v05.css" />
 </head>
 <body>
 <div id="app">
   <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
 
   <header class="hud topbar">
-    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v0.4</span></div>
+    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v0.5</span></div>
     <div class="resources">
       <span>🇫🇷 🍞 <strong id="food">0</strong></span>
       <span>🪵 <strong id="wood">0</strong></span>
       <span>👥 <strong id="population">0/0</strong></span>
     </div>
-    <div id="status">Vorm een regiment en bouw je leger op.</div>
+    <div id="status">Vorm regimenten en ontwikkel je leger.</div>
     <button id="resetBtn" type="button">Nieuwe slag</button>
   </header>
 
@@ -27,7 +28,8 @@
     <span>Sleep: selecteren</span>
     <span>Klik regimentslid: heel regiment</span>
     <span>Rechtsklik: lopen / verzamelen</span>
-    <span>Formatieknop: direct herschikken</span>
+    <span>Q/E: regiment 15° draaien</span>
+    <span>Minimap: klik om camera te verplaatsen</span>
     <span>WASD / pijltjes: camera</span>
     <span>Muiswiel: zoom</span>
   </aside>
@@ -71,7 +73,11 @@
 <script src="src/combat-ai.js"></script>
 <script src="src/hud.js"></script>
 <script src="src/selection.js"></script>
+<script src="src/navigation.js"></script>
+<script src="src/visibility.js"></script>
 <script src="src/simulation-render.js"></script>
+<script src="src/v05.js"></script>
 <script src="src/input.js"></script>
+<script src="src/v05-debug.js"></script>
 </body>
 </html>
