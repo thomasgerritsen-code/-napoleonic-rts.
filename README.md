@@ -1,4 +1,4 @@
-# Napoleonic RTS — v0.6.4
+# Napoleonic RTS — v0.6.5
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -8,50 +8,72 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Nieuw in v0.6.4 — marcheren alleen op wegen en vloeiendere formaties
+## Nieuw in v0.6.5 — wegen worden echte marsroutes
 
-### Wegen bepalen het marsgedrag
-Bataljons gebruiken nu twee verschillende bewegingsvormen:
+### Bataljons zoeken bij lange verplaatsingen bewust een weg op
+Een lange verplaatsingsorder wordt niet meer alleen op afstand beoordeeld. De routeplanner vergelijkt de verwachte reistijd van een gewone veldverplaatsing met een route die een bruikbaar deel over de weg loopt.
 
-- **Op een weg:** het bataljon gaat over naar een compactere marscolonne en wordt als marcherend behandeld.
-- **Buiten een weg:** het bataljon blijft in de gekozen veldformatie (Linie, Colonne of Carré) en verplaatst zich als samenhangende formatie, maar gebruikt geen marscolonne/marsstatus.
+Daardoor kan een bataljon:
+- eerst vanuit open terrein naar de weg bewegen
+- daarna versneld over de weg marcheren
+- bij het juiste punt de weg weer verlaten
+- vervolgens in veldformatie naar de eindpositie bewegen en daar ontplooien
 
-Wanneer een bataljon een weg op- of afloopt, veranderen de formatie-afstanden geleidelijk. De eenheden klappen daardoor niet abrupt van veldformatie naar marscolonne of andersom.
+De weg is niet verplicht. Een wegroute wordt alleen gekozen wanneer:
+- de order lang genoeg is om de omweg zinvol te maken
+- een voldoende groot deel van de route daadwerkelijk over de weg loopt
+- de extra afstand niet buitensporig groot wordt
+- de hogere wegmars-snelheid de omweg qua geschatte reistijd voldoende terugverdient
 
-### Minder schokkerig bewegen
-De oude beweging kon zichtbaar gaan trekken en afremmen doordat:
-- de groepssnelheid in grote discrete stappen veranderde wanneer soldaten achterliepen
-- individuele soldaten tegelijk hun formatievak en lokale ontwijking probeerden te volgen
-- een groep bij het laatste waypoint met te veel snelheid een kleine draaicirkel kon blijven maken
+Korte positioneringsorders blijven daarom rechtstreeks door het veld gaan.
 
-v0.6.4 gebruikt daarom:
-- een continu gesmoothde groepssnelheid
+### Duidelijk sneller op de weg
+De groepssnelheden zijn bewust verder uit elkaar gezet zodat wegen tactisch merkbaar worden:
+
+**Infanteriebataljon**
+- veld: 36
+- weg: 54
+- ongeveer 50% hogere groepssnelheid op de weg
+
+**Cavalerieregiment**
+- veld: 64
+- weg: 88
+- ongeveer 38% hogere groepssnelheid op de weg
+
+De bestaande cohesieregeling blijft actief: een formatie kan tijdelijk iets vertragen wanneer leden achterlopen. De overgang naar de hogere of lagere snelheid blijft gesmoothd, zodat het bataljon bij het op- en afgaan van een weg niet plotseling verspringt.
+
+### Marsgedrag blijft gekoppeld aan terrein
+De regel uit v0.6.4 blijft gelden:
+- **op de weg:** compacte marscolonne + marsstatus + hogere snelheid
+- **buiten de weg:** de gekozen Linie, Colonne of Carré blijft behouden als bewegende veldformatie, zonder marsstatus
+
+De overgang tussen marscolonne en veldformatie verloopt geleidelijk.
+
+## Tests voor v0.6.5
+
+De regressiesuite bevat nu **15 Chromium-tests**. Nieuw is een route- en snelheidstest die onder andere controleert dat:
+- een lange order vanaf open terrein een zinvolle wegroute kiest
+- die route meerdere waypoints op de weg bevat
+- de weg voldoende deel van de totale route vormt
+- de omweg binnen de ingestelde grens blijft
+- de geschatte wegroute sneller is dan dezelfde afstand op veldsnelheid
+- een korte veldorder geen onnodige wegomweg maakt
+- een infanteriebataljon op de weg duidelijk sneller beweegt dan een vergelijkbaar bataljon in het veld
+
+De v0.6.5-code behaalde **15/15 geslaagde Chromium-tests** vóór deployment.
+
+## v0.6.4 — alleen marcheren op wegen en vloeiendere formaties
+
+v0.6.4 introduceerde het onderscheid tussen echte wegmars en veldverplaatsing. Op wegen vormen bataljons een compactere marscolonne; daarbuiten bewegen ze in hun gekozen veldformatie zonder marsstatus.
+
+De schokkerige groepsbeweging werd verminderd met:
+- continu gesmoothde groepssnelheid
 - geleidelijke draaiing van het groepsanker
-- directe, vloeiende beweging van iedere soldaat naar zijn bewegende formatievak tijdens formele groepsorders
-- zachte vertraging bij het uiteindelijke doel
-- extra draaimogelijkheid bij lage snelheid vlak bij het eindpunt
-- afgeronde tussenliggende routehoeken zonder het eindpunt over te schieten
+- directe beweging naar vloeiend bewegende formatieposities
+- zachte vertraging bij het eindpunt
+- afgeronde routehoeken
 
-Het resultaat is dat het bataljon als één massa beweegt zonder het eerdere trekken–afremmen–bijtrekken.
-
-### Rechts vasthouden + slepen blijft de eindrichting bepalen
-Voor een geselecteerd bataljon:
-1. houd de **rechtermuisknop** ingedrukt op de gewenste eindpositie
-2. sleep in de richting waarin het bataljon moet kijken
-3. laat de rechtermuisknop los
-
-De bestemming en gekozen front-richting blijven dus los van de vraag of de route over een weg of over open terrein loopt.
-
-## Tests voor v0.6.4
-
-De regressiesuite bevat nu **14 Chromium-tests**. Nieuw en aangepast zijn onder andere:
-- een echte rechtsklik-sleeptest op open terrein die controleert dat de groep in `field-formation` beweegt, niet als marcherend wordt gemarkeerd en de gekozen eindrichting behoudt
-- een aparte wegtest die controleert dat een bataljon op `road` wel `road-march` gebruikt en dat alle bataljonsleden als marcherend gelden
-- een bewegingsstabiliteitstest die de afgelegde afstand van het groepsanker iedere 0,2 seconde meet en grote tempo-sprongen afkeurt
-- controle dat zowel weg- als veldbeweging het eindpunt werkelijk bereiken en correct ontplooien
-- de bestaande Britse versterkingstest, 520-unit stresstest en versnelde 10-minuten soak-test
-
-De definitieve v0.6.4-code behaalde **14/14 geslaagde Chromium-tests** voordat GitHub Pages werd gedeployed.
+Rechts vasthouden + slepen blijft de bestemming en uiteindelijke front-richting van een geselecteerd bataljon bepalen.
 
 ## v0.6.3 — blijvende Britse versterkingen
 
@@ -91,7 +113,7 @@ Combat-targeting gebruikt een **combat spatial hash**. De renderer-onafhankelijk
 Een boer onthoudt zijn grondstoftype en zoekt automatisch een volgende boom of voedselbron wanneer de huidige bron leeg is.
 
 ### Terrein en fog of war
-- wegen versnellen en activeren bataljonsmarcheren
+- wegen versnellen, activeren bataljonsmarcheren en kunnen bewust als snellere marsroute worden gekozen
 - bossen vertragen maar beschermen
 - heuvels vertragen en geven aanvalbonus
 - verkend terrein blijft onthouden
@@ -131,4 +153,4 @@ npm run test:soak
 
 ## Richting v0.7
 
-Na verdere handmatige feedback kan v0.7 zich richten op firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, betere interactie tussen meerdere bataljons tijdens manoeuvres, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.
+Na verdere handmatige feedback kan v0.7 zich richten op meerdere wegverbindingen en kruispunten, firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, betere interactie tussen meerdere bataljons tijdens manoeuvres, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.
