@@ -66,8 +66,8 @@ test('worker automatically continues with a nearby resource of the same type', a
 test('right-drag orders a battalion through march-column, movement and final deployment facing', async ({ page }, testInfo) => {
   const errors = await openGame(page); await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
   const id = await page.evaluate(() => window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1200,1050)); await page.evaluate(id => window.__RTS_DEBUG__.selectRegiment(id), id);
-  const start = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1720,1120));
-  const end = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1720,1230));
+  const start = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1450,1050));
+  const end = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1450,1170));
   await page.mouse.move(start.x,start.y); await page.mouse.down({button:'right'}); await page.mouse.move(end.x,end.y,{steps:8}); await page.mouse.up({button:'right'});
   let fs = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id);
   expect(fs.pathLength).toBeGreaterThan(0); expect(fs.finalFacing).not.toBeNull(); expect(Math.abs(fs.finalFacing-Math.PI/2)).toBeLessThan(.08); expect(['forming-column','marching-column']).toContain(fs.phase);
