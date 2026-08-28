@@ -154,10 +154,10 @@ test('worker automatically continues with a nearby resource of the same type', a
 
 test('right-drag on open terrain preserves field formation and final facing', async ({ page }, testInfo) => {
   const errors = await openGame(page); await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
-  const id = await page.evaluate(() => window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1200,1250));
+  const id = await page.evaluate(() => window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1080,1180));
   await page.evaluate(id => window.__RTS_DEBUG__.selectRegiment(id), id);
-  const destination = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1450,1250));
-  const facing = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1570,1250));
+  const destination = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1320,1180));
+  const facing = await page.evaluate(() => window.__RTS_DEBUG__.worldToScreen(1420,1180));
   await page.mouse.move(destination.x,destination.y); await page.mouse.down({button:'right'}); await page.mouse.move(facing.x,facing.y,{steps:8}); await page.mouse.up({button:'right'});
   let fs = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id);
   expect(fs.pathLength).toBeGreaterThan(0); expect(Math.abs(fs.finalFacing)).toBeLessThan(.08);
