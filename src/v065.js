@@ -101,19 +101,25 @@ function attachPlanV065(points, meta) {
 const buildRegimentPathV064ForV065 = buildRegimentPathV06;
 buildRegimentPathV06 = function buildRegimentPathV065(start, goal) {
   const kind = planningGroupKindV065;
-  const direct = dedupePathV065(buildRegimentPathV064ForV065(start, goal));
+  const speeds = groupTravelSpeedsV065(kind);
+  const basePath = dedupePathV065(buildRegimentPathV064ForV065(start, goal));
   const directDistance = Math.hypot(goal.x - start.x, goal.y - start.y);
-  const directStats = pathStatsV065(start, direct, kind);
+  const baseStats = pathStatsV065(start, basePath, kind);
+  // This is the real comparison baseline: the same displacement travelled through ordinary
+  // field terrain at field speed. The older A* may already dip onto the road, so using its
+  // travel time as the "direct" baseline would incorrectly hide successful road seeking.
+  const directFieldTime = directDistance / Math.max(1, speeds.field);
 
   if (directDistance < ROAD_SEEK_MIN_DISTANCE_V065) {
-    return attachPlanV065(direct, {
+    return attachPlanV065(basePath, {
       choice: 'direct',
       reason: 'short-order',
       kind,
-      directTime: directStats.time,
-      chosenTime: directStats.time,
-      detourRatio: 1,
-      roadShare: directStats.roadShare
+      directTime: directFieldTime,
+      chosenTime: baseStats.time,
+      detourRatio: baseStats.distance / Math.max(1, directDistance),
+      roadShare: baseStats.roadShare,
+      roadDistance: baseStats.roadDistance
     });
   }
 
@@ -122,23 +128,30 @@ buildRegimentPathV06 = function buildRegimentPathV065(start, goal) {
   const toRoad = roadAtV064(start.x, start.y) ? [] : buildRegimentPathV064ForV065(start, entry);
   const alongRoad = buildRegimentPathV064ForV065(roadAtV064(start.x, start.y) ? start : entry, roadAtV064(goal.x, goal.y) ? goal : exit);
   const fromRoad = roadAtV064(goal.x, goal.y) ? [] : buildRegimentPathV064ForV065(exit, goal);
-  const roadCandidate = dedupePathV065([...toRoad, ...alongRoad, ...fromRoad]);
-  const roadStats = pathStatsV065(start, roadCandidate, kind);
-  const distanceBase = Math.max(1, directStats.distance);
-  const detourRatio = roadStats.distance / distanceBase;
-  const enoughRoad = roadStats.roadShare >= ROAD_MIN_SHARE_V065 && roadStats.roadDistance >= 360;
+  const explicitRoadPath = dedupePathV065([...toRoad, ...alongRoad, ...fromRoad]);
+  const explicitRoadStats = pathStatsV065(start, explicitRoadPath, kind);
+
+  // The original A* already has a small road preference. If it has independently found a better
+  // road route, keep it instead of forcing the hand-built entry/exit route. This also avoids
+  // needless zig-zags around buildings close to the road.
+  const bestRoadPath = baseStats.roadDistance >= 360 && baseStats.time <= explicitRoadStats.time
+    ? basePath
+    : explicitRoadPath;
+  const bestRoadStats = bestRoadPath === basePath ? baseStats : explicitRoadStats;
+  const detourRatio = bestRoadStats.distance / Math.max(1, directDistance);
+  const enoughRoad = bestRoadStats.roadShare >= ROAD_MIN_SHARE_V065 && bestRoadStats.roadDistance >= 360;
   const reasonableDetour = detourRatio <= ROAD_MAX_DETOUR_RATIO_V065;
-  const worthwhileTime = roadStats.time <= directStats.time * ROAD_MAX_TIME_RATIO_V065;
+  const worthwhileTime = bestRoadStats.time <= directFieldTime * ROAD_MAX_TIME_RATIO_V065;
   const chooseRoad = enoughRoad && reasonableDetour && worthwhileTime;
 
-  const chosen = chooseRoad ? roadCandidate : direct;
-  const chosenStats = chooseRoad ? roadStats : directStats;
+  const chosen = chooseRoad ? bestRoadPath : basePath;
+  const chosenStats = chooseRoad ? bestRoadStats : baseStats;
   return attachPlanV065(chosen, {
     choice: chooseRoad ? 'road' : 'direct',
     reason: chooseRoad ? 'faster-road-route' : !reasonableDetour ? 'detour-too-large' : !enoughRoad ? 'too-little-road' : 'direct-faster',
     kind,
-    directTime: directStats.time,
-    roadTime: roadStats.time,
+    directTime: directFieldTime,
+    roadTime: bestRoadStats.time,
     chosenTime: chosenStats.time,
     detourRatio,
     roadShare: chosenStats.roadShare,
