@@ -1,4 +1,4 @@
-# Napoleonic RTS — v0.6.3
+# Napoleonic RTS — v0.6.4
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -8,62 +8,58 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Nieuw in v0.6.3 — blijvende versterkingen en realistisch bataljonsmarcheren
+## Nieuw in v0.6.4 — marcheren alleen op wegen en vloeiendere formaties
 
-### Britse AI blijft na de eerste aanval produceren
-De Britse AI beoordeelt zijn leger nu op **werkelijke levende gevechtssterkte + reeds bestelde versterkingen** in plaats van alleen op het aantal nog bestaande regimenten.
+### Wegen bepalen het marsgedrag
+Bataljons gebruiken nu twee verschillende bewegingsvormen:
 
-Daardoor:
-- worden zwaar uitgedunde regimenten niet meer als een volledig leger meegeteld
-- blijft infanterie worden aangevuld na verliezen
-- blijft cavalerie worden aangevuld na verliezen
-- blijft artillerie worden aangevuld na verliezen
-- worden officieren en drummers als aparte noodzakelijke reserve onderhouden
-- worden extra Houses gebouwd op basis van huidig én reeds besteld bevolkingsgebruik
-- kan een tweede Barracks de versterkingsproductie versnellen
-- krijgen verloren kanonnen en cavalerie na een veldslag prioriteit, zodat een lange infanteriewachtrij de zware eenheden niet blokkeert
+- **Op een weg:** het bataljon gaat over naar een compactere marscolonne en wordt als marcherend behandeld.
+- **Buiten een weg:** het bataljon blijft in de gekozen veldformatie (Linie, Colonne of Carré) en verplaatst zich als samenhangende formatie, maar gebruikt geen marscolonne/marsstatus.
 
-De AI bouwt nieuwe aanvalsgolven op. Verse regimenten verzamelen eerst rond de Britse basis en worden daarna opnieuw naar het front gestuurd in plaats van dat de tegenstander na zijn eerste aanval stilvalt.
+Wanneer een bataljon een weg op- of afloopt, veranderen de formatie-afstanden geleidelijk. De eenheden klappen daardoor niet abrupt van veldformatie naar marscolonne of andersom.
 
-### Realistischer in formatie lopen
-Een bataljon verplaatst zich bij een langere mars niet meer alsof iedere soldaat afzonderlijk rechtstreeks naar zijn uiteindelijke positie loopt.
+### Minder schokkerig bewegen
+De oude beweging kon zichtbaar gaan trekken en afremmen doordat:
+- de groepssnelheid in grote discrete stappen veranderde wanneer soldaten achterliepen
+- individuele soldaten tegelijk hun formatievak en lokale ontwijking probeerden te volgen
+- een groep bij het laatste waypoint met te veel snelheid een kleine draaicirkel kon blijven maken
 
-De beweging verloopt nu in fasen:
-1. **Marscolonne vormen** — de soldaten sluiten eerst aan in een compactere colonne.
-2. **Gezamenlijk marcheren** — het bataljon beweegt rond één gezamenlijke formatie-ankerpositie.
-3. **Geleidelijk draaien** — bij bochten verandert het front stapsgewijs in plaats van dat alle soldaten onmiddellijk omklappen.
-4. **Ontplooien** — vlak bij het doel gaat de groep terug naar de gekozen Linie, Colonne of Carré.
-5. **Gevormd** — de eenheden nemen hun definitieve posities en front in.
+v0.6.4 gebruikt daarom:
+- een continu gesmoothde groepssnelheid
+- geleidelijke draaiing van het groepsanker
+- directe, vloeiende beweging van iedere soldaat naar zijn bewegende formatievak tijdens formele groepsorders
+- zachte vertraging bij het uiteindelijke doel
+- extra draaimogelijkheid bij lage snelheid vlak bij het eindpunt
+- afgeronde tussenliggende routehoeken zonder het eindpunt over te schieten
 
-Wanneer achterblijvers te ver uit de formatie raken, vertraagt de groep tijdelijk zodat de samenhang behouden blijft.
+Het resultaat is dat het bataljon als één massa beweegt zonder het eerdere trekken–afremmen–bijtrekken.
 
-### Rechts vasthouden + slepen bepaalt het bataljonsfront
+### Rechts vasthouden + slepen blijft de eindrichting bepalen
 Voor een geselecteerd bataljon:
-- houd de **rechtermuisknop** ingedrukt op de gewenste eindpositie
-- sleep in de richting waarin het bataljon moet kijken
-- laat de rechtermuisknop los
+1. houd de **rechtermuisknop** ingedrukt op de gewenste eindpositie
+2. sleep in de richting waarin het bataljon moet kijken
+3. laat de rechtermuisknop los
 
-Het beginpunt van de sleepactie is dus de **bestemming** en de sleeprichting bepaalt het **uiteindelijke front**.
+De bestemming en gekozen front-richting blijven dus los van de vraag of de route over een weg of over open terrein loopt.
 
-Tijdens het slepen wordt zichtbaar:
-- een richtingspijl
-- de geplande frontlijn van het bataljon
-- de front-hoek in graden
+## Tests voor v0.6.4
 
-De invoer wordt op window/capture-niveau gevolgd, zodat de gekozen richting niet verloren gaat wanneer de muis bij het loslaten over een HUD-element terechtkomt.
+De regressiesuite bevat nu **14 Chromium-tests**. Nieuw en aangepast zijn onder andere:
+- een echte rechtsklik-sleeptest op open terrein die controleert dat de groep in `field-formation` beweegt, niet als marcherend wordt gemarkeerd en de gekozen eindrichting behoudt
+- een aparte wegtest die controleert dat een bataljon op `road` wel `road-march` gebruikt en dat alle bataljonsleden als marcherend gelden
+- een bewegingsstabiliteitstest die de afgelegde afstand van het groepsanker iedere 0,2 seconde meet en grote tempo-sprongen afkeurt
+- controle dat zowel weg- als veldbeweging het eindpunt werkelijk bereiken en correct ontplooien
+- de bestaande Britse versterkingstest, 520-unit stresstest en versnelde 10-minuten soak-test
 
-## Tests voor v0.6.3
+De definitieve v0.6.4-code behaalde **14/14 geslaagde Chromium-tests** voordat GitHub Pages werd gedeployed.
 
-De regressiesuite bevat nu **13 Chromium-tests**. Nieuw zijn onder andere:
-- een echte Playwright-rechtermuissleep die controleert op `marscolonne → mars → ontplooien → gevormd`
-- controle dat de uiteindelijke formatie exact de gesleepte richting aanneemt
-- een volwassen Britse legertest waarin zware verliezen aan infanterie, cavalerie en artillerie worden toegebracht en vervolgens wordt gecontroleerd dat **alle drie opnieuw worden geproduceerd**
-- de bestaande 520-unit stresstest
-- de versnelde 10-minuten soak-test
+## v0.6.3 — blijvende Britse versterkingen
 
-De laatste pre-release Chromium-run voor v0.6.3 eindigde met **13/13 geslaagd**.
+De Britse AI beoordeelt zijn leger op **werkelijke levende gevechtssterkte + reeds bestelde versterkingen** in plaats van alleen op het aantal nog bestaande regimenten. Daardoor blijft de tegenstander na de eerste aanval infanterie, cavalerie en artillerie aanvullen en nieuwe aanvalsgolven opbouwen.
 
-## Testlab en performance uit v0.6.2
+Verloren zware eenheden krijgen na een veldslag extra prioriteit, officieren en drummers worden als aparte noodzakelijke reserve onderhouden en de AI breidt huisvesting en productiecapaciteit uit wanneer dat nodig is.
+
+## Testlab en performance
 
 Druk tijdens het spelen op **F3** voor het test/debugpaneel. Het toont onder andere FPS, frametime, update- en rendertijd, aantallen units en groepen, collision-correcties, combat-targetingbelasting, vastgelopen routes en Britse AI-status.
 
@@ -95,7 +91,7 @@ Combat-targeting gebruikt een **combat spatial hash**. De renderer-onafhankelijk
 Een boer onthoudt zijn grondstoftype en zoekt automatisch een volgende boom of voedselbron wanneer de huidige bron leeg is.
 
 ### Terrein en fog of war
-- wegen versnellen
+- wegen versnellen en activeren bataljonsmarcheren
 - bossen vertragen maar beschermen
 - heuvels vertragen en geven aanvalbonus
 - verkend terrein blijft onthouden
