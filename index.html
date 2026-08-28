@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="theme-color" content="#111713" />
-  <title>Napoleonic RTS v0.1</title>
+  <title>Napoleonic RTS v0.2</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,39 +12,55 @@
     <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
 
     <header class="hud topbar">
-      <div>
-        <strong>NAPOLEONIC RTS</strong>
-        <span class="version">v0.1</span>
+      <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v0.2</span></div>
+      <div class="resources">
+        <span>🍞 <strong id="food">0</strong></span>
+        <span>🪵 <strong id="wood">0</strong></span>
+        <span>👥 <strong id="population">0/0</strong></span>
       </div>
-      <div id="status">Selecteer Franse troepen</div>
+      <div id="status">Bouw je leger op.</div>
       <button id="resetBtn" type="button">Nieuwe slag</button>
     </header>
 
     <aside class="hud help">
       <strong>Besturing</strong>
       <span>Sleep: selecteren</span>
-      <span>Rechtsklik: verplaatsen</span>
+      <span>Rechtsklik: lopen / verzamelen</span>
+      <span>Klik gebouw: productie</span>
       <span>WASD / pijltjes: camera</span>
       <span>Muiswiel: zoom</span>
-      <span>Mobiel: tik unit → tik terrein</span>
+    </aside>
+
+    <aside class="hud objective">
+      <strong>Doel</strong>
+      <span>Verzamel hout en voedsel.</span>
+      <span>Bouw een Barracks.</span>
+      <span>Train musketiers.</span>
+      <span>Versla het Britse leger.</span>
     </aside>
 
     <section class="hud bottombar">
-      <div class="selection">
-        <span>Geselecteerd</span>
-        <strong id="selectedCount">0</strong>
+      <div class="selection-panel">
+        <span class="label">Selectie</span>
+        <strong id="selectionTitle">Niets geselecteerd</strong>
+        <span id="selectionDetails">Selecteer troepen of een gebouw.</span>
       </div>
-      <div class="formation-buttons">
+
+      <div class="actions" id="actions">
+        <button type="button" data-action="build-barracks">Barracks<br><small>300 🪵</small></button>
+        <button type="button" data-action="build-house">House<br><small>120 🪵</small></button>
         <button type="button" data-formation="line">Linie</button>
         <button type="button" data-formation="column">Colonne</button>
         <button type="button" data-formation="square">Carré</button>
       </div>
+
       <div class="army-counts">
         <span>🇫🇷 <strong id="frenchCount">0</strong></span>
         <span>🇬🇧 <strong id="britishCount">0</strong></span>
       </div>
     </section>
 
+    <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div>
     <div id="message" class="message hidden"></div>
   </div>
   <script src="game.js"></script>
