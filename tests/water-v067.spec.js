@@ -12,8 +12,18 @@ async function openGame(page) {
   return pageErrors;
 }
 
-test('v0.6.7 river has three bridges, one ford and blocks ordinary terrain', async ({ page }, testInfo) => {
+test('v0.6.7 loads with river systems, simulation facade and no JavaScript errors', async ({ page }, testInfo) => {
   const errors = await openGame(page);
+  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.7/);
+  await expect(page.locator('.version')).toHaveText('v0.6.7');
+  await expect(page.locator('#minimap')).toBeVisible();
+  const facade = await page.evaluate(() => ({
+    version: window.RTS_SIM.version,
+    hasSnapshot: typeof window.RTS_SIM.snapshot === 'function',
+    hasDispatch: typeof window.RTS_SIM.dispatch === 'function',
+    hasAudit: typeof window.RTS_SIM.audit === 'function'
+  }));
+  expect(facade).toEqual({ version:'0.6.7', hasSnapshot:true, hasDispatch:true, hasAudit:true });
   const water = await page.evaluate(() => window.__RTS_DEBUG__.waterSystemV067());
   expect(water.name).toBe('Ruisseau de la Campagne');
   expect(water.bridges).toBe(3);
@@ -62,5 +72,21 @@ test('a battalion crossing the river uses a legal crossing and never cuts throug
   expect(samples.some(s => s.anchorCrossing === 'Pont de la Chaussée')).toBe(true);
   expect(samples[samples.length-1].anchor.x).toBeGreaterThan(1550);
   await testInfo.attach('v067-bridge-march', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  expect(errors).toEqual([]);
+});
+
+test('F3 test lab and bug reports expose v0.6.7', async ({ page }) => {
+  const errors = await openGame(page);
+  await page.keyboard.press('F3');
+  await expect(page.locator('#debugPanel')).toBeVisible();
+  await page.selectOption('#debugScenario','artillery-3');
+  await page.locator('[data-debug-action="run"]').click();
+  const snap = await page.evaluate(() => window.__RTS_DEBUG__.simulationSnapshot());
+  expect(snap.version).toBe('0.6.7');
+  expect(snap.groups.filter(g=>g.kind==='artillery'&&!g.destroyed)).toHaveLength(3);
+  const report = await page.evaluate(() => JSON.parse(window.__RTS_DEBUG__.createBugReport()));
+  expect(report.version).toBe('0.6.7');
+  expect(report.scenario).toBe('artillery-3');
+  expect(report.audit).toBeTruthy();
   expect(errors).toEqual([]);
 });
