@@ -1,4 +1,4 @@
-# Napoleonic RTS — v0.4
+# Napoleonic RTS — v0.5
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait volledig in HTML5 Canvas + JavaScript.
 
@@ -8,59 +8,49 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Wat is nieuw in v0.4
+## Wat is nieuw in v0.5
 
-### Echte regimenten
-- Een infanterieregiment vereist minimaal **12 vrije musketiers + 1 vrije officier + 1 vrije drummer**
-- De officier en drummer worden bij het vormen permanent aan het regiment toegewezen
-- Klikken op één lid van een regiment selecteert het volledige regiment
-- Sleepselectie die een regiment raakt selecteert eveneens het hele regiment
-- Regimenten bewaren hun eigen formatie en bewegen als groep
-- Linie, Colonne en Carré worden direct op het regiment toegepast
-- Regimenten kunnen maximaal 36 musketiers bevatten
+### Regimenten met richting en front
+- Een infanterieregiment vereist nog steeds minimaal **12 musketiers + 1 officier + 1 drummer**
+- Regimenten hebben nu een echte richting/facing
+- Tijdens mars draaien regimenten automatisch naar de marsrichting
+- Met **Q/E** of de knoppen **↺/↻** roteer je een geselecteerd regiment 15°
+- Linie, Colonne en Carré worden rond de gekozen richting geroteerd
+- De regimentsmarker toont de huidige richting in graden
 
-### Officier en drummer
-- Nieuwe trainbare eenheden in de Barracks
-- Officier kost 160 voedsel + 60 hout
-- Drummer kost 90 voedsel + 20 hout
-- Een regiment kan niet worden gevormd zonder beide rollen
-- Verlies van de officier veroorzaakt een grote morale-schok
-- Verlies van de drummer vermindert de morale-ondersteuning
+### Betere beweging en collision
+- Nieuwe spatial-hash voor lokale unitqueries
+- Eenheden sturen lokaal om gebouwen heen
+- Separation voorkomt dat grote groepen op exact dezelfde positie samenklappen
+- Overlapcorrectie is zachter binnen hetzelfde regiment zodat formaties intact blijven
 
-### Britse ontwikkel-AI
-De Britse tegenstander speelt nu niet meer met alleen een vooraf geplaatst leger:
-- Britse boeren verzamelen zelfstandig voedsel en hout
-- De AI traint extra boeren
-- De AI bouwt zelfstandig een Barracks
-- De AI bouwt Houses wanneer de population cap krap wordt
-- Later kan de AI een tweede Barracks bouwen
-- De AI produceert musketiers, officieren en drummers
-- De AI vormt alleen regimenten wanneer een officier én drummer beschikbaar zijn
-- De AI kan meerdere regimenten opbouwen
-- Het eerste regiment verdedigt de basis tijdens de opbouwfase
-- Daarna trekken Britse regimenten in formaties naar de Franse positie
-- De Britse ontwikkelstatus is rechtsboven zichtbaar
+### Stable en cavalerie
+- Nieuw gebouw: **Stable** — 360 hout
+- Cavalerie trainen: **150 voedsel + 50 hout**
+- De Britse AI kan zelf een Stable bouwen en cavalerie produceren
 
-### Bestaande systemen
-- Hout- en voedseleconomie
-- Boeren en gebouwen
-- Barracks en Houses
-- Population cap
-- Morale en vluchtgedrag
-- Musketvuur en salvo-cyclus
-- Bajonetaanval
-- Cavaleriecharge
-- Artillerie met ronde kogel en grapeshot
+### Artillery Foundry
+- Nieuw gebouw: **Artillery Foundry** — 420 hout
+- Artillerie trainen: **120 voedsel + 100 hout**
+- De Britse AI kan zelf een Foundry bouwen en extra artillerie produceren
 
-## Regiment vormen
+### Minimap en fog of war
+- Nieuwe klikbare minimap rechtsonder
+- Klik op de minimap om de camera te verplaatsen
+- Vijandelijke eenheden en gebouwen zijn alleen zichtbaar binnen Franse zichtafstand
+- De minimap toont eveneens alleen vijanden die op dat moment zichtbaar zijn
+- Franse cavalerie en artillerie hebben een iets grotere zichtafstand
 
-1. Selecteer minstens 12 losse musketiers.
-2. Voeg 1 losse officier toe.
-3. Voeg 1 losse drummer toe.
-4. Klik **Maak regiment**.
-5. Kies Linie, Colonne of Carré.
-
-De startpositie bevat precies genoeg infanterie, een officier en een drummer om het systeem direct te proberen.
+### Britse v0.5 ontwikkel-AI
+De Britse tegenstander ontwikkelt zich nu verder dan alleen infanterie:
+- verzamelt voedsel en hout
+- bouwt Barracks en Houses
+- vormt regimenten met officier en drummer
+- bouwt na de eerste regimenten zelfstandig een Stable
+- bouwt daarna een Artillery Foundry
+- produceert cavalerie en artillerie
+- bouwt uitbreidingsgebouwen sequentieel af zodat bouwers geen half voltooid project verlaten
+- gebruikt de geproduceerde cavalerie en artillerie in militaire orders
 
 ## Productie
 
@@ -72,24 +62,31 @@ De startpositie bevat precies genoeg infanterie, een officier en een drummer om 
 - Officier: 160 voedsel + 60 hout
 - Drummer: 90 voedsel + 20 hout
 
-## Automatische browsertests
+**Stable**
+- Cavalerie: 150 voedsel + 50 hout
 
-Vanaf v0.4 gebruikt het project **Playwright 1.62.1 + Chromium** in GitHub Actions. Een nieuwe GitHub Pages-release wordt pas gepubliceerd nadat de browser-regressietests zijn geslaagd.
+**Artillery Foundry**
+- Artillerie: 120 voedsel + 100 hout
 
-De huidige tests controleren in een echte headless Chromium-browser:
-- de game laadt en het Canvas wordt gerenderd zonder JavaScript-errors
-- regimentvorming via de echte UI-knop
-- officier en drummer zijn structureel aan het regiment toegewezen
-- Linie, Colonne en Carré werken via echte UI-klikken
-- Barracks-productie van musketier, officier en drummer via echte UI-klikken
-- grondstofkosten, productiequeue en voltooide productie
-- de Britse AI ontwikkelt zijn economie gedurende een versnelde 180-seconden simulatie
-- de Britse AI bouwt een complete Barracks en produceert nieuwe eenheden
-- de Britse AI vormt minimaal één geldig regiment met officier en drummer
+## Automatische Chromium-tests
 
-De eerste volledige Chromium-run eindigde met **4/4 tests geslaagd**.
+Het project gebruikt **Playwright 1.62.1 + Chromium** in GitHub Actions. GitHub Pages wordt alleen gedeployed wanneer de browsertests slagen.
 
-Bij een testfout bewaart GitHub Actions automatisch het Playwright HTML-rapport, traces, screenshots en video's als artifact. De Pages-deploy is afhankelijk van de testjob en wordt bij een mislukte test niet uitgevoerd.
+De v0.5-suite controleert:
+- v0.5 laadt zonder JavaScript-errors en Canvas/minimap worden gerenderd
+- regimenten behouden hun toegewezen officier en drummer
+- regimentsrotatie werkt via echte UI-knoppen en Q/E
+- Linie, Colonne en Carré blijven werken
+- Stable-productie van cavalerie via een echte browserklik
+- Foundry-productie van artillerie via een echte browserklik
+- fog of war verbergt een verre Britse eenheid
+- minimap is zichtbaar en interactief
+- Britse AI bouwt in een versnelde simulatie Barracks, Stable en Foundry
+- Britse AI vormt geldige regimenten en produceert cavalerie en artillerie
+
+De eerste volledige v0.5 Chromium-run eindigde met **5/5 tests geslaagd**.
+
+Bij een testfout bewaart GitHub Actions het Playwright-rapport en screenshots als artifact. De Pages-deploy wordt dan niet uitgevoerd.
 
 ## Test lokaal
 
@@ -99,12 +96,11 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-## Roadmap v0.5
+## Mogelijke volgende stap — v0.6
 
-- Regimentsrotatie en richting/front
-- Betere collision en pathfinding tussen regimenten
-- Minimap en fog of war
-- Stable en cavalerieproductie
-- Artillery Foundry en artillerieproductie
-- Meerdere nationale AI-strategieën
-- Meer terreinsoorten en kaartobjecten
+- echte regiment-level pathfinding rond grote obstakels
+- drag-to-face: marsdoel slepen om positie én front in één beweging te bepalen
+- fog-of-war met verkend-terrein-geheugen
+- terreinbonussen voor bos, wegen en hoogte
+- cavalry-regimenten en artillery batteries als formele groepen
+- grotere kaarten en meerdere AI-strategieën
