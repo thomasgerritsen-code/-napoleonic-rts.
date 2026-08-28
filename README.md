@@ -1,6 +1,6 @@
 # Napoleonic RTS — v0.4
 
-Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait volledig in HTML5 Canvas + JavaScript en heeft geen externe dependencies.
+Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait volledig in HTML5 Canvas + JavaScript.
 
 ## ▶ Speel nu
 
@@ -72,26 +72,32 @@ De startpositie bevat precies genoeg infanterie, een officier en een drummer om 
 - Officier: 160 voedsel + 60 hout
 - Drummer: 90 voedsel + 20 hout
 
-## Testresultaten v0.4
+## Automatische browsertests
 
-Voor publicatie zijn alle bronmodules door een JavaScript-syntaxcontrole gehaald en is een geautomatiseerde DOM/integratietest uitgevoerd op dezelfde v0.4-code.
+Vanaf v0.4 gebruikt het project **Playwright 1.62.1 + Chromium** in GitHub Actions. Een nieuwe GitHub Pages-release wordt pas gepubliceerd nadat de browser-regressietests zijn geslaagd.
 
-Getest:
-- regimentknop blijft stabiel tijdens game-updates
-- Frans regiment kan alleen geldig worden gevormd
-- officier en drummer worden structureel toegewezen
-- Linie, Colonne en Carré
-- Barracks-productie van musketier, officier en drummer
-- grondstofkosten en productiequeue
-- Britse AI bouwt zelfstandig een complete Barracks
-- Britse AI traint nieuwe eenheden
-- Britse AI vormt zelfstandig regimenten
-- elk AI-regiment heeft bij vorming een officier en drummer
-- Britse basis groeit gedurende een 150 seconden versnelde simulatie
+De huidige tests controleren in een echte headless Chromium-browser:
+- de game laadt en het Canvas wordt gerenderd zonder JavaScript-errors
+- regimentvorming via de echte UI-knop
+- officier en drummer zijn structureel aan het regiment toegewezen
+- Linie, Colonne en Carré werken via echte UI-klikken
+- Barracks-productie van musketier, officier en drummer via echte UI-klikken
+- grondstofkosten, productiequeue en voltooide productie
+- de Britse AI ontwikkelt zijn economie gedurende een versnelde 180-seconden simulatie
+- de Britse AI bouwt een complete Barracks en produceert nieuwe eenheden
+- de Britse AI vormt minimaal één geldig regiment met officier en drummer
 
-De integratietest eindigde met `FINAL PASS`.
+De eerste volledige Chromium-run eindigde met **4/4 tests geslaagd**.
 
-Een echte headless-Chromium-run kon in de ontwikkelcontainer niet betrouwbaar starten door de GPU/DBus-omgeving; daarom is daarvoor niet ten onrechte een browser-pass geclaimd.
+Bij een testfout bewaart GitHub Actions automatisch het Playwright HTML-rapport, traces, screenshots en video's als artifact. De Pages-deploy is afhankelijk van de testjob en wordt bij een mislukte test niet uitgevoerd.
+
+## Test lokaal
+
+```bash
+npm install
+npx playwright install --with-deps chromium
+npm run test:e2e
+```
 
 ## Roadmap v0.5
 
