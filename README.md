@@ -1,4 +1,4 @@
-# Napoleonic RTS — v0.6.2
+# Napoleonic RTS — v0.6.3
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -8,82 +8,72 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Nieuw in v0.6.2 — testlab, performance en voorbereiding op 3D
+## Nieuw in v0.6.3 — blijvende versterkingen en realistisch bataljonsmarcheren
 
-Deze release is vooral bedoeld om handmatig testen veel waardevoller te maken en de simulatie technisch klaar te zetten voor verdere schaalvergroting.
+### Britse AI blijft na de eerste aanval produceren
+De Britse AI beoordeelt zijn leger nu op **werkelijke levende gevechtssterkte + reeds bestelde versterkingen** in plaats van alleen op het aantal nog bestaande regimenten.
 
-### 1. F3 debug/testpaneel
-Druk tijdens het spelen op **F3**. Het paneel toont live:
-- FPS en frametime
-- update- en rendertijd
-- aantal levende eenheden
-- aantal actieve groepen
-- collision-correcties
-- gemiddeld aantal combat-kandidaten per targeting-query
-- vastgelopen groepsroutes
-- actuele Britse AI-status
-- details van de geselecteerde groep, gebouw of losse eenheden
+Daardoor:
+- worden zwaar uitgedunde regimenten niet meer als een volledig leger meegeteld
+- blijft infanterie worden aangevuld na verliezen
+- blijft cavalerie worden aangevuld na verliezen
+- blijft artillerie worden aangevuld na verliezen
+- worden officieren en drummers als aparte noodzakelijke reserve onderhouden
+- worden extra Houses gebouwd op basis van huidig én reeds besteld bevolkingsgebruik
+- kan een tweede Barracks de versterkingsproductie versnellen
+- krijgen verloren kanonnen en cavalerie na een veldslag prioriteit, zodat een lange infanteriewachtrij de zware eenheden niet blokkeert
 
-### 2. Directe testscenario's
-Vanuit het F3-paneel kun je zonder opbouwfase direct laden:
-- normale slag
-- regiment versus regiment
-- cavaleriecharge tegen infanterie
-- drie bemande kanonnen
-- regiment rond 35% moraal
-- regiment rond 40% resterende sterkte
-- 520 musketiers voor performance-testing
-- Britse basis vijf minuten vooruitgesimuleerd
+De AI bouwt nieuwe aanvalsgolven op. Verse regimenten verzamelen eerst rond de Britse basis en worden daarna opnieuw naar het front gestuurd in plaats van dat de tegenstander na zijn eerste aanval stilvalt.
 
-### 3. Kopieerbaar bugrapport
-De knop **Kopieer bugrapport** maakt een JSON-rapport met onder andere:
-- gameversie en speeltijd
-- browser/viewport
-- huidig testscenario
-- performancecijfers
-- geselecteerde groep of eenheden
-- economie en AI-plan
-- alle levende units, gebouwen en groepen
-- huidige auditresultaten
+### Realistischer in formatie lopen
+Een bataljon verplaatst zich bij een langere mars niet meer alsof iedere soldaat afzonderlijk rechtstreeks naar zijn uiteindelijke positie loopt.
 
-Dit rapport kan rechtstreeks in een bugmelding of ChatGPT-bericht worden geplakt.
+De beweging verloopt nu in fasen:
+1. **Marscolonne vormen** — de soldaten sluiten eerst aan in een compactere colonne.
+2. **Gezamenlijk marcheren** — het bataljon beweegt rond één gezamenlijke formatie-ankerpositie.
+3. **Geleidelijk draaien** — bij bochten verandert het front stapsgewijs in plaats van dat alle soldaten onmiddellijk omklappen.
+4. **Ontplooien** — vlak bij het doel gaat de groep terug naar de gekozen Linie, Colonne of Carré.
+5. **Gevormd** — de eenheden nemen hun definitieve posities en front in.
 
-### 4. Performanceverbetering
-Combat-targeting gebruikte eerder voor veel eenheden herhaaldelijk een volledige lijstscan. v0.6.2 gebruikt daarvoor een aparte **combat spatial hash**. Alleen vijanden in relevante gridcellen worden bekeken. Gebouwen blijven lineair gecontroleerd omdat hun aantal klein is.
+Wanneer achterblijvers te ver uit de formatie raken, vertraagt de groep tijdelijk zodat de samenhang behouden blijft.
 
-Het F3-paneel toont `combat candidates/query`, zodat zichtbaar wordt hoeveel potentiële doelen daadwerkelijk per targeting-query worden bekeken.
+### Rechts vasthouden + slepen bepaalt het bataljonsfront
+Voor een geselecteerd bataljon:
+- houd de **rechtermuisknop** ingedrukt op de gewenste eindpositie
+- sleep in de richting waarin het bataljon moet kijken
+- laat de rechtermuisknop los
 
-### 5. Scheiding simulatie en rendering
-Er is nu een `window.RTS_SIM` simulatie-interface met:
-- `snapshot()` — renderer-onafhankelijke state
-- `dispatch(command)` — orders zoals bewegen, formatie en rotatie
-- `step(seconds)` — gecontroleerd simuleren
-- `audit()` — integriteitscontrole
-- `getMetrics()` — performancegegevens
+Het beginpunt van de sleepactie is dus de **bestemming** en de sleeprichting bepaalt het **uiteindelijke front**.
 
-Canvas blijft voorlopig de renderer, maar tests/debugtools kunnen nu via dezelfde simulatie-interface werken. Dit is de eerste concrete stap richting een latere 3D-renderer zonder de gameplaylogica volledig opnieuw te schrijven.
+Tijdens het slepen wordt zichtbaar:
+- een richtingspijl
+- de geplande frontlijn van het bataljon
+- de front-hoek in graden
 
-### 6. Langere Chromium-tests
-Naast de bestaande regressies zijn toegevoegd:
-- F3/testlab + bugrapport-test
-- 520-unit stresstest
-- versnelde **10-minuten soak-test**
+De invoer wordt op window/capture-niveau gevolgd, zodat de gekozen richting niet verloren gaat wanneer de muis bij het loslaten over een HUD-element terechtkomt.
 
-De audit controleert onder meer op:
-- NaN of oneindige unitposities
-- units buiten het slagveld
-- actieve groepen zonder levende leden
-- actieve artilleriebatterijen zonder operationele bemanning
-- ongeldige productiewachtrijen
-- ongeldige/negatieve economie-state
-- groepen die langer dan 20 seconden geen voortgang maken op hun route
-- langdurig onveranderd AI-plan als waarschuwing
+## Tests voor v0.6.3
 
-## v0.6.1 — artillerie als één eenheid
+De regressiesuite bevat nu **13 Chromium-tests**. Nieuw zijn onder andere:
+- een echte Playwright-rechtermuissleep die controleert op `marscolonne → mars → ontplooien → gevormd`
+- controle dat de uiteindelijke formatie exact de gesleepte richting aanneemt
+- een volwassen Britse legertest waarin zware verliezen aan infanterie, cavalerie en artillerie worden toegebracht en vervolgens wordt gecontroleerd dat **alle drie opnieuw worden geproduceerd**
+- de bestaande 520-unit stresstest
+- de versnelde 10-minuten soak-test
 
-Een operationele batterij bestaat uit **1 kanon + 2 toegewezen musketiers**. Het kanon is het bewegende hoofdelement en de bemanningsleden volgen vaste crew-slots. Daardoor bewegen kanon en musketiers visueel als één samengesteld object en ontstaat geen jitter door afzonderlijke infantry-pathfinding/collision.
+De laatste pre-release Chromium-run voor v0.6.3 eindigde met **13/13 geslaagd**.
 
-## Belangrijkste gameplay uit v0.6
+## Testlab en performance uit v0.6.2
+
+Druk tijdens het spelen op **F3** voor het test/debugpaneel. Het toont onder andere FPS, frametime, update- en rendertijd, aantallen units en groepen, collision-correcties, combat-targetingbelasting, vastgelopen routes en Britse AI-status.
+
+Directe testscenario's omvatten onder andere regiment versus regiment, cavaleriecharge, drie bemande kanonnen, lage moraal, lage regimentsterkte, 520 musketiers en een vooruitgesimuleerde Britse basis.
+
+De knop **Kopieer bugrapport** maakt een JSON-rapport met gameversie, speeltijd, selectie, economie, AI, units, gebouwen, groepen, performance en auditresultaten.
+
+Combat-targeting gebruikt een **combat spatial hash**. De renderer-onafhankelijke `window.RTS_SIM` interface biedt `snapshot()`, `dispatch(command)`, `step(seconds)`, `audit()` en `getMetrics()` als voorbereiding op verdere schaalvergroting en een latere 3D-renderer.
+
+## Bestaande gameplay
 
 ### Rallypoints en productie
 - Town Center, Barracks, Stable en Artillery Foundry hebben een verzamelpunt
@@ -93,20 +83,16 @@ Een operationele batterij bestaat uit **1 kanon + 2 toegewezen musketiers**. Het
 ### Regimenten breken
 - infanterie onder 32% groepsmoraal
 - cavalerie onder 28% groepsmoraal
-- iedere formele gevechtsgroep ook wanneer maximaal één derde van de oorspronkelijke sterkte overblijft
+- formele gevechtsgroepen breken ook wanneer maximaal één derde van de oorspronkelijke sterkte overblijft
 
 ### Artillerie
 - 1 kanon vereist 2 toegewezen vrije musketiers
+- kanon + bemanning bewegen visueel als één samengestelde eenheid
 - zonder twee levende bemanningsleden kan het kanon niet bewegen of vuren
 - verlies van een bemanningslid breekt de batterij
 
 ### Boeren
-Een boer onthoudt het grondstoftype en zoekt automatisch een volgende boom of voedselbron wanneer de huidige bron leeg is.
-
-### Regiment-level pathfinding en drag-to-face
-- groepen gebruiken A*-pathfinding rond gebouwen
-- rechtsklik-slepen bepaalt doelpositie en eindrichting
-- Q/E draait een geselecteerde groep 15 graden
+Een boer onthoudt zijn grondstoftype en zoekt automatisch een volgende boom of voedselbron wanneer de huidige bron leeg is.
 
 ### Terrein en fog of war
 - wegen versnellen
@@ -149,4 +135,4 @@ npm run test:soak
 
 ## Richting v0.7
 
-Na handmatige feedback kan v0.7 zich richten op betere formatiecohesie, firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, belegering, verdere economische ketens en verdere loskoppeling van de 2D-renderer.
+Na verdere handmatige feedback kan v0.7 zich richten op firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, betere interactie tussen meerdere bataljons tijdens manoeuvres, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.
