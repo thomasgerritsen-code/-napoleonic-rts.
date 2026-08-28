@@ -2,9 +2,15 @@
 
 Een kleine browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. Deze eerste versie is volledig geschreven in HTML5 Canvas + JavaScript en heeft geen externe dependencies.
 
-## Spelen
+## ▶ Speel nu
 
-Open `index.html` rechtstreeks in een moderne browser, of publiceer de repository via GitHub Pages.
+Directe browserversie:
+
+https://raw.githack.com/thomasgerritsen-code/-napoleonic-rts./main/index.html
+
+> Dit is een tijdelijke directe speel-link op basis van de publieke GitHub-repository. Zodra GitHub Pages is ingeschakeld, gebruiken we de nette `github.io`-link.
+
+## Besturing
 
 ### Desktop
 - Linkermuisknop slepen: selecteer Franse eenheden
