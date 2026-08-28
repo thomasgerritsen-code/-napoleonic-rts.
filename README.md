@@ -1,4 +1,4 @@
-# Napoleonic RTS — v0.6.8
+# Napoleonic RTS — v0.6.9
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -8,55 +8,72 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Nieuw in v0.6.8 — verkeersdrukte bij bruggen
+## Nieuw in v0.6.9 — vloeiender bewegen, gevechtscohesie en realistischere dorpen
 
-De rivierovergangen uit v0.6.7 zijn nu echte tactische bottlenecks. Regimenten kunnen niet langer onbeperkt tegelijk over hetzelfde smalle brugdek bewegen.
+Deze release richt zich op de zichtbare beweging van complete bataljons. Vooral wegmars, het geven van een nieuwe marsorder, vijandcontact en close combat zijn aangepast zodat de soldaten minder als losse individuen tegen elkaar in bewegen.
 
-### Bruggen hebben capaciteit
+### Geen achterwaartse sprong meer bij een nieuwe wegorder
 
-- **Pont de la Chaussée:** maximaal 1 bataljon tegelijk
-- **Pont de la Crête:** maximaal 1 bataljon tegelijk
-- **Pont des Fermes:** maximaal 1 bataljon tegelijk
-- **Gué de la Colline:** maximaal 2 bataljons tegelijk, omdat de voorde breder is
+Wanneer een bataljon al op een weg staat en verderop op **dezelfde weg** een nieuw doel krijgt, wordt de route nu direct langs de weg in de juiste richting opgebouwd. Een eerder mogelijk eerste waypoint achter de formatie wordt verwijderd.
 
-Een regiment reserveert een passage pas wanneer het de oversteek nadert. Andere regimenten die dezelfde passage willen gebruiken komen in een wachtrij.
+Daardoor schuift het bataljon niet meer eerst een stuk achteruit voordat het naar het nieuwe doel loopt. De huidige groepssnelheid wordt bovendien behouden wanneer een bestaande mars wordt aangepast, zodat een nieuwe order minder als een complete herstart voelt.
 
-### Automatisch versmallen naar marscolonne
+### Wegmars zonder voortdurend bibberen
 
-Bij nadering van een oversteek schakelt een infanterie- of cavalerieregiment tijdelijk naar een smalle marscolonne. De gekozen eindformatie wordt niet verloren: Linie, Colonne of Carré blijft de gewenste veldformatie en wordt na de passage weer door het normale formatiesysteem gebruikt.
+Tijdens een formele bataljonsmars wordt de loopsnelheid nu gebaseerd op het terrein onder het **groepsanker** en de wegklasse, in plaats van afzonderlijk per soldaat. Soldaten die gedeeltelijk naast de weg lopen krijgen daardoor niet meer een andere snelheid dan hun buurman.
 
-### Wachtrijen op de oever
+Daarnaast worden collision-correcties tussen leden van hetzelfde marcherende bataljon sterk onderdrukt. De formatieposities regelen de onderlinge afstand al; de oude combinatie van slotcorrectie plus collision-push trok soldaten afwisselend naar hun positie en er weer vanaf. Dat was een belangrijke oorzaak van het zichtbare links-rechts bibberen.
 
-Wachtende bataljons krijgen een eigen stoppositie vóór de brug. Elke volgende groep staat verder terug, zodat formaties niet op exact hetzelfde punt stapelen. Zodra de passage vrij is schuift de eerste groep uit de wachtrij door.
+### Bataljon reageert als groep op vijandcontact
 
-De brug wordt pas vrijgegeven wanneer ook de achterste soldaten van het passerende bataljon van het brugdek af zijn. Hierdoor kan een volgend regiment niet door de staart van zijn voorganger heen bewegen.
+Wanneer een bewegend infanteriebataljon contact krijgt met de tegenstander, wordt de overgang nu op groepsniveau afgehandeld:
+- bij vuurcontact komt het groepsanker tot stilstand en vormt het bataljon zich voor het gevecht
+- bij een bajonetaanval vertraagt het bataljon progressief wanneer het de tegenstander nadert
+- vlak vóór diepe overlap stopt de groepsbeweging en blijft de close-combatformatie actief
+- collision-correcties tussen vijandelijke formaties worden tijdens dit contact zachter toegepast
 
-### Verkeersstatus zichtbaar op de kaart
+Hierdoor hoeven individuele soldaten niet meer tegelijk te stoppen, in te halen, botsen en opnieuw naar hun formatiepositie te corrigeren.
 
-Bij een gebruikte oversteek verschijnt een compacte status, bijvoorbeeld:
+### Drummer blijft achter de infanterie
 
-`1/1 bezet · wacht 2`
+De drummer stond in de oude marscolonne technisch vóór de musketiers. Dat is gecorrigeerd:
+- in marscolonne staat de drummer achter de laatste infanterierij
+- in Linie/Colonne blijft hij achter de gevechtslinie
+- in Carré blijft hij binnen de formatie
+- een drummer in een formeel infanteriebataljon is nu een **support-eenheid** en zoekt niet meer zelfstandig close combat op
 
-Daarmee is direct zichtbaar of een brug vrij, bezet of geblokkeerd door meerdere wachtende regimenten.
+Morale- en routingregels blijven actief, maar de drummer stormt niet meer door de musketiers heen om een melee-aanval uit te voeren.
 
-### Tactisch effect
+### Realistischere kruispunten en dorpen
 
-Bruggen zijn nu echte choke points. Een lange colonne kan zich voor een brug ophopen, een tegenstander kan een passage blokkeren en de bredere voorde kan aantrekkelijk worden wanneer een hoofdbrug overbelast is. De bestaande route-, rivier- en snelheidsregels uit v0.6.6 en v0.6.7 blijven actief.
+De oude dorpsmarkeringen op of vrijwel midden in de weg zijn vervangen door echte kleine nederzettingen:
+- elk dorp bestaat uit meerdere afzonderlijke huizen langs beide kanten van een weg
+- huizen worden pas geplaatst wanneer ook hun volledige voetafdruk buiten **alle** kruisende wegprofielen ligt
+- kruispunten krijgen een bredere versleten aansluiting en sporen, zodat wegen visueel natuurlijker in elkaar overlopen
+- dorpsnamen worden niet meer op het speelveld getekend
 
-## Tests voor v0.6.8
+De plaatsen blijven onderdeel van de kaartstructuur en het wegennet, maar het slagveld oogt minder als een schematische kaart met labels.
 
-De releasegate bevat **20 Chromium-tests**. Naast economie, formaties, artillerie, AI, wegen, rivierroutering, de 520-unit stresstest en de versnelde 10-minuten soak-test wordt nu specifiek gecontroleerd dat:
-- v0.6.8 zonder JavaScript-fouten laadt
-- bruggen capaciteit 1 hebben
-- de voorde capaciteit 2 heeft
-- twee bataljons voor dezelfde brug werkelijk een wachtrij vormen
-- regimenten bij de brug tijdelijk in brug-/marscolonne gaan
-- nooit twee bataljons tegelijk hetzelfde smalle brugdek bezetten
-- beide bataljons uiteindelijk de overzijde bereiken
-- beide bataljons na de passage weer in hun gekozen Linie eindigen
-- F3-snapshots en bugrapporten v0.6.8 rapporteren
+## Tests voor v0.6.9
 
-GitHub Pages wordt alleen gepubliceerd wanneer de volledige Chromium-gate slaagt.
+De gameplaybuild behaalde **24/24 geslaagde Chromium-tests**. Naast alle bestaande economie-, formatie-, artillerie-, AI-, rivier-, brugverkeer-, 520-unit stress- en 10-minuten soak-regressies controleert v0.6.9 specifiek dat:
+- huizen naast de wegen staan en niet door een ander kruisend wegsegment worden geraakt
+- alle zes nederzettingen uit meerdere huizen bestaan
+- dorpsnamen niet meer op de kaart worden weergegeven
+- een nieuw doel verderop op dezelfde weg geen eerste waypoint achter het bataljon oplevert
+- het groepsanker bij zo'n nieuwe order niet eerst achteruit beweegt
+- de drummer in zowel marscolonne als veldlinie achter de infanterie blijft
+- de drummer als support-eenheid actief blijft
+- vijandcontact het complete bataljon naar een coherente combat-formatie schakelt
+- de bestaande brugwachtrijen, waterroutering, AI, stress- en soaktests geldig blijven
+
+De gecorrigeerde gameplaycommit `7811953999c727768e68cefc5f44fd1a4cb1bb94` behaalde 24/24 tests en werd succesvol naar GitHub Pages gedeployed voordat deze definitieve releasebeschrijving werd toegevoegd. Deze README-commit gaat opnieuw door dezelfde releasegate.
+
+## v0.6.8 — verkeersdrukte bij bruggen
+
+De rivierovergangen uit v0.6.7 zijn echte tactische bottlenecks. Bruggen laten maximaal één bataljon tegelijk toe; de bredere Gué de la Colline maximaal twee. Regimenten versmallen tijdelijk naar marscolonne, wachten op afzonderlijke posities op de oever en ontvouwen na de passage weer naar hun gekozen veldformatie.
+
+De brug wordt pas vrijgegeven wanneer ook de achterste soldaten van het passerende bataljon van het brugdek af zijn. De kaart toont bij gebruikte passages een compacte bezettings- en wachtrijstatus.
 
 ## v0.6.7 — rivier, bruggen en voorde
 
@@ -84,7 +101,7 @@ Het slagveld bevat **13 wegen in drie klassen**:
 - 5 lokale wegen
 - 4 karrensporen
 
-Zes gehuchten/kruispunten vormen natuurlijke knooppunten, waaronder **Les Quatre Chemins**. Lange orders gebruiken een wegennet-graafmodel om de snelste combinatie van wegen te kiezen; korte tactische orders blijven rechtstreeks door het veld gaan.
+Zes nederzettings-/kruispuntlocaties vormen natuurlijke knooppunten. Lange orders gebruiken een wegennet-graafmodel om de snelste combinatie van wegen te kiezen; korte tactische orders blijven rechtstreeks door het veld gaan.
 
 | Terrein | Infanterie | Cavalerie | Artillerie |
 | --- | ---: | ---: | ---: |
