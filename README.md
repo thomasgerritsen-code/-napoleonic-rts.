@@ -1,4 +1,4 @@
-# Napoleonic RTS — v0.6.6
+# Napoleonic RTS — v0.6.7
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -8,36 +8,89 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Nieuw in v0.6.6 — Napoleontisch wegenstelsel
+## Nieuw in v0.6.7 — rivier, bruggen en doorwaadbare plaats
 
-De oude enkele rechte weg is vervangen door een compleet, historisch geïnspireerd wegennet. De kaart is opgebouwd rond het type netwerk dat voor Napoleontische legers strategisch belangrijk was: een beperkt aantal belangrijke chaussées tussen plaatsen, aangevuld met smallere lokale wegen en eenvoudige karrensporen. Grote kruispunten en gehuchten vormen natuurlijke knooppunten.
+Het wegenstelsel uit v0.6.6 wordt nu doorsneden door de **Ruisseau de la Campagne**, een meanderende waterloop die van noord naar zuid over het slagveld loopt. De rivier is een echte navigatiebarrière: troepen kunnen niet meer willekeurig dwars door diep water lopen en moeten een geschikte oversteek zoeken.
 
-### 13 wegen in drie klassen
+### Vier strategische oversteekpunten
 
-**4 hoofdwegen / chaussées**
-- Grande Chaussée
-- Route du Nord
-- Route du Sud-Ouest
-- Route du Nord-Est
+De kaart bevat nu:
 
-**5 lokale wegen**
-- Chemin de la Crête Ouest
-- Chemin de la Crête Est
-- Chemin du Bois
-- Chemin des Fermes Est
-- Chemin des Fermes Sud
+**3 bruggen**
+- **Pont de la Chaussée** — stenen brug op de Grande Chaussée
+- **Pont de la Crête** — houten brug bij de heuvel-/kamroutes
+- **Pont des Fermes** — houten brug bij de zuidelijke boerderijwegen
 
-**4 karrensporen**
-- Voie du Moulin
-- Voie de la Ferme
-- Voie du Verger
-- Voie de la Lisière
+**1 voorde**
+- **Gué de la Colline** — brede doorwaadbare plaats waar eenheden wel kunnen oversteken, maar duidelijk langzamer dan over een brug
 
-Op de kaart zijn daarnaast zes kleine gehuchten/kruispunten gemarkeerd, waaronder **Les Quatre Chemins** als centraal strategisch knooppunt.
+Hierdoor zijn bruggen en voorden echte tactische knooppunten. Een leger dat de belangrijkste brug beheerst kan beweging tussen beide oevers sterk beïnvloeden.
 
-### Wegkwaliteit heeft invloed op snelheid
+### Water is een echte terreinbarrière
 
-De verschillende wegklassen zijn niet alleen visueel anders; ze hebben verschillende marskwaliteiten.
+De rivier is gekoppeld aan dezelfde navigatielogica die formaties en losse eenheden gebruiken:
+- het terrein-A* beschouwt diep water als onbegaanbaar
+- wegsegmenten die illegaal door de rivier zouden snijden worden uit het wegennet-graafmodel geweerd
+- groepsankers mogen bij scherpe bochten niet door een rivierbocht heen snijden
+- losse eenheden en arbeiders zoeken bij een oeverwissel een legale brug of voorde
+- een klik midden in diep water wordt naar een bruikbaar oversteekpunt verplaatst
+
+De game tekent de rivier dus niet alleen: de waterloop verandert daadwerkelijk welke routes mogelijk zijn.
+
+### Brug of voorde is een echte keuze
+
+Oversteken kost snelheid. Bruggen zijn relatief efficiënt; de voorde veroorzaakt een veel grotere vertraging.
+
+Indicatieve maximumsnelheid tijdens de passage:
+
+| Passage | Infanterie | Cavalerie | Artillerie |
+| --- | ---: | ---: | ---: |
+| Brug | 38 | 52 | 18 |
+| Voorde | 28 | 36 | 12 |
+
+Daarnaast telt de routeplanner een extra passagevertraging mee. Voor artillerie is een voorde bewust het zwaarst. Daardoor kan een iets langere route naar een brug sneller zijn dan de kortere route door de voorde.
+
+### Gecombineerd met het wegennet
+
+Lange marsorders combineren nu twee strategische systemen:
+1. veldverplaatsing naar een geschikte route
+2. chaussées, lokale wegen en karrensporen uit v0.6.6
+3. een legale rivieroversteek
+4. eventueel een andere wegklasse aan de overzijde
+5. ontplooiing in Linie, Colonne of Carré bij het einddoel
+
+Een bataljon dat van west naar oost over de Grande Chaussée wordt gestuurd kiest bijvoorbeeld de **Pont de la Chaussée** en blijft tijdens de hele route buiten diep water.
+
+### Rivier op de minimap
+
+Verkende delen van de rivier worden op de minimap weergegeven. Bruggen en de voorde krijgen kleine markeringen, zodat belangrijke passages ook tijdens het manoeuvreren op grotere schaal herkenbaar blijven.
+
+## Tests voor v0.6.7
+
+De releasegate draait nu **18 effectieve Chromium-tests**. Daarin blijven de bestaande economie-, formatie-, artillerie-, AI-, wegen-, 520-unit stress- en 10-minuten soak-regressies actief. Daarbovenop controleert v0.6.7 specifiek dat:
+- de release exact als v0.6.7 laadt zonder JavaScript-fouten
+- de rivier precies drie bruggen en één voorde bevat
+- diep water als geblokkeerd terrein wordt herkend
+- brug- en voordegebieden wel passeerbaar zijn
+- een brug sneller is dan de voorde
+- een bataljon dat de rivier moet kruisen een legale passage in zijn route heeft
+- de route-audit nul illegale watersegmenten vindt
+- het bewegende groepsanker nooit in diep water terechtkomt
+- het bataljon de Pont de la Chaussée daadwerkelijk passeert en aan de andere oever aankomt
+- F3-snapshots en bugrapporten v0.6.7 rapporteren
+
+De gameplaybuild behaalde **18/18 geslaagde Chromium-tests** en werd succesvol naar GitHub Pages gedeployed voordat deze definitieve releasebeschrijving werd toegevoegd. Deze README-commit gaat opnieuw door dezelfde gate voordat hij als definitieve v0.6.7-release geldt.
+
+## v0.6.6 — Napoleontisch wegenstelsel
+
+De oude enkele rechte weg werd vervangen door een netwerk met **13 wegen in drie klassen**:
+- 4 hoofdwegen / chaussées
+- 5 lokale wegen
+- 4 karrensporen
+
+Zes gehuchten/kruispunten vormen natuurlijke knooppunten, waaronder **Les Quatre Chemins**. Lange orders gebruiken een apart wegennet-graafmodel om de snelste combinatie van wegen te kiezen; korte tactische orders blijven rechtstreeks door het veld gaan.
+
+Wegkwaliteit beïnvloedt de snelheid:
 
 | Terrein | Infanterie | Cavalerie | Artillerie |
 | --- | ---: | ---: | ---: |
@@ -46,57 +99,7 @@ De verschillende wegklassen zijn niet alleen visueel anders; ze hebben verschill
 | Lokale weg | 49 | 80 | 26 |
 | Chaussée | 56 | 90 | 30 |
 
-Een chaussée is dus de beste route voor een lange strategische verplaatsing. Een karrenspoor kan nuttig zijn, maar levert veel minder voordeel op.
-
-### Echte kruispuntroutering
-
-Lange bataljonsorders gebruiken nu naast de gewone terrein-A* een apart **wegennet-graafmodel**. De planner kent de echte knooppunten van het netwerk en berekent de snelste combinatie van wegen op basis van:
-- afstand naar de weg
-- type weg
-- werkelijke marsnelheid van het geselecteerde groepstype
-- lengte van de omweg
-- geschatte totale reistijd
-
-Een bataljon kan daardoor bijvoorbeeld:
-1. in veldformatie naar een lokale weg lopen
-2. via een kruispunt een chaussée nemen
-3. versneld over de hoofdweg marcheren
-4. bij een volgend kruispunt afslaan
-5. de weg verlaten en in veldformatie naar zijn eindpositie gaan
-6. daar ontplooien in de gekozen Linie, Colonne of Carré
-
-Korte tactische verplaatsingen blijven rechtstreeks door het veld gaan. De planner stuurt een bataljon dus niet onnodig naar een weg als dat geen voordeel oplevert.
-
-### Marsregels blijven intact
-
-- **Op een weg:** het bataljon gebruikt marscolonne/marsstatus.
-- **Buiten een weg:** het bataljon beweegt in de gekozen veldformatie en marcheert niet formeel.
-- Rechts vasthouden + slepen blijft de uiteindelijke front-richting bepalen.
-- Overgangen tussen wegmars en veldformatie blijven gesmoothd.
-
-### Wegennet op de minimap
-
-Verkende delen van het wegennet worden ook op de minimap getekend. Hoofdwegen zijn duidelijker zichtbaar dan lokale wegen en tracks, zodat kruispunten en strategische marsassen ook op grotere schaal leesbaar zijn.
-
-### Performance
-
-Omdat wegdetectie bij honderden soldaten zeer vaak wordt aangeroepen, gebruikt v0.6.6 een **spatial index voor wegsegmenten**. Een unit controleert daardoor alleen wegsegmenten in zijn directe kaartcel in plaats van steeds alle wegen te doorzoeken.
-
-## Tests voor v0.6.6
-
-De regressiesuite bevat **17 Chromium-tests**. Naast alle bestaande gameplaycontroles wordt nu onder andere getest dat:
-- het netwerk exact 4 chaussées, 5 lokale wegen en 4 tracks bevat
-- meerdere wegen samenkomen bij het centrale kruispunt
-- chaussée > lokale weg > track > veld geldt voor infanteriesnelheid
-- een bataljon vloeiend en versneld over de Grande Chaussée marcheert
-- een lange verplaatsing het wegennet kiest wanneer dat sneller is
-- een korte veldorder geen onnodige omweg maakt
-- een lange route meerdere wegverbindingen kan combineren
-- rechtsklik-vasthouden + slepen op open terrein nog steeds bestemming en front bepaalt
-- 520 units structureel geldig blijven
-- een versnelde simulatie van 10 speelminuten geen corrupte state, ghost groups of vastgelopen productie veroorzaakt
-
-De gameplaycommit van v0.6.6 behaalde **17/17 geslaagde Chromium-tests** voordat deze releasebeschrijving werd toegevoegd. De uiteindelijke releasecommit moet dezelfde gate opnieuw passeren voordat GitHub Pages hem publiceert.
+Een spatial index voor wegsegmenten voorkomt dat honderden eenheden continu het complete netwerk hoeven te doorzoeken.
 
 ## Eerdere verbeteringen
 
@@ -133,12 +136,15 @@ Combat-targeting gebruikt een spatial hash. De renderer-onafhankelijke `window.R
 - 1 kanon vereist 2 toegewezen musketiers
 - kanon + bemanning bewegen visueel als één samengestelde eenheid
 - zonder twee levende bemanningsleden kan het kanon niet bewegen of vuren
+- bruggen zijn veel geschikter voor kanonnen dan de voorde
 
 ### Boeren
-Een boer onthoudt zijn grondstoftype en zoekt automatisch een volgende boom of voedselbron wanneer de huidige bron leeg is.
+Een boer onthoudt zijn grondstoftype en zoekt automatisch een volgende boom of voedselbron wanneer de huidige bron leeg is. Bij een noodzakelijke oeverwissel gebruikt ook een losse arbeider een legale oversteek.
 
 ### Terrein en fog of war
 - wegen versnellen en activeren bataljonsmarcheren
+- rivierwater blokkeert gewone passage
+- bruggen en voorden maken gecontroleerde rivieroversteek mogelijk
 - bossen vertragen maar beschermen
 - heuvels vertragen en geven aanvalbonus
 - verkend terrein blijft onthouden
@@ -178,4 +184,4 @@ npm run test:soak
 
 ## Richting v0.7
 
-Na verdere handmatige feedback kan v0.7 zich richten op firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, verkeersdrukte en passage bij smalle kruispunten, bruggen/doorwaadbare plaatsen, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.
+Na verdere handmatige feedback kan v0.7 zich richten op firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, verkeersdrukte en bottlenecks bij bruggen/kruispunten, mogelijke vernietigbare bruggen, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.
