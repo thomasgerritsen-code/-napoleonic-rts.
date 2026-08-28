@@ -1,0 +1,35 @@
+#minimap {
+  position: fixed;
+  right: 18px;
+  bottom: 104px;
+  width: 240px;
+  height: 138px;
+  border: 2px solid rgba(244,216,109,.78);
+  border-radius: 6px;
+  background: #20281d;
+  box-shadow: 0 8px 28px rgba(0,0,0,.45);
+  z-index: 5;
+  cursor: crosshair;
+}
+
+.actions button[data-action="rotate-left"],
+.actions button[data-action="rotate-right"] {
+  min-width: 86px;
+}
+
+@media (max-width: 900px) {
+  #minimap {
+    width: 170px;
+    height: 98px;
+    right: 10px;
+    bottom: 118px;
+  }
+}
+
+@media (max-width: 620px) {
+  #minimap {
+    width: 135px;
+    height: 78px;
+    bottom: 126px;
+  }
+}
