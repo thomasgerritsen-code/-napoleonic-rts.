@@ -1,6 +1,6 @@
-# Napoleonic RTS — v0.3
+# Napoleonic RTS — v0.3.1
 
-Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait volledig in HTML5 Canvas + JavaScript en heeft geen externe dependencies.
+Browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait volledig in HTML5 Canvas + JavaScript.
 
 ## ▶ Speel nu
 
@@ -8,61 +8,51 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Wat is nieuw in v0.3
+## Bugfix v0.3.1
 
-- Morale per gevechtseenheid
-- Morale daalt door treffers, artillerie en verliezen dichtbij
-- Eenheden kunnen breken en van het slagveld vluchten
-- Morale herstelt langzaam buiten direct gevecht
-- Musketiers vuren in duidelijkere salvo-cycli en hebben langere herlaadtijd
-- Bajonetaanval voor geselecteerde infanterie
-- Cavaleriecharge met tijdelijke snelheids- en impactbonus
-- Artillerie kan wisselen tussen ronde kogel en grapeshot
-- Grapeshot heeft kort bereik maar raakt meerdere doelen in een kegel
-- Ronde kogels veroorzaken zware gebiedsschade en morale shock
-- Morale-balk boven gevechtseenheden
-- Britse AI gebruikt nu ook cavaleriecharges en kan grapeshot kiezen
+Deze versie repareert twee belangrijke gameplayproblemen uit v0.3:
 
-## Economie uit v0.2 blijft behouden
+- Barracks-productieknoppen blijven nu stabiel bestaan en worden niet meer ieder frame vervangen.
+- Startende population cap verhoogd van 20 naar 40; de startpopulatie is 30/40, waardoor je direct nieuwe musketiers kunt trainen.
+- House verhoogt de population cap met 15.
+- Formatieknoppen hebben nu een duidelijke actieve status.
+- Linie, colonne en carré worden direct op de geselecteerde eenheden toegepast, in plaats van pas merkbaar te worden bij een later bevel.
+- De Barracks toont na voltooiing expliciet dat je erop kunt klikken om productie te starten.
 
-- Town Center en selecteerbare gebouwen
-- 6 Franse boeren als start-economie
-- Hout en voedsel als verzamelbare grondstoffen
-- Barracks en Houses bouwen
-- Boeren en musketiers trainen
-- Productiequeue en population cap
-- Linie, colonne en carré
+## Getest
+
+De volgende flow is geautomatiseerd getest:
+
+1. Barracks selecteren.
+2. Musketierknop blijft bestaan tijdens meerdere game-updates tussen `mousedown` en `click`.
+3. Musketier in de productiequeue plaatsen.
+4. Kosten van 80 voedsel en 20 hout worden afgeschreven.
+5. Na de productietijd verschijnt daadwerkelijk een extra Franse musketier.
+6. Colonne selecteren: status, actieve knop en formatieposities veranderen direct.
+7. Carré selecteren: status en actieve knop veranderen correct.
+
+## Gameplay
+
+- Town Center en Barracks
+- boeren, hout en voedsel
+- gebouwen bouwen
+- musketiers produceren
+- population cap en Houses
+- linie, colonne en carré
+- musket-salvo's en herladen
+- morale en vluchtgedrag
+- bajonetaanval
+- cavaleriecharge
+- ronde kogel en grapeshot voor artillerie
+- Britse AI
 
 ## Besturing
 
-### Desktop
-- Linkermuisknop slepen: selecteer Franse eenheden
-- Klik op een eigen gebouw: selecteer gebouw
-- Rechtermuisknop op terrein: verplaatsen
-- Rechtermuisknop op boom/voedsel met boeren: verzamelen
-- Barracks/House-knop: bouwen
-- Selecteer infanterie: Bajonet-knop verschijnt
-- Selecteer cavalerie: Charge-knop verschijnt
-- Selecteer artillerie: wissel Kanonkogel / Grapeshot
+- Linkermuisknop slepen: eenheden selecteren
+- Klik op eigen gebouw: gebouw selecteren
+- Rechtermuisknop: bewegen of grondstof verzamelen
+- Barracks/House: selecteer boeren, kies gebouw en klik op de kaart
+- Formatieknoppen: geselecteerde groep direct herschikken
 - WASD / pijltjestoetsen: camera
 - Muiswiel: zoom
-- Esc: bouwmodus annuleren
-
-### Mobiel
-- Tik op een Franse unit of gebouw om te selecteren
-- Tik op terrein om te bewegen
-- Tik met een boer op een grondstof om te verzamelen
-- Bouw-, productie- en gevechtsknoppen werken via touch
-
-## Speldoel
-
-Bouw een economie op, vergroot je leger en versla het Britse leger. Frontale aanvallen zijn riskanter geworden: morale, charges en artilleriekeuze bepalen nu veel meer de uitkomst.
-
-## Roadmap v0.4
-
-- Regimenten als echte bestuurbare groepen
-- Officier en drummer per regiment
-- Formaties die tijdens beweging intact blijven
-- Frontbreedte en rotatie van regimenten
-- Regimentsgewijze pathfinding en collision
-- Control groups en minimap
+- Esc: bouwen annuleren
