@@ -1,17 +1,49 @@
 'use strict';
-// ---------- v0.7.0 regression fixes: single right-drag owner + exclusive bridge deck ----------
+// ---------- v0.7.0 regression fixes: robust right-drag + exclusive bridge deck ----------
 
 // v0.6 installs a canvas-level right-drag gesture while v0.6.3 installs the
-// robust window-capture gesture that handles release over HUD overlays as well.
-// Let the window gesture remain the single source of truth: it has already
-// recorded the mousedown before this listener runs, then we stop the event from
-// reaching the older canvas handler. This prevents one drag from issuing two
-// competing movement orders.
+// robust window-capture gesture.  The minimap visually overlays part of the
+// battlefield, so a battlefield right-drag can start on that overlay even
+// though its screen coordinates came from worldToScreen().  Right-drag is not a
+// minimap camera gesture (left click remains the minimap control), so treat the
+// minimap as a transparent order surface for the right button.
 window.addEventListener('mousedown', e => {
-  if (e.button !== 2 || e.target !== canvas || buildMode || rallyPlacementBuilding) return;
+  if (e.button !== 2 || buildMode || rallyPlacementBuilding) return;
+  const minimapEl = document.getElementById('minimap');
+  const orderSurface = e.target === canvas || e.target === minimapEl;
+  if (!orderSurface) return;
+
+  // The v0.6.3 window listener has already initialized canvas gestures because
+  // it was registered earlier.  When the minimap is the event target it skips
+  // that initialization, so do it here explicitly.
+  if (!rightDragInputV063) {
+    rightDragInputV063 = {
+      sx:e.clientX,
+      sy:e.clientY,
+      ex:e.clientX,
+      ey:e.clientY,
+      moved:false
+    };
+    suppressContextMenuUntil = performance.now() + 1600;
+  }
+
+  // Keep the older v0.6 canvas handler from issuing a second competing order.
   e.preventDefault();
   e.stopPropagation();
 }, true);
+
+// v0.7 centers march-column offsets around the complete battalion.  The two
+// command/support figures then sit roughly 45 world units ahead of the anchor.
+// A 190-unit legacy hold point therefore lets the front file enter the bridge
+// deck (deck envelope is about 151 units from its center) while another group
+// still owns it.  Keep the complete waiting column outside the physical deck.
+const queueHoldPointV068BeforeV070 = queueHoldPointV068;
+queueHoldPointV068 = function queueHoldPointV070(c, initialSide, queuePosition = 1) {
+  if (!c || c.type !== 'bridge') return queueHoldPointV068BeforeV070(c, initialSide, queuePosition);
+  const bridgeHoldDistance = Math.max(CROSSING_HOLD_DISTANCE_V068, c.length / 2 + 110);
+  const distance = bridgeHoldDistance + Math.max(0, queuePosition - 1) * CROSSING_QUEUE_GAP_V068;
+  return crossingPointV068(c, initialSide * distance, 0);
+};
 
 function crossingQueueBlockedV070(state) {
   if (!state || state.capacity !== 1 || state.holderIds.length) return false;
@@ -25,9 +57,8 @@ function crossingQueueBlockedV070(state) {
   });
   if (clearing) return true;
 
-  // Also protect against a physical tail or unrelated formation still touching
-  // the deck. Ignore queued groups themselves: if the first requester already
-  // reached the entrance, it must still be eligible to become the holder.
+  // Once no holder exists, make sure the previous formation has physically
+  // left the deck before handing the crossing to the next queued battalion.
   const queued = new Set(state.queue);
   return regiments.some(reg =>
     !reg?.destroyed &&
@@ -36,8 +67,8 @@ function crossingQueueBlockedV070(state) {
   );
 }
 
-// Replaces only the promotion policy. Queue registration, hold points, speed
-// caps and bridge-column locomotion remain the proven v0.6.8 implementation.
+// Replaces only the promotion policy. Queue registration, speed caps and
+// bridge-column locomotion remain the v0.6.8 implementation.
 promoteTrafficQueuesV068 = function promoteTrafficQueuesExclusiveV070() {
   for (const state of CROSSING_TRAFFIC_V068.values()) {
     while (state.holderIds.length < state.capacity && state.queue.length) {
