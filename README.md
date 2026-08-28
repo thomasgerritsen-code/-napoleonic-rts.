@@ -1,6 +1,6 @@
-# Napoleonic RTS — v0.6.1
+# Napoleonic RTS — v0.6.2
 
-Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait volledig in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
+Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
 ## ▶ Speel nu
 
@@ -8,68 +8,114 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
-## Nieuw in v0.6.1 — artillerie als één eenheid
+## Nieuw in v0.6.2 — testlab, performance en voorbereiding op 3D
 
-De artilleriebemanning is opnieuw opgebouwd om het trillen rond een bewegend kanon te verwijderen.
+Deze release is vooral bedoeld om handmatig testen veel waardevoller te maken en de simulatie technisch klaar te zetten voor verdere schaalvergroting.
 
-- een operationele batterij bestaat nog steeds uit **1 kanon + 2 toegewezen musketiers**
-- het kanon is nu het bewegende hoofdelement; de bemanningsleden volgen vaste crew-slots
-- toegewezen musketiers voeren tijdens het bedienen geen eigen infantry-pathfinding of losse gevechtsbeweging meer uit
-- de twee bemanningsleden blijven daardoor stabiel op dezelfde relatieve positie ten opzichte van het kanon
-- tijdens verplaatsing staan beide musketiers zichtbaar achter het affuit en lijken ze het kanon voort te duwen
-- de bemanning heeft een kleine loopanimatie en zichtbare armen richting het kanon tijdens het rijden
-- stilstaand nemen de musketiers vaste posities naast de achterkant van het kanon in
-- kanon + bemanning worden als één samengesteld object getekend, met één selectiering, één morale-indicator en één `2/2` crew-indicator
-- de normale regel blijft gelden: als één van de twee toegewezen musketiers sneuvelt, breekt de batterij en moet het kanon opnieuw bemand worden
+### 1. F3 debug/testpaneel
+Druk tijdens het spelen op **F3**. Het paneel toont live:
+- FPS en frametime
+- update- en rendertijd
+- aantal levende eenheden
+- aantal actieve groepen
+- collision-correcties
+- gemiddeld aantal combat-kandidaten per targeting-query
+- vastgelopen groepsroutes
+- actuele Britse AI-status
+- details van de geselecteerde groep, gebouw of losse eenheden
 
-### Chromium-regressietest voor de artilleriefix
+### 2. Directe testscenario's
+Vanuit het F3-paneel kun je zonder opbouwfase direct laden:
+- normale slag
+- regiment versus regiment
+- cavaleriecharge tegen infanterie
+- drie bemande kanonnen
+- regiment rond 35% moraal
+- regiment rond 40% resterende sterkte
+- 520 musketiers voor performance-testing
+- Britse basis vijf minuten vooruitgesimuleerd
 
-De testsuite controleert nu tijdens meerdere opeenvolgende simulatiestappen dat:
-- het kanon daadwerkelijk vooruit beweegt
-- beide musketiers exact dezelfde lokale positie ten opzichte van het kanon behouden
-- beide bemanningsleden tijdens beweging op de vaste duwposities staan
-- de afstand tussen beide bemanningsleden stabiel blijft
-- de bestaande batterijbreuk bij verlies van bemanning blijft werken
+### 3. Kopieerbaar bugrapport
+De knop **Kopieer bugrapport** maakt een JSON-rapport met onder andere:
+- gameversie en speeltijd
+- browser/viewport
+- huidig testscenario
+- performancecijfers
+- geselecteerde groep of eenheden
+- economie en AI-plan
+- alle levende units, gebouwen en groepen
+- huidige auditresultaten
 
-De eerste v0.6.1-run eindigde met **9/9 tests geslaagd in Chromium**.
+Dit rapport kan rechtstreeks in een bugmelding of ChatGPT-bericht worden geplakt.
 
-## Belangrijkste systemen uit v0.6
+### 4. Performanceverbetering
+Combat-targeting gebruikte eerder voor veel eenheden herhaaldelijk een volledige lijstscan. v0.6.2 gebruikt daarvoor een aparte **combat spatial hash**. Alleen vijanden in relevante gridcellen worden bekeken. Gebouwen blijven lineair gecontroleerd omdat hun aantal klein is.
 
-### Rallypoints en productie zonder stapelen
-- Town Center, Barracks, Stable en Artillery Foundry hebben een eigen **verzamelpunt/rallypoint**
-- selecteer een productiegebouw en klik **🚩 Verzamelpunt**, daarna op de gewenste positie op de kaart
-- nieuwe eenheden verschijnen op een vrije positie rond het gebouw en lopen naar een willekeurige vrije plek rond het rallypoint
-- het rallypoint is zichtbaar als vlag op het slagveld
+Het F3-paneel toont `combat candidates/query`, zodat zichtbaar wordt hoeveel potentiële doelen daadwerkelijk per targeting-query worden bekeken.
 
-### Zichtbare productiewachtrij
-Bij selectie van een Town Center, Barracks, Stable of Foundry verschijnt een apart productievenster met de complete wachtrij, voortgang, wachtende eenheden en het ingestelde rallypoint.
+### 5. Scheiding simulatie en rendering
+Er is nu een `window.RTS_SIM` simulatie-interface met:
+- `snapshot()` — renderer-onafhankelijke state
+- `dispatch(command)` — orders zoals bewegen, formatie en rotatie
+- `step(seconds)` — gecontroleerd simuleren
+- `audit()` — integriteitscontrole
+- `getMetrics()` — performancegegevens
 
-### Regimenten kunnen breken
-- infanterieregiment breekt bij groepsmoraal onder **32%**
-- cavalerie-regiment breekt bij groepsmoraal onder **28%**
-- groepen breken ook als maximaal **één derde** van de oorspronkelijke gevechtssterkte over is
-- overlevenden worden losse eenheden en kunnen bij lage moraal vluchten
+Canvas blijft voorlopig de renderer, maar tests/debugtools kunnen nu via dezelfde simulatie-interface werken. Dit is de eerste concrete stap richting een latere 3D-renderer zonder de gameplaylogica volledig opnieuw te schrijven.
 
-### Kanonnen hebben bemanning nodig
-- selecteer **1 kanon + 2 vrije musketiers**
-- klik **Kanonbemanning**
-- zonder twee levende toegewezen bemanningsleden kan het kanon niet bewegen of vuren
+### 6. Langere Chromium-tests
+Naast de bestaande regressies zijn toegevoegd:
+- F3/testlab + bugrapport-test
+- 520-unit stresstest
+- versnelde **10-minuten soak-test**
 
-### Boeren blijven automatisch doorwerken
-Een boer onthoudt zijn grondstoftype. Als een boom of voedselbron leeg raakt, zoekt hij automatisch een volgende bron van hetzelfde type.
+De audit controleert onder meer op:
+- NaN of oneindige unitposities
+- units buiten het slagveld
+- actieve groepen zonder levende leden
+- actieve artilleriebatterijen zonder operationele bemanning
+- ongeldige productiewachtrijen
+- ongeldige/negatieve economie-state
+- groepen die langer dan 20 seconden geen voortgang maken op hun route
+- langdurig onveranderd AI-plan als waarschuwing
+
+## v0.6.1 — artillerie als één eenheid
+
+Een operationele batterij bestaat uit **1 kanon + 2 toegewezen musketiers**. Het kanon is het bewegende hoofdelement en de bemanningsleden volgen vaste crew-slots. Daardoor bewegen kanon en musketiers visueel als één samengesteld object en ontstaat geen jitter door afzonderlijke infantry-pathfinding/collision.
+
+## Belangrijkste gameplay uit v0.6
+
+### Rallypoints en productie
+- Town Center, Barracks, Stable en Artillery Foundry hebben een verzamelpunt
+- geproduceerde eenheden verschijnen verspreid en lopen naar willekeurige vrije plekken rond het rallypoint
+- geselecteerde productiegebouwen tonen hun complete wachtrij en voortgang
+
+### Regimenten breken
+- infanterie onder 32% groepsmoraal
+- cavalerie onder 28% groepsmoraal
+- iedere formele gevechtsgroep ook wanneer maximaal één derde van de oorspronkelijke sterkte overblijft
+
+### Artillerie
+- 1 kanon vereist 2 toegewezen vrije musketiers
+- zonder twee levende bemanningsleden kan het kanon niet bewegen of vuren
+- verlies van een bemanningslid breekt de batterij
+
+### Boeren
+Een boer onthoudt het grondstoftype en zoekt automatisch een volgende boom of voedselbron wanneer de huidige bron leeg is.
 
 ### Regiment-level pathfinding en drag-to-face
-- formele groepen gebruiken A*-pathfinding om gebouwen heen
-- rechtsklik-slepen bepaalt eindpositie én uiteindelijke richting/front
-- Q/E en de 15°-rotatieknoppen blijven beschikbaar
+- groepen gebruiken A*-pathfinding rond gebouwen
+- rechtsklik-slepen bepaalt doelpositie en eindrichting
+- Q/E draait een geselecteerde groep 15 graden
 
 ### Terrein en fog of war
-- wegen versnellen beweging
-- bossen vertragen maar bieden bescherming
-- heuvels vertragen beklimming en geven een aanvalbonus
-- verkend terrein blijft gedeeltelijk zichtbaar in fog of war
+- wegen versnellen
+- bossen vertragen maar beschermen
+- heuvels vertragen en geven aanvalbonus
+- verkend terrein blijft onthouden
 
-### Formele groepen
+## Formele groepen
+
 **Infanterieregiment**
 - minimaal 12 musketiers
 - 1 officier
@@ -81,39 +127,13 @@ Een boer onthoudt zijn grondstoftype. Als een boom of voedselbron leeg raakt, zo
 
 **Artilleriebatterij**
 - 1 kanon
-- exact 2 toegewezen musketiers als minimale operationele bemanning
-
-## Britse AI
-De Britse AI:
-- verzamelt voedsel en hout
-- bouwt Barracks, Houses, Stable en Artillery Foundry
-- vormt infanterie- en cavaleriegroepen
-- wijst automatisch twee musketiers toe aan kanonnen
-- produceert ontbrekende kanonbemanning
-- combineert infanterie, cavalerie en artilleriebatterijen in militaire orders
-- kiest per slag een aggressive, balanced of defensive strategie
-
-## Productie
-
-**Town Center**
-- Boer: 50 voedsel
-
-**Barracks**
-- Musketier: 80 voedsel + 20 hout
-- Officier: 160 voedsel + 60 hout
-- Drummer: 90 voedsel + 20 hout
-
-**Stable**
-- Cavalerie: 150 voedsel + 50 hout
-
-**Artillery Foundry**
-- Artillerie: 120 voedsel + 100 hout
+- 2 toegewezen musketiers
 
 ## Automatische Chromium-tests
 
-Het project gebruikt **Playwright 1.62.1 + Chromium** in GitHub Actions. GitHub Pages wordt alleen gedeployed wanneer alle browsertests slagen. Bij een fout worden Playwright-rapport, screenshots, traces en video's als artifact bewaard.
+Het project gebruikt **Playwright 1.62.1 + Chromium** in GitHub Actions. GitHub Pages wordt alleen gedeployed wanneer alle browsertests slagen. Bij fouten worden rapporten, screenshots, traces en video's als artifact bewaard.
 
-## Test lokaal
+Lokaal:
 
 ```bash
 npm install
@@ -121,13 +141,12 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-## Mogelijke volgende stap — v0.7
+Alleen de soak-test:
 
-- zichtbare laad-, richt- en vuuranimatie voor de kanonbemanning
-- bemanning die tijdens het laden fysiek van positie wisselt
-- doelbewuste firing arcs en echte line-of-fire voor artillerie
-- betere formatiecohesie tijdens lange marsen en scherpe bochten
-- gebouwen kunnen aanvallen en uitgebreidere belegering
-- meer economische ketens en grondstoffen
-- historische facties en unieke regimenten
-- save/load en scenarioselectie
+```bash
+npm run test:soak
+```
+
+## Richting v0.7
+
+Na handmatige feedback kan v0.7 zich richten op betere formatiecohesie, firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, belegering, verdere economische ketens en verdere loskoppeling van de 2D-renderer.
