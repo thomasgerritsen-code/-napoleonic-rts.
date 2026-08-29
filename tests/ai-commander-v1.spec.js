@@ -8,8 +8,22 @@ test('AI Commander progresses through mass, advance, attack and flank while prod
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
 
   const result=await page.evaluate(()=>{
-    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,760);
-    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,1040);
+    // This regression exercises the command-state lifecycle, not threat detection. Keep the
+    // strategic safety inputs deterministic while leaving the production system untouched.
+    for(const u of units){
+      if(u.side==='france' && u.type!=='worker'){
+        u.x=120; u.y=120; u.targetX=120; u.targetY=120;
+      }
+    }
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,720);
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,900);
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,1080);
+    // Ensure the lifecycle test starts from a force ratio that is deliberately above the
+    // retreat threshold; retreat behavior has its own dedicated regression below.
+    for(const u of units){
+      if(u.side==='britain' && u.type!=='worker'){u.morale=100;u.hp=u.maxHp;}
+      if(u.side==='france' && u.type!=='worker'){u.morale=35;}
+    }
     eval('elapsed=60');
 
     const states=[];
@@ -58,7 +72,11 @@ test('AI Commander retreats on collapsed morale instead of blindly attacking', a
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
   const state=await page.evaluate(()=>{
     const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,900);
-    window.__RTS_DEBUG__.setGroupMorale(id,22);
+    const reg=getRegiment(id);
+    for(const u of regimentMembers(reg))u.morale=22;
+    reg.morale=22;
+    // Keep this regression focused on morale collapse rather than base-threat priority.
+    for(const u of units){if(u.side==='france'&&u.type!=='worker'){u.x=120;u.y=120;u.targetX=120;u.targetY=120;}}
     eval('elapsed=70');
     window.__AI_COMMANDER_V1__.forceState('ATTACK');
     window.__AI_COMMANDER_V1__.tick();
