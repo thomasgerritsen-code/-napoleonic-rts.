@@ -44,6 +44,7 @@ test('Architecture v2 owns road lookup and route planning without legacy v066 ru
   expect(html).toContain('src/systems/navigation/road-index.js');
   expect(html).toContain('src/systems/navigation/route-planner.js');
   expect(html).toContain('src/systems/navigation/bridge-corridors.js');
+  expect(html).toContain('src/systems/navigation/bridge-route-resolver.js');
   expect(html).toContain('src/systems/navigation/bridge-safety.js');
   expect(html).not.toMatch(/<script[^>]+src=["']src\/v066-road-index\.js/);
   expect(html).not.toMatch(/<script[^>]+src=["']src\/v066-route-fixes\.js/);
@@ -52,9 +53,9 @@ test('Architecture v2 owns road lookup and route planning without legacy v066 ru
 
 test('angled battalion approach clears Pont de la Chaussee corners without stalling', async ({page}) => {
   const errors=await openNavigationV2(page);
-  await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
 
-  const setup=await page.evaluate(() => {
+  const result=await page.evaluate(() => {
+    window.__RTS_DEBUG__.setPeaceMode(true);
     const nav=window.NRTS.subsystems.get('navigation');
     const corridor=nav.bridgeCorridor('pont-chaussee',-1);
     const start={x:corridor.approach.x-85,y:corridor.approach.y-90};
@@ -62,76 +63,86 @@ test('angled battalion approach clears Pont de la Chaussee corners without stall
     const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',start.x,start.y);
     window.__RTS_DEBUG__.selectRegiment(id);
     window.__RTS_DEBUG__.orderSelectedWithFacing(target.x,target.y,0);
-    return {id,corridor,start,target,nav:nav.bridgeState(id)};
-  });
 
-  expect(setup.nav.corridors.some(c=>c.id==='pont-chaussee')).toBe(true);
+    const initialNav=nav.bridgeState(id);
+    let sawApproach=false;
+    let sawCrossing=false;
+    let maxDeckAnchorPerp=0;
+    let maxDeckMemberPerp=0;
+    let longestNearBridgeStall=0;
+    let currentNearBridgeStall=0;
+    let previousAnchor=null;
+    let final=null;
+    let everInWater=false;
+    let stepsRun=0;
 
-  let sawApproach=false;
-  let sawCrossing=false;
-  let maxDeckAnchorPerp=0;
-  let maxDeckMemberPerp=0;
-  let longestNearBridgeStall=0;
-  let currentNearBridgeStall=0;
-  let previousAnchor=null;
-  let final=null;
-  let everInWater=false;
+    for(let i=0;i<220;i++){
+      window.RTS_SIM.step(0.25);
+      stepsRun++;
 
-  for(let i=0;i<220;i++){
-    await page.evaluate(() => window.RTS_SIM.step(0.25));
-    const sample=await page.evaluate(id => {
       const reg=getRegiment(id);
       const members=regimentMembers(reg).filter(u=>!u.dead&&!u.routing);
       const formation=window.__RTS_DEBUG__.formationState(id);
-      const c=WATER_CROSSINGS_V067.find(c=>c.id==='pont-chaussee');
+      const c=WATER_CROSSINGS_V067.find(item=>item.id==='pont-chaussee');
       const anchor=groupAnchorV068(reg);
-      const aLocal=anchor?crossingLocalV068(c,anchor.x,anchor.y):null;
+      const anchorLocal=anchor?crossingLocalV068(c,anchor.x,anchor.y):null;
       const deckMembers=members
-        .map(u=>({local:crossingLocalV068(c,u.x,u.y)}))
-        .filter(x=>Math.abs(x.local.along)<=c.length/2+8);
-      return {
+        .map(u=>crossingLocalV068(c,u.x,u.y))
+        .filter(local=>Math.abs(local.along)<=c.length/2+8);
+      const maxMemberPerp=deckMembers.length?Math.max(...deckMembers.map(local=>Math.abs(local.perp))):0;
+      const navState=nav.bridgeState(id);
+
+      everInWater ||= anchor?waterAtV067(anchor.x,anchor.y):false;
+      sawApproach ||= navState?.trafficState==='approach';
+      sawCrossing ||= navState?.trafficState==='crossing';
+
+      if(anchorLocal && Math.abs(anchorLocal.along)<=135+10){
+        maxDeckAnchorPerp=Math.max(maxDeckAnchorPerp,Math.abs(anchorLocal.perp));
+        maxDeckMemberPerp=Math.max(maxDeckMemberPerp,maxMemberPerp);
+      }
+
+      const nearBridge=anchor && Math.hypot(anchor.x-1500,anchor.y-900)<330;
+      if(nearBridge && previousAnchor){
+        const moved=Math.hypot(anchor.x-previousAnchor.x,anchor.y-previousAnchor.y);
+        if(moved<0.15) currentNearBridgeStall+=0.25;
+        else currentNearBridgeStall=0;
+        longestNearBridgeStall=Math.max(longestNearBridgeStall,currentNearBridgeStall);
+      } else currentNearBridgeStall=0;
+      previousAnchor=anchor?{x:anchor.x,y:anchor.y}:null;
+
+      final={
         phase:formation.phase,
         centroid:formation.centroid,
-        anchor,
-        anchorWater:anchor?waterAtV067(anchor.x,anchor.y):false,
-        traffic:formation.crossingTraffic,
-        anchorLocal:aLocal,
-        maxDeckMemberPerp:deckMembers.length?Math.max(...deckMembers.map(x=>Math.abs(x.local.perp))):0,
-        minMemberX:members.length?Math.min(...members.map(u=>u.x)):0,
-        nav:window.NRTS.subsystems.get('navigation').bridgeState(id)
+        anchor:anchor?{x:anchor.x,y:anchor.y}:null,
+        nav:navState
       };
-    },setup.id);
-
-    everInWater ||= sample.anchorWater;
-    sawApproach ||= sample.nav?.trafficState==='approach';
-    sawCrossing ||= sample.nav?.trafficState==='crossing';
-
-    if(sample.anchorLocal && Math.abs(sample.anchorLocal.along)<=135+10){
-      maxDeckAnchorPerp=Math.max(maxDeckAnchorPerp,Math.abs(sample.anchorLocal.perp));
-      maxDeckMemberPerp=Math.max(maxDeckMemberPerp,sample.maxDeckMemberPerp);
+      if(formation.phase==='formed' && (formation.centroid?.x||0)>corridor.clear.x+45) break;
     }
 
-    const nearBridge=sample.anchor && Math.hypot(sample.anchor.x-1500,sample.anchor.y-900)<330;
-    if(nearBridge && previousAnchor){
-      const moved=Math.hypot(sample.anchor.x-previousAnchor.x,sample.anchor.y-previousAnchor.y);
-      if(moved<0.15) currentNearBridgeStall+=0.25;
-      else currentNearBridgeStall=0;
-      longestNearBridgeStall=Math.max(longestNearBridgeStall,currentNearBridgeStall);
-    } else currentNearBridgeStall=0;
-    previousAnchor=sample.anchor?{...sample.anchor}:null;
+    return {
+      corridor,
+      initialNav,
+      sawApproach,
+      sawCrossing,
+      everInWater,
+      maxDeckAnchorPerp,
+      maxDeckMemberPerp,
+      longestNearBridgeStall,
+      final,
+      stepsRun
+    };
+  });
 
-    final=sample;
-    if(sample.phase==='formed' && (sample.centroid?.x||0)>setup.corridor.clear.x+45) break;
-  }
-
-  expect(sawApproach).toBe(true);
-  expect(sawCrossing).toBe(true);
-  expect(everInWater).toBe(false);
-  expect(maxDeckAnchorPerp).toBeLessThanOrEqual(24);
-  expect(maxDeckMemberPerp).toBeLessThan(55);
-  expect(longestNearBridgeStall).toBeLessThan(1.5);
-  expect(final?.phase).toBe('formed');
-  expect(final?.centroid?.x).toBeGreaterThan(setup.corridor.clear.x+45);
+  expect(result.initialNav.corridors.some(c=>c.id==='pont-chaussee')).toBe(true);
+  expect(result.sawApproach).toBe(true);
+  expect(result.sawCrossing).toBe(true);
+  expect(result.everInWater).toBe(false);
+  expect(result.maxDeckAnchorPerp).toBeLessThanOrEqual(24);
+  expect(result.maxDeckMemberPerp).toBeLessThan(55);
+  expect(result.longestNearBridgeStall).toBeLessThan(1.5);
+  expect(result.final?.phase).toBe('formed');
+  expect(result.final?.centroid?.x).toBeGreaterThan(result.corridor.clear.x+45);
+  expect(result.stepsRun).toBeLessThanOrEqual(220);
   expect(errors).toEqual([]);
 });
 
