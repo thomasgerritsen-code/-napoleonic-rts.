@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
+// Release validation marker: keep this stacked PR covered by the main-target Chromium gate.
 test('Combat Animations v1 follows combat events and stays visual-only', async ({ page }) => {
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=v071',{waitUntil:'networkidle'});
