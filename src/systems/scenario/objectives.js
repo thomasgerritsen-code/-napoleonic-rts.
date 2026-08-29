@@ -1,0 +1,12 @@
+'use strict';
+(function installObjectivesScenariosV1(global){
+  const nrts=global.NRTS;if(!nrts)throw new Error('NRTS required');
+  const presets={crossroads:{name:'Kruispunt',points:[{id:'center',x:1600,y:900,label:'Centraal kruispunt'}],target:120},bridge:{name:'Bruggenhoofd',points:[{id:'bridge',x:1600,y:930,label:'Bruggenhoofd'}],target:150},threePoints:{name:'Drie posities',points:[{id:'north',x:1450,y:560,label:'Noord'},{id:'center',x:1600,y:900,label:'Centrum'},{id:'south',x:1550,y:1280,label:'Zuid'}],target:180}};
+  const state={scenario:'crossroads',france:0,britain:0,points:[]};
+  function resetScenario(name='crossroads'){const p=presets[name]||presets.crossroads;state.scenario=name;state.france=0;state.britain=0;state.points=p.points.map(x=>({...x,owner:null,progress:0}));return snapshot();}
+  function troopsNear(side,p){return livingUnits(side).filter(u=>u.type!=='worker'&&!u.routing&&Math.hypot(u.x-p.x,u.y-p.y)<125).length;}
+  let clock=0;const oldUpdate=update;update=function(dt){oldUpdate(dt);clock+=dt;if(clock<1)return;clock=0;const preset=presets[state.scenario]||presets.crossroads;for(const p of state.points){const f=troopsNear('france',p),b=troopsNear('britain',p);if(f&& !b){p.progress=Math.min(10,p.progress+1);if(p.progress>=4)p.owner='france';}else if(b&&!f){p.progress=Math.max(-10,p.progress-1);if(p.progress<=-4)p.owner='britain';}else if(f&&b)p.progress*=.8;if(p.owner==='france')state.france++;if(p.owner==='britain')state.britain++;}if(state.france>=preset.target&&!gameOver){gameOver=true;messageEl.textContent='FRANSE OBJECTIEFOORWINNING';messageEl.classList.remove('hidden');}else if(state.britain>=preset.target&&!gameOver){gameOver=true;messageEl.textContent='BRITSE OBJECTIEFOORWINNING';messageEl.classList.remove('hidden');}if(statusEl&&!gameOver)statusEl.textContent=`${preset.name}: 🇫🇷 ${state.france}/${preset.target} · 🇬🇧 ${state.britain}/${preset.target}`;};
+  const oldReset=resetGame;resetGame=function(){oldReset();resetScenario(state.scenario);};
+  function snapshot(){return {scenario:state.scenario,france:state.france,britain:state.britain,points:state.points.map(p=>({...p})),target:(presets[state.scenario]||presets.crossroads).target};}
+  const api=Object.freeze({presets:Object.keys(presets),select:resetScenario,state:snapshot});nrts.subsystems.register('objectives-scenarios',api,{phase:'architecture-v2',legacyBridge:false,responsibility:'capture objectives, victory points and skirmish scenario presets'});global.__OBJECTIVES_SCENARIOS_V1__=api;resetScenario();
+})(window);

@@ -75,3 +75,4 @@ const tacticalTerrainScript=document.createElement('script');tacticalTerrainScri
 const staminaDisciplineScript=document.createElement('script');staminaDisciplineScript.src='src/systems/movement/stamina-discipline.js?build=sd1';staminaDisciplineScript.async=false;document.body.appendChild(staminaDisciplineScript);
 const cavArtScript=document.createElement('script');cavArtScript.src='src/systems/combat/cavalry-artillery.js?build=ca1';cavArtScript.async=false;document.body.appendChild(cavArtScript);
 const weatherScript=document.createElement('script');weatherScript.src='src/systems/world/battlefield-weather.js?build=bw1';weatherScript.async=false;document.body.appendChild(weatherScript);
+const objectiveScript=document.createElement('script');objectiveScript.src='src/systems/scenario/objectives.js?build=os1';objectiveScript.async=false;document.body.appendChild(objectiveScript);
