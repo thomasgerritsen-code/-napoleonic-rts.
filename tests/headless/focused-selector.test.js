@@ -32,9 +32,20 @@ test('AI changes stay focused on AI plus the lightweight smoke test', () => {
   ]);
 });
 
-test('core runtime changes use only the lightweight smoke test', () => {
+test('index changes include the village regression because the settlement bundle is loaded there', () => {
   const selected = selectFocusedTests(['index.html']);
-  assert.deepEqual(selected, ['tests/smoke-v1.spec.js']);
+  assert.deepEqual(selected, [
+    'tests/smoke-v1.spec.js',
+    'tests/village-renderer-v2.spec.js'
+  ]);
+});
+
+test('village renderer changes stay lightweight but always verify the settlement model', () => {
+  const selected = selectFocusedTests(['src/systems/world/village-renderer-v2.js']);
+  assert.deepEqual(selected, [
+    'tests/smoke-v1.spec.js',
+    'tests/village-renderer-v2.spec.js'
+  ]);
 });
 
 test('documentation-only changes keep browser coverage minimal', () => {
