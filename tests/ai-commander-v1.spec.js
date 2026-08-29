@@ -8,6 +8,11 @@ test('AI Commander progresses through mass, advance, attack and flank while prod
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
 
   const result=await page.evaluate(()=>{
+    // The normal battle can finish while the page is settling in CI. This regression owns its
+    // command-state fixture, so make that fixture explicitly active before exercising the AI.
+    gameOver=false;
+    messageEl.classList.add('hidden');
+
     // This regression exercises the command-state lifecycle, not threat detection. Keep the
     // strategic safety inputs deterministic while leaving the production system untouched.
     for(const u of units){
@@ -71,6 +76,10 @@ test('AI Commander retreats on collapsed morale instead of blindly attacking', a
   await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment && window.__AI_COMMANDER_V1__));
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
   const state=await page.evaluate(()=>{
+    // Keep this fixture independent from the lifecycle of the background battle.
+    gameOver=false;
+    messageEl.classList.add('hidden');
+
     const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,900);
     const reg=getRegiment(id);
     for(const u of regimentMembers(reg))u.morale=22;
