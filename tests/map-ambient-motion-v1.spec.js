@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
+// Release validation marker: keep this stacked PR covered by the main-target Chromium gate.
 test('Map Ambient Motion v1 stays visual-only and preserves terrain/navigation', async ({ page }) => {
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=v071',{waitUntil:'networkidle'});
