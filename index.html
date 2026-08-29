@@ -13,10 +13,18 @@
 <body>
 <div id="app">
   <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
-  <header class="hud topbar"><div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v0.7.1</span></div><div class="resources"><span>🇫🇷 🍞 <strong id="food">0</strong></span><span>🪵 <strong id="wood">0</strong></span><span>👥 <strong id="population">0/0</strong></span></div><div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button></header>
+  <header class="hud topbar">
+    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v0.7.1</span></div>
+    <div class="resources"><span>🇫🇷 🍞 <strong id="food">0</strong></span><span>🪵 <strong id="wood">0</strong></span><span>👥 <strong id="population">0/0</strong></span></div>
+    <div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button>
+  </header>
   <aside class="hud help"><strong>Besturing</strong><span>Sleep: selecteren</span><span>Klik groepslid: hele groep</span><span>Rechtsklik: lopen / verzamelen</span><span>Rechts vasthouden + slepen: doel + front</span><span>Q/E: groep 15° draaien</span><span>F3: test/debugpaneel</span><span>Minimap: camera verplaatsen</span><span>WASD / pijltjes: camera</span><span>Muiswiel: zoom</span></aside>
   <aside class="hud objective"><strong>Britse ontwikkeling</strong><span id="aiEconomy">Economie: —</span><span id="aiBuildings">Gebouwen: —</span><span id="aiRegiments">Regimenten: —</span><span id="aiPlan">Plan: opbouwen</span></aside>
-  <section class="hud bottombar"><div class="selection-panel"><span class="label">Selectie</span><strong id="selectionTitle">Niets geselecteerd</strong><span id="selectionDetails">Selecteer troepen of een gebouw.</span></div><div class="actions" id="actions"><button type="button" data-action="build-barracks">Barracks<br><small>300 🪵</small></button><button type="button" data-action="build-house">House<br><small>120 🪵</small></button><button type="button" data-formation="line">Linie</button><button type="button" data-formation="column">Colonne</button><button type="button" data-formation="square">Carré</button></div><div class="army-counts"><span>🇫🇷 <strong id="frenchCount">0</strong></span><span>🇬🇧 <strong id="britishCount">0</strong></span><span>🎖️ <strong id="frenchRegiments">0</strong></span></div></section>
+  <section class="hud bottombar">
+    <div class="selection-panel"><span class="label">Selectie</span><strong id="selectionTitle">Niets geselecteerd</strong><span id="selectionDetails">Selecteer troepen of een gebouw.</span></div>
+    <div class="actions" id="actions"><button type="button" data-action="build-barracks">Barracks<br><small>300 🪵</small></button><button type="button" data-action="build-house">House<br><small>120 🪵</small></button><button type="button" data-formation="line">Linie</button><button type="button" data-formation="column">Colonne</button><button type="button" data-formation="square">Carré</button></div>
+    <div class="army-counts"><span>🇫🇷 <strong id="frenchCount">0</strong></span><span>🇬🇧 <strong id="britishCount">0</strong></span><span>🎖️ <strong id="frenchRegiments">0</strong></span></div>
+  </section>
   <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div><div id="message" class="message hidden"></div>
 </div>
 <script src="src/foundation/runtime.js"></script>
@@ -37,6 +45,10 @@
 <script src="src/v05.js"></script>
 <script src="src/v06.js"></script>
 <script src="src/v061.js"></script>
+
+<!-- Architecture v2 owns cannon + crew compound cohesion. -->
+<script src="src/systems/artillery/compound-unit.js?build=a2"></script>
+
 <script src="src/v063.js"></script>
 <script src="src/simulation-api.js"></script>
 <script src="src/input.js"></script>
@@ -51,6 +63,11 @@
 <script src="src/v069-motion.js"></script>
 <script src="src/v069-combat.js"></script>
 <script src="src/v069-map.js"></script>
+
+<!-- Architecture v2 owns building footprints, road exclusion and top-down rendering. -->
+<script src="src/systems/world/building-placement.js?build=a2"></script>
+<script src="src/systems/world/topdown-buildings.js?build=a2"></script>
+
 <script src="src/v070.js?build=070"></script>
 <script src="src/v070-motion.js?build=070c"></script>
 <script src="src/v070-regression-fixes.js?build=070d"></script>
@@ -62,9 +79,12 @@
 <script src="src/systems/formation/followers.js?build=a2"></script>
 <script src="src/systems/movement/fixed-step.js?build=a2"></script>
 <script src="src/systems/movement/speed-model.js?build=a2"></script>
+<script src="src/systems/movement/road-exit-stability.js?build=a2"></script>
 <script src="src/systems/movement/api.js?build=a2"></script>
 <script src="src/systems/rendering/map-realism.js?build=mapv1"></script>
 <script src="src/systems/rendering/map-ambient-motion.js?build=ambient1"></script>
+<script src="src/systems/rendering/characters.js?build=cv1"></script>
+<script src="src/systems/rendering/combat-animations.js?build=ca1"></script>
 <script src="src/v064-sim.js"></script>
 <script src="src/v065-sim.js"></script>
 <script src="src/v066-sim.js"></script>
