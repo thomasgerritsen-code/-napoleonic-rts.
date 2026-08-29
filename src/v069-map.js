@@ -1,5 +1,5 @@
 'use strict';
-// ---------- Napoleonic RTS v0.6.9: realistic junctions + roadside villages ----------
+// ---------- Village layout v2: organic Napoleonic roadside settlements ----------
 
 function stringSeedV069(text) {
   let h = 2166136261;
@@ -15,27 +15,32 @@ function randV069(state) {
   return state.value / 4294967296;
 }
 
+function roadGeometryV069(road, x, y) {
+  let best = null;
+  for (let i = 1; i < road.points.length; i++) {
+    const a = road.points[i - 1], b = road.points[i];
+    const hit = closestPointOnSegmentV066(x, y, a, b);
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const candidate = {
+      road,
+      segmentIndex:i - 1,
+      distance:hit.distance,
+      edgeClearance:hit.distance - road.width / 2,
+      tx:(b.x - a.x) / len,
+      ty:(b.y - a.y) / len,
+      px:hit.x,
+      py:hit.y
+    };
+    if (!best || candidate.distance < best.distance) best = candidate;
+  }
+  return best;
+}
+
 function nearestRoadGeometryV069(x, y) {
   let best = null;
   for (const road of ROAD_NETWORK_V066) {
-    for (let i = 1; i < road.points.length; i++) {
-      const hit = closestPointOnSegmentV066(x, y, road.points[i - 1], road.points[i]);
-      const edgeClearance = hit.distance - road.width / 2;
-      if (!best || edgeClearance < best.edgeClearance) {
-        const a = road.points[i - 1], b = road.points[i];
-        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        best = {
-          road,
-          segmentIndex:i - 1,
-          distance:hit.distance,
-          edgeClearance,
-          tx:(b.x - a.x) / len,
-          ty:(b.y - a.y) / len,
-          px:hit.x,
-          py:hit.y
-        };
-      }
-    }
+    const geometry = roadGeometryV069(road, x, y);
+    if (geometry && (!best || geometry.edgeClearance < best.edgeClearance)) best = geometry;
   }
   return best;
 }
@@ -43,101 +48,145 @@ function nearestRoadGeometryV069(x, y) {
 function roadsAtJunctionV069(h) {
   const roads = [];
   for (const road of ROAD_NETWORK_V066) {
-    let best = Infinity;
-    for (let i = 1; i < road.points.length; i++) {
-      best = Math.min(best, closestPointOnSegmentV066(h.x, h.y, road.points[i - 1], road.points[i]).distance);
-    }
-    if (best <= road.width / 2 + 18) roads.push(road);
+    const geometry = roadGeometryV069(road, h.x, h.y);
+    if (geometry && geometry.distance <= road.width / 2 + 22) roads.push(road);
   }
   return roads;
 }
 
-function roadsideHouseCandidateV069(h, base, i, state, w, height) {
+function structureProfileV069(kind, state) {
+  switch (kind) {
+    case 'farmhouse':
+      return {w:42 + randV069(state) * 14, h:23 + randV069(state) * 7, extraOffset:12, spacing:54};
+    case 'barn':
+      return {w:34 + randV069(state) * 13, h:20 + randV069(state) * 7, extraOffset:32, spacing:48};
+    case 'inn':
+      return {w:52 + randV069(state) * 9, h:29 + randV069(state) * 6, extraOffset:16, spacing:62};
+    case 'chapel':
+      return {w:56 + randV069(state) * 8, h:23 + randV069(state) * 5, extraOffset:20, spacing:65};
+    default:
+      return {w:29 + randV069(state) * 10, h:18 + randV069(state) * 7, extraOffset:5, spacing:42};
+  }
+}
+
+function clearOfVillageStructuresV069(x, y, w, h, occupied) {
+  const radius = Math.hypot(w, h) * .58;
+  for (const other of occupied) {
+    const otherRadius = Math.hypot(other.w, other.h) * .58;
+    if (Math.hypot(x - other.x, y - other.y) < radius + otherRadius + 9) return false;
+  }
+  return true;
+}
+
+function roadsideHouseCandidateV069(h, base, slot, state, w, height, occupied = [], kind = 'cottage') {
   const laneOffset = base.road.width / 2;
-  const randomAlong = (randV069(state) - .5) * 18;
-  const randomOffset = randV069(state) * 12;
-  const direction = i % 2 === 0 ? -1 : 1;
-  const initialSide = (Math.floor(i / 2) % 2 === 0) ? -1 : 1;
-  const row = Math.floor(i / 2);
+  const randomAlong = (randV069(state) - .5) * 20;
+  const randomOffset = randV069(state) * 14;
   const footprint = Math.hypot(w, height) / 2;
+  const profileExtra = kind === 'barn' ? 32 : kind === 'farmhouse' ? 12 : kind === 'chapel' ? 20 : kind === 'inn' ? 16 : 5;
   let best = null;
 
-  // Villages sit around a junction, not on top of it. Search farther along the selected
-  // road and on both verges until the complete house footprint is outside every road.
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const side = attempt < 40 ? initialSide : -initialSide;
-    const alongBand = attempt % 10;
-    const outwardBand = Math.floor((attempt % 40) / 10);
-    const along = direction * (74 + row * 46 + alongBand * 15) + randomAlong;
-    const offset = laneOffset + 34 + randomOffset + outwardBand * 18;
+  // Sample both sides and both directions of the road. The slot controls the distance from
+  // the junction, while attempts introduce deterministic micro-variation and a second row.
+  for (let attempt = 0; attempt < 180; attempt++) {
+    const side = ((slot + Math.floor(attempt / 45)) % 2 === 0) ? -1 : 1;
+    const direction = ((Math.floor(slot / 2) + Math.floor(attempt / 90)) % 2 === 0) ? -1 : 1;
+    const alongBand = attempt % 15;
+    const depthBand = Math.floor((attempt % 45) / 15);
+    const along = direction * (70 + Math.floor(slot / 2) * 38 + alongBand * 8) + randomAlong;
+    const offset = laneOffset + 29 + profileExtra + randomOffset + depthBand * 18;
     const x = h.x + base.tx * along - base.ty * side * offset;
     const y = h.y + base.ty * along + base.tx * side * offset;
-    if (x < 35 || y < 35 || x > WORLD.width - 35 || y > WORLD.height - 35) continue;
+    if (x < 55 || y < 55 || x > WORLD.width - 55 || y > WORLD.height - 55) continue;
+
     const nearest = nearestRoadGeometryV069(x, y);
     if (!nearest) continue;
     const clearance = nearest.edgeClearance;
     const footprintClearance = clearance - footprint;
-    const score = footprintClearance >= 12 && clearance <= 105
-      ? Math.abs(clearance - (footprint + 24)) + Math.abs(alongBand - 2) * 1.5
-      : Infinity;
-    if (score < (best?.score ?? Infinity)) best = {x,y,side,clearance,score};
-  }
+    if (footprintClearance < 10 || clearance > 145) continue;
+    if (!clearOfVillageStructuresV069(x, y, w, height, occupied)) continue;
 
-  // Dense multi-road junctions can invalidate a whole side of the primary road. A broad
-  // deterministic fallback samples both verges farther from the crossroads and still only
-  // accepts positions that are clearly beside, but not on, some road.
-  if (!best) {
-    for (let attempt = 0; attempt < 120; attempt++) {
-      const side = attempt % 2 ? 1 : -1;
-      const direction2 = Math.floor(attempt / 2) % 2 ? 1 : -1;
-      const ring = Math.floor(attempt / 4);
-      const along = direction2 * (105 + ring * 13 + row * 22);
-      const offset = laneOffset + 48 + (ring % 5) * 15;
-      const x = h.x + base.tx * along - base.ty * side * offset;
-      const y = h.y + base.ty * along + base.tx * side * offset;
-      if (x < 35 || y < 35 || x > WORLD.width - 35 || y > WORLD.height - 35) continue;
-      const nearest = nearestRoadGeometryV069(x, y);
-      if (!nearest) continue;
-      const clearance = nearest.edgeClearance;
-      if (clearance - footprint >= 12 && clearance <= 110) {
-        best = {x,y,side,clearance,score:0};
-        break;
-      }
-    }
+    const desired = footprint + 24 + profileExtra * .45;
+    const score = Math.abs(clearance - desired) + Math.abs(alongBand - 4) * 1.2 + depthBand * 4;
+    if (score < (best?.score ?? Infinity)) best = {x, y, side, clearance, score};
   }
 
   return best;
 }
 
+function chooseVillageKindsV069(state, junctionRoadCount) {
+  const kinds = [];
+  kinds.push(junctionRoadCount >= 3 && randV069(state) > .35 ? 'chapel' : 'inn');
+  kinds.push('farmhouse', 'cottage', 'cottage', 'barn', 'farmhouse', 'cottage');
+  const extra = 5 + Math.floor(randV069(state) * 4);
+  for (let i = 0; i < extra; i++) {
+    const r = randV069(state);
+    kinds.push(r < .20 ? 'barn' : r < .48 ? 'farmhouse' : 'cottage');
+  }
+  return kinds;
+}
+
 function buildVillageSceneryV069() {
   const villages = [];
   for (const h of ROAD_HAMLETS_V066) {
-    const base = nearestRoadGeometryV069(h.x, h.y);
-    if (!base) continue;
     const state = { value:stringSeedV069(h.name) };
-    const count = 5 + Math.floor(randV069(state) * 3);
+    const junctionRoads = roadsAtJunctionV069(h);
+    const fallback = nearestRoadGeometryV069(h.x, h.y);
+    if (!fallback) continue;
+
+    const branchBases = (junctionRoads.length ? junctionRoads : [fallback.road])
+      .map(road => roadGeometryV069(road, h.x, h.y))
+      .filter(Boolean);
+    if (!branchBases.length) branchBases.push(fallback);
+
+    const kinds = chooseVillageKindsV069(state, junctionRoads.length);
     const houses = [];
-    for (let i = 0; i < count; i++) {
-      const w = 20 + randV069(state) * 10;
-      const height = 14 + randV069(state) * 7;
-      const angleJitter = (randV069(state) - .5) * .16;
-      const candidate = roadsideHouseCandidateV069(h, base, i, state, w, height);
+    const slotsByBranch = new Map();
+
+    for (let i = 0; i < kinds.length; i++) {
+      const kind = kinds[i];
+      const profile = structureProfileV069(kind, state);
+      const branchIndex = i === 0 ? 0 : i % branchBases.length;
+      const base = branchBases[branchIndex];
+      const slot = slotsByBranch.get(branchIndex) || 0;
+      slotsByBranch.set(branchIndex, slot + 1);
+
+      const candidate = roadsideHouseCandidateV069(
+        h, base, slot, state, profile.w, profile.h, houses, kind
+      );
       if (!candidate) continue;
+
+      let angle = Math.atan2(base.ty, base.tx) + (randV069(state) - .5) * .10;
+      if (kind === 'barn' && randV069(state) > .62) angle += Math.PI / 2;
+
       houses.push({
+        id:`${h.name.replace(/\s+/g,'-').toLowerCase()}-${i}`,
+        kind,
         x:candidate.x,
         y:candidate.y,
-        w,
-        h:height,
-        angle:Math.atan2(base.ty, base.tx) + angleJitter,
+        w:profile.w,
+        h:profile.h,
+        angle,
         side:candidate.side,
-        roadClearance:candidate.clearance
+        roadName:base.road.name,
+        roadClass:base.road.roadClass,
+        roadClearance:candidate.clearance,
+        yardSeed:(stringSeedV069(h.name) ^ ((i + 1) * 2654435761)) >>> 0
       });
     }
+
+    const kindCounts = houses.reduce((counts, structure) => {
+      counts[structure.kind] = (counts[structure.kind] || 0) + 1;
+      return counts;
+    }, {});
+
     villages.push({
       name:h.name,
       x:h.x,
       y:h.y,
-      junctionRoadCount:roadsAtJunctionV069(h).length,
+      junctionRoadCount:junctionRoads.length,
+      structureCount:houses.length,
+      kindCounts,
       houses
     });
   }
@@ -146,19 +195,20 @@ function buildVillageSceneryV069() {
 
 const VILLAGE_SCENERY_V069 = Object.freeze(buildVillageSceneryV069().map(v => Object.freeze({
   ...v,
+  kindCounts:Object.freeze({...v.kindCounts}),
   houses:Object.freeze(v.houses.map(h => Object.freeze({...h})))
 })));
 
 function drawJunctionApronV069(village) {
   if (village.junctionRoadCount < 2) return;
-  const radius = 22 + Math.min(5, village.junctionRoadCount) * 5;
+  const radius = 24 + Math.min(5, village.junctionRoadCount) * 6;
   ctx.save();
   ctx.translate(village.x, village.y);
-  ctx.fillStyle = 'rgba(201,180,137,.30)';
+  ctx.fillStyle = 'rgba(201,180,137,.25)';
   ctx.beginPath();
-  ctx.ellipse(0, 0, radius * 1.15, radius * .82, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, radius * 1.22, radius * .86, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(92,72,48,.22)';
+  ctx.strokeStyle = 'rgba(92,72,48,.19)';
   ctx.lineWidth = 1.5;
   for (let i = 0; i < 3; i++) {
     ctx.beginPath();
@@ -168,33 +218,25 @@ function drawJunctionApronV069(village) {
   ctx.restore();
 }
 
+// Fallback only. Architecture v2 replaces this with the strict roof-plan renderer after load.
 function drawHouseV069(house, index) {
   ctx.save();
   ctx.translate(house.x, house.y);
   ctx.rotate(house.angle);
-  ctx.fillStyle = index % 3 === 0 ? 'rgba(190,173,141,.96)' : index % 3 === 1 ? 'rgba(175,156,126,.96)' : 'rgba(205,188,154,.96)';
-  ctx.fillRect(-house.w/2, -house.h/2, house.w, house.h);
-  ctx.fillStyle = index % 2 ? 'rgba(103,67,48,.96)' : 'rgba(119,76,49,.96)';
+  ctx.fillStyle = house.kind === 'barn' ? '#60483a' : '#80553f';
+  ctx.fillRect(-house.w / 2, -house.h / 2, house.w, house.h);
+  ctx.strokeStyle = 'rgba(48,34,27,.82)';
+  ctx.lineWidth = 1 / camera.zoom;
+  ctx.strokeRect(-house.w / 2, -house.h / 2, house.w, house.h);
   ctx.beginPath();
-  ctx.moveTo(-house.w*.58, -house.h*.34);
-  ctx.lineTo(0, -house.h*.85);
-  ctx.lineTo(house.w*.58, -house.h*.34);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = 'rgba(75,59,43,.92)';
-  ctx.fillRect(-2.5, 1, 5, house.h/2 - 1);
-  ctx.strokeStyle = 'rgba(103,83,58,.62)';
-  ctx.lineWidth = 1;
-  const fenceY = house.side > 0 ? house.h/2 + 8 : -house.h/2 - 8;
-  ctx.beginPath();
-  ctx.moveTo(-house.w*.75, fenceY);
-  ctx.lineTo(house.w*.75, fenceY);
+  ctx.moveTo(-house.w * .42, 0);
+  ctx.lineTo(house.w * .42, 0);
   ctx.stroke();
   ctx.restore();
 }
 
-// v0.6.7 terrain still calls drawHamletsV066 after the roads are rendered. Replace that
-// renderer with junction wear + roadside houses, and intentionally draw no village labels.
+// Terrain calls this after roads are rendered. Villages remain visual scenery and do not
+// alter navigation/collision; all structures are kept outside road footprints.
 drawHamletsV066 = function drawHamletsV069() {
   ctx.save();
   for (const village of VILLAGE_SCENERY_V069) {
@@ -205,11 +247,30 @@ drawHamletsV066 = function drawHamletsV069() {
   ctx.textAlign = 'start';
 };
 
+const villageKindTotalsV069 = {};
+let villageStructureTotalV069 = 0;
+let villageMinStructuresV069 = Infinity;
+for (const village of VILLAGE_SCENERY_V069) {
+  villageStructureTotalV069 += village.houses.length;
+  villageMinStructuresV069 = Math.min(villageMinStructuresV069, village.houses.length);
+  for (const [kind, count] of Object.entries(village.kindCounts)) {
+    villageKindTotalsV069[kind] = (villageKindTotalsV069[kind] || 0) + count;
+  }
+}
+window.__VILLAGE_SCENERY_V2__ = Object.freeze({
+  version:'village-layout-v2',
+  villageCount:VILLAGE_SCENERY_V069.length,
+  structureCount:villageStructureTotalV069,
+  minStructures:Number.isFinite(villageMinStructuresV069) ? villageMinStructuresV069 : 0,
+  kinds:Object.freeze({...villageKindTotalsV069}),
+  navigationUnchanged:true
+});
+
 const resetGameV068ForV069 = resetGame;
 resetGame = function resetGameV069() {
   V069_MOTION_STATS.sameGroupOverlapSkips = 0;
   V069_MOTION_STATS.combatSoftCorrections = 0;
   V069_MOTION_STATS.roadRetargetFixes = 0;
   resetGameV068ForV069();
-  statusEl.textContent = 'v0.6.9: vloeiender wegmars en gevechtscontact; drummers blijven achter de lijn en dorpen liggen naast de weg.';
+  statusEl.textContent = 'Dorpen: grotere organische lintbebouwing met boerderijen, schuren, erven en dorpsankers.';
 };
