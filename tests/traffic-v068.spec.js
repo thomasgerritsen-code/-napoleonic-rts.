@@ -28,49 +28,49 @@ test('v0.6.9 preserves single-lane bridge traffic and wider ford capacity', asyn
   expect(errors).toEqual([]);
 });
 
-test('two battalions queue at Pont de la Chaussee, never share the deck and reform after crossing', async ({ page }, testInfo) => {
+test('two battalions integrate with the production bridge queue and reform after crossing', async ({ page }, testInfo) => {
   const errors = await openGame(page);
-  await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
-  const ids = await page.evaluate(() => {
+  const result = await page.evaluate(() => {
+    window.__RTS_DEBUG__.setPeaceMode(true);
     const first = window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1030,900);
     const second = window.__RTS_DEBUG__.createFreshInfantryRegiment('france',760,900);
     window.__RTS_DEBUG__.selectRegiment(first);
     window.__RTS_DEBUG__.orderSelectedWithFacing(2200,900,0);
     window.__RTS_DEBUG__.selectRegiment(second);
     window.__RTS_DEBUG__.orderSelectedWithFacing(2200,900,0);
-    return [first, second];
+    const ids=[first,second];
+
+    let sawQueue=false;
+    let sawForcedColumn=false;
+    let sawFirstCrossing=false;
+    let sawSecondCrossing=false;
+    let maxDeckGroups=0;
+    let finalStates=null;
+
+    for(let i=0;i<140;i++){
+      window.RTS_SIM.step(.5);
+      const traffic=window.__RTS_DEBUG__.crossingTrafficV068('pont-chaussee');
+      const deck=window.__RTS_DEBUG__.bridgeDeckOccupancyV068('pont-chaussee');
+      const states=ids.map(id=>window.__RTS_DEBUG__.formationState(id));
+      maxDeckGroups=Math.max(maxDeckGroups,deck.count);
+      sawQueue ||= traffic.waiting>0 || states.some(s=>s?.crossingTraffic?.state==='waiting');
+      sawForcedColumn ||= states.some(s=>s?.forcedBridgeColumn && ['bridge-waiting','bridge-forming','bridge-crossing'].includes(s.phase));
+      sawFirstCrossing ||= states[0]?.crossingTraffic?.state==='crossing';
+      sawSecondCrossing ||= states[1]?.crossingTraffic?.state==='crossing';
+      finalStates=states;
+      if(states.every(s=>s?.phase==='formed' && s.centroid.x>1800)) break;
+    }
+
+    return {sawQueue,sawForcedColumn,sawFirstCrossing,sawSecondCrossing,maxDeckGroups,finalStates};
   });
 
-  let sawQueue = false;
-  let sawForcedColumn = false;
-  let sawFirstCrossing = false;
-  let sawSecondCrossing = false;
-  let maxDeckGroups = 0;
-  let finalStates = null;
-
-  for (let i=0; i<140; i++) {
-    await page.evaluate(() => window.RTS_SIM.step(0.5));
-    const sample = await page.evaluate(ids => ({
-      traffic:window.__RTS_DEBUG__.crossingTrafficV068('pont-chaussee'),
-      deck:window.__RTS_DEBUG__.bridgeDeckOccupancyV068('pont-chaussee'),
-      states:ids.map(id => window.__RTS_DEBUG__.formationState(id))
-    }), ids);
-    maxDeckGroups = Math.max(maxDeckGroups, sample.deck.count);
-    sawQueue ||= sample.traffic.waiting > 0 || sample.states.some(s => s?.crossingTraffic?.state === 'waiting');
-    sawForcedColumn ||= sample.states.some(s => s?.forcedBridgeColumn && ['bridge-waiting','bridge-forming','bridge-crossing'].includes(s.phase));
-    sawFirstCrossing ||= sample.states[0]?.crossingTraffic?.state === 'crossing';
-    sawSecondCrossing ||= sample.states[1]?.crossingTraffic?.state === 'crossing';
-    finalStates = sample.states;
-    if (sample.states.every(s => s?.phase === 'formed' && s.centroid.x > 1800)) break;
-  }
-
-  expect(sawQueue).toBe(true);
-  expect(sawForcedColumn).toBe(true);
-  expect(sawFirstCrossing).toBe(true);
-  expect(sawSecondCrossing).toBe(true);
-  expect(maxDeckGroups).toBeLessThanOrEqual(1);
-  expect(finalStates).toHaveLength(2);
-  for (const state of finalStates) {
+  expect(result.sawQueue).toBe(true);
+  expect(result.sawForcedColumn).toBe(true);
+  expect(result.sawFirstCrossing).toBe(true);
+  expect(result.sawSecondCrossing).toBe(true);
+  expect(result.maxDeckGroups).toBeLessThanOrEqual(1);
+  expect(result.finalStates).toHaveLength(2);
+  for (const state of result.finalStates) {
     expect(state.formation).toBe('line');
     expect(state.phase).toBe('formed');
     expect(state.centroid.x).toBeGreaterThan(1800);
