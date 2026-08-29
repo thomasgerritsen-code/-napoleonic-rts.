@@ -17,6 +17,10 @@ function selectFocusedTests(files) {
     selected.add('tests/speed-v071.spec.js');
   };
 
+  const addVillage = () => {
+    selected.add('tests/village-renderer-v2.spec.js');
+  };
+
   for (const raw of files) {
     const file = String(raw || '').trim();
     if (!file) continue;
@@ -26,6 +30,13 @@ function selectFocusedTests(files) {
     if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') {
       selected.add('tests/foundation-v071.spec.js');
     }
+
+    if (
+      file === 'src/v069-map.js' ||
+      file === 'src/systems/world/topdown-buildings.js' ||
+      file === 'src/systems/world/village-renderer-v2.js' ||
+      file === 'tests/village-renderer-v2.spec.js'
+    ) addVillage();
 
     if (
       file.startsWith('src/systems/navigation/') ||
