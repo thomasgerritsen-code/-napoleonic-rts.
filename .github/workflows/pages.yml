@@ -36,7 +36,6 @@ jobs:
   focused:
     name: Focused Chromium PR gate
     if: ${{ github.event_name == 'pull_request' }}
-    needs: fast
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -89,7 +88,6 @@ jobs:
   release:
     name: Full Chromium release gate (${{ matrix.shard }}/2)
     if: ${{ github.event_name != 'pull_request' }}
-    needs: fast
     strategy:
       fail-fast: false
       matrix:
