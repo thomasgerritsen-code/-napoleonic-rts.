@@ -56,8 +56,12 @@
 <script src="src/v064.js"></script>
 <script src="src/v065.js"></script>
 <script src="src/v066.js"></script>
-<script src="src/v066-road-index.js"></script>
-<script src="src/v066-route-fixes.js"></script>
+
+<!-- Architecture v2 owns the road lookup + network route planner. -->
+<script src="src/systems/navigation/road-index.js?build=a2"></script>
+<script src="src/systems/navigation/route-planner.js?build=a2"></script>
+
+<!-- Historical water/traffic layers remain compatibility + rendering adapters. -->
 <script src="src/v067.js"></script>
 <script src="src/v068.js"></script>
 <script src="src/v069-motion.js"></script>
@@ -66,6 +70,12 @@
 <script src="src/v070.js?build=070"></script>
 <script src="src/v070-motion.js?build=070c"></script>
 <script src="src/v070-regression-fixes.js?build=070d"></script>
+
+<!-- Architecture v2 owns final route/crossing guidance, including bridge anti-stall. -->
+<script src="src/systems/navigation/bridge-corridors.js?build=a2"></script>
+<script src="src/systems/navigation/bridge-route-resolver.js?build=a2"></script>
+<script src="src/systems/navigation/bridge-safety.js?build=a2"></script>
+<script src="src/systems/navigation/api.js?build=a2"></script>
 
 <!-- Architecture v2 owns the active v0.7.1 movement/formation layer. -->
 <script src="src/systems/movement/state.js?build=a2"></script>

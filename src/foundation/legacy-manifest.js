@@ -16,17 +16,30 @@
       formationFollowers: 'src/systems/formation/followers.js',
       movementFixedStep: 'src/systems/movement/fixed-step.js',
       movementSpeedModel: 'src/systems/movement/speed-model.js',
-      movementFormationApi: 'src/systems/movement/api.js'
+      movementFormationApi: 'src/systems/movement/api.js',
+      navigationRoadIndex: 'src/systems/navigation/road-index.js',
+      navigationRoutePlanner: 'src/systems/navigation/route-planner.js',
+      navigationBridgeCorridors: 'src/systems/navigation/bridge-corridors.js',
+      navigationBridgeRouteResolver: 'src/systems/navigation/bridge-route-resolver.js',
+      navigationBridgeSafety: 'src/systems/navigation/bridge-safety.js',
+      navigationApi: 'src/systems/navigation/api.js'
     }),
     legacyPatches: Object.freeze([
       'src/v05.js', 'src/v06.js', 'src/v061.js', 'src/v063.js', 'src/simulation-api.js',
       'src/input.js', 'src/v063-fixes.js', 'src/v064.js', 'src/v065.js', 'src/v066.js',
-      'src/v066-road-index.js', 'src/v066-route-fixes.js', 'src/v067.js', 'src/v068.js',
-      'src/v069-motion.js', 'src/v069-combat.js', 'src/v069-map.js', 'src/v070.js',
-      'src/v070-motion.js', 'src/v070-regression-fixes.js', 'src/v071-motion.js',
-      'src/v071-speed-hotfix.js'
+      'src/v067.js', 'src/v068.js', 'src/v069-motion.js', 'src/v069-combat.js',
+      'src/v069-map.js', 'src/v070.js', 'src/v070-motion.js', 'src/v070-regression-fixes.js',
+      'src/v071-motion.js', 'src/v071-speed-hotfix.js'
+    ]),
+    navigationCompatibility: Object.freeze([
+      'src/v066.js',
+      'src/v067.js',
+      'src/v068.js',
+      'src/v070-regression-fixes.js'
     ]),
     retiredFromRuntime: Object.freeze([
+      'src/v066-road-index.js',
+      'src/v066-route-fixes.js',
       'src/v071-motion.js',
       'src/v071-speed-hotfix.js'
     ]),
