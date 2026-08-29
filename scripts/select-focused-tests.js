@@ -32,6 +32,7 @@ function selectFocusedTests(files) {
     }
 
     if (
+      file === 'index.html' ||
       file === 'src/v069-map.js' ||
       file === 'src/systems/world/topdown-buildings.js' ||
       file === 'src/systems/world/village-renderer-v2.js' ||
