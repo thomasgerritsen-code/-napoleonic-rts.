@@ -36,6 +36,7 @@ function selectFocusedTests(files) {
       file === 'src/v069-map.js' ||
       file === 'src/systems/world/topdown-buildings.js' ||
       file === 'src/systems/world/village-renderer-v2.js' ||
+      file === 'src/systems/world/village-authority-v3.js' ||
       file === 'tests/village-renderer-v2.spec.js'
     ) addVillage();
 
