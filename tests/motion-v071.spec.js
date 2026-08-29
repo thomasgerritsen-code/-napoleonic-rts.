@@ -16,8 +16,6 @@ async function openV071(page) {
   return pageErrors;
 }
 
-async function state(page,id){ return page.evaluate(id=>window.__RTS_DEBUG__.motionSystemV071(id),id); }
-
 function angleDelta(a,b){ return Math.atan2(Math.sin(a-b),Math.cos(a-b)); }
 
 function coefficientOfVariation(values){
@@ -39,16 +37,20 @@ test('v0.7.1 uses damped slot followers with a fixed-step interpolated productio
 
 test('straight road march has low centroid jitter and low per-soldier direction chatter', async ({page},testInfo) => {
   const errors=await openV071(page);
-  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
-  const id=await page.evaluate(()=>window.__RTS_DEBUG__.createFreshInfantryRegiment('france',700,900));
-  await page.evaluate(id=>{window.__RTS_DEBUG__.selectRegiment(id);window.__RTS_DEBUG__.orderSelectedWithFacing(1850,895,0);},id);
-  await page.evaluate(()=>window.RTS_SIM.step(1.5));
-
-  const samples=[];
-  for(let i=0;i<48;i++){
-    await page.evaluate(()=>window.RTS_SIM.step(.05));
-    samples.push(await state(page,id));
-  }
+  const result=await page.evaluate(() => {
+    window.__RTS_DEBUG__.setPeaceMode(true);
+    const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',700,900);
+    window.__RTS_DEBUG__.selectRegiment(id);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(1850,895,0);
+    window.RTS_SIM.step(1.5);
+    const samples=[];
+    for(let i=0;i<48;i++){
+      window.RTS_SIM.step(.05);
+      samples.push(window.__RTS_DEBUG__.motionSystemV071(id));
+    }
+    return {samples,stats:window.__RTS_DEBUG__.motionStatsV071()};
+  });
+  const samples=result.samples;
 
   expect(samples.every(s=>s.road==='Grande Chaussée')).toBe(true);
   expect(Math.max(...samples.map(s=>s.maxSlotError))).toBeLessThan(42);
@@ -86,40 +88,47 @@ test('straight road march has low centroid jitter and low per-soldier direction 
   expect(Math.max(...headingJumps)).toBeLessThan(.22);
   expect(headingJumps.filter(v=>v>.10).length).toBeLessThanOrEqual(2);
 
-  const stats=await page.evaluate(()=>window.__RTS_DEBUG__.motionStatsV071());
-  expect(stats.followerSteps).toBeGreaterThan(400);
-  expect(stats.maxFollowerSpeed).toBeLessThan(130);
-  expect(stats.directionReversals).toBeLessThan(40);
+  expect(result.stats.followerSteps).toBeGreaterThan(400);
+  expect(result.stats.maxFollowerSpeed).toBeLessThan(130);
+  expect(result.stats.directionReversals).toBeLessThan(40);
   await testInfo.attach('v071-smooth-road-march',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
   expect(errors).toEqual([]);
 });
 
 test('formation transition converges without a teleport or internal collision fight', async ({page}) => {
   const errors=await openV071(page);
-  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
-  const id=await page.evaluate(()=>window.__RTS_DEBUG__.createFreshInfantryRegiment('france',680,900));
-  await page.evaluate(id=>{window.__RTS_DEBUG__.selectRegiment(id);window.__RTS_DEBUG__.orderSelectedWithFacing(1420,895,0);},id);
-  await page.evaluate(()=>window.RTS_SIM.step(1.0));
+  const result=await page.evaluate(() => {
+    window.__RTS_DEBUG__.setPeaceMode(true);
+    const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',680,900);
+    window.__RTS_DEBUG__.selectRegiment(id);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(1420,895,0);
+    window.RTS_SIM.step(1.0);
 
-  let previous=await state(page,id);
-  let maxMemberStep=0;
-  for(let i=0;i<30;i++){
-    await page.evaluate(()=>window.RTS_SIM.step(.05));
-    const current=await state(page,id);
-    const before=new Map(previous.members.map(u=>[u.id,u]));
-    for(const u of current.members){
-      const p=before.get(u.id);
-      if(p) maxMemberStep=Math.max(maxMemberStep,Math.hypot(u.x-p.x,u.y-p.y));
+    let previous=window.__RTS_DEBUG__.motionSystemV071(id);
+    let maxMemberStep=0;
+    for(let i=0;i<30;i++){
+      window.RTS_SIM.step(.05);
+      const current=window.__RTS_DEBUG__.motionSystemV071(id);
+      const before=new Map(previous.members.map(u=>[u.id,u]));
+      for(const u of current.members){
+        const p=before.get(u.id);
+        if(p) maxMemberStep=Math.max(maxMemberStep,Math.hypot(u.x-p.x,u.y-p.y));
+      }
+      previous=current;
     }
-    previous=current;
-  }
-  expect(maxMemberStep).toBeLessThan(7.5);
-  expect(previous.maxSlotError).toBeLessThan(32);
-  expect(previous.meanSlotError).toBeLessThan(15);
-  const stats=await page.evaluate(()=>window.__RTS_DEBUG__.motionStatsV071());
-  expect(stats.internalCollisionSkips).toBeGreaterThan(0);
-  const oldStats=await page.evaluate(()=>window.__RTS_DEBUG__.motionStatsV070());
-  expect(oldStats.snappedMembers).toBe(0);
-  expect(oldStats.teleportViolations).toBe(0);
+    return {
+      maxMemberStep,
+      finalState:previous,
+      stats:window.__RTS_DEBUG__.motionStatsV071(),
+      oldStats:window.__RTS_DEBUG__.motionStatsV070()
+    };
+  });
+
+  expect(result.maxMemberStep).toBeLessThan(7.5);
+  expect(result.finalState.maxSlotError).toBeLessThan(32);
+  expect(result.finalState.meanSlotError).toBeLessThan(15);
+  expect(result.stats.internalCollisionSkips).toBeGreaterThan(0);
+  expect(result.oldStats.snappedMembers).toBe(0);
+  expect(result.oldStats.teleportViolations).toBe(0);
   expect(errors).toEqual([]);
 });
