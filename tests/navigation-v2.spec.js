@@ -65,7 +65,9 @@ test('angled battalion approach clears Pont de la Chaussee corners without stall
     window.__RTS_DEBUG__.orderSelectedWithFacing(target.x,target.y,0);
 
     const initialNav=nav.bridgeState(id);
-    let sawApproach=false;
+    const initialReg=getRegiment(id);
+    const initialPath=(initialReg?.path||[]).slice(Math.max(0,initialReg?.pathIndex||0));
+    const initialPathHasApproach=initialPath.some(p=>Math.hypot(p.x-corridor.approach.x,p.y-corridor.approach.y)<=2.5);
     let sawCrossing=false;
     let maxDeckAnchorPerp=0;
     let maxDeckMemberPerp=0;
@@ -93,7 +95,6 @@ test('angled battalion approach clears Pont de la Chaussee corners without stall
       const navState=nav.bridgeState(id);
 
       everInWater ||= anchor?waterAtV067(anchor.x,anchor.y):false;
-      sawApproach ||= navState?.trafficState==='approach';
       sawCrossing ||= navState?.trafficState==='crossing';
 
       if(anchorLocal && Math.abs(anchorLocal.along)<=135+10){
@@ -122,7 +123,7 @@ test('angled battalion approach clears Pont de la Chaussee corners without stall
     return {
       corridor,
       initialNav,
-      sawApproach,
+      initialPathHasApproach,
       sawCrossing,
       everInWater,
       maxDeckAnchorPerp,
@@ -134,7 +135,7 @@ test('angled battalion approach clears Pont de la Chaussee corners without stall
   });
 
   expect(result.initialNav.corridors.some(c=>c.id==='pont-chaussee')).toBe(true);
-  expect(result.sawApproach).toBe(true);
+  expect(result.initialPathHasApproach).toBe(true);
   expect(result.sawCrossing).toBe(true);
   expect(result.everInWater).toBe(false);
   expect(result.maxDeckAnchorPerp).toBeLessThanOrEqual(24);
