@@ -34,30 +34,66 @@ if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
     return looseCrossingTargetBeforeBridgeSafetyV2(u,tx,ty);
   };
 
-  // A normal road march can use the full historical column width, but bridges are
-  // bottlenecks. Narrow only the lateral component while forced into a bridge
-  // column. Crucially, slot geometry is aligned to the fixed bridge axis instead
-  // of the anchor's temporary turning angle; otherwise a long column can swing its
-  // rear files sideways through a bridge corner while the anchor turns in.
+  function bridgeColumnBlendV2(c,march,info) {
+    if (info?.entered || ['crossing','clearing'].includes(info?.state)) return 1;
+    const local=crossingLocalArchitectureV2(c,march.anchorX,march.anchorY);
+    const onInitialSide=local.along*info.initialSide;
+    const clearance=onInitialSide-c.length/2;
+    const config=window.NRTS_CONFIG?.navigation?.bridge || {};
+    const start=Math.max(1,Number(config.columnFormStartClearance)||90);
+    const full=Math.max(0,Math.min(start-1,Number(config.columnFormFullClearance)||24));
+    if (clearance>=start) return 0;
+    if (clearance<=full) return 1;
+    const t=(start-clearance)/Math.max(1,start-full);
+    return t*t*(3-2*t);
+  }
+
+  // Traffic reservation and centreline steering begin well before the bridge, but
+  // visual compression is deliberately delayed. A field battalion keeps its field
+  // formation and a road battalion keeps its normal road column until it is close
+  // to the mouth; only then does it progressively become the narrower bridge column.
   const forceBridgeColumnTargetsBeforeBridgeSafetyV2=forceBridgeColumnTargetsV068;
   forceBridgeColumnTargetsV068=function forceBridgeColumnTargetsBridgeSafetyV2(reg,march,info) {
     const c=WATER_CROSSINGS_V067.find(item=>item.id===info?.crossingId);
     if (!c || c.type!=='bridge') return forceBridgeColumnTargetsBeforeBridgeSafetyV2(reg,march,info);
 
-    const desired=marchColumnOffsetsV063(reg);
+    const bridgeDesired=marchColumnOffsetsV063(reg);
     const lateralScale=window.NRTS_CONFIG?.navigation?.bridge?.columnLateralScale || 0.72;
-    for (const offset of desired.values()) offset.oy*=lateralScale;
+    for (const offset of bridgeDesired.values()) offset.oy*=lateralScale;
+
+    const roadMarch=typeof roadAtV064==='function'
+      ? roadAtV064(march.anchorX,march.anchorY)
+      : Boolean(typeof roadNetworkAtV066==='function' && roadNetworkAtV066(march.anchorX,march.anchorY));
+    const normalDesired=roadMarch
+      ? marchColumnOffsetsV063(reg)
+      : finalFormationOffsetsV063(reg,reg.formation);
+    const bridgeBlend=bridgeColumnBlendV2(c,march,info);
+    const desired=new Map();
+    const ids=new Set([...normalDesired.keys(),...bridgeDesired.keys()]);
+    for (const id of ids) {
+      const normal=normalDesired.get(id)||bridgeDesired.get(id)||{ox:0,oy:0};
+      const bridge=bridgeDesired.get(id)||normal;
+      desired.set(id,{
+        ox:normal.ox+(bridge.ox-normal.ox)*bridgeBlend,
+        oy:normal.oy+(bridge.oy-normal.oy)*bridgeBlend
+      });
+    }
 
     const offsets=blendFormationOffsetsV064(reg,march,desired,info.state==='waiting'?3.6:3.1);
     const phase=info.state==='waiting'?'bridge-waiting':
       info.state==='crossing'?'bridge-crossing':
-      info.state==='clearing'?'bridge-clearing':'bridge-forming';
+      info.state==='clearing'?'bridge-clearing':
+      bridgeBlend<0.05?'bridge-approach':'bridge-forming';
     const bridgeFacing=crossingHeadingV068(c,info.initialSide);
-    applyFormationTargetsV063(reg,march.anchorX,march.anchorY,offsets,bridgeFacing,phase);
+    const facingDelta=normalizeAngleV063(bridgeFacing-march.marchFacing);
+    const formationFacing=normalizeAngleV063(march.marchFacing+facingDelta*bridgeBlend);
+    applyFormationTargetsV063(reg,march.anchorX,march.anchorY,offsets,formationFacing,phase);
     reg.movementPhaseV063=phase;
     march.phase=phase;
-    march.locomotionV064='bridge-column';
-    for (const u of regimentMembers(reg)) u.marchingV064=true;
+    march.locomotionV064=bridgeBlend<0.05
+      ? (roadMarch?'road-march':'field-formation')
+      : 'bridge-column';
+    for (const u of regimentMembers(reg)) u.marchingV064=roadMarch||bridgeBlend>=0.05;
   };
 
   function bridgeAlignmentSafetyV2(reg) {
