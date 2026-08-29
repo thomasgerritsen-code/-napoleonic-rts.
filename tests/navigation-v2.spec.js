@@ -38,6 +38,8 @@ test('Architecture v2 owns road lookup and route planning without legacy v066 ru
   expect(nav.road).toBe('Grande Chaussée');
   expect(nav.bridge).toBe('Pont de la Chaussée');
   expect(nav.config.bridge.centerlineTolerance).toBeGreaterThan(0);
+  expect(nav.config.bridge.columnFormStartClearance).toBe(90);
+  expect(nav.config.bridge.columnFormFullClearance).toBe(24);
   expect(nav.retired).toEqual(expect.arrayContaining(['src/v066-road-index.js','src/v066-route-fixes.js']));
 
   const html=fs.readFileSync(path.join(process.cwd(),'index.html'),'utf8');
@@ -48,6 +50,46 @@ test('Architecture v2 owns road lookup and route planning without legacy v066 ru
   expect(html).toContain('src/systems/navigation/bridge-safety.js');
   expect(html).not.toMatch(/<script[^>]+src=["']src\/v066-road-index\.js/);
   expect(html).not.toMatch(/<script[^>]+src=["']src\/v066-route-fixes\.js/);
+  expect(errors).toEqual([]);
+});
+
+test('bridge column stays broad until the battalion is close to the bridge mouth', async ({page}) => {
+  const errors=await openNavigationV2(page);
+  const result=await page.evaluate(() => {
+    window.__RTS_DEBUG__.setPeaceMode(true);
+    const c=WATER_CROSSINGS_V067.find(item=>item.id==='pont-chaussee');
+    const side=-1;
+    const far=crossingPointV068(c,side*(c.length/2+140),120);
+    const near=crossingPointV068(c,side*(c.length/2+20),120);
+    const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',far.x,far.y);
+    const reg=getRegiment(id);
+    window.__RTS_DEBUG__.selectRegiment(id);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(c.x+400,c.y,0);
+    const march=reg.marchV063;
+    const info={crossingId:c.id,crossingName:c.name,state:'approach',queuePosition:0,initialSide:side,entered:false,forcedColumn:true};
+    reg.crossingTrafficV068=info;
+
+    const span=()=>{
+      const offsets=[...(march.slotOffsetsV064?.values?.()||[])];
+      if(!offsets.length)return 0;
+      const ys=offsets.map(offset=>Number(offset.oy)||0);
+      return Math.max(...ys)-Math.min(...ys);
+    };
+
+    march.anchorX=far.x; march.anchorY=far.y; march.slotOffsetsV064=null;
+    for(let i=0;i<120;i++) forceBridgeColumnTargetsV068(reg,march,info);
+    const farSpan=span();
+
+    march.anchorX=near.x; march.anchorY=near.y;
+    for(let i=0;i<120;i++) forceBridgeColumnTargetsV068(reg,march,info);
+    const nearSpan=span();
+
+    return {farSpan,nearSpan,config:window.NRTS_CONFIG.navigation.bridge};
+  });
+
+  expect(result.farSpan).toBeGreaterThan(120);
+  expect(result.nearSpan).toBeLessThan(result.farSpan*0.65);
+  expect(result.config.columnFormStartClearance).toBeGreaterThan(result.config.columnFormFullClearance);
   expect(errors).toEqual([]);
 });
 
