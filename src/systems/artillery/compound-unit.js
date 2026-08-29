@@ -44,15 +44,12 @@
   }
 
   function travelIntent(reg, cannon, state) {
-    // Artillery still uses the proven legacy path lifecycle: reg.path is cleared by
-    // setGroupWaypointV06 only once the route has actually handed off to its final target.
-    // Do not treat targetX/targetY alone as a persistent command flag; those fields may
-    // intentionally remain populated after path hand-off.
+    // Travel stance follows authoritative command + physical motion only. Legacy
+    // targetX/arrivedAtTarget fields may remain stale after the route has handed off,
+    // so they must not keep the crew permanently in its travel pose.
     const routeActive = Array.isArray(reg.path);
-    const targetDistance = Math.hypot((cannon.targetX ?? cannon.x)-cannon.x, (cannon.targetY ?? cannon.y)-cannon.y);
-    const finalApproach = !routeActive && cannon.arrivedAtTarget === false && targetDistance > 2.5;
     const physicallyMoving = state.lastDisplacement > 0.10;
-    return routeActive || finalApproach || physicallyMoving;
+    return routeActive || physicallyMoving;
   }
 
   function targetTravelFacing(reg, cannon, state) {
@@ -190,7 +187,10 @@
         displacement:state.lastDisplacement,
         offsets:currentOffsets(reg,cannon),
         routeActive:Array.isArray(reg.path),
-        cannonArrived:cannon.arrivedAtTarget===true
+        cannonArrived:cannon.arrivedAtTarget===true,
+        targetDistance:Math.hypot((cannon.targetX ?? cannon.x)-cannon.x,(cannon.targetY ?? cannon.y)-cannon.y),
+        pathIndex:reg.pathIndex||0,
+        pathLength:Array.isArray(reg.path)?reg.path.length:0
       };
     }
   });
