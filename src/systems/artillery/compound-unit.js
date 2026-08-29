@@ -44,11 +44,15 @@
   }
 
   function travelIntent(reg, cannon, state) {
-    const pathActive = !!(reg.path && reg.pathIndex < reg.path.length);
+    // Artillery still uses the proven legacy path lifecycle: reg.path is cleared by
+    // setGroupWaypointV06 only once the route has actually handed off to its final target.
+    // Do not treat targetX/targetY alone as a persistent command flag; those fields may
+    // intentionally remain populated after path hand-off.
+    const routeActive = Array.isArray(reg.path);
     const targetDistance = Math.hypot((cannon.targetX ?? cannon.x)-cannon.x, (cannon.targetY ?? cannon.y)-cannon.y);
-    const commandActive = pathActive || targetDistance > 8;
+    const finalApproach = !routeActive && cannon.arrivedAtTarget === false && targetDistance > 2.5;
     const physicallyMoving = state.lastDisplacement > 0.10;
-    return commandActive || physicallyMoving;
+    return routeActive || finalApproach || physicallyMoving;
   }
 
   function targetTravelFacing(reg, cannon, state) {
@@ -93,7 +97,12 @@
 
     const state=batteryState(reg,cannon);
     const previousX=state.lastX, previousY=state.lastY;
-    state.lastDisplacement=Math.hypot(cannon.x-previousX,cannon.y-previousY);
+    // Several collision/compatibility hooks call sync with dt=0 in the same frame.
+    // Only the authoritative timed update may consume the displacement sample, otherwise
+    // a dt=0 sync can erase the fact that the cannon just moved.
+    if (dt>0) {
+      state.lastDisplacement=Math.hypot(cannon.x-previousX,cannon.y-previousY);
+    }
 
     const intent=travelIntent(reg,cannon,state);
     if (intent) {
@@ -137,8 +146,10 @@
       member.slotFollowerV071=null;
     });
 
-    state.lastX=cannon.x;
-    state.lastY=cannon.y;
+    if (dt>0) {
+      state.lastX=cannon.x;
+      state.lastY=cannon.y;
+    }
   }
 
   function syncAll(dt=0) {
@@ -177,7 +188,9 @@
         settledSeconds:state.settledSeconds,
         facing:state.facing,
         displacement:state.lastDisplacement,
-        offsets:currentOffsets(reg,cannon)
+        offsets:currentOffsets(reg,cannon),
+        routeActive:Array.isArray(reg.path),
+        cannonArrived:cannon.arrivedAtTarget===true
       };
     }
   });
