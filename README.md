@@ -1,4 +1,4 @@
-# Napoleonic RTS — v0.6.9
+# Napoleonic RTS — v1.0.0
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,24 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.0.0 — eerste volledige release
+
+Versie 1.0 bundelt de complete geïntegreerde releasecandidate en markeert het punt waarop de kernsystemen gezamenlijk door de volledige release-regressie zijn gekomen.
+
+Belangrijkste onderdelen van v1.0.0:
+- stateful Britse AI met blijvende productie, reserves, aanvalsgolven, flankmanoeuvres en terugtrekken/hergroeperen
+- stabiele bataljonsformaties met wegmars, veldformatie, drag-to-facing en vloeiendere road-to-field overgang
+- artillerie als samengestelde kanon+bemanning-eenheid
+- stamina, discipline, morale en command-systemen
+- cavalry charge momentum, carré-counterplay en eindige artilleriemunitie
+- fog of war, scouting, tactical terrain, cover en line of sight
+- realistischere kaartweergave, vegetatiebeweging, karaktervisuals en gevechtsanimaties
+- battlefield aftermath, wind, regen, mist en tijd-van-de-dag-atmosfeer
+- capture objectives, victory points en meerdere skirmish-scenario's
+- Architecture v2 subsystemen en uitgebreide headless/Chromium regressiedekking
+
+De releasecandidate wordt alleen naar `main` gemerged wanneer de fast headless gate, focused Chromium gate en beide volledige Chromium release-shards slagen.
 
 ## Nieuw in v0.6.9 — vloeiender bewegen, gevechtscohesie en realistischere dorpen
 
@@ -194,6 +212,6 @@ Alleen de soak-test:
 npm run test:soak
 ```
 
-## Richting v0.7
+## Verdere ontwikkeling
 
-Na verdere handmatige feedback kan v0.7 zich richten op firing arcs/line-of-fire, laad- en vuuranimaties voor artillerie, passageprioriteit voor artillerie, vernietigbare bruggen, belegering, uitgebreidere economische ketens en verdere loskoppeling van de 2D-renderer.
+Na v1.0 kan de game verder worden uitgebreid met onder meer uitgebreidere economische ketens, belegering, vernietigbare infrastructuur, verdere optimalisatie en uiteindelijk een losgekoppelde 3D-renderer bovenop de bestaande simulatiearchitectuur.
