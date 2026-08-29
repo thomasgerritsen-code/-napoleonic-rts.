@@ -26,6 +26,17 @@
         fieldFollowerFactor: 1.16
       })
     }),
+    navigation: Object.freeze({
+      roadIndexCell: 180,
+      bridge: Object.freeze({
+        approachClearance: 18,
+        portalMargin: 14,
+        centerlineTolerance: 12,
+        looseWaypointTolerance: 10,
+        stallSeconds: 0.70,
+        stallMovementEpsilon: 0.35
+      })
+    }),
     architecture: Object.freeze({
       allowNewVersionPatchFiles: false,
       legacyBaseline: '0.7.1',
