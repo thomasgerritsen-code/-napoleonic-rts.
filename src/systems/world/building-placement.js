@@ -72,6 +72,15 @@
     return null;
   };
 
+  // Initial scenario buildings are created before this Architecture v2 subsystem loads.
+  // Normalize those existing footprints once so the same road-exclusion invariant applies
+  // to startup state, scenario-created buildings and later player/AI construction.
+  for (const b of buildings) {
+    if (b.dead || clearOfRoad(b.type, b.x, b.y, 10)) continue;
+    const safe = nearestRoadSafePosition(b.type, b.x, b.y);
+    if (safe) { b.x = safe.x; b.y = safe.y; }
+  }
+
   nrts.subsystems.register('building-placement', Object.freeze({
     validSpot: (...args) => validBuildingSpot(...args),
     roadClearance: roadClearanceForBuilding,
