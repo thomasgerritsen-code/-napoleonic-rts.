@@ -13,28 +13,16 @@
 <body>
 <div id="app">
   <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
-  <header class="hud topbar">
-    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v0.7.1</span></div>
-    <div class="resources"><span>🇫🇷 🍞 <strong id="food">0</strong></span><span>🪵 <strong id="wood">0</strong></span><span>👥 <strong id="population">0/0</strong></span></div>
-    <div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button>
-  </header>
+  <header class="hud topbar"><div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v0.7.1</span></div><div class="resources"><span>🇫🇷 🍞 <strong id="food">0</strong></span><span>🪵 <strong id="wood">0</strong></span><span>👥 <strong id="population">0/0</strong></span></div><div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button></header>
   <aside class="hud help"><strong>Besturing</strong><span>Sleep: selecteren</span><span>Klik groepslid: hele groep</span><span>Rechtsklik: lopen / verzamelen</span><span>Rechts vasthouden + slepen: doel + front</span><span>Q/E: groep 15° draaien</span><span>F3: test/debugpaneel</span><span>Minimap: camera verplaatsen</span><span>WASD / pijltjes: camera</span><span>Muiswiel: zoom</span></aside>
   <aside class="hud objective"><strong>Britse ontwikkeling</strong><span id="aiEconomy">Economie: —</span><span id="aiBuildings">Gebouwen: —</span><span id="aiRegiments">Regimenten: —</span><span id="aiPlan">Plan: opbouwen</span></aside>
-  <section class="hud bottombar">
-    <div class="selection-panel"><span class="label">Selectie</span><strong id="selectionTitle">Niets geselecteerd</strong><span id="selectionDetails">Selecteer troepen of een gebouw.</span></div>
-    <div class="actions" id="actions"><button type="button" data-action="build-barracks">Barracks<br><small>300 🪵</small></button><button type="button" data-action="build-house">House<br><small>120 🪵</small></button><button type="button" data-formation="line">Linie</button><button type="button" data-formation="column">Colonne</button><button type="button" data-formation="square">Carré</button></div>
-    <div class="army-counts"><span>🇫🇷 <strong id="frenchCount">0</strong></span><span>🇬🇧 <strong id="britishCount">0</strong></span><span>🎖️ <strong id="frenchRegiments">0</strong></span></div>
-  </section>
+  <section class="hud bottombar"><div class="selection-panel"><span class="label">Selectie</span><strong id="selectionTitle">Niets geselecteerd</strong><span id="selectionDetails">Selecteer troepen of een gebouw.</span></div><div class="actions" id="actions"><button type="button" data-action="build-barracks">Barracks<br><small>300 🪵</small></button><button type="button" data-action="build-house">House<br><small>120 🪵</small></button><button type="button" data-formation="line">Linie</button><button type="button" data-formation="column">Colonne</button><button type="button" data-formation="square">Carré</button></div><div class="army-counts"><span>🇫🇷 <strong id="frenchCount">0</strong></span><span>🇬🇧 <strong id="britishCount">0</strong></span><span>🎖️ <strong id="frenchRegiments">0</strong></span></div></section>
   <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div><div id="message" class="message hidden"></div>
 </div>
-
-<!-- Architecture v2 foundation. -->
 <script src="src/foundation/runtime.js"></script>
 <script src="src/foundation/config.js"></script>
 <script src="src/foundation/contracts.js"></script>
 <script src="src/foundation/legacy-manifest.js"></script>
-
-<!-- Frozen v0.7.1 compatibility layers plus extracted Architecture v2 domains. -->
 <script src="src/core.js"></script>
 <script src="src/economy.js"></script>
 <script src="src/regiments.js"></script>
@@ -56,12 +44,8 @@
 <script src="src/v064.js"></script>
 <script src="src/v065.js"></script>
 <script src="src/v066.js"></script>
-
-<!-- Architecture v2 owns the road lookup + network route planner. -->
 <script src="src/systems/navigation/road-index.js?build=a2"></script>
 <script src="src/systems/navigation/route-planner.js?build=a2"></script>
-
-<!-- Historical water/traffic layers remain compatibility + rendering adapters. -->
 <script src="src/v067.js"></script>
 <script src="src/v068.js"></script>
 <script src="src/v069-motion.js"></script>
@@ -70,23 +54,17 @@
 <script src="src/v070.js?build=070"></script>
 <script src="src/v070-motion.js?build=070c"></script>
 <script src="src/v070-regression-fixes.js?build=070d"></script>
-
-<!-- Architecture v2 owns final route/crossing guidance, including bridge anti-stall. -->
 <script src="src/systems/navigation/bridge-corridors.js?build=a2"></script>
 <script src="src/systems/navigation/bridge-route-resolver.js?build=a2"></script>
 <script src="src/systems/navigation/bridge-safety.js?build=a2"></script>
 <script src="src/systems/navigation/api.js?build=a2"></script>
-
-<!-- Architecture v2 owns the active v0.7.1 movement/formation layer. -->
 <script src="src/systems/movement/state.js?build=a2"></script>
 <script src="src/systems/formation/followers.js?build=a2"></script>
 <script src="src/systems/movement/fixed-step.js?build=a2"></script>
 <script src="src/systems/movement/speed-model.js?build=a2"></script>
 <script src="src/systems/movement/api.js?build=a2"></script>
-
-<!-- Architecture v2 visual ownership. -->
 <script src="src/systems/rendering/map-realism.js?build=mapv1"></script>
-
+<script src="src/systems/rendering/map-ambient-motion.js?build=ambient1"></script>
 <script src="src/v064-sim.js"></script>
 <script src="src/v065-sim.js"></script>
 <script src="src/v066-sim.js"></script>
@@ -108,8 +86,6 @@
 <script src="src/v070-debug.js?build=070"></script>
 <script src="src/v071-debug.js?build=071a"></script>
 <script src="src/test-lab.js"></script>
-
-<!-- Remaining domains still bridge into legacy implementations where not yet migrated. -->
 <script src="src/foundation/legacy-facades.js"></script>
 </body>
 </html>
