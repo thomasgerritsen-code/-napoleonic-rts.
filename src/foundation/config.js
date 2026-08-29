@@ -36,6 +36,12 @@
         portalMargin: 14,
         centerlineTolerance: 12,
         looseWaypointTolerance: 10,
+        // Traffic reservation and centreline steering may begin early, but the
+        // visible formation should stay in its normal road/field shape until the
+        // battalion is close to the bridge mouth. From 90 px before the deck it
+        // progressively forms the bridge column and is fully narrowed at 24 px.
+        columnFormStartClearance: 90,
+        columnFormFullClearance: 24,
         // Bridge columns are intentionally a little narrower than road columns.
         // This leaves room for damped followers while the anchor finishes turning
         // into the bridge, preventing outside files from clipping a bridge corner.
