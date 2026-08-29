@@ -25,9 +25,31 @@
     return roadClearanceForBuilding(type, x, y) >= margin;
   }
 
+  function nearestRoadSafePosition(type, x, y) {
+    if (clearOfRoad(type, x, y, 10)) return { x, y };
+    for (let ring = 1; ring <= 12; ring++) {
+      const radius = ring * 24;
+      for (let step = 0; step < 24; step++) {
+        const angle = step / 24 * Math.PI * 2;
+        const px = x + Math.cos(angle) * radius;
+        const py = y + Math.sin(angle) * radius;
+        if (px < 100 || py < 100 || px > WORLD.width - 100 || py > WORLD.height - 100) continue;
+        if (clearOfRoad(type, px, py, 10)) return { x:px, y:py };
+      }
+    }
+    return null;
+  }
+
   const previousValidBuildingSpot = validBuildingSpot;
   validBuildingSpot = function validBuildingSpotV2(type, x, y) {
     return previousValidBuildingSpot(type, x, y) && clearOfRoad(type, x, y, 10);
+  };
+
+  const previousCreateBuilding = createBuilding;
+  createBuilding = function createBuildingRoadSafe(side, type, x, y, complete = true) {
+    const safe = nearestRoadSafePosition(type, x, y);
+    if (!safe) return null;
+    return previousCreateBuilding(side, type, safe.x, safe.y, complete);
   };
 
   const previousFindBuildLocation = findBuildLocation;
@@ -42,9 +64,9 @@
       const radius = 150 + ring * 55;
       for (let step = 0; step < 16; step++) {
         const angle = (step / 16) * Math.PI * 2 + (dir < 0 ? Math.PI : 0);
-        const x = tc.x + Math.cos(angle) * radius;
-        const y = tc.y + Math.sin(angle) * radius;
-        if (validBuildingSpot(type, x, y)) return { x, y };
+        const px = tc.x + Math.cos(angle) * radius;
+        const py = tc.y + Math.sin(angle) * radius;
+        if (validBuildingSpot(type, px, py)) return { x:px, y:py };
       }
     }
     return null;
@@ -53,7 +75,8 @@
   nrts.subsystems.register('building-placement', Object.freeze({
     validSpot: (...args) => validBuildingSpot(...args),
     roadClearance: roadClearanceForBuilding,
-    clearOfRoad
+    clearOfRoad,
+    nearestSafe: nearestRoadSafePosition
   }), {
     phase: 'architecture-v2',
     legacyBridge: false,
