@@ -2,6 +2,17 @@
 
 Baseline: **v0.7.1** (`29b038d3655d05be968bff6a80cb8f3162f1c8e8`)
 
+## Status
+
+- ✅ Foundation runtime, config, contracts en subsystem registry
+- ✅ Stabiele facades voor movement, formation, navigation, AI, combat en simulation
+- ✅ Architecture guard tegen nieuwe `v072+` globale patchlagen
+- ✅ AI production en AI tactics fysiek losgemaakt van combat
+- ⏭ Movement + formation consolidatie
+- ⏭ Roads + navigation consolidatie
+- ⏭ Artillerie als samengestelde gameplay-unit
+- ⏭ Combat/morale en read-only rendering
+
 ## Doel
 
 Nieuwe gameplayontwikkeling mag niet langer worden toegevoegd als een volgende globale versiepatch (`v072.js`, `v073.js`, enz.). De bestaande v0.7.1 patchketen blijft tijdelijk bevroren als compatibiliteitslaag en wordt vervolgens per subsystem vervangen.
@@ -15,8 +26,8 @@ Nieuwe gameplayontwikkeling mag niet langer worden toegevoegd als een volgende g
 5. **Configuratie buiten logica.** Nieuwe tuningwaarden horen in de centrale configlaag en niet verspreid in featurecode.
 6. **Expliciete states.** Bataljons gebruiken de gedefinieerde state machine in plaats van nieuwe combinaties van losse booleans.
 7. **Simulatie is leidend.** Rendering mag authoritative state niet wijzigen.
-8. **AI-productie en tactiek blijven onafhankelijk.** Een beëindigde of mislukte aanval mag de productiecyclus niet stoppen.
-9. **Nieuwe code gebruikt subsystem-facades.** Tijdens de migratie wijzen `movement`, `formation`, `navigation`, `ai-production`, `ai-tactics`, `combat` en `simulation` nog naar de v0.7.1-implementaties. Daardoor kunnen die implementaties later één voor één worden vervangen zonder alle callers opnieuw te wijzigen.
+8. **AI-productie en tactiek zijn onafhankelijk.** `src/ai/production.js` bezit bouwen, trainen en regimentvorming; `src/ai/tactics.js` bezit militaire orders. Combat bezit geen productie- of attack-planningcode meer.
+9. **Nieuwe code gebruikt subsystem-facades.** Tijdens de migratie wijzen `movement`, `formation`, `navigation`, `ai-production`, `ai-tactics`, `combat` en `simulation` naar compatibele implementaties. Daardoor kunnen implementaties één voor één worden vervangen zonder alle callers opnieuw te wijzigen.
 
 ## Doelstructuur
 
@@ -47,9 +58,9 @@ src/
     combat.js
     morale.js
   ai/
-    production.js
+    production.js      # actief
     strategy.js
-    tactics.js
+    tactics.js         # actief
   rendering/
     renderer.js
   input/
@@ -60,16 +71,15 @@ src/
 
 ## Migratievolgorde
 
-1. Foundation/runtime, contracten en stabiele facades.
-2. Test- en debugfacade stabiliseren.
+1. Foundation/runtime, contracten en stabiele facades. **Gereed.**
+2. AI production en tactics uit combat halen. **Gereed.**
 3. Movement + formation consolideren uit `v06x/v07x`.
 4. Roads + navigation consolideren.
 5. Artillerie als samengestelde gameplay-unit consolideren.
-6. AI-productie losmaken van attack/tactical planning.
-7. Combat/morale consolideren.
-8. Rendering volledig read-only maken.
-9. Oude patchbestanden per subsystem verwijderen zodra regressies groen blijven.
-10. Pas daarna nieuwe features toevoegen.
+6. Combat/morale verder consolideren.
+7. Rendering volledig read-only maken.
+8. Oude patchbestanden per subsystem verwijderen zodra regressies groen blijven.
+9. Pas daarna nieuwe features toevoegen.
 
 ## Definition of done per migratiestap
 

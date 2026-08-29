@@ -1,7 +1,5 @@
 'use strict';
-// Single inventory of the historical v0.7.1 script stack. This is intentionally
-// descriptive only in Foundation phase 1; index.html still owns loading so behaviour
-// remains compatible with the established startup sequence.
+// Single inventory of the historical v0.7.1 script stack and Architecture v2 extractions.
 (function installLegacyManifest(global) {
   const manifest = Object.freeze({
     baseline: '0.7.1',
@@ -11,6 +9,10 @@
       'src/hud.js', 'src/selection.js', 'src/navigation.js', 'src/visibility.js',
       'src/simulation-render.js'
     ]),
+    extractedSubsystems: Object.freeze({
+      aiProduction: 'src/ai/production.js',
+      aiTactics: 'src/ai/tactics.js'
+    }),
     legacyPatches: Object.freeze([
       'src/v05.js', 'src/v06.js', 'src/v061.js', 'src/v063.js', 'src/simulation-api.js',
       'src/input.js', 'src/v063-fixes.js', 'src/v064.js', 'src/v065.js', 'src/v066.js',
