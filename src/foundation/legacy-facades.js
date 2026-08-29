@@ -69,3 +69,4 @@
     subsystems: ['movement', 'formation', 'navigation', 'ai-production', 'ai-tactics', 'combat', 'simulation']
   });
 })(window);
+const moraleCommandScript=document.createElement('script');moraleCommandScript.src='src/systems/morale/command-morale.js?build=mc2';moraleCommandScript.async=false;document.body.appendChild(moraleCommandScript);
