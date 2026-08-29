@@ -61,7 +61,11 @@ function followPath(path, start) {
     y: start.y,
     pathIndex: 0,
     clippedWater: false,
-    maxDeckPerp: 0
+    maxDeckPerp: 0,
+    stallFrames: 0,
+    maxStallFrames: 0,
+    previousX: start.x,
+    previousY: start.y
   };
 
   return runFixedSteps({
@@ -81,6 +85,13 @@ function followPath(path, start) {
       }
       if (distance <= 1.05) current.pathIndex++;
 
+      const moved = Math.hypot(current.x - current.previousX, current.y - current.previousY);
+      if (moved < 0.01 && current.pathIndex < path.length) current.stallFrames++;
+      else current.stallFrames = 0;
+      current.maxStallFrames = Math.max(current.maxStallFrames, current.stallFrames);
+      current.previousX = current.x;
+      current.previousY = current.y;
+
       if (Math.abs(current.x) <= RIVER_HALF_WIDTH) {
         current.maxDeckPerp = Math.max(current.maxDeckPerp, Math.abs(current.y));
         if (Math.abs(current.y) > BRIDGE_HALF_WIDTH) current.clippedWater = true;
@@ -88,6 +99,10 @@ function followPath(path, start) {
     },
     stop: current => current.pathIndex >= path.length
   });
+}
+
+function pointIndex(path, point, epsilon = 2.5) {
+  return path.findIndex(candidate => Math.hypot(candidate.x - point.x, candidate.y - point.y) <= epsilon);
 }
 
 test('production bridge corridor keeps approach, entry and exit on the bridge centreline', () => {
@@ -103,7 +118,7 @@ test('production bridge corridor keeps approach, entry and exit on the bridge ce
   assert.ok(corridor.exit.x < corridor.clear.x);
 });
 
-test('angled approaches are corridor-routed without clipping bridge corners', () => {
+test('angled approaches fully traverse production bridge corridors without clipping or stalling', () => {
   const angles = [-60, -45, -30, -15, 0, 15, 30, 45, 60];
   const { context, crossing } = loadBridgeGeometry();
   const corridor = context.bridgeCorridorArchitectureV2(crossing, -1);
@@ -120,14 +135,26 @@ test('angled approaches are corridor-routed without clipping bridge corners', ()
     };
     const injected = context.injectBridgeCorridorsArchitectureV2(start, [target]);
     const simulation = followPath(injected.path, start);
-    return { injected, simulation };
+    return { injected, simulation, target };
   });
 
   for (const { value: angle, result } of results) {
+    const path = result.injected.path;
+    const approachIndex = pointIndex(path, corridor.approach);
+    const entryIndex = pointIndex(path, corridor.entry);
+    const exitIndex = pointIndex(path, corridor.exit);
+    const clearIndex = pointIndex(path, corridor.clear);
+
     assert.equal(result.injected.corridors.length, 1, `angle ${angle} should resolve one bridge corridor`);
     assert.equal(result.injected.corridors[0].id, crossing.id);
+    assert.ok(approachIndex >= 0, `angle ${angle} omitted the approach portal`);
+    assert.ok(entryIndex > approachIndex, `angle ${angle} reached entry before approach`);
+    assert.ok(exitIndex > entryIndex, `angle ${angle} reached exit before entry`);
+    assert.ok(clearIndex > exitIndex, `angle ${angle} reached clear before exit`);
     assert.equal(result.simulation.state.clippedWater, false, `angle ${angle} clipped a bridge corner`);
     assert.ok(result.simulation.state.maxDeckPerp <= BRIDGE_HALF_WIDTH, `angle ${angle} left the bridge deck`);
-    assert.equal(result.simulation.state.pathIndex, result.injected.path.length, `angle ${angle} did not finish the corridor`);
+    assert.equal(result.simulation.state.pathIndex, path.length, `angle ${angle} did not finish the corridor`);
+    assert.ok(result.simulation.state.maxStallFrames / 60 < 0.2, `angle ${angle} stalled on the corridor`);
+    assert.ok(result.simulation.state.x > corridor.clear.x + 100, `angle ${angle} did not clear the bridge`);
   }
 });
