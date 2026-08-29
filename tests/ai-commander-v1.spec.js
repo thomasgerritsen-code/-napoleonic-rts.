@@ -13,6 +13,11 @@ test('AI Commander progresses through mass, advance, attack and flank while prod
     gameOver=false;
     messageEl.classList.add('hidden');
 
+    // v0.5 peace mode wraps aiMilitaryOrder and intentionally drops every military order.
+    // The browser remains frozen while this synchronous evaluate runs, so temporarily bypass
+    // that wrapper for these explicit Commander ticks only.
+    v05PeaceMode=false;
+
     // This regression exercises the command-state lifecycle, not threat detection. Keep the
     // strategic safety inputs deterministic while leaving the production system untouched.
     for(const u of units){
@@ -51,6 +56,7 @@ test('AI Commander progresses through mass, advance, attack and flank while prod
     const diag=window.NRTS.diagnostics.snapshot().subsystems.find(s=>s.name==='ai-commander');
     const state=window.__AI_COMMANDER_V1__.state();
     const game=window.__RTS_DEBUG__.getState();
+    v05PeaceMode=true;
     return {
       states,
       diag,
@@ -79,6 +85,7 @@ test('AI Commander retreats on collapsed morale instead of blindly attacking', a
     // Keep this fixture independent from the lifecycle of the background battle.
     gameOver=false;
     messageEl.classList.add('hidden');
+    v05PeaceMode=false;
 
     const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,900);
     const reg=getRegiment(id);
@@ -89,7 +96,9 @@ test('AI Commander retreats on collapsed morale instead of blindly attacking', a
     eval('elapsed=70');
     window.__AI_COMMANDER_V1__.forceState('ATTACK');
     window.__AI_COMMANDER_V1__.tick();
-    return window.__AI_COMMANDER_V1__.state();
+    const result=window.__AI_COMMANDER_V1__.state();
+    v05PeaceMode=true;
+    return result;
   });
   expect(state.state).toBe('RETREAT');
   expect(state.retreatUntil).toBeGreaterThan(70);
