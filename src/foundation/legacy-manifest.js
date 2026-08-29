@@ -11,7 +11,12 @@
     ]),
     extractedSubsystems: Object.freeze({
       aiProduction: 'src/ai/production.js',
-      aiTactics: 'src/ai/tactics.js'
+      aiTactics: 'src/ai/tactics.js',
+      movementState: 'src/systems/movement/state.js',
+      formationFollowers: 'src/systems/formation/followers.js',
+      movementFixedStep: 'src/systems/movement/fixed-step.js',
+      movementSpeedModel: 'src/systems/movement/speed-model.js',
+      movementFormationApi: 'src/systems/movement/api.js'
     }),
     legacyPatches: Object.freeze([
       'src/v05.js', 'src/v06.js', 'src/v061.js', 'src/v063.js', 'src/simulation-api.js',
@@ -19,6 +24,10 @@
       'src/v066-road-index.js', 'src/v066-route-fixes.js', 'src/v067.js', 'src/v068.js',
       'src/v069-motion.js', 'src/v069-combat.js', 'src/v069-map.js', 'src/v070.js',
       'src/v070-motion.js', 'src/v070-regression-fixes.js', 'src/v071-motion.js',
+      'src/v071-speed-hotfix.js'
+    ]),
+    retiredFromRuntime: Object.freeze([
+      'src/v071-motion.js',
       'src/v071-speed-hotfix.js'
     ]),
     simulationAdapters: Object.freeze([
