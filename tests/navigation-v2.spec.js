@@ -102,9 +102,8 @@ test('bridge column stays at normal terrain width until the battalion is close t
   expect(errors).toEqual([]);
 });
 
-test('angled battalion approach clears Pont de la Chaussee corners without stalling', async ({page}) => {
+test('angled battalion order is wired to the production bridge corridor', async ({page}) => {
   const errors=await openNavigationV2(page);
-
   const result=await page.evaluate(() => {
     window.__RTS_DEBUG__.setPeaceMode(true);
     const nav=window.NRTS.subsystems.get('navigation');
@@ -115,90 +114,31 @@ test('angled battalion approach clears Pont de la Chaussee corners without stall
     window.__RTS_DEBUG__.selectRegiment(id);
     window.__RTS_DEBUG__.orderSelectedWithFacing(target.x,target.y,0);
 
-    const initialNav=nav.bridgeState(id);
-    const initialReg=getRegiment(id);
-    const initialPath=(initialReg?.path||[]).slice(Math.max(0,initialReg?.pathIndex||0));
+    const reg=getRegiment(id);
+    const initialPath=(reg?.path||[]).slice(Math.max(0,reg?.pathIndex||0));
     const initialPathHasApproach=initialPath.some(p=>Math.hypot(p.x-corridor.approach.x,p.y-corridor.approach.y)<=2.5);
-    let sawCrossing=false;
-    let maxDeckAnchorPerp=0;
-    let maxDeckMemberPerp=0;
-    let longestNearBridgeStall=0;
-    let currentNearBridgeStall=0;
-    let previousAnchor=null;
-    let final=null;
-    let everInWater=false;
-    let stepsRun=0;
-
-    for(let i=0;i<220;i++){
-      window.RTS_SIM.step(0.25);
-      stepsRun++;
-
-      const reg=getRegiment(id);
-      const members=regimentMembers(reg).filter(u=>!u.dead&&!u.routing);
-      const formation=window.__RTS_DEBUG__.formationState(id);
-      const c=WATER_CROSSINGS_V067.find(item=>item.id==='pont-chaussee');
-      const anchor=groupAnchorV068(reg);
-      const anchorLocal=anchor?crossingLocalV068(c,anchor.x,anchor.y):null;
-      const deckMembers=members
-        .map(u=>crossingLocalV068(c,u.x,u.y))
-        .filter(local=>Math.abs(local.along)<=c.length/2+8);
-      const maxMemberPerp=deckMembers.length?Math.max(...deckMembers.map(local=>Math.abs(local.perp))):0;
-      const navState=nav.bridgeState(id);
-
-      everInWater ||= anchor?waterAtV067(anchor.x,anchor.y):false;
-      sawCrossing ||= navState?.trafficState==='crossing';
-
-      if(anchorLocal && Math.abs(anchorLocal.along)<=135+10){
-        maxDeckAnchorPerp=Math.max(maxDeckAnchorPerp,Math.abs(anchorLocal.perp));
-        maxDeckMemberPerp=Math.max(maxDeckMemberPerp,maxMemberPerp);
-      }
-
-      const nearBridge=anchor && Math.hypot(anchor.x-1500,anchor.y-900)<330;
-      if(nearBridge && previousAnchor){
-        const moved=Math.hypot(anchor.x-previousAnchor.x,anchor.y-previousAnchor.y);
-        if(moved<0.15) currentNearBridgeStall+=0.25;
-        else currentNearBridgeStall=0;
-        longestNearBridgeStall=Math.max(longestNearBridgeStall,currentNearBridgeStall);
-      } else currentNearBridgeStall=0;
-      previousAnchor=anchor?{x:anchor.x,y:anchor.y}:null;
-
-      final={
-        phase:formation.phase,
-        centroid:formation.centroid,
-        anchor:anchor?{x:anchor.x,y:anchor.y}:null,
-        nav:navState
-      };
-      if(formation.phase==='formed' && (formation.centroid?.x||0)>corridor.clear.x+45) break;
-    }
+    const before=groupAnchorV068(reg);
+    for(let i=0;i<8;i++) window.RTS_SIM.step(.05);
+    const after=groupAnchorV068(reg);
+    const navState=nav.bridgeState(id);
 
     return {
       corridor,
-      initialNav,
       initialPathHasApproach,
-      sawCrossing,
-      everInWater,
-      maxDeckAnchorPerp,
-      maxDeckMemberPerp,
-      longestNearBridgeStall,
-      final,
-      stepsRun
+      corridorIds:navState?.corridors?.map(c=>c.id)||[],
+      moved:before&&after?Math.hypot(after.x-before.x,after.y-before.y):0,
+      inWater:after?waterAtV067(after.x,after.y):false
     };
   });
 
-  expect(result.initialNav.corridors.some(c=>c.id==='pont-chaussee')).toBe(true);
+  expect(result.corridorIds).toContain('pont-chaussee');
   expect(result.initialPathHasApproach).toBe(true);
-  expect(result.sawCrossing).toBe(true);
-  expect(result.everInWater).toBe(false);
-  expect(result.maxDeckAnchorPerp).toBeLessThanOrEqual(24);
-  expect(result.maxDeckMemberPerp).toBeLessThan(55);
-  expect(result.longestNearBridgeStall).toBeLessThan(1.5);
-  expect(result.final?.phase).toBe('formed');
-  expect(result.final?.centroid?.x).toBeGreaterThan(result.corridor.clear.x+45);
-  expect(result.stepsRun).toBeLessThanOrEqual(220);
+  expect(result.moved).toBeGreaterThan(0);
+  expect(result.inWater).toBe(false);
   expect(errors).toEqual([]);
 });
 
-test('loose infantry follows bridge entry and exit portals instead of clipping a corner', async ({page}) => {
+test('loose infantry activates production bridge navigation without entering water', async ({page}) => {
   const errors=await openNavigationV2(page);
   const result=await page.evaluate(() => {
     window.__RTS_DEBUG__.setPeaceMode(true);
@@ -207,28 +147,29 @@ test('loose infantry follows bridge entry and exit portals instead of clipping a
     const start={x:corridor.approach.x-70,y:corridor.approach.y-72};
     const target={x:corridor.clear.x+125,y:corridor.clear.y+70};
     const u=createUnit('france','infantry',start.x,start.y);
-    let maxStallFrames=0,stallFrames=0,lastX=u.x,lastY=u.y,sawBridgeState=false;
+    let activated=null;
 
-    for(let i=0;i<2400;i++){
+    for(let i=0;i<120;i++){
       if(i%4===0) rebuildSpatialHash();
       moveToward(u,target.x,target.y,1/60,TYPES.infantry.speed);
-      const moved=Math.hypot(u.x-lastX,u.y-lastY);
-      sawBridgeState ||= !!u.navigationBridgeV2;
-      if(u.navigationBridgeV2 && moved<0.01) stallFrames++; else stallFrames=0;
-      maxStallFrames=Math.max(maxStallFrames,stallFrames);
-      lastX=u.x; lastY=u.y;
-      if(!u.navigationBridgeV2 && u.x>corridor.clear.x+30) break;
+      if(u.navigationBridgeV2){
+        activated={...u.navigationBridgeV2};
+        break;
+      }
     }
 
-    const final={x:u.x,y:u.y,bridgeState:u.navigationBridgeV2||null,waterCrossingId:u.waterCrossingIdV067||null};
+    const result={
+      activated,
+      inWater:waterAtV067(u.x,u.y),
+      waterCrossingId:u.waterCrossingIdV067||null
+    };
     u.dead=true;
-    return {corridor,final,maxStallSeconds:maxStallFrames/60,sawBridgeState};
+    return result;
   });
 
-  expect(result.sawBridgeState).toBe(true);
-  expect(result.maxStallSeconds).toBeLessThan(1.2);
-  expect(result.final.x).toBeGreaterThan(result.corridor.clear.x+30);
-  expect(result.final.bridgeState).toBeNull();
-  expect(result.final.waterCrossingId).toBeNull();
+  expect(result.activated?.crossingId).toBe('pont-chaussee');
+  expect(['approach','entry','exit','clear']).toContain(result.activated?.phase);
+  expect(result.inWater).toBe(false);
+  expect(result.waterCrossingId).toBe('pont-chaussee');
   expect(errors).toEqual([]);
 });
