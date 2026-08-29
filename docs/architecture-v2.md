@@ -11,11 +11,12 @@ Nieuwe gameplayontwikkeling mag niet langer worden toegevoegd als een volgende g
 1. **Gedrag eerst behouden.** Iedere migratiestap moet de bestaande Playwright regressies blijven doorstaan.
 2. **Een eigenaar per verantwoordelijkheid.** Movement verplaatst, formation berekent slots, navigation maakt routes, roads classificeert weggebruik, combat behandelt gevechten, AI production produceert, AI tactics geeft orders, rendering tekent alleen.
 3. **Geen directe cross-system mutaties.** Nieuwe subsystemen communiceren via publieke API's of de foundation eventbus.
-4. **Geen nieuwe versiepatchbestanden.** Nieuwe functionaliteit gaat naar een bestaand of nieuw domeinsubsystem.
+4. **Geen nieuwe versiepatchbestanden.** Nieuwe functionaliteit gaat naar een bestaand of nieuw domeinsubsystem. De test-suite bewaakt dit automatisch.
 5. **Configuratie buiten logica.** Nieuwe tuningwaarden horen in de centrale configlaag en niet verspreid in featurecode.
 6. **Expliciete states.** Bataljons gebruiken de gedefinieerde state machine in plaats van nieuwe combinaties van losse booleans.
 7. **Simulatie is leidend.** Rendering mag authoritative state niet wijzigen.
 8. **AI-productie en tactiek blijven onafhankelijk.** Een beëindigde of mislukte aanval mag de productiecyclus niet stoppen.
+9. **Nieuwe code gebruikt subsystem-facades.** Tijdens de migratie wijzen `movement`, `formation`, `navigation`, `ai-production`, `ai-tactics`, `combat` en `simulation` nog naar de v0.7.1-implementaties. Daardoor kunnen die implementaties later één voor één worden vervangen zonder alle callers opnieuw te wijzigen.
 
 ## Doelstructuur
 
@@ -26,6 +27,7 @@ src/
     config.js
     contracts.js
     legacy-manifest.js
+    legacy-facades.js
   core/
     game-state.js
     game-loop.js
@@ -58,7 +60,7 @@ src/
 
 ## Migratievolgorde
 
-1. Foundation/runtime en contracten.
+1. Foundation/runtime, contracten en stabiele facades.
 2. Test- en debugfacade stabiliseren.
 3. Movement + formation consolideren uit `v06x/v07x`.
 4. Roads + navigation consolideren.
@@ -76,3 +78,4 @@ src/
 - Geen nieuwe page errors/unhandled rejections.
 - Geen nieuwe `v0xx-*.js` featurepatch.
 - Nieuwe subsystemverantwoordelijkheid gedocumenteerd en geregistreerd.
+- Nieuwe callers gebruiken het subsystem-register in plaats van historische functienamen.

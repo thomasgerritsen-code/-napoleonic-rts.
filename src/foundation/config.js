@@ -11,14 +11,15 @@
       maxCatchUpSteps: 8
     }),
     movement: Object.freeze({
-      roadSpeedMultiplierTarget: 1.30,
-      infantryFollowerHardCap: 124,
-      cavalryFollowerHardCap: 178,
+      roadMultipliers: Object.freeze({ chaussee: 1.24, secondary: 1.13, track: 1.05 }),
+      intermediateTravelFloor: Object.freeze({ road: 0.95, field: 0.92 }),
+      followerHardCaps: Object.freeze({ infantry: 124, cavalry: 178 }),
       slotArrivalDistance: 1.35
     }),
     architecture: Object.freeze({
       allowNewVersionPatchFiles: false,
       legacyBaseline: '0.7.1',
+      legacyBaselineCommit: '29b038d3655d05be968bff6a80cb8f3162f1c8e8',
       migrationStrategy: 'strangler-by-subsystem'
     })
   });
