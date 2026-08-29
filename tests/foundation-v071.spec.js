@@ -7,6 +7,7 @@ async function openFoundation(page) {
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/?test=v071', { waitUntil: 'networkidle' });
   await page.waitForFunction(() => Boolean(
+    window.RTS_VERSION === '1.0.0' &&
     window.NRTS?.foundationVersion === '1.0.0' &&
     window.NRTS_CONFIG?.simulation?.fixedHz === 60 &&
     window.NRTS_CONTRACTS?.BattalionState &&
@@ -14,15 +15,17 @@ async function openFoundation(page) {
     window.NRTS?.subsystems.has('movement') &&
     window.NRTS?.subsystems.has('ai-production') &&
     window.NRTS?.subsystems.has('ai-tactics') &&
-    window.RTS_SIM?.version === '0.7.1'
+    window.RTS_SIM?.version === window.RTS_VERSION
   ));
   return pageErrors;
 }
 
-test('foundation loads around the unchanged latest v0.7.1 runtime', async ({ page }) => {
+test('foundation loads the current release around the v0.7.1 legacy baseline', async ({ page }) => {
   const errors = await openFoundation(page);
+  await expect(page).toHaveTitle('Napoleonic RTS v1.0.0');
+  await expect(page.locator('.version')).toHaveText('v1.0.0');
   const snapshot = await page.evaluate(() => window.NRTS.diagnostics.snapshot());
-  expect(snapshot.gameVersion).toBe('0.7.1');
+  expect(snapshot.gameVersion).toBe('1.0.0');
   expect(snapshot.foundationVersion).toBe('1.0.0');
   expect(snapshot.subsystems.map(item => item.name)).toEqual(expect.arrayContaining([
     'config', 'contracts', 'legacy-manifest',
@@ -31,7 +34,7 @@ test('foundation loads around the unchanged latest v0.7.1 runtime', async ({ pag
   expect(errors).toEqual([]);
 });
 
-test('stable subsystem facades point at the final v0.7.1 implementations', async ({ page }) => {
+test('stable subsystem facades point at the current simulation facade', async ({ page }) => {
   await openFoundation(page);
   const result = await page.evaluate(() => ({
     road: window.NRTS.subsystems.get('navigation').roadAt(1000, 900)?.road?.name || null,
@@ -40,7 +43,7 @@ test('stable subsystem facades point at the final v0.7.1 implementations', async
     hasTacticalOrder: typeof window.NRTS.subsystems.get('ai-tactics').issueMilitaryOrder === 'function',
     infantryFieldSpeed: window.NRTS.subsystems.get('movement').terrainSpeed('infantry', 700, 1200)
   }));
-  expect(result.simVersion).toBe('0.7.1');
+  expect(result.simVersion).toBe('1.0.0');
   expect(result.hasProductionDevelop).toBe(true);
   expect(result.hasTacticalOrder).toBe(true);
   expect(result.infantryFieldSpeed).toBeGreaterThan(0);
