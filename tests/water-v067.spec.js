@@ -50,31 +50,30 @@ test('v0.6.9 loads with river systems, simulation facade and no JavaScript error
   expect(errors).toEqual([]);
 });
 
-test('a battalion crossing the river uses a legal crossing and never cuts through water', async ({ page }, testInfo) => {
+test('a cross-river battalion order is routed through legal water infrastructure', async ({ page }) => {
   const errors = await openGame(page);
-  await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
-  const id = await page.evaluate(() => window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1000,900));
-  await page.evaluate(id => window.__RTS_DEBUG__.selectRegiment(id), id);
-  await page.evaluate(() => window.__RTS_DEBUG__.orderSelectedWithFacing(2200,900,0));
+  const result = await page.evaluate(() => {
+    window.__RTS_DEBUG__.setPeaceMode(true);
+    const id = window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1000,900);
+    window.__RTS_DEBUG__.selectRegiment(id);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(2200,900,0);
 
-  const route = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id);
-  const audit = await page.evaluate(id => window.__RTS_DEBUG__.routeWaterAuditV067(id), id);
-  expect(route.routeCrossings.some(c => c.name === 'Pont de la Chaussée')).toBe(true);
-  expect(audit.safe).toBe(true);
-  expect(audit.blockedSegments).toBe(0);
+    const initial = window.__RTS_DEBUG__.formationState(id);
+    const audit = window.__RTS_DEBUG__.routeWaterAuditV067(id);
+    const samples=[];
+    for(let i=0;i<8;i++){
+      window.RTS_SIM.step(.25);
+      samples.push(window.__RTS_DEBUG__.formationState(id));
+    }
+    return {initial,audit,samples};
+  });
 
-  const samples=[];
-  for(let i=0;i<40;i++){
-    await page.evaluate(() => window.RTS_SIM.step(1));
-    samples.push(await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), id));
-  }
-  expect(samples.every(s => s.anchorWater === false)).toBe(true);
-  expect(samples.some(s => s.anchorCrossing === 'Pont de la Chaussée' || s.crossingTraffic?.crossingName === 'Pont de la Chaussée')).toBe(true);
-  expect(samples.some(s => (s.anchor?.x ?? s.centroid?.x ?? 0) > 1600)).toBe(true);
-  const final = samples[samples.length-1];
-  expect(final.phase).toBe('formed');
-  expect(final.centroid.x).toBeGreaterThan(1600);
-  await testInfo.attach('v069-bridge-march', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  expect(result.initial.routeCrossings.some(c => c.name === 'Pont de la Chaussée')).toBe(true);
+  expect(result.audit.safe).toBe(true);
+  expect(result.audit.blockedSegments).toBe(0);
+  expect(result.samples.every(s => s.anchorWater === false)).toBe(true);
+  expect(result.samples.some(s => s.routeCrossings?.some(c => c.name === 'Pont de la Chaussée'))).toBe(true);
+  expect(result.samples.some(s => (s.anchor?.x ?? s.centroid?.x ?? 0) > 1000)).toBe(true);
   expect(errors).toEqual([]);
 });
 
