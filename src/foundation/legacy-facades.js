@@ -70,3 +70,4 @@
   });
 })(window);
 const fogScoutingScript=document.createElement('script');fogScoutingScript.src='src/systems/visibility/fog-scouting.js?build=fs1';fogScoutingScript.async=false;document.body.appendChild(fogScoutingScript);
+const moraleCommandScript=document.createElement('script');moraleCommandScript.src='src/systems/morale/command-morale.js?build=mc2';moraleCommandScript.async=false;document.body.appendChild(moraleCommandScript);
