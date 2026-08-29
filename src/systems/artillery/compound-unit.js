@@ -12,8 +12,8 @@
     Object.freeze({ox:-9, oy:24})
   ]);
   const TRAVEL = Object.freeze([
-    Object.freeze({ox:-30, oy:-15}),
-    Object.freeze({ox:-30, oy:15})
+    Object.freeze({ox:-28, oy:-14}),
+    Object.freeze({ox:-28, oy:14})
   ]);
 
   function angleDelta(from, to) {
