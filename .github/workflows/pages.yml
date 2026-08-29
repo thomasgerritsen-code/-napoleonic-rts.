@@ -87,7 +87,7 @@ jobs:
 
   release:
     name: Full Chromium release gate (${{ matrix.shard }}/2)
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' || github.head_ref == 'release/integration-2026-08-29' }}
     strategy:
       fail-fast: false
       matrix:
@@ -128,7 +128,7 @@ jobs:
 
   deploy:
     name: Deploy GitHub Pages
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [fast, release]
     environment:
       name: github-pages
