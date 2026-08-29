@@ -122,10 +122,8 @@ function aiRegroup(regs,tc,target){
   aiPlan='Commandant: hergroepeert en laat reserves aansluiten';
 }
 
-// This uniquely named function is the Architecture v2 owner. The historical global
-// aiMilitaryOrder is assigned to it below so later compatibility wrappers capture this
-// implementation instead of an earlier tactical function. The public diagnostic tick calls
-// this direct reference and therefore cannot be redirected by those wrappers.
+// Unique Architecture-v2 owner. A conventional aiMilitaryOrder function below remains as
+// the compatibility entrypoint so historical wrappers loaded later can safely capture it.
 function aiCommanderMilitaryOrderV1(){
   if(gameOver)return; AI_COMMANDER_V1.cycle++;
   const regs=aiRegs(); if(!regs.length){aiTransition('DEFEND');aiPlan='Commandant: wacht op gevechtsgereed regiment';return;}
@@ -140,7 +138,9 @@ function aiCommanderMilitaryOrderV1(){
   else aiRegroup(regs,tc,target);
 }
 
-aiMilitaryOrder = aiCommanderMilitaryOrderV1;
+function aiMilitaryOrder(){
+  return aiCommanderMilitaryOrderV1();
+}
 
 window.__AI_COMMANDER_V1__=Object.freeze({
   state:()=>({...AI_COMMANDER_V1,ownStrength:aiSideStrength('britain'),enemyStrength:aiSideStrength('france')}),
