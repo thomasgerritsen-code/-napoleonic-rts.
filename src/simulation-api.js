@@ -1,8 +1,8 @@
 'use strict';
-// ---------- v0.6.3 simulation facade + performance layer ----------
+// ---------- simulation facade + performance layer ----------
 // Keeps game-state commands separate from Canvas so a future renderer can consume the same simulation.
 
-const RTS_VERSION = '0.6.3';
+const RTS_VERSION = '1.0.0';
 document.title = `Napoleonic RTS v${RTS_VERSION}`;
 const simVersionBadge = document.querySelector('.version');
 if (simVersionBadge) simVersionBadge.textContent = `v${RTS_VERSION}`;
