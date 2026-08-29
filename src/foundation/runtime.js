@@ -1,8 +1,9 @@
 'use strict';
-// Napoleonic RTS foundation runtime. Behaviour-neutral infrastructure for v0.7.1.
+// Napoleonic RTS foundation runtime. Behaviour-neutral infrastructure around the v0.7.1 legacy baseline.
 (function installFoundation(global) {
   if (global.NRTS) return;
 
+  const gameVersion = global.RTS_VERSION || '1.0.0';
   const listeners = new Map();
   const subsystems = new Map();
   const machines = new Map();
@@ -117,7 +118,7 @@
     },
     snapshot() {
       return {
-        gameVersion: '0.7.1',
+        gameVersion,
         foundationVersion: '1.0.0',
         bootStartedAt,
         uptimeMs: performance.now() - bootStartedAt,
@@ -137,7 +138,7 @@
   });
 
   global.NRTS = Object.freeze({
-    gameVersion: '0.7.1',
+    gameVersion,
     foundationVersion: '1.0.0',
     events,
     subsystems: subsystemApi,
@@ -145,5 +146,5 @@
     diagnostics
   });
 
-  events.emit('foundation:ready', { gameVersion: '0.7.1', foundationVersion: '1.0.0' });
+  events.emit('foundation:ready', { gameVersion, foundationVersion: '1.0.0' });
 })(window);
