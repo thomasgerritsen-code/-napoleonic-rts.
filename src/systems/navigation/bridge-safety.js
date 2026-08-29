@@ -102,14 +102,44 @@ if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
     if (Number.isFinite(march.speedV064)) march.speedV064=Math.min(march.speedV064,alignmentCap);
   }
 
+  function bridgeExitProgressSafetyV2(reg) {
+    const march=reg?.marchV063;
+    const info=reg?.crossingTrafficV068;
+    if (!march?.v064 || !info?.forcedColumn || !info.entered || info.state!=='crossing') return;
+
+    const c=WATER_CROSSINGS_V067.find(item=>item.id===info.crossingId);
+    if (!c || c.type!=='bridge') return;
+    const corridor=window.NRTS_NAVIGATION_V2?.bridgeCorridor(c.id,info.initialSide);
+    if (!corridor) return;
+
+    const local=crossingLocalArchitectureV2(c,march.anchorX,march.anchorY);
+    const direction=-info.initialSide;
+    const progress=local.along*direction;
+    // The legacy path solver advances an intermediate waypoint inside 38 px. The
+    // bridge holder guide must make the same transition; otherwise the path solver
+    // aims at clear while traffic guidance keeps turning back toward exit forever.
+    if (progress<corridor.portalDistance-18) return;
+
+    const guide=corridor.clear;
+    const guideDistance=Math.hypot(guide.x-march.anchorX,guide.y-march.anchorY);
+    const desiredHeading=Math.atan2(guide.y-march.anchorY,guide.x-march.anchorX);
+    march.marchFacing=turnTowardV064(march.marchFacing,desiredHeading,false,guideDistance);
+  }
+
   const updateGroupPathsBeforeBridgeSafetyV2=updateGroupPathsV06;
   updateGroupPathsV06=function updateGroupPathsBridgeSafetyV2() {
     // Apply the bias before the authoritative movement tick and again afterwards.
     // The first pass influences this step; the second preserves the corrected
     // heading/speed for the next fixed step after legacy waypoint turning runs.
-    for (const reg of regiments) bridgeAlignmentSafetyV2(reg);
+    for (const reg of regiments) {
+      bridgeAlignmentSafetyV2(reg);
+      bridgeExitProgressSafetyV2(reg);
+    }
     updateGroupPathsBeforeBridgeSafetyV2();
-    for (const reg of regiments) bridgeAlignmentSafetyV2(reg);
+    for (const reg of regiments) {
+      bridgeAlignmentSafetyV2(reg);
+      bridgeExitProgressSafetyV2(reg);
+    }
 
     for (const reg of regiments) {
       const march=reg?.marchV063;
