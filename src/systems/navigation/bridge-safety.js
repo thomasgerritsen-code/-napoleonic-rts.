@@ -2,7 +2,7 @@
 // ---------- Architecture v2: bridge safety policies ----------
 // Completes the corridor traversal for loose units after they technically reach
 // the opposite bank, keeps battalion anchors aligned with the bridge centreline,
-// and guarantees useful forward speed after a corner recovery.
+// and keeps the outside files of a forced bridge column clear of bridge corners.
 
 if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
   const looseCrossingTargetBeforeBridgeSafetyV2=looseCrossingTargetV067;
@@ -32,6 +32,29 @@ if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
     }
 
     return looseCrossingTargetBeforeBridgeSafetyV2(u,tx,ty);
+  };
+
+  // A normal road march can use the full historical column width, but bridges are
+  // bottlenecks. Narrow only the lateral component while forced into a bridge
+  // column; longitudinal spacing and all non-bridge formation geometry stay intact.
+  const forceBridgeColumnTargetsBeforeBridgeSafetyV2=forceBridgeColumnTargetsV068;
+  forceBridgeColumnTargetsV068=function forceBridgeColumnTargetsBridgeSafetyV2(reg,march,info) {
+    const c=WATER_CROSSINGS_V067.find(item=>item.id===info?.crossingId);
+    if (!c || c.type!=='bridge') return forceBridgeColumnTargetsBeforeBridgeSafetyV2(reg,march,info);
+
+    const desired=marchColumnOffsetsV063(reg);
+    const lateralScale=window.NRTS_CONFIG?.navigation?.bridge?.columnLateralScale || 0.72;
+    for (const offset of desired.values()) offset.oy*=lateralScale;
+
+    const offsets=blendFormationOffsetsV064(reg,march,desired,info.state==='waiting'?3.6:3.1);
+    const phase=info.state==='waiting'?'bridge-waiting':
+      info.state==='crossing'?'bridge-crossing':
+      info.state==='clearing'?'bridge-clearing':'bridge-forming';
+    applyFormationTargetsV063(reg,march.anchorX,march.anchorY,offsets,march.marchFacing,phase);
+    reg.movementPhaseV063=phase;
+    march.phase=phase;
+    march.locomotionV064='bridge-column';
+    for (const u of regimentMembers(reg)) u.marchingV064=true;
   };
 
   function bridgeAlignmentSafetyV2(reg) {
