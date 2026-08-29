@@ -53,7 +53,7 @@ test('Architecture v2 owns road lookup and route planning without legacy v066 ru
   expect(errors).toEqual([]);
 });
 
-test('bridge column stays broad until the battalion is close to the bridge mouth', async ({page}) => {
+test('bridge column stays at normal terrain width until the battalion is close to the bridge mouth', async ({page}) => {
   const errors=await openNavigationV2(page);
   const result=await page.evaluate(() => {
     window.__RTS_DEBUG__.setPeaceMode(true);
@@ -69,26 +69,35 @@ test('bridge column stays broad until the battalion is close to the bridge mouth
     const info={crossingId:c.id,crossingName:c.name,state:'approach',queuePosition:0,initialSide:side,entered:false,forcedColumn:true};
     reg.crossingTrafficV068=info;
 
-    const span=()=>{
-      const offsets=[...(march.slotOffsetsV064?.values?.()||[])];
+    const mapSpan=offsetMap=>{
+      const offsets=[...(offsetMap?.values?.()||[])];
       if(!offsets.length)return 0;
       const ys=offsets.map(offset=>Number(offset.oy)||0);
       return Math.max(...ys)-Math.min(...ys);
     };
+    const slotSpan=()=>mapSpan(march.slotOffsetsV064);
 
     march.anchorX=far.x; march.anchorY=far.y; march.slotOffsetsV064=null;
+    const roadMarch=roadAtV064(far.x,far.y);
+    const normalDesired=roadMarch?marchColumnOffsetsV063(reg):finalFormationOffsetsV063(reg,reg.formation);
+    const normalSpan=mapSpan(normalDesired);
+    const bridgeDesired=marchColumnOffsetsV063(reg);
+    for(const offset of bridgeDesired.values()) offset.oy*=window.NRTS_CONFIG.navigation.bridge.columnLateralScale;
+    const bridgeSpan=mapSpan(bridgeDesired);
+
     for(let i=0;i<120;i++) forceBridgeColumnTargetsV068(reg,march,info);
-    const farSpan=span();
+    const farSpan=slotSpan();
 
     march.anchorX=near.x; march.anchorY=near.y;
     for(let i=0;i<120;i++) forceBridgeColumnTargetsV068(reg,march,info);
-    const nearSpan=span();
+    const nearSpan=slotSpan();
 
-    return {farSpan,nearSpan,config:window.NRTS_CONFIG.navigation.bridge};
+    return {farSpan,nearSpan,normalSpan,bridgeSpan,roadMarch,config:window.NRTS_CONFIG.navigation.bridge};
   });
 
-  expect(result.farSpan).toBeGreaterThan(120);
-  expect(result.nearSpan).toBeLessThan(result.farSpan*0.65);
+  expect(result.farSpan).toBeGreaterThanOrEqual(result.normalSpan*0.90);
+  expect(result.nearSpan).toBeLessThan(result.farSpan*0.85);
+  expect(result.nearSpan).toBeLessThanOrEqual(result.bridgeSpan*1.12);
   expect(result.config.columnFormStartClearance).toBeGreaterThan(result.config.columnFormFullClearance);
   expect(errors).toEqual([]);
 });
