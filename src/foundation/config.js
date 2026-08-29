@@ -29,7 +29,10 @@
     navigation: Object.freeze({
       roadIndexCell: 180,
       bridge: Object.freeze({
-        approachClearance: 18,
+        // Start centering before the bridge mouth. 54 px keeps the approach portal
+        // just inside the legacy 190 px traffic hold point on a 270 px bridge, so
+        // a granted battalion can align without interfering with the waiting queue.
+        approachClearance: 54,
         portalMargin: 14,
         centerlineTolerance: 12,
         looseWaypointTolerance: 10,
