@@ -63,16 +63,18 @@
 <script src="src/v068.js"></script>
 <script src="src/v069-motion.js"></script>
 <script src="src/v069-combat.js"></script>
-<script src="src/v069-map.js?build=village3b"></script>
+<script src="src/v069-map.js?build=village3c"></script>
 
 <!-- Architecture v2 owns building footprints, road exclusion and strict top-down settlement rendering. -->
 <script src="src/systems/world/building-placement.js?build=a2"></script>
-<script src="src/systems/world/topdown-buildings.js?build=village3b"></script>
-<script src="src/systems/world/village-renderer-v2.js?build=village3b"></script>
+<script src="src/systems/world/topdown-buildings.js?build=village3c"></script>
+<script src="src/systems/world/village-renderer-v2.js?build=village3c"></script>
 
 <script src="src/v070.js?build=070"></script>
 <script src="src/v070-motion.js?build=070c"></script>
 <script src="src/v070-regression-fixes.js?build=070d"></script>
+<!-- Reassert the architecture-v2 settlement renderer after legacy v0.7.0 rebuilds villages. -->
+<script src="src/systems/world/village-authority-v3.js?build=village3c"></script>
 <script src="src/systems/navigation/bridge-corridors.js?build=a2"></script>
 <script src="src/systems/navigation/bridge-route-resolver.js?build=a2"></script>
 <script src="src/systems/navigation/bridge-safety.js?build=a2"></script>
