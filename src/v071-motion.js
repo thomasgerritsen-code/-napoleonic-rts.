@@ -97,11 +97,14 @@ function dampedSlotMoveV071(u, reg, tx, ty, dt) {
   let dy = yResult.value - u.y;
 
   // Never allow formation recovery to become a hidden teleport. Large errors may
-  // catch up, but only at a bounded physical speed.
+  // catch up, but only at a bounded physical speed. The hard cap prevents a
+  // support member or temporarily displaced soldier from making a visible one-
+  // frame sprint while recovering its slot.
   const base = Math.max(1, Number(TYPES[u.type]?.speed) || 1);
   const targetSpeed = Math.hypot(targetVx, targetVy);
   const catchupAllowance = Math.min(base * 0.72, Math.max(0, error - 5) * 1.45);
-  const maxSpeed = Math.max(base * (road ? 1.30 : 1.16), targetSpeed + catchupAllowance);
+  const followerHardCap = kind === 'cavalry' ? 178 : 124;
+  const maxSpeed = Math.min(followerHardCap, Math.max(base * (road ? 1.30 : 1.16), targetSpeed + catchupAllowance));
   const bounded = clampMagnitudeV071(dx, dy, maxSpeed * safeDt);
   dx = bounded.x;
   dy = bounded.y;
