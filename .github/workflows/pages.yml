@@ -17,10 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Fast headless + Chromium regression tests
+  fast:
+    name: Fast headless gate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -33,17 +33,86 @@ jobs:
       - name: Run fast headless simulation tests
         run: node --test tests/headless/*.test.js
 
+  focused:
+    name: Focused Chromium PR gate
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Select focused browser tests
+        id: focused
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          printf '%s\n' "$CHANGED_FILES"
+          TEST_FILES="$(printf '%s\n' "$CHANGED_FILES" | node scripts/select-focused-tests.js)"
+          echo "Focused Playwright set: $TEST_FILES"
+          echo "test_files=$TEST_FILES" >> "$GITHUB_OUTPUT"
+
       - name: Install test dependencies
         run: npm install --no-audit --no-fund
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright tests
+      - name: Run focused Playwright tests
+        env:
+          TEST_FILES: ${{ steps.focused.outputs.test_files }}
+          CI_RELEASE: '0'
+        run: npx playwright test $TEST_FILES --project=chromium
+
+      - name: Upload Playwright failure report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  release:
+    name: Full Chromium release gate
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full Playwright release suite
+        env:
+          CI_RELEASE: '1'
         run: npm run test:e2e
 
-      - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+      - name: Upload Playwright failure report
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v5
         with:
           name: playwright-report-${{ github.run_id }}
@@ -56,7 +125,7 @@ jobs:
   deploy:
     name: Deploy GitHub Pages
     if: ${{ github.event_name != 'pull_request' }}
-    needs: test
+    needs: [fast, release]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
