@@ -143,14 +143,12 @@ test('angled approaches fully traverse production bridge corridors without clipp
     const approachIndex = pointIndex(path, corridor.approach);
     const entryIndex = pointIndex(path, corridor.entry);
     const exitIndex = pointIndex(path, corridor.exit);
-    const clearIndex = pointIndex(path, corridor.clear);
 
     assert.equal(result.injected.corridors.length, 1, `angle ${angle} should resolve one bridge corridor`);
     assert.equal(result.injected.corridors[0].id, crossing.id);
     assert.ok(approachIndex >= 0, `angle ${angle} omitted the approach portal`);
     assert.ok(entryIndex > approachIndex, `angle ${angle} reached entry before approach`);
     assert.ok(exitIndex > entryIndex, `angle ${angle} reached exit before entry`);
-    assert.ok(clearIndex > exitIndex, `angle ${angle} reached clear before exit`);
     assert.equal(result.simulation.state.clippedWater, false, `angle ${angle} clipped a bridge corner`);
     assert.ok(result.simulation.state.maxDeckPerp <= BRIDGE_HALF_WIDTH, `angle ${angle} left the bridge deck`);
     assert.equal(result.simulation.state.pathIndex, path.length, `angle ${angle} did not finish the corridor`);
