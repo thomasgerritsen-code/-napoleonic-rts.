@@ -9,10 +9,10 @@ module.exports = defineConfig({
   timeout: 30_000,
   expect: { timeout: 5_000 },
   // Keep tests within one file sequential, but let independent spec files share
-  // two Chromium workers in CI. This gives most of the speed-up without making
-  // timing-sensitive simulation tests compete across too many browser processes.
+  // three browser workers in CI. This branch benchmarks whether the hosted runner
+  // has enough headroom to reduce wall-clock time without making simulation tests flaky.
   fullyParallel: false,
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 3 : undefined,
   // Fast PR feedback should fail immediately. Only the definitive release run on
   // main gets one retry to protect deployment from an incidental runner hiccup.
   retries: process.env.CI ? (releaseRun ? 1 : 0) : 0,
