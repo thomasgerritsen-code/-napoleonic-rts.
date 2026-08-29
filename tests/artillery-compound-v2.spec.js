@@ -42,6 +42,12 @@ test('artillery cannon and crew move as one stable compound unit and deploy with
       samples.push({
         mode:state?.mode,
         blend:state?.travelBlend,
+        displacement:state?.displacement,
+        routeActive:state?.routeActive,
+        cannonArrived:state?.cannonArrived,
+        targetDistance:state?.targetDistance,
+        pathIndex:state?.pathIndex,
+        pathLength:state?.pathLength,
         cannonX:cannon.x,
         cannonY:cannon.y,
         local
@@ -72,6 +78,7 @@ test('artillery cannon and crew move as one stable compound unit and deploy with
       sampleCount:samples.length,
       sawTravel:samples.some(s=>s.mode==='travel' && s.blend>.45),
       final:samples[samples.length-1],
+      lastFive:samples.slice(-5),
       modeChanges,
       maxLocalStep,
       maxSymmetryError,
@@ -88,7 +95,7 @@ test('artillery cannon and crew move as one stable compound unit and deploy with
   expect(result.modeChanges).toBeLessThanOrEqual(2);
   expect(result.maxLocalStep).toBeLessThan(8.5);
   expect(result.maxSymmetryError).toBeLessThan(.75);
-  expect(result.final?.mode).toBe('deployed');
-  expect(result.final?.blend).toBeLessThan(.05);
+  expect(result.final?.mode, JSON.stringify(result.lastFive)).toBe('deployed');
+  expect(result.final?.blend, JSON.stringify(result.lastFive)).toBeLessThan(.05);
   expect(errors).toEqual([]);
 });
