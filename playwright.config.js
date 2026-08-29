@@ -1,6 +1,7 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 const releaseRun = process.env.CI_RELEASE === '1';
+const systemChrome = process.env.CI_SYSTEM_CHROME === '1';
 
 module.exports = defineConfig({
   testDir: './tests',
@@ -25,12 +26,17 @@ module.exports = defineConfig({
     headless: true,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
+    // System Chrome avoids downloading Playwright's browser bundle in CI. That
+    // bundle also supplies FFmpeg, so keep video for local bundled-Chromium runs
+    // and rely on trace + screenshots for the faster CI path.
+    video: systemChrome ? 'off' : 'retain-on-failure'
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] }
+      use: systemChrome
+        ? { ...devices['Desktop Chrome'], channel: 'chrome' }
+        : { ...devices['Desktop Chrome'] }
     }
   ],
   webServer: {
