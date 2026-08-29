@@ -75,13 +75,10 @@ test('production v068 bridge queue enforces capacity and promotes the next batta
   context.registerTrafficV068(second,bridge);
   context.promoteTrafficQueuesV068();
 
-  let state = context.CROSSING_TRAFFIC_V068.get(bridge.id);
-  assert.deepEqual(Array.from(state.holderIds),['first']);
-  assert.deepEqual(Array.from(state.queue),['second']);
   assert.equal(first.crossingTrafficV068.state,'approach');
+  assert.equal(first.crossingTrafficV068.queuePosition,0);
   assert.equal(second.crossingTrafficV068.state,'waiting');
   assert.equal(second.crossingTrafficV068.queuePosition,1);
-  assert.equal(state.capacity,1);
 
   first.crossingTrafficV068.entered=true;
   first.marchV063.anchorX=400;
@@ -89,15 +86,25 @@ test('production v068 bridge queue enforces capacity and promotes the next batta
   context.updateHolderStateV068(first,first.marchV063,first.crossingTrafficV068,bridge);
   context.promoteTrafficQueuesV068();
 
-  state = context.CROSSING_TRAFFIC_V068.get(bridge.id);
-  assert.deepEqual(Array.from(state.holderIds),['second']);
-  assert.deepEqual(Array.from(state.queue),[]);
   assert.equal(first.crossingTrafficV068.state,'clearing');
   assert.equal(second.crossingTrafficV068.state,'approach');
+  assert.equal(second.crossingTrafficV068.queuePosition,0);
 });
 
 test('production v068 keeps ford capacity wider than bridge capacity', () => {
-  const { context, bridge, ford } = loadTrafficRuntime();
-  assert.equal(context.CROSSING_TRAFFIC_V068.get(bridge.id).capacity,1);
-  assert.equal(context.CROSSING_TRAFFIC_V068.get(ford.id).capacity,2);
+  const { context, ford, regiments } = loadTrafficRuntime();
+  const first = regiment('ford-first',-300);
+  const second = regiment('ford-second',-360);
+  const third = regiment('ford-third',-420);
+  regiments.push(first,second,third);
+
+  context.registerTrafficV068(first,ford);
+  context.registerTrafficV068(second,ford);
+  context.registerTrafficV068(third,ford);
+  context.promoteTrafficQueuesV068();
+
+  assert.equal(first.crossingTrafficV068.state,'approach');
+  assert.equal(second.crossingTrafficV068.state,'approach');
+  assert.equal(third.crossingTrafficV068.state,'waiting');
+  assert.equal(third.crossingTrafficV068.queuePosition,1);
 });
