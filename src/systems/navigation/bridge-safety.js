@@ -120,7 +120,15 @@ if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
     // aims at clear while traffic guidance keeps turning back toward exit forever.
     if (progress<corridor.portalDistance-18) return;
 
-    const guide=corridor.clear;
+    // Keep the anchor on the bridge axis until the *rear* file can clear the deck.
+    // This distance is derived from the actual march-column depth, so cavalry and
+    // infantry use the same rule without a hard-coded battalion size assumption.
+    const desired=marchColumnOffsetsV063(reg);
+    let rearExtent=0;
+    for (const offset of desired.values()) rearExtent=Math.max(rearExtent,Math.max(0,-Number(offset.ox||0)));
+    const touchEdge=c.length/2+16;
+    const releaseProgress=Math.max(corridor.approachDistance,touchEdge+rearExtent+10);
+    const guide=crossingPointArchitectureV2(c,direction*releaseProgress,0);
     const guideDistance=Math.hypot(guide.x-march.anchorX,guide.y-march.anchorY);
     const desiredHeading=Math.atan2(guide.y-march.anchorY,guide.x-march.anchorX);
     march.marchFacing=turnTowardV064(march.marchFacing,desiredHeading,false,guideDistance);
