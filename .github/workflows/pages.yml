@@ -34,8 +34,7 @@ jobs:
         run: node --test tests/headless/*.test.js
 
   focused:
-    name: Focused Chromium PR gate
-    if: ${{ github.event_name == 'pull_request' }}
+    name: Focused Chromium gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -52,10 +51,15 @@ jobs:
       - name: Select focused browser tests
         id: focused
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          ZERO_SHA="0000000000000000000000000000000000000000"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "$ZERO_SHA" ]; then
+            CHANGED_FILES="$(printf '%s\n' index.html src/foundation/version.js src/foundation/runtime.js src/simulation-api.js)"
+          else
+            CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          fi
           printf '%s\n' "$CHANGED_FILES"
           TEST_FILES="$(printf '%s\n' "$CHANGED_FILES" | node scripts/select-focused-tests.js)"
           echo "Focused Playwright set: $TEST_FILES"
@@ -87,7 +91,7 @@ jobs:
 
   release:
     name: Full Chromium release gate (${{ matrix.shard }}/2)
-    if: ${{ github.event_name != 'pull_request' || github.head_ref == 'release/integration-2026-08-29' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')) }}
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +133,7 @@ jobs:
   deploy:
     name: Deploy GitHub Pages
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    needs: [fast, release]
+    needs: [fast, focused]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
