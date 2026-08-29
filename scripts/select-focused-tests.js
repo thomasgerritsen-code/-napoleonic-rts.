@@ -3,8 +3,7 @@
 const fs = require('fs');
 
 function selectFocusedTests(files) {
-  const selected = new Set(['tests/foundation-v071.spec.js']);
-  let needsCoreSmoke = false;
+  const selected = new Set(['tests/smoke-v1.spec.js']);
 
   const addNavigation = () => {
     selected.add('tests/navigation-v2.spec.js');
@@ -24,6 +23,10 @@ function selectFocusedTests(files) {
 
     if (/^tests\/[^/]+\.spec\.js$/.test(file)) selected.add(file);
 
+    if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') {
+      selected.add('tests/foundation-v071.spec.js');
+    }
+
     if (
       file.startsWith('src/systems/navigation/') ||
       /^src\/v0(66|67|68)\.js$/.test(file) ||
@@ -42,26 +45,8 @@ function selectFocusedTests(files) {
       /(^|\/)ai[^/]*\.js$/.test(file) ||
       file === 'tests/ai-separation.spec.js'
     ) selected.add('tests/ai-separation.spec.js');
-
-    if (
-      file === 'index.html' ||
-      file === 'game.js' ||
-      file === 'style.css' ||
-      file === 'v05.css' ||
-      file === 'v06.css' ||
-      file === 'playwright.config.js' ||
-      file === 'package.json' ||
-      file.startsWith('src/foundation/') ||
-      (file.startsWith('src/') &&
-        !file.startsWith('src/systems/navigation/') &&
-        !file.startsWith('src/systems/movement/') &&
-        !file.startsWith('src/systems/formation/') &&
-        !file.startsWith('src/systems/ai/') &&
-        !/^src\/v0(63|64|66|67|68|69|70|71)\.js$/.test(file))
-    ) needsCoreSmoke = true;
   }
 
-  if (needsCoreSmoke) selected.add('tests/rts.spec.js');
   return [...selected].sort();
 }
 
