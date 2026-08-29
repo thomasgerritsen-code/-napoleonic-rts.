@@ -36,6 +36,10 @@
         portalMargin: 14,
         centerlineTolerance: 12,
         looseWaypointTolerance: 10,
+        // Bridge columns are intentionally a little narrower than road columns.
+        // This leaves room for damped followers while the anchor finishes turning
+        // into the bridge, preventing outside files from clipping a bridge corner.
+        columnLateralScale: 0.72,
         stallSeconds: 0.70,
         stallMovementEpsilon: 0.35
       })
