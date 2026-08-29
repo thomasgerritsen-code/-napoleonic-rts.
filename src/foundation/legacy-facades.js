@@ -69,3 +69,4 @@
     subsystems: ['movement', 'formation', 'navigation', 'ai-production', 'ai-tactics', 'combat', 'simulation']
   });
 })(window);
+const fogScoutingScript=document.createElement('script');fogScoutingScript.src='src/systems/visibility/fog-scouting.js?build=fs1';fogScoutingScript.async=false;document.body.appendChild(fogScoutingScript);
