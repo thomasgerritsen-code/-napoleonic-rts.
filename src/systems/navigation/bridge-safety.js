@@ -70,7 +70,25 @@ if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
     const local=crossingLocalArchitectureV2(c,march.anchorX,march.anchorY);
     const lateral=Math.abs(local.perp);
     const tolerance=window.NRTS_CONFIG?.navigation?.bridge?.centerlineTolerance || 12;
-    if (lateral<=tolerance) return;
+    const direction=-info.initialSide;
+    const approachLocal=crossingLocalArchitectureV2(c,corridor.approach.x,corridor.approach.y);
+    const entryLocal=crossingLocalArchitectureV2(c,corridor.entry.x,corridor.entry.y);
+    const exitLocal=crossingLocalArchitectureV2(c,corridor.exit.x,corridor.exit.y);
+
+    // Before the bridge deck, allow the damped slot followers to finish forming
+    // the narrow bridge column. This avoids a front/outside file entering the
+    // longitudinal bridge band while it is still converging from a field line.
+    let maxMemberLateral=0;
+    for (const u of regimentMembers(reg)) {
+      if (u.dead || u.routing) continue;
+      const memberLocal=crossingLocalArchitectureV2(c,u.x,u.y);
+      maxMemberLateral=Math.max(maxMemberLateral,Math.abs(memberLocal.perp));
+    }
+    const remainingToEntry=(entryLocal.along-local.along)*direction;
+    const safeMemberLateral=Math.max(18,c.width/2-8);
+    const formingBeforeDeck=remainingToEntry>0 && remainingToEntry<115 && maxMemberLateral>safeMemberLateral;
+
+    if (lateral<=tolerance && !formingBeforeDeck) return;
 
     // Only bias steering near the crossing. Farther away the normal route planner
     // remains authoritative. Once near the mouth, forward progress is combined
@@ -78,12 +96,12 @@ if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
     const distanceToBridge=Math.hypot(march.anchorX-c.x,march.anchorY-c.y);
     if (distanceToBridge>corridor.approachDistance+120) return;
 
-    const direction=-info.initialSide;
-    const approachLocal=crossingLocalArchitectureV2(c,corridor.approach.x,corridor.approach.y);
-    const exitLocal=crossingLocalArchitectureV2(c,corridor.exit.x,corridor.exit.y);
     const low=Math.min(approachLocal.along,exitLocal.along);
     const high=Math.max(approachLocal.along,exitLocal.along);
-    const forward=Math.max(22,Math.min(42,lateral*.82));
+    // While the outside files are still narrowing, make almost all movement a
+    // lateral alignment movement and preserve a small forward creep. The creep
+    // avoids a visible stop/stall but gives the followers time to converge.
+    const forward=formingBeforeDeck?6:Math.max(22,Math.min(42,lateral*.82));
     const targetAlong=Math.max(low,Math.min(high,local.along+direction*forward));
     const guide=crossingPointArchitectureV2(c,targetAlong,0);
     const guideDistance=Math.hypot(guide.x-march.anchorX,guide.y-march.anchorY);
@@ -94,8 +112,9 @@ if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
     // Keep the bridge reserved, but reduce forward momentum while lateral error is
     // still large so the column can finish aligning before reaching a deck corner.
     const cap=crossingSpeedCapV067(groupKindV06(reg),c);
-    const factor=lateral>30?.46:lateral>20?.58:.72;
-    const alignmentCap=Math.max(14,cap*factor);
+    const factor=formingBeforeDeck?.22:lateral>30?.46:lateral>20?.58:.72;
+    const minimum=formingBeforeDeck?7:14;
+    const alignmentCap=Math.max(minimum,cap*factor);
     if (Number.isFinite(march.speedV064)) march.speedV064=Math.min(march.speedV064,alignmentCap);
   }
 
