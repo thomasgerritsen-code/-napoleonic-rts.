@@ -1,7 +1,8 @@
 'use strict';
 // ---------- Architecture v2: bridge safety policies ----------
 // Completes the corridor traversal for loose units after they technically reach
-// the opposite bank, and guarantees useful forward speed after a corner recovery.
+// the opposite bank, keeps battalion anchors aligned with the bridge centreline,
+// and guarantees useful forward speed after a corner recovery.
 
 if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
   const looseCrossingTargetBeforeBridgeSafetyV2=looseCrossingTargetV067;
@@ -33,9 +34,57 @@ if (typeof NRTS_NAV_V2_ACTIVE !== 'undefined' && NRTS_NAV_V2_ACTIVE) {
     return looseCrossingTargetBeforeBridgeSafetyV2(u,tx,ty);
   };
 
+  function bridgeAlignmentSafetyV2(reg) {
+    const march=reg?.marchV063;
+    const info=reg?.crossingTrafficV068;
+    if (!march?.v064 || !info?.forcedColumn || ['waiting','clearing'].includes(info.state)) return;
+
+    const c=WATER_CROSSINGS_V067.find(item=>item.id===info.crossingId);
+    if (!c || c.type!=='bridge') return;
+    const corridor=window.NRTS_NAVIGATION_V2?.bridgeCorridor(c.id,info.initialSide);
+    if (!corridor) return;
+
+    const local=crossingLocalArchitectureV2(c,march.anchorX,march.anchorY);
+    const lateral=Math.abs(local.perp);
+    const tolerance=window.NRTS_CONFIG?.navigation?.bridge?.centerlineTolerance || 12;
+    if (lateral<=tolerance) return;
+
+    // Only bias steering near the crossing. Farther away the normal route planner
+    // remains authoritative. Once near the mouth, forward progress is combined
+    // with a centreline correction instead of snapping the anchor sideways.
+    const distanceToBridge=Math.hypot(march.anchorX-c.x,march.anchorY-c.y);
+    if (distanceToBridge>corridor.approachDistance+120) return;
+
+    const direction=-info.initialSide;
+    const approachLocal=crossingLocalArchitectureV2(c,corridor.approach.x,corridor.approach.y);
+    const exitLocal=crossingLocalArchitectureV2(c,corridor.exit.x,corridor.exit.y);
+    const low=Math.min(approachLocal.along,exitLocal.along);
+    const high=Math.max(approachLocal.along,exitLocal.along);
+    const forward=Math.max(22,Math.min(42,lateral*.82));
+    const targetAlong=Math.max(low,Math.min(high,local.along+direction*forward));
+    const guide=crossingPointArchitectureV2(c,targetAlong,0);
+    const guideDistance=Math.hypot(guide.x-march.anchorX,guide.y-march.anchorY);
+    const desiredHeading=Math.atan2(guide.y-march.anchorY,guide.x-march.anchorX);
+    march.marchFacing=turnTowardV064(march.marchFacing,desiredHeading,false,guideDistance);
+
+    // A front rank may reserve the bridge before the battalion anchor is centred.
+    // Keep the bridge reserved, but reduce forward momentum while lateral error is
+    // still large so the column can finish aligning before reaching a deck corner.
+    const cap=crossingSpeedCapV067(groupKindV06(reg),c);
+    const factor=lateral>30?.46:lateral>20?.58:.72;
+    const alignmentCap=Math.max(14,cap*factor);
+    if (Number.isFinite(march.speedV064)) march.speedV064=Math.min(march.speedV064,alignmentCap);
+  }
+
   const updateGroupPathsBeforeBridgeSafetyV2=updateGroupPathsV06;
   updateGroupPathsV06=function updateGroupPathsBridgeSafetyV2() {
+    // Apply the bias before the authoritative movement tick and again afterwards.
+    // The first pass influences this step; the second preserves the corrected
+    // heading/speed for the next fixed step after legacy waypoint turning runs.
+    for (const reg of regiments) bridgeAlignmentSafetyV2(reg);
     updateGroupPathsBeforeBridgeSafetyV2();
+    for (const reg of regiments) bridgeAlignmentSafetyV2(reg);
+
     for (const reg of regiments) {
       const march=reg?.marchV063;
       const info=reg?.crossingTrafficV068;
