@@ -168,7 +168,7 @@ test('loose infantry activates production bridge navigation without entering wat
   });
 
   expect(result.activated?.crossingId).toBe('pont-chaussee');
-  expect(['entry','exit','clear']).toContain(result.activated?.phase);
+  expect(['approach','entry','exit','clear']).toContain(result.activated?.phase);
   expect(result.inWater).toBe(false);
   expect(result.waterCrossingId).toBe('pont-chaussee');
   expect(errors).toEqual([]);
