@@ -20,6 +20,7 @@
       navigationRoadIndex: 'src/systems/navigation/road-index.js',
       navigationRoutePlanner: 'src/systems/navigation/route-planner.js',
       navigationBridgeCorridors: 'src/systems/navigation/bridge-corridors.js',
+      navigationBridgeSafety: 'src/systems/navigation/bridge-safety.js',
       navigationApi: 'src/systems/navigation/api.js'
     }),
     legacyPatches: Object.freeze([
