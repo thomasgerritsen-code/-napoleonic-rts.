@@ -1,12 +1,19 @@
 const { defineConfig, devices } = require('@playwright/test');
 
+const releaseRun = process.env.CI_RELEASE === '1';
+
 module.exports = defineConfig({
   testDir: './tests',
   timeout: 30_000,
   expect: { timeout: 5_000 },
+  // Keep tests within one file sequential, but let independent spec files share
+  // two Chromium workers in CI. This gives most of the speed-up without making
+  // timing-sensitive simulation tests compete across too many browser processes.
   fullyParallel: false,
-  workers: 1,
-  retries: process.env.CI ? 1 : 0,
+  workers: process.env.CI ? 2 : undefined,
+  // Fast PR feedback should fail immediately. Only the definitive release run on
+  // main gets one retry to protect deployment from an incidental runner hiccup.
+  retries: process.env.CI ? (releaseRun ? 1 : 0) : 0,
   // v0.6.7 has direct replacements for the two old tests whose only obsolete part is the v0.6.6 release label.
   grepInvert: /v0\.6\.6 loads with simulation facade|F3 test lab exposes diagnostics and v0\.6\.6 bug reports/,
   reporter: [
