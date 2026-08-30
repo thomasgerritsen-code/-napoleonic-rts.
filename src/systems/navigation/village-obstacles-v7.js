@@ -14,8 +14,8 @@
     x:h.x,y:h.y,w:h.w,h:h.h,angle:h.angle||0,kind:h.kind||'cottage',zone:h.zone||'legacy'
   }))));
 
-  const ROUTE_MARGIN=Object.freeze({infantry:13,cavalry:18,artillery:20,worker:7});
-  const UNIT_MARGIN=2.8;
+  const ROUTE_MARGIN=Object.freeze({infantry:15,cavalry:20,artillery:23,worker:8});
+  const UNIT_MARGIN=3.5;
 
   function kindMargin(kind){return ROUTE_MARGIN[kind] ?? ROUTE_MARGIN.infantry;}
   function routeRadius(obstacle,kind){return Math.hypot(obstacle.w,obstacle.h)*.5+kindMargin(kind);}
@@ -46,8 +46,12 @@
 
   function candidatePenalty(a,p1,p2,b,kind,hitObstacle){
     if(!inWorld(p1)||!inWorld(p2)) return Infinity;
-    let penalty=Math.hypot(p1.x-a.x,p1.y-a.y)+Math.hypot(p2.x-p1.x,p2.y-p1.y)+Math.hypot(b.x-p2.x,b.y-p2.y);
     const segments=[[a,p1],[p1,p2],[p2,b]];
+    const hitRadius=routeRadius(hitObstacle,kind);
+    for(const [s,e] of segments){
+      if(segmentCircleHit(s,e,hitObstacle,hitRadius)) return Infinity;
+    }
+    let penalty=Math.hypot(p1.x-a.x,p1.y-a.y)+Math.hypot(p2.x-p1.x,p2.y-p1.y)+Math.hypot(b.x-p2.x,b.y-p2.y);
     for(const [s,e] of segments){
       for(const other of obstacles){
         if(other.id===hitObstacle.id) continue;
@@ -64,8 +68,10 @@
     const r=routeRadius(obstacle,kind);
     const options=[];
     for(const side of [-1,1]){
-      const lateral=r*1.34+6;
-      const along=r*.72;
+      // Keep both corner waypoints comfortably outside the clearance circle. The old values
+      // were too close to a tangent and could re-enter the same roof on the approach segment.
+      const lateral=r*1.62+12;
+      const along=r*1.38+8;
       const p1={x:obstacle.x-dx*along+nx*side*lateral,y:obstacle.y-dy*along+ny*side*lateral};
       const p2={x:obstacle.x+dx*along+nx*side*lateral,y:obstacle.y+dy*along+ny*side*lateral};
       options.push({p1,p2,penalty:candidatePenalty(a,p1,p2,b,kind,obstacle)});
@@ -75,7 +81,7 @@
   }
 
   function avoidSegment(a,b,kind,depth=0){
-    if(depth>7) return [b];
+    if(depth>10) return [b];
     const blocked=firstRouteHit(a,b,kind);
     if(!blocked) return [b];
     const bypass=bypassFor(a,b,kind,blocked.obstacle);
@@ -100,10 +106,10 @@
 
   function nearestOpenPoint(point,kind='infantry'){
     let p={x:point.x,y:point.y};
-    for(let pass=0;pass<8;pass++){
+    for(let pass=0;pass<10;pass++){
       let moved=false;
       for(const obstacle of obstacles){
-        const r=routeRadius(obstacle,kind)+4;
+        const r=routeRadius(obstacle,kind)+5;
         const dx=p.x-obstacle.x,dy=p.y-obstacle.y,d=Math.hypot(dx,dy);
         if(d>=r) continue;
         const angle=d>1e-4?Math.atan2(dy,dx):(obstacle.angle+Math.PI/2);
@@ -142,7 +148,7 @@
 
   function resolveUnitPoint(point){
     let p={x:point.x,y:point.y},corrected=false;
-    for(let pass=0;pass<4;pass++){
+    for(let pass=0;pass<6;pass++){
       let changed=false;
       for(const obstacle of obstacles){
         const next=localRoofCorrection(p,obstacle);
@@ -217,6 +223,6 @@
   global.__VILLAGE_NAVIGATION_V7__=api;
   nrts.subsystems.register('village-navigation-v7',api,{
     phase:'architecture-v2',legacyBridge:false,
-    responsibility:'route regiments around scenery structures and prevent individual units from entering visible roofs'
+    responsibility:'route regiments around enlarged scenery structures and prevent individual units from entering visible roofs'
   });
 })(window);
