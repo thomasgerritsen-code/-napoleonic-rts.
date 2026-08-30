@@ -10,7 +10,7 @@
   const movementEpsilon=Math.max(.08,Number(cfg.stallMovementEpsilon)||.35);
   const recoveryDuration=.95,nearRadius=560,unitContextRadius=300;
   const unitState=new Map(),groupState=new Map();
-  const stats={unitRecoveries:0,groupRecoveries:0,blockedTargetRecoveries:0,bridgeRecoveries:0,fordRecoveries:0,unsafeRecoveryRejected:0,maxUnitStallSeconds:0,maxGroupStallSeconds:0,unitContextRecoveries:0};
+  const stats={unitRecoveries:0,groupRecoveries:0,blockedTargetRecoveries:0,blockedSegmentContexts:0,bridgeRecoveries:0,fordRecoveries:0,unsafeRecoveryRejected:0,maxUnitStallSeconds:0,maxGroupStallSeconds:0,unitContextRecoveries:0};
   function livingMembers(reg){return reg?regimentMembers(reg).filter(u=>!u.dead):[];}
   function inferredInfo(reg,c,x,y){const final=reg.finalTarget||{x:reg.targetX,y:reg.targetY},side=Math.sign(bankSideV067(x,y)),finalSide=Math.sign(bankSideV067(final?.x??c.x,final?.y??c.y));return{crossingId:c.id,initialSide:side||(finalSide?-finalSide:-1),entered:side&&finalSide?side===finalSide:false,state:'approach',forcedColumn:true};}
   function activeCrossing(reg){
@@ -19,7 +19,18 @@
     for(const route of reg?.routeCrossingsV067||[]){if(!route?.id||cleared.has(route.id))continue;const c=WATER_CROSSINGS_V067.find(x=>x.id===route.id);if(!c)continue;const d=Math.hypot(center.x-c.x,center.y-c.y);if(d<=nearRadius&&(!best||d<best.d))best={c,d};}
     return best?{c:best.c,info:inferredInfo(reg,best.c,center.x,center.y)}:null;
   }
+  function blockedTargetCrossingContext(reg,u){
+    if(!Number.isFinite(u?.targetX)||!Number.isFinite(u?.targetY))return null;
+    if(!segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY))return null;
+    const hit=typeof segmentWaterCrossingV067==='function'?segmentWaterCrossingV067(u.x,u.y,u.targetX,u.targetY):null;
+    if(hit?.crossing){stats.blockedSegmentContexts++;return{c:hit.crossing,info:inferredInfo(reg,hit.crossing,u.x,u.y),blockedSegment:true};}
+    const mx=(u.x+u.targetX)*.5,my=(u.y+u.targetY)*.5;let best=null;
+    for(const c of WATER_CROSSINGS_V067){const d=Math.hypot(mx-c.x,my-c.y);if(!best||d<best.d)best={c,d};}
+    if(best?.c&&best.d<=nearRadius){stats.blockedSegmentContexts++;return{c:best.c,info:inferredInfo(reg,best.c,u.x,u.y),blockedSegment:true,fallback:true};}
+    return null;
+  }
   function unitCrossingContext(reg,u,prior,groupContext){
+    const blocked=blockedTargetCrossingContext(reg,u);if(blocked)return blocked;
     if(groupContext&&Math.hypot(u.x-groupContext.c.x,u.y-groupContext.c.y)<=nearRadius)return groupContext;
     if(prior?.crossingId){const remembered=WATER_CROSSINGS_V067.find(c=>c.id===prior.crossingId);if(remembered&&Math.hypot(u.x-remembered.x,u.y-remembered.y)<=nearRadius)return{c:remembered,info:inferredInfo(reg,remembered,u.x,u.y),remembered:true};}
     let best=null;for(const c of WATER_CROSSINGS_V067){const d=Math.hypot(u.x-c.x,u.y-c.y);if(d<=unitContextRadius&&(!best||d<best.d))best={c,d};}return best?{c:best.c,info:inferredInfo(reg,best.c,u.x,u.y),inferred:true}:null;
@@ -35,19 +46,17 @@
     if(!reg||reg.destroyed)return;const members=livingMembers(reg);if(!members.length)return;const center=centroid(members),groupContext=activeCrossing(reg);
     if(groupContext){const{c,info}=groupContext;let gs=groupState.get(reg.id);if(!gs||gs.crossingId!==c.id){gs={crossingId:c.id,x:center.x,y:center.y,stall:0,lastRecovery:-999};groupState.set(reg.id,gs);}else{const moved=Math.hypot(center.x-gs.x,center.y-gs.y);gs.x=center.x;gs.y=center.y;gs.stall=moved<=movementEpsilon?gs.stall+dt:0;stats.maxGroupStallSeconds=Math.max(stats.maxGroupStallSeconds,gs.stall);if(gs.stall>=groupStallSeconds&&elapsed-gs.lastRecovery>.65){if(recoverGroupAnchor(reg,c,info))gs.lastRecovery=elapsed;gs.stall=0;}}}else groupState.delete(reg.id);
     for(const u of members){
-      const prior=unitState.get(u.id),context=unitCrossingContext(reg,u,prior,groupContext);if(!context){unitState.delete(u.id);continue;}const{c,info}=context;let s=prior;
-      if(!s||s.crossingId!==c.id){s={crossingId:c.id,x:u.x,y:u.y,stall:0,lastRecovery:-999};unitState.set(u.id,s);}else{const moved=Math.hypot(u.x-s.x,u.y-s.y);s.x=u.x;s.y=u.y;s.stall=moved<=movementEpsilon?s.stall+dt:0;stats.maxUnitStallSeconds=Math.max(stats.maxUnitStallSeconds,s.stall);}
       const hasTarget=Number.isFinite(u.targetX)&&Number.isFinite(u.targetY),targetDistance=hasTarget?Math.hypot(u.targetX-u.x,u.targetY-u.y):0;
-      const targetBlocked=hasTarget&&segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY),behindAnchor=Math.hypot(u.x-center.x,u.y-center.y)>48;
-      const movementDemand=targetDistance>14&&!u.arrivedAtTarget;
-      const stalledNearCrossing=movementDemand&&behindAnchor&&s.stall>=unitStallSeconds;
+      const targetBlocked=hasTarget&&segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY),prior=unitState.get(u.id),context=unitCrossingContext(reg,u,prior,groupContext);if(!context){unitState.delete(u.id);continue;}const{c,info}=context;let s=prior;
+      if(!s||s.crossingId!==c.id){s={crossingId:c.id,x:u.x,y:u.y,stall:0,lastRecovery:-999};unitState.set(u.id,s);}else{const moved=Math.hypot(u.x-s.x,u.y-s.y);s.x=u.x;s.y=u.y;s.stall=moved<=movementEpsilon?s.stall+dt:0;stats.maxUnitStallSeconds=Math.max(stats.maxUnitStallSeconds,s.stall);}
+      const behindAnchor=Math.hypot(u.x-center.x,u.y-center.y)>48,movementDemand=targetDistance>14&&!u.arrivedAtTarget,stalledNearCrossing=movementDemand&&behindAnchor&&s.stall>=unitStallSeconds;
       if((targetBlocked||stalledNearCrossing)&&elapsed-s.lastRecovery>.55){if(assignUnitRecovery(u,c,info,targetBlocked?'blocked-target':'stalled-follower',!groupContext))s.lastRecovery=elapsed;s.stall=0;}
-      if(!movementDemand&&!targetBlocked&&s.stall>unitStallSeconds) s.stall=0;
+      if(!movementDemand&&!targetBlocked&&s.stall>unitStallSeconds)s.stall=0;
     }
   }
   const previousMoveToward=moveToward;
   moveToward=function moveTowardWithRiverCrossingRecoveryV1(u,tx,ty,dt,speed=TYPES[u.type].speed){const r=u?.riverCrossingRecoveryV1;if(r&&elapsed<=r.until){const d=Math.hypot(u.x-r.x,u.y-r.y);if(d>5){u.arrivedAtTarget=false;return previousMoveToward(u,r.x,r.y,dt,speed);}u.riverCrossingRecoveryV1=null;}else if(r)u.riverCrossingRecoveryV1=null;return previousMoveToward(u,tx,ty,dt,speed);};
   const previousUpdate=update;update=function updateWithRiverCrossingRecoveryV1(dt){if(dt>0&&!gameOver)for(const reg of regiments)sampleRegiment(reg,dt);previousUpdate(dt);};
-  const api=Object.freeze({version:'river-crossing-recovery-v1.2',localOnly:true,preservesSelectedCrossing:true,unitRecovery:true,laggingUnitContext:true,movementDemandGuard:true,groupAnchorRecovery:true,stats:()=>({...stats,trackedUnits:unitState.size,trackedGroups:groupState.size})});global.__RIVER_CROSSING_RECOVERY_V1__=api;
-  if(global.NRTS.subsystems.has('river-crossing-recovery'))global.NRTS.services?.provide?.('river-crossing-recovery','src/systems/navigation/river-crossing-recovery-v1.js',api,{generation:25,legacyBridge:false});else global.NRTS.subsystems.register('river-crossing-recovery',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'recover stalled battalions and lagging followers locally around rivers, bridges and fords without changing their selected crossing'});
+  const api=Object.freeze({version:'river-crossing-recovery-v1.3',localOnly:true,preservesSelectedCrossing:true,unitRecovery:true,laggingUnitContext:true,blockedSegmentContext:true,movementDemandGuard:true,groupAnchorRecovery:true,stats:()=>({...stats,trackedUnits:unitState.size,trackedGroups:groupState.size})});global.__RIVER_CROSSING_RECOVERY_V1__=api;
+  if(global.NRTS.subsystems.has('river-crossing-recovery'))global.NRTS.services?.provide?.('river-crossing-recovery','src/systems/navigation/river-crossing-recovery-v1.js',api,{generation:26,legacyBridge:false});else global.NRTS.subsystems.register('river-crossing-recovery',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'recover stalled battalions and lagging followers locally around rivers, bridges and fords without changing their selected crossing'});
 })(window);
