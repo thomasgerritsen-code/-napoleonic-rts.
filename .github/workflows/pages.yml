@@ -78,6 +78,15 @@ jobs:
           CI_SYSTEM_CHROME: '1'
         run: npx playwright test $TEST_FILES --project=chromium
 
+      - name: Upload game health report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: game-health-${{ github.run_id }}
+          path: test-results/game-health-report.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Upload Playwright failure report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v5
