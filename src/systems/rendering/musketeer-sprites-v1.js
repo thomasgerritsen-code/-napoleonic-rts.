@@ -21,26 +21,59 @@
   const displayWidth=cfg.displayWidth||Math.round(displayHeight*(sourceCellW/sourceCellH)*1.48);
   const frameRate=cfg.frameRate||7.5;
   const idleFrame=Math.max(0,Math.min(FRAMES-1,cfg.idleFrame??1));
-  const sheets={france:new Image(),britain:new Image()};
-  const loaded={france:false,britain:false};
-  const stats={spriteDraws:0,fallbackDraws:0,framesUsed:new Set(),directionsUsed:new Set()};
+  const stats={spriteDraws:0,fallbackDraws:0,framesUsed:new Set(),directionsUsed:new Set(),embeddedUpgrades:0};
 
-  function installSheet(side,src){
-    if(!src)return;
-    const image=sheets[side];
-    image.decoding='async';
-    image.onload=()=>{loaded[side]=image.naturalWidth===asset.width&&image.naturalHeight===asset.height;};
-    image.onerror=()=>{loaded[side]=false;};
-    image.src=src;
+  function sourceRect(direction,frame){
+    const row=Math.floor(direction/2);
+    const col=(direction%2)*FRAMES+frame;
+    return{x:col*sourceCellW,y:row*sourceCellH,w:sourceCellW,h:sourceCellH};
   }
 
-  // The generated reference is the authoritative binary source. The tiny files in
-  // assets/units are intentionally only repository placeholders and are not valid
-  // WebP images. Both armies currently use the same top-down geometry; the renderer
-  // still keeps separate Image instances so a British visual variant can be swapped
-  // in later without touching simulation code.
-  installSheet('france',asset.src);
-  installSheet('britain',asset.src);
+  function makeGeneratedSheet(side){
+    const canvas=document.createElement('canvas');
+    canvas.width=asset.width;canvas.height=asset.height;
+    const g=canvas.getContext('2d');
+    const coat=side==='britain'?'#a4312d':'#244f8f';
+    const facings=[-Math.PI/2,-Math.PI/4,0,Math.PI/4,Math.PI/2,3*Math.PI/4,Math.PI,5*Math.PI/4];
+    for(let direction=0;direction<DIRECTIONS;direction++){
+      for(let frame=0;frame<FRAMES;frame++){
+        const r=sourceRect(direction,frame),cx=r.x+r.w/2,cy=r.y+r.h/2;
+        const stride=[-1.0,-.35,.35,1.0][frame];
+        g.save();g.translate(cx,cy);g.rotate(facings[direction]);
+        // Tiny overhead shadow, torso, head/hat and a long musket silhouette. The
+        // leg/arm offsets change per frame, giving a readable march cycle while
+        // preserving a genuinely orthographic top-down silhouette.
+        g.fillStyle='rgba(0,0,0,.22)';g.beginPath();g.ellipse(0,2,5.2,8.6,0,0,Math.PI*2);g.fill();
+        g.fillStyle='#222';g.fillRect(-1.1,-11,2.2,21);
+        g.fillStyle='#75552d';g.fillRect(.55,-12.2,1.15,24.2);
+        g.strokeStyle='#252525';g.lineWidth=1.7;g.lineCap='round';
+        g.beginPath();g.moveTo(-2.2,3);g.lineTo(-4.2+stride,8.7);g.moveTo(2.2,3);g.lineTo(4.2-stride,8.7);g.stroke();
+        g.fillStyle=coat;g.beginPath();g.ellipse(0,0,4.25,6.8,0,0,Math.PI*2);g.fill();
+        g.strokeStyle='#e9e0c4';g.lineWidth=1;g.beginPath();g.moveTo(-3,-2+stride*.45);g.lineTo(2.5,2-stride*.45);g.stroke();
+        g.fillStyle='#d4ad83';g.beginPath();g.arc(0,-6.2,2.15,0,Math.PI*2);g.fill();
+        g.fillStyle='#202020';g.beginPath();g.ellipse(0,-7.2,3.05,1.55,0,0,Math.PI*2);g.fill();
+        g.fillStyle='#eee';g.fillRect(-3.7,-1.4,1.05,3.3);
+        g.restore();
+      }
+    }
+    return canvas;
+  }
+
+  const sheets={france:makeGeneratedSheet('france'),britain:makeGeneratedSheet('britain')};
+  const loaded={france:true,britain:true};
+
+  // Prefer the approved embedded WebP when the browser accepts it. Generated
+  // canvases remain the synchronous fallback, so rendering can never stall on an
+  // image decode or a placeholder file.
+  if(asset.src){
+    for(const side of ['france','britain']){
+      const image=new Image();image.decoding='async';
+      image.onload=()=>{
+        if(image.naturalWidth===asset.width&&image.naturalHeight===asset.height){sheets[side]=image;stats.embeddedUpgrades++;}
+      };
+      image.src=asset.src;
+    }
+  }
 
   function directionForFacing(facing=0){
     const raw=Math.round((facing+Math.PI/2)/(Math.PI/4));
@@ -50,11 +83,6 @@
   function frameFor(u){
     if(!moving(u))return idleFrame;
     return Math.floor(elapsed*frameRate+(u.id%4)*.73)%FRAMES;
-  }
-  function sourceRect(direction,frame){
-    const row=Math.floor(direction/2);
-    const col=(direction%2)*FRAMES+frame;
-    return{x:col*sourceCellW,y:row*sourceCellH,w:sourceCellW,h:sourceCellH};
   }
   function ready(){return loaded.france&&loaded.britain;}
   function drawOverlay(u){
@@ -93,10 +121,10 @@
   const api=Object.freeze({
     version:'musketeer-sprites-v1',projection:'orthographic-top-down',directions:DIRECTIONS,frames:FRAMES,
     usesGeneratedReference:true,usesImageAssets:true,sourceLayout:'8-columns-by-4-rows / two directions per row',
-    source:'embedded-generated-webp',
+    source:'generated-canvas-with-embedded-webp-upgrade',
     ready,directionForFacing,frameFor,sourceRect,
-    stats:()=>({spriteDraws:stats.spriteDraws,fallbackDraws:stats.fallbackDraws,framesUsed:[...stats.framesUsed],directionsUsed:[...stats.directionsUsed],loaded:ready(),hasBritishVariant:loaded.britain})
+    stats:()=>({spriteDraws:stats.spriteDraws,fallbackDraws:stats.fallbackDraws,framesUsed:[...stats.framesUsed],directionsUsed:[...stats.directionsUsed],loaded:ready(),hasBritishVariant:loaded.britain,embeddedUpgrades:stats.embeddedUpgrades})
   });
   global.__MUSKETEER_SPRITES_V1__=api;
-  nrts.subsystems.register('infantry-sprite-renderer',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'animated eight-direction true top-down Napoleonic infantry sprites from the generated embedded WebP sheet'});
+  nrts.subsystems.register('infantry-sprite-renderer',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'synchronous animated eight-direction orthographic infantry sprites with optional embedded-WebP upgrade'});
 })(window);
