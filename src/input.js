@@ -161,7 +161,8 @@
     const dt = Math.min(0.033, (now - lastTime) / 1000);
     lastTime = now;
     if (!TEST_MANUAL_SIMULATION) update(dt);
-    draw();
+    if (typeof window.renderStableFrameV1 === 'function') window.renderStableFrameV1(() => draw(), now);
+    else draw();
     requestAnimationFrame(frame);
   }
 
