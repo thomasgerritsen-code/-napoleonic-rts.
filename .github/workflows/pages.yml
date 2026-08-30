@@ -30,8 +30,8 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Run fast headless simulation tests
-        run: node --test tests/headless/*.test.js
+      - name: Audit complete JavaScript codebase and run headless simulation tests
+        run: npm run test:fast
 
   focused:
     name: Focused Chromium gate
