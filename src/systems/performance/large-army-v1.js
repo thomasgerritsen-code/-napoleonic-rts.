@@ -8,6 +8,8 @@
   const combatGrid = { france: new Map(), britain: new Map() };
   const regimentById = new Map();
   const membersByRegiment = new Map();
+  const getRegimentBeforePerformanceV12 = getRegiment;
+  const regimentMembersBeforePerformanceV12 = regimentMembers;
 
   const cellKey = (x, y) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
 
@@ -38,16 +40,18 @@
     }
   }
 
-  // Replace repeated O(regiments * units) scans with one cache rebuild per simulation frame.
+  // Replace repeated O(regiments * units) scans with one cache rebuild per simulation frame,
+  // while falling back to the original authority for regiments created between ticks.
   getRegiment = function getRegimentCached(id) {
     const reg = regimentById.get(id);
-    return reg && !reg.destroyed ? reg : null;
+    if (reg && !reg.destroyed) return reg;
+    return getRegimentBeforePerformanceV12(id);
   };
 
   regimentMembers = function regimentMembersCached(reg) {
     if (!reg || reg.destroyed) return [];
     const members = membersByRegiment.get(reg.id);
-    if (!members) return [];
+    if (!members) return regimentMembersBeforePerformanceV12(reg);
     // Deaths can happen after the frame cache is built; filter only this small regiment array,
     // never the full global unit list.
     return members.filter(unit => !unit.dead);
@@ -131,7 +135,8 @@
     prepareFrameIndexes,
     cameraCulling: true,
     cachedRegimentMembership: true,
-    spatialCombatQueries: true
+    spatialCombatQueries: true,
+    immediateLookupFallbacks: true
   });
   global.__LARGE_ARMY_PERFORMANCE_V1__ = api;
   if (!nrts.subsystems.has('large-army-performance')) {
