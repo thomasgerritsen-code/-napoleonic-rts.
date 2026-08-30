@@ -3,7 +3,14 @@
 const fs = require('fs');
 
 function selectFocusedTests(files) {
+  const normalized = files.map(file => String(file || '').trim()).filter(Boolean);
   const selected = new Set(['tests/smoke-v1.spec.js']);
+  const battlefieldV7Bundle = normalized.some(file =>
+    file === 'src/systems/world/map-expansion-v7.js' ||
+    file === 'src/systems/world/village-scale-v7.js' ||
+    file === 'src/systems/navigation/village-obstacles-v7.js' ||
+    file === 'tests/village-navigation-v7.spec.js'
+  );
 
   const addNavigation = () => {
     selected.add('tests/navigation-v2.spec.js');
@@ -21,10 +28,7 @@ function selectFocusedTests(files) {
     selected.add('tests/village-renderer-v2.spec.js');
   };
 
-  for (const raw of files) {
-    const file = String(raw || '').trim();
-    if (!file) continue;
-
+  for (const file of normalized) {
     if (/^tests\/[^/]+\.spec\.js$/.test(file)) selected.add(file);
 
     if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') {
@@ -34,6 +38,7 @@ function selectFocusedTests(files) {
     if (
       file === 'index.html' ||
       file === 'src/v069-map.js' ||
+      file === 'src/systems/world/map-expansion-v7.js' ||
       file === 'src/systems/world/topdown-buildings.js' ||
       file.startsWith('src/systems/world/village-') ||
       file === 'src/systems/world/building-placement.js' ||
@@ -41,16 +46,22 @@ function selectFocusedTests(files) {
     ) addVillage();
 
     if (
+      file === 'src/systems/world/map-expansion-v7.js' ||
       file === 'src/systems/world/village-scale-v7.js' ||
       file === 'src/systems/navigation/village-obstacles-v7.js' ||
       file === 'tests/village-navigation-v7.spec.js'
     ) selected.add('tests/village-navigation-v7.spec.js');
 
-    if (
+    const isV7NavigationInfrastructure = battlefieldV7Bundle && (
+      file === 'src/systems/navigation/road-index.js' ||
+      file === 'src/systems/navigation/route-planner.js' ||
+      file === 'src/systems/navigation/village-obstacles-v7.js'
+    );
+    if (!isV7NavigationInfrastructure && (
       file.startsWith('src/systems/navigation/') ||
       /^src\/v0(66|67|68)\.js$/.test(file) ||
       /^tests\/(navigation-v2|traffic-v068|water-v067)\.spec\.js$/.test(file)
-    ) addNavigation();
+    )) addNavigation();
 
     if (
       file.startsWith('src/systems/movement/') ||
