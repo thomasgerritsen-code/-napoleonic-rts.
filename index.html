@@ -29,7 +29,7 @@
 </div>
 <script src="src/foundation/version.js?build=100d"></script>
 <script src="src/foundation/runtime.js?build=arch21"></script>
-<script src="src/foundation/config.js?build=restore1"></script>
+<script src="src/foundation/config.js?build=avoid2"></script>
 <script src="src/foundation/contracts.js"></script>
 <script src="src/foundation/legacy-manifest.js"></script>
 <script src="src/core.js"></script>
@@ -46,10 +46,7 @@
 <script src="src/v05.js"></script>
 <script src="src/v06.js"></script>
 <script src="src/v061.js"></script>
-
-<!-- Architecture v2 owns cannon + crew compound cohesion. -->
 <script src="src/systems/artillery/compound-unit.js?build=a2"></script>
-
 <script src="src/v063.js"></script>
 <script src="src/simulation-api.js?build=100d"></script>
 <script src="src/input.js"></script>
@@ -57,7 +54,6 @@
 <script src="src/v064.js"></script>
 <script src="src/v065.js"></script>
 <script src="src/v066.js"></script>
-<!-- V7 battlefield authority expands the world and removes redundant close parallel roads. -->
 <script src="src/systems/world/map-expansion-v7.js?build=arch21"></script>
 <script src="src/systems/navigation/road-index.js?build=a3"></script>
 <script src="src/systems/navigation/route-planner.js?build=a3"></script>
@@ -68,22 +64,17 @@
 <script src="src/v069-map.js?build=village7b"></script>
 <script src="src/systems/world/village-layout-v6.js?build=village7b"></script>
 <script src="src/systems/world/village-scale-v7.js?build=arch21"></script>
-<!-- Gameplay-building scale is applied before village collision normalization. -->
 <script src="src/systems/world/gameplay-building-scale-v1.js?build=restore1"></script>
 <script src="src/systems/world/village-collision-v4.js?build=arch21"></script>
-
-<!-- Architecture v2 owns building footprints, road exclusion and village scenery exclusion. -->
 <script src="src/systems/world/building-placement.js?build=village7b"></script>
 <script src="src/systems/world/ecology-v1.js?build=restore1"></script>
 <script src="src/systems/world/topdown-buildings.js?build=village7b"></script>
 <script src="src/systems/world/village-renderer-v2.js?build=village7b"></script>
 <script src="src/systems/world/village-yard-blend-v5.js?build=village7b"></script>
 <script src="src/systems/world/village-landscape-v6.js?build=village7b"></script>
-
 <script src="src/v070.js?build=070"></script>
 <script src="src/v070-motion.js?build=070c"></script>
 <script src="src/v070-regression-fixes.js?build=070d"></script>
-<!-- Reassert hierarchical collision-safe Village V6 rendering after legacy v0.7.0. -->
 <script src="src/systems/world/village-authority-v6.js?build=village7b"></script>
 <script src="src/systems/navigation/bridge-corridors.js?build=a2"></script>
 <script src="src/systems/navigation/bridge-route-resolver.js?build=a2"></script>
@@ -95,9 +86,7 @@
 <script src="src/systems/movement/speed-model.js?build=a2"></script>
 <script src="src/systems/movement/road-exit-stability.js?build=a2"></script>
 <script src="src/systems/movement/api.js?build=arch21"></script>
-<!-- Final movement authority: enlarged settlement roofs are physical obstacles for routes and soldiers. -->
 <script src="src/systems/navigation/village-obstacles-v7.js?build=village7b"></script>
-<!-- Architecture v2.1 stable world service resolves final battlefield/village authorities. -->
 <script src="src/systems/world/api.js?build=arch21"></script>
 <script src="src/systems/rendering/map-realism.js?build=restore1"></script>
 <script src="src/systems/rendering/map-ambient-motion.js?build=ambient1"></script>
@@ -113,13 +102,10 @@
 <script src="src/v069-sim.js"></script>
 <script src="src/v070-sim.js?build=070"></script>
 <script src="src/v071-sim.js?build=100d"></script>
-
-<!-- Post-legacy authorities. These are deliberately loaded after all version adapters. -->
 <script src="src/systems/artillery/crew-approach-v1.js?build=restore1"></script>
-<script src="src/systems/movement/stuck-recovery-v1.js?build=restore1"></script>
+<script src="src/systems/movement/stuck-recovery-v1.js?build=avoid2"></script>
 <script src="src/systems/ai/authority-v2.js?build=restore1"></script>
 <script src="src/systems/input/formation-drag-v1.js?build=restore1"></script>
-
 <script src="src/v05-debug.js"></script>
 <script src="src/v06-debug.js"></script>
 <script src="src/v061-debug.js"></script>
