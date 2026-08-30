@@ -4,7 +4,7 @@ const fs = require('fs');
 
 function selectFocusedTests(files) {
   const normalized = files.map(file => String(file || '').trim()).filter(Boolean);
-  const selected = new Set(['tests/smoke-v1.spec.js']);
+  const selected = new Set(['tests/smoke-v1.spec.js', 'tests/game-health-observer.spec.js']);
   const battlefieldV7Bundle = normalized.some(file =>
     file === 'src/systems/world/map-expansion-v7.js' ||
     file === 'src/systems/world/village-scale-v7.js' ||
@@ -37,6 +37,7 @@ function selectFocusedTests(files) {
     if (/^tests\/[^/]+\.spec\.js$/.test(file)) selected.add(file);
     if (restorationFiles.has(file)) addRestoration();
 
+    if (file === 'src/systems/diagnostics/game-health-observer-v1.js' || file === 'tests/game-health-observer.spec.js') selected.add('tests/game-health-observer.spec.js');
     if (file === 'src/systems/navigation/bridge-follower-safety-v1.js' || file === 'tests/bridge-follower-safety-v1.spec.js') addBridgeFollowerSafety();
     if (file === 'src/assets/musketeer-sprite-v1.js' || file === 'src/systems/rendering/musketeer-sprites-v1.js' || file === 'tests/musketeer-sprites-v1.spec.js') addMusketeerSprites();
 
