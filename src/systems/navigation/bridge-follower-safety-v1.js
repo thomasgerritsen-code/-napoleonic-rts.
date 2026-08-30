@@ -14,6 +14,11 @@
   const releasePadding=Math.max(35,Number(cfg.memberReleasePadding)||90);
   const stats={corrections:0,resumes:0,regiments:new Set()};
 
+  function legalSegment(u,point){
+    return point&&Number.isFinite(point.x)&&Number.isFinite(point.y)&&
+      !segmentCrossesBlockedWaterV067(u.x,u.y,point.x,point.y);
+  }
+
   function safeTargetForMember(u,c,info){
     const direction=-info.initialSide;
     const current=crossingLocalArchitectureV2(c,u.x,u.y);
@@ -30,25 +35,29 @@
       return null;
     }
 
-    let along=target.along;
-    if(direction>0)along=Math.max(along,current.along+advanceStep);
-    else along=Math.min(along,current.along-advanceStep);
-    along=Math.max(-releaseAlong,Math.min(releaseAlong,along));
-    let perp=Math.max(-safeHalf,Math.min(safeHalf,target.perp));
-    let point=crossingPointArchitectureV2(c,along,perp);
+    // First priority at a bridge edge is a purely lateral move back toward the
+    // center lane. Advancing diagonally from the corner can cut across a sliver of
+    // river even when both endpoints are technically on the bridge rectangle.
+    const centeredPerp=Math.max(-safeHalf*.35,Math.min(safeHalf*.35,current.perp));
+    let point=crossingPointArchitectureV2(c,current.along,centeredPerp);
+    if(legalSegment(u,point))return point;
 
-    if(segmentCrossesBlockedWaterV067(u.x,u.y,point.x,point.y)){
-      along=current.along+direction*Math.min(18,advanceStep);
-      along=Math.max(-releaseAlong,Math.min(releaseAlong,along));
-      perp=Math.max(-safeHalf,Math.min(safeHalf,current.perp*.35));
-      point=crossingPointArchitectureV2(c,along,perp);
-    }
-    if(segmentCrossesBlockedWaterV067(u.x,u.y,point.x,point.y)){
-      along=current.along+direction*12;
+    point=crossingPointArchitectureV2(c,current.along,0);
+    if(legalSegment(u,point))return point;
+
+    // Once centered, advance in short legal centerline steps until the original
+    // formation slot can be reached without crossing blocked water.
+    const candidates=[Math.min(18,advanceStep),12,6];
+    for(const step of candidates){
+      let along=current.along+direction*step;
       along=Math.max(-releaseAlong,Math.min(releaseAlong,along));
       point=crossingPointArchitectureV2(c,along,0);
+      if(legalSegment(u,point))return point;
     }
-    return point;
+
+    // Last resort: retain the current legal position rather than assigning an
+    // impossible target that continually pushes the follower into the river.
+    return {x:u.x,y:u.y};
   }
 
   const previousForceBridgeColumn=forceBridgeColumnTargetsV068;
