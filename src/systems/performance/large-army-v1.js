@@ -40,12 +40,17 @@
 
   // Replace repeated O(regiments * units) scans with one cache rebuild per simulation frame.
   getRegiment = function getRegimentCached(id) {
-    return regimentById.get(id) || null;
+    const reg = regimentById.get(id);
+    return reg && !reg.destroyed ? reg : null;
   };
 
   regimentMembers = function regimentMembersCached(reg) {
     if (!reg || reg.destroyed) return [];
-    return membersByRegiment.get(reg.id) || [];
+    const members = membersByRegiment.get(reg.id);
+    if (!members) return [];
+    // Deaths can happen after the frame cache is built; filter only this small regiment array,
+    // never the full global unit list.
+    return members.filter(unit => !unit.dead);
   };
 
   // Replace the two full enemy-array scans performed by every combat unit each tick.
@@ -64,6 +69,7 @@
         const bucket = grid?.get(`${cx},${cy}`);
         if (!bucket) continue;
         for (const other of bucket) {
+          if (other.dead || other.routing || other.type === 'worker') continue;
           const dx = other.x - unit.x;
           const dy = other.y - unit.y;
           const d2 = dx * dx + dy * dy;
