@@ -1,12 +1,13 @@
 const { test, expect } = require('@playwright/test');
 
-test('villages are globally separated and block gameplay building placement', async ({ page }) => {
+test('villages are collision-safe and render as naturally connected parcels', async ({ page }) => {
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
-  await page.goto('/?test=village-v4',{waitUntil:'networkidle'});
+  await page.goto('/?test=village-v5',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>Boolean(
     window.__VILLAGE_COLLISION_V4__ &&
     window.__VILLAGE_RENDERER_V2__ &&
+    window.__VILLAGE_YARD_BLEND_V5__ &&
     window.__VILLAGE_AUTHORITY_V4__ &&
     window.NRTS?.subsystems.has('building-placement')
   ));
@@ -15,6 +16,7 @@ test('villages are globally separated and block gameplay building placement', as
     draw();
     const collision=window.__VILLAGE_COLLISION_V4__;
     const renderer=window.__VILLAGE_RENDERER_V2__;
+    const yardBlend=window.__VILLAGE_YARD_BLEND_V5__;
     const authority=window.__VILLAGE_AUTHORITY_V4__;
     const placement=window.NRTS.subsystems.get('building-placement');
     const sample=collision.sampleObstacle;
@@ -22,7 +24,7 @@ test('villages are globally separated and block gameplay building placement', as
     const safe=sample ? placement.nearestSafe('house',sample.x,sample.y) : null;
     const safeValid=safe ? placement.validSpot('house',safe.x,safe.y) : false;
     return {
-      collision,renderer,authority,
+      collision,renderer,yardBlend,authority,
       activeAuthority:drawHamletsV066.__nrtsVillageAuthority || null,
       sampleBlocked,safe,safeValid,
       placementObstacleCount:placement.villageObstacleCount
@@ -41,9 +43,18 @@ test('villages are globally separated and block gameplay building placement', as
   expect(result.renderer.visibleFacades).toBe(false);
   expect(result.renderer.yardDetails).toBe(true);
 
+  expect(result.yardBlend.version).toBe('village-yard-blend-v5');
+  expect(result.yardBlend.fullRectBoundaries).toBe(false);
+  expect(result.yardBlend.sharedEdgesOpen).toBe(true);
+  expect(result.yardBlend.organicPlotShape).toBe(true);
+  expect(result.yardBlend.villageGroundConnections).toBe(true);
+  expect(result.yardBlend.collisionGeometryUnchanged).toBe(true);
+
   expect(result.authority.version).toBe('village-authority-v4');
   expect(result.authority.overridesLegacyV070).toBe(true);
   expect(result.authority.collisionSafe).toBe(true);
+  expect(result.authority.naturalYardBlend).toBe(true);
+  expect(result.authority.yardBlend).toBe('village-yard-blend-v5');
   expect(result.activeAuthority).toBe('village-authority-v4');
 
   expect(result.sampleBlocked).toBe(true);
