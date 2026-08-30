@@ -31,7 +31,7 @@ test('Architecture V2.1 centralizes world tuning and exposes stable services', a
       serviceGeneration: config.architecture.serviceGeneration,
       configuredWorld: config.world.battlefield,
       configuredScale: config.world.village.structureScale,
-      actualWorld: { width: window.WORLD.width, height: window.WORLD.height },
+      actualWorld: world.size(),
       worldSnapshot,
       worldOwner: window.NRTS.services.owner('world'),
       worldGeneration: window.NRTS.services.generation('world'),
