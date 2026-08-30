@@ -18,8 +18,18 @@ test('v1.1 production runtime uses one unified human renderer', () => {
 test('human renderer declares strict orthographic top-down projection', () => {
   const source = read('src/systems/rendering/characters.js');
   assert.match(source, /projection:'orthographic-top-down'/);
+  assert.match(source, /standingSilhouette:true/);
   assert.match(source, /supportedTypes:Object\.freeze\(\['worker','infantry','officer','drummer','cavalry'\]\)/);
   assert.match(source, /drawTopDownSoldierAt/);
+});
+
+test('standing infantry stays compact instead of using a prone head-to-foot ground axis', () => {
+  const source = read('src/systems/rendering/characters.js');
+  assert.match(source, /Long head-to-foot stacking reads as a prone\/crawling body and is avoided/);
+  assert.match(source, /Feet remain close to the body/);
+  assert.match(source, /head\/shako overlaps the front edge of the shoulders/);
+  assert.doesNotMatch(source, /Legs\/trousers trail behind the torso in plan view/);
+  assert.doesNotMatch(source, /arc\(9\.55\*scale/);
 });
 
 test('cavalry is rendered in plan view and does not fall back to legacy unit drawing', () => {

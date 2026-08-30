@@ -1,6 +1,6 @@
 'use strict';
 (function initRtsVersion(root) {
-  const VERSION = '1.1.0';
+  const VERSION = '1.1.1';
   const apply = () => {
     document.title = `Napoleonic RTS v${VERSION}`;
     const badge = document.querySelector('.version');
