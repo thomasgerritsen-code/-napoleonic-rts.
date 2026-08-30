@@ -26,12 +26,15 @@ test('large-army combat targeting uses spatial cells instead of a full unit scan
   assert.doesNotMatch(source, /for \(const other of units\)/);
 });
 
-test('large-army authority caches regiment membership once per frame', () => {
+test('large-army authority caches regiment membership once per frame with immediate fallbacks', () => {
   const source = read('src/systems/performance/large-army-v1.js');
   assert.match(source, /membersByRegiment/);
   assert.match(source, /regimentMembersCached/);
   assert.match(source, /regimentById/);
   assert.match(source, /getRegimentCached/);
+  assert.match(source, /getRegimentBeforePerformanceV12/);
+  assert.match(source, /regimentMembersBeforePerformanceV12/);
+  assert.match(source, /immediateLookupFallbacks: true/);
 });
 
 test('large-army authority camera-culls expensive render entities', () => {
