@@ -11,7 +11,8 @@ async function openV071(page) {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/?test=v071', { waitUntil: 'networkidle' });
   await page.waitForFunction(() => Boolean(
-    window.RTS_SIM?.version === '0.7.1' &&
+    window.RTS_VERSION &&
+    window.RTS_SIM?.version === window.RTS_VERSION &&
     window.NRTS?.subsystems.has('ai-production') &&
     window.NRTS?.subsystems.has('ai-tactics')
   ));

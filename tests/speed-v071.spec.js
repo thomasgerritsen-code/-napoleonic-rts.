@@ -9,7 +9,8 @@ async function openV071(page) {
   });
   await page.goto('/?test=v071', {waitUntil:'networkidle'});
   await page.waitForFunction(() => Boolean(
-    window.RTS_SIM?.version==='0.7.1' &&
+    window.RTS_VERSION &&
+    window.RTS_SIM?.version===window.RTS_VERSION &&
     window.__RTS_DEBUG__?.motionSystemV071 &&
     window.__V071_SPEED_PARITY__?.version==='0.7.1-hotfix2'
   ));

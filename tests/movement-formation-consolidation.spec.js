@@ -7,7 +7,8 @@ async function openConsolidatedMovement(page) {
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('/?test=v071', { waitUntil:'networkidle' });
   await page.waitForFunction(() => Boolean(
-    window.RTS_SIM?.version === '0.7.1' &&
+    window.RTS_VERSION &&
+    window.RTS_SIM?.version === window.RTS_VERSION &&
     window.NRTS?.subsystems.has('movement') &&
     window.NRTS?.subsystems.has('formation') &&
     window.__RTS_DEBUG__?.motionStatsV071 &&
@@ -16,14 +17,14 @@ async function openConsolidatedMovement(page) {
   return errors;
 }
 
-test('active v0.7.1 movement layer is owned by Architecture v2 modules', async ({ page }) => {
+test('active v0.7.1 movement layer is owned by Architecture v2.1 modules', async ({ page }) => {
   const errors = await openConsolidatedMovement(page);
   const snapshot = await page.evaluate(() => window.NRTS.diagnostics.snapshot());
   const movement = snapshot.subsystems.find(s => s.name === 'movement');
   const formation = snapshot.subsystems.find(s => s.name === 'formation');
-  expect(movement?.meta?.phase).toBe('architecture-v2');
+  expect(movement?.meta?.phase).toBe('architecture-v2.1');
   expect(movement?.meta?.legacyBridge).toBe(false);
-  expect(formation?.meta?.phase).toBe('architecture-v2');
+  expect(formation?.meta?.phase).toBe('architecture-v2.1');
   expect(formation?.meta?.legacyBridge).toBe(false);
   expect(errors).toEqual([]);
 });
