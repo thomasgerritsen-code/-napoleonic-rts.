@@ -9,7 +9,8 @@ async function openV071(page) {
   });
   await page.goto('/?test=v071', {waitUntil:'networkidle'});
   await page.waitForFunction(() => Boolean(
-    window.RTS_SIM?.version==='0.7.1' &&
+    window.RTS_VERSION &&
+    window.RTS_SIM?.version===window.RTS_VERSION &&
     window.__RTS_DEBUG__?.motionSystemV071 &&
     window.__RTS_DEBUG__?.motionStatsV071
   ));
@@ -26,8 +27,9 @@ function coefficientOfVariation(values){
 
 test('v0.7.1 uses damped slot followers with a fixed-step interpolated production renderer', async ({page}) => {
   const errors=await openV071(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.7\.1/);
-  await expect(page.locator('.version')).toHaveText('v0.7.1');
+  const releaseVersion=await page.evaluate(()=>window.RTS_VERSION);
+  await expect(page).toHaveTitle(`Napoleonic RTS v${releaseVersion}`);
+  await expect(page.locator('.version')).toHaveText(`v${releaseVersion}`);
   const stats=await page.evaluate(()=>window.__RTS_DEBUG__.motionStatsV071());
   expect(stats.solver).toBe('anchor-damped-slots-fixed60-render-interp');
   expect(stats.fixedStepHz).toBe(60);
