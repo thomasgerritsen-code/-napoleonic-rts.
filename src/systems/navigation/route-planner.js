@@ -94,23 +94,69 @@ function buildNetworkRoadCandidateV066(start,goal,kind) {
   return {path,stats,startAccess,goalAccess,roadRoute};
 }
 
+function pathEndsNearGoalArchitectureV2(path,goal,tolerance=105) {
+  if (!Array.isArray(path) || !path.length) return false;
+  const last=path[path.length-1];
+  return Number.isFinite(last?.x)&&Number.isFinite(last?.y)&&Math.hypot(last.x-goal.x,last.y-goal.y)<=tolerance;
+}
+
+function pathWaterSafeArchitectureV2(start,path) {
+  if (typeof segmentCrossesBlockedWaterV067!=='function') return true;
+  let previous=start;
+  for (const point of path||[]) {
+    if (segmentCrossesBlockedWaterV067(previous.x,previous.y,point.x,point.y)) return false;
+    previous=point;
+  }
+  return true;
+}
+
+function buildExplicitCrossingDetourArchitectureV2(start,goal,kind) {
+  if (typeof bankSideV067!=='function' || typeof nearestCrossingV067!=='function' || typeof crossingBankPointV067!=='function') return null;
+  const startSide=bankSideV067(start.x,start.y),goalSide=bankSideV067(goal.x,goal.y);
+  if (!Number.isFinite(startSide) || !Number.isFinite(goalSide) || startSide*goalSide>=0) return null;
+  const crossing=nearestCrossingV067(start.x,start.y,goal.x,goal.y,kind);
+  if (!crossing) return null;
+  const entry=crossingBankPointV067(crossing,startSide);
+  const exit=crossingBankPointV067(crossing,goalSide);
+  const toEntry=dedupePathV065(buildRegimentPathV064ForV065(start,entry));
+  const fromExit=dedupePathV065(buildRegimentPathV064ForV065(exit,goal));
+  if (!pathEndsNearGoalArchitectureV2(toEntry,entry,115) || !pathEndsNearGoalArchitectureV2(fromExit,goal,115)) return null;
+  const path=dedupePathV065([...toEntry,{x:entry.x,y:entry.y},{x:crossing.x,y:crossing.y},{x:exit.x,y:exit.y},...fromExit]);
+  if (!pathEndsNearGoalArchitectureV2(path,goal,115) || !pathWaterSafeArchitectureV2(start,path)) return null;
+  return path;
+}
+
+function recoverIncompleteRouteArchitectureV2(start,goal,kind,path) {
+  if (pathEndsNearGoalArchitectureV2(path,goal) && pathWaterSafeArchitectureV2(start,path)) return null;
+  return buildExplicitCrossingDetourArchitectureV2(start,goal,kind);
+}
+
 const buildRegimentPathV065ForArchitectureV2=buildRegimentPathV06;
 buildRegimentPathV06=function buildRegimentPathArchitectureV2(start,goal) {
   const kind=planningGroupKindV065 || 'infantry';
   const reference=directFieldReferenceV066(start,goal,kind);
   const basePath=dedupePathV065(buildRegimentPathV064ForV065(start,goal));
   const baseStats=pathStatsV065(start,basePath,kind);
+  const baseRecovery=recoverIncompleteRouteArchitectureV2(start,goal,kind,basePath);
 
   if (reference.distance<ROAD_SEEK_MIN_DISTANCE_V065 || kind==='artillery') {
-    return attachPlanV065(basePath,{
-      choice:'direct',reason:'short-order',kind,
-      directTime:reference.time,chosenTime:baseStats.time,
-      detourRatio:baseStats.distance/Math.max(1,reference.distance),roadShare:baseStats.roadShare,roadDistance:baseStats.roadDistance
+    const chosen=baseRecovery||basePath;
+    const chosenStats=pathStatsV065(start,chosen,kind);
+    return attachPlanV065(chosen,{
+      choice:baseRecovery?'crossing-recovery':'direct',reason:baseRecovery?'incomplete-water-route':'short-order',kind,
+      directTime:reference.time,chosenTime:chosenStats.time,
+      detourRatio:chosenStats.distance/Math.max(1,reference.distance),roadShare:chosenStats.roadShare,roadDistance:chosenStats.roadDistance
     });
   }
 
   const candidate=buildNetworkRoadCandidateV066(start,goal,kind);
-  if (!candidate) return buildRegimentPathV065ForArchitectureV2(start,goal);
+  if (!candidate) {
+    if (baseRecovery) {
+      const stats=pathStatsV065(start,baseRecovery,kind);
+      return attachPlanV065(baseRecovery,{choice:'crossing-recovery',reason:'road-network-unreachable',kind,directTime:reference.time,chosenTime:stats.time,detourRatio:stats.distance/Math.max(1,reference.distance),roadShare:stats.roadShare,roadDistance:stats.roadDistance});
+    }
+    return buildRegimentPathV065ForArchitectureV2(start,goal);
+  }
 
   const detourRatio=candidate.stats.distance/Math.max(1,reference.distance);
   const enoughRoad=candidate.stats.roadShare>=0.28 && candidate.stats.roadDistance>=360;
@@ -121,16 +167,28 @@ buildRegimentPathV06=function buildRegimentPathArchitectureV2(start,goal) {
   const useBaseRoad=baseIsRoad && baseWorthwhile && baseStats.time+0.35<candidate.stats.time;
   const chooseRoad=(enoughRoad&&reasonableDetour&&worthwhileTime)||useBaseRoad;
 
-  if (!chooseRoad) {
-    return attachPlanV065(basePath,{
-      choice:'direct',reason:!reasonableDetour?'detour-too-large':!enoughRoad?'too-little-road':'direct-faster',kind,
-      directTime:reference.time,roadTime:candidate.stats.time,chosenTime:baseStats.time,
-      detourRatio,roadShare:baseStats.roadShare,roadDistance:baseStats.roadDistance
+  let chosen=chooseRoad ? (useBaseRoad ? basePath : candidate.path) : basePath;
+  let stats=chooseRoad ? (useBaseRoad ? baseStats : candidate.stats) : baseStats;
+  const recovered=recoverIncompleteRouteArchitectureV2(start,goal,kind,chosen);
+  if (recovered) {
+    chosen=recovered;
+    stats=pathStatsV065(start,chosen,kind);
+    return attachPlanV065(chosen,{
+      choice:'crossing-recovery',reason:'chosen-route-incomplete',kind,
+      directTime:reference.time,roadTime:candidate.stats.time,chosenTime:stats.time,
+      detourRatio:stats.distance/Math.max(1,reference.distance),roadShare:stats.roadShare,roadDistance:stats.roadDistance,
+      roadGraph:false
     });
   }
 
-  const chosen=useBaseRoad ? basePath : candidate.path;
-  const stats=useBaseRoad ? baseStats : candidate.stats;
+  if (!chooseRoad) {
+    return attachPlanV065(chosen,{
+      choice:'direct',reason:!reasonableDetour?'detour-too-large':!enoughRoad?'too-little-road':'direct-faster',kind,
+      directTime:reference.time,roadTime:candidate.stats.time,chosenTime:stats.time,
+      detourRatio,roadShare:stats.roadShare,roadDistance:stats.roadDistance
+    });
+  }
+
   return attachPlanV065(chosen,{
     choice:'road',reason:'faster-road-route',kind,
     directTime:reference.time,roadTime:stats.time,chosenTime:stats.time,
