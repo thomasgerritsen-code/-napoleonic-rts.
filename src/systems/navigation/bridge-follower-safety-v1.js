@@ -1,8 +1,7 @@
 'use strict';
-// ---------- Architecture v2.1: bridge follower safety ----------
-// Battalion anchors already use bridge corridors. This owner handles the remaining
-// per-soldier case: a rear rank can still receive a diagonal formation slot beyond
-// the far bank and have its water guard reject that step forever.
+// ---------- Architecture v2.1: crossing follower safety ----------
+// Battalion anchors use crossing corridors. This owner keeps individual formation
+// members inside the legal bridge/ford lane until their normal slot is water-safe.
 (function installBridgeFollowerSafetyV1(global){
   const nrts=global.NRTS;
   if(!nrts)throw new Error('NRTS foundation runtime must load before bridge follower safety.');
@@ -28,11 +27,12 @@
     if(Math.abs(current.along)>releaseAlong&&Math.abs(target.along)>releaseAlong)return null;
 
     const radius=Number(TYPES[u.type]?.radius)||7;
-    const safeHalf=Math.max(8,c.width/2-radius-deckClearance);
+    const laneClearance=c.type==='ford'?Math.max(6,deckClearance*.75):deckClearance;
+    const safeHalf=Math.max(8,c.width/2-radius-laneClearance);
     const targetBlocked=segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY);
-    const onBridgeLength=Math.abs(current.along)<=c.length/2+30;
-    const currentOutsideSafeLane=onBridgeLength&&Math.abs(current.perp)>safeHalf;
-    const targetOutsideSafeLane=onBridgeLength&&Math.abs(target.perp)>safeHalf;
+    const onCrossingLength=Math.abs(current.along)<=c.length/2+30;
+    const currentOutsideSafeLane=onCrossingLength&&Math.abs(current.perp)>safeHalf;
+    const targetOutsideSafeLane=onCrossingLength&&Math.abs(target.perp)>safeHalf;
     if(!targetBlocked&&!currentOutsideSafeLane&&!targetOutsideSafeLane){
       if(u.bridgeFollowerSafetyV1){u.bridgeFollowerSafetyV1=null;stats.resumes++;}
       return null;
@@ -62,7 +62,7 @@
   forceBridgeColumnTargetsV068=function forceBridgeColumnTargetsFollowerSafetyV1(reg,march,info){
     previousForceBridgeColumn(reg,march,info);
     const c=WATER_CROSSINGS_V067.find(item=>item.id===info?.crossingId);
-    if(!c||c.type!=='bridge'||!info?.forcedColumn)return;
+    if(!c||!info?.forcedColumn)return;
     const facing=crossingHeadingV068(c,info.initialSide);
     let corrected=0;
     for(const u of regimentMembers(reg)){
@@ -95,7 +95,7 @@
 
   const previousUpdateHolderState=updateHolderStateV068;
   updateHolderStateV068=function updateHolderStateFollowerReleaseSafetyV1(reg,march,info,c){
-    const wasActive=!!(c&&c.type==='bridge'&&info?.forcedColumn&&!['waiting','clearing'].includes(info.state));
+    const wasActive=!!(c&&info?.forcedColumn&&!['waiting','clearing'].includes(info.state));
     previousUpdateHolderState(reg,march,info,c);
     if(!wasActive||!reg||reg.destroyed||everyLivingMemberSafelyCleared(reg,c,info))return;
     if(reg.crossingTrafficV068?.state!=='clearing')return;
@@ -111,7 +111,7 @@
     const memory=u?.bridgeLastCrossingV1;
     if(!memory)return null;
     const c=WATER_CROSSINGS_V067.find(item=>item.id===memory.crossingId);
-    return c&&c.type==='bridge'?{memory,c}:null;
+    return c?{memory,c}:null;
   }
 
   function recoverBlockedWaterMember(reg,u){
@@ -143,10 +143,9 @@
     return true;
   }
 
-  // Keep a short per-member memory after group traffic releases the bridge. This
-  // prevents the first restored line/column slot from pulling a rear file diagonally
-  // across a river corner. It also rescues the exceptional few-pixel water excursion
-  // that the legacy rollback cannot escape once it has already happened.
+  // Keep a short per-member memory after group traffic releases a crossing. This
+  // prevents restored formation slots from pulling a rear file diagonally outside
+  // a bridge deck or ford lane, and rescues an exceptional water excursion.
   const previousUpdateGroupPaths=updateGroupPathsV06;
   updateGroupPathsV06=function updateGroupPathsFollowerWaterRecoveryV1(){
     previousUpdateGroupPaths();
@@ -160,10 +159,10 @@
   };
 
   const api=Object.freeze({
-    version:'bridge-follower-safety-v1',deckCorridor:true,formationResume:true,memberReleaseGate:true,waterStragglerRecovery:true,postReleaseGuard:true,
+    version:'bridge-follower-safety-v1',deckCorridor:true,fordCorridor:true,formationResume:true,memberReleaseGate:true,waterStragglerRecovery:true,postReleaseGuard:true,
     stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,waterRecoveries:stats.waterRecoveries,postReleaseGuards:stats.postReleaseGuards,regiments:stats.regiments.size}),
     config:Object.freeze({deckClearance,advanceStep,releasePadding,releaseMemberMargin})
   });
   global.__BRIDGE_FOLLOWER_SAFETY_V1__=api;
-  nrts.subsystems.register('bridge-follower-safety',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'keep lagging formation members on the legal bridge deck until direct formation-slot travel is safe again'});
+  nrts.subsystems.register('bridge-follower-safety',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'keep lagging formation members inside legal bridge and ford lanes until direct formation-slot travel is safe again'});
 })(window);
