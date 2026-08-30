@@ -27,15 +27,26 @@ test('standing infantry stays compact instead of using a prone head-to-foot grou
   const source = read('src/systems/rendering/characters.js');
   assert.match(source, /Long head-to-foot stacking reads as a prone\/crawling body and is avoided/);
   assert.match(source, /Feet remain close to the body/);
-  assert.match(source, /head\/shako overlaps the front edge of the shoulders/);
   assert.doesNotMatch(source, /Legs\/trousers trail behind the torso in plan view/);
   assert.doesNotMatch(source, /arc\(9\.55\*scale/);
 });
 
-test('cavalry is rendered in plan view and does not fall back to legacy unit drawing', () => {
+test('v1.1.2 uses a larger rearward head and a compact shorter musket', () => {
+  const source = read('src/systems/rendering/characters.js');
+  assert.match(source, /enlargedRearwardHead:true/);
+  assert.match(source, /arc\(2\.15\*scale,0,2\.85\*scale/);
+  assert.match(source, /ellipse\(3\.05\*scale,0,2\.6\*scale,3\.35\*scale/);
+  assert.match(source, /Slightly shorter musket keeps the weapon distinct/);
+  assert.doesNotMatch(source, /lineTo\(9\.3\*scale,6\.2\*scale\)/);
+});
+
+test('cavalry rider gets the same visible head treatment as troops on foot', () => {
   const source = read('src/systems/rendering/characters.js');
   assert.match(source, /function drawCavalry\(u,state\)/);
-  assert.match(source, /Horse body, neck, head and tail all lie along \+X\/-X in true plan view/);
+  assert.match(source, /cavalryRiderHead:true/);
+  assert.match(source, /rider gets the same larger\/rearward head logic/);
+  assert.match(source, /ctx\.arc\(1\.85,0,2\.0/);
+  assert.match(source, /ctx\.ellipse\(2\.75,0,1\.95,2\.55/);
   assert.match(source, /else if\(u\.type==='cavalry'\)drawCavalry\(u,state\)/);
 });
 
