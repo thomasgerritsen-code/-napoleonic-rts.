@@ -7,14 +7,10 @@
 
   const sourceVillages = global.__VILLAGE_LAYOUT_V6_DATA__ || VILLAGE_SCENERY_V069;
   const sourceVersion = global.__VILLAGE_LAYOUT_V6__?.version || 'village-layout-v2';
-
-  const YARD_MULTIPLIERS = Object.freeze({
-    cottage:[2.0,2.35],
-    farmhouse:[2.15,2.65],
-    barn:[1.8,2.0],
-    inn:[2.0,2.15],
-    chapel:[1.8,2.5]
-  });
+  const villageConfig = global.NRTS_CONFIG?.world?.village;
+  if (!villageConfig) throw new Error('Central village config must load before village collision normalization.');
+  const YARD_MULTIPLIERS = villageConfig.yardMultipliers;
+  const PLOT_GAP = villageConfig.plotGap;
 
   function plotGeometry(house) {
     const [mw,mh] = YARD_MULTIPLIERS[house.kind] || YARD_MULTIPLIERS.cottage;
@@ -48,7 +44,7 @@
     return true;
   }
 
-  function clearOfOccupied(candidate, radius, occupied, gap = 10) {
+  function clearOfOccupied(candidate, radius, occupied, gap = PLOT_GAP) {
     for (const other of occupied) {
       if (Math.hypot(candidate.x-other.x,candidate.y-other.y) < radius + other.plotRadius + gap) return false;
     }
@@ -133,7 +129,7 @@
       const a=occupied[i],b=occupied[j];
       const gap=Math.hypot(a.x-b.x,a.y-b.y)-a.plotRadius-b.plotRadius;
       minPlotGap=Math.min(minPlotGap,gap);
-      if (gap < 9.999) overlapCount++;
+      if (gap < PLOT_GAP - .001) overlapCount++;
     }
   }
 
@@ -160,6 +156,8 @@
     minPlotGap:Number.isFinite(minPlotGap) ? minPlotGap : null,
     sampleObstacle:sample,
     zones:Object.freeze(normalizedZones),
+    plotGap:PLOT_GAP,
+    configDriven:true,
     globalSeparation:true,
     includesRenderedYards:true
   });

@@ -28,6 +28,14 @@
     }),
     navigation: Object.freeze({
       roadIndexCell: 180,
+      village: Object.freeze({
+        routeMargin: Object.freeze({ infantry: 15, cavalry: 20, artillery: 23, worker: 8 }),
+        unitRoofMargin: 3.5,
+        routeRingBuffer: 26,
+        openPointPadding: 6,
+        maxOpenPointResolvePasses: 12,
+        maxUnitResolvePasses: 8
+      }),
       bridge: Object.freeze({
         // Start centering before the bridge mouth. 54 px keeps the approach portal
         // just inside the legacy 190 px traffic hold point on a 270 px bridge, so
@@ -50,7 +58,35 @@
         stallMovementEpsilon: 0.35
       })
     }),
+    world: Object.freeze({
+      battlefield: Object.freeze({
+        width: 4300,
+        height: 2500
+      }),
+      roads: Object.freeze({
+        omittedIds: Object.freeze([
+          'chemin-de-la-crete-ouest',
+          'chemin-de-la-crete-est',
+          'voie-de-la-ferme',
+          'voie-du-verger',
+          'voie-de-la-lisiere'
+        ])
+      }),
+      village: Object.freeze({
+        structureScale: 1.22,
+        yardMultipliers: Object.freeze({
+          cottage: Object.freeze([2.0, 2.35]),
+          farmhouse: Object.freeze([2.15, 2.65]),
+          barn: Object.freeze([1.8, 2.0]),
+          inn: Object.freeze([2.0, 2.15]),
+          chapel: Object.freeze([1.8, 2.5])
+        }),
+        plotGap: 10
+      })
+    }),
     architecture: Object.freeze({
+      version: '2.1',
+      serviceGeneration: 21,
       allowNewVersionPatchFiles: false,
       legacyBaseline: '0.7.1',
       legacyBaselineCommit: '29b038d3655d05be968bff6a80cb8f3162f1c8e8',

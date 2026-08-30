@@ -7,19 +7,15 @@
     throw new Error('v0.6.6 roads must load before Battlefield V7 expansion.');
   }
 
-  const targetWorld=Object.freeze({width:4300,height:2500});
+  const worldConfig=global.NRTS_CONFIG?.world;
+  if (!worldConfig) throw new Error('Central world config must load before Battlefield V7 expansion.');
+  const targetWorld=worldConfig.battlefield;
   WORLD.width=Math.max(WORLD.width,targetWorld.width);
   WORLD.height=Math.max(WORLD.height,targetWorld.height);
 
   // Keep the roads that carry strategic traffic or anchor settlements. Removing the close,
   // mostly decorative parallel routes creates wider open fields without moving bridge mouths.
-  const omittedIds=Object.freeze([
-    'chemin-de-la-crete-ouest',
-    'chemin-de-la-crete-est',
-    'voie-de-la-ferme',
-    'voie-du-verger',
-    'voie-de-la-lisiere'
-  ]);
+  const omittedIds=worldConfig.roads.omittedIds;
   const omitted=new Set(omittedIds);
   const roads=Object.freeze(ROAD_NETWORK_V066.filter(road=>!omitted.has(road.id)));
   const hamlets=Object.freeze(ROAD_HAMLETS_V066.filter(hamlet=>{
@@ -129,6 +125,7 @@
     originalRoadCount:ROAD_NETWORK_V066.length,
     removedRoadCount:ROAD_NETWORK_V066.length-roads.length,
     omittedRoadIds:omittedIds,
+    configDriven:true,
     sparserRoadNetwork:true,
     bridgeCoordinatesPreserved:true
   });

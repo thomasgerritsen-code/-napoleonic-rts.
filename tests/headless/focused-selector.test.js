@@ -75,6 +75,39 @@ test('village collision and building placement changes verify settlement exclusi
   }
 });
 
+test('Architecture V2.1 config changes select foundation plus the compact service regression', () => {
+  const selected = selectFocusedTests(['src/foundation/config.js']);
+  assert.deepEqual(selected, [
+    'tests/architecture-v21.spec.js',
+    'tests/foundation-v071.spec.js',
+    'tests/smoke-v1.spec.js'
+  ]);
+});
+
+test('Architecture V2.1 world service changes stay compact', () => {
+  const selected = selectFocusedTests(['src/systems/world/api.js']);
+  assert.deepEqual(selected, [
+    'tests/architecture-v21.spec.js',
+    'tests/smoke-v1.spec.js'
+  ]);
+});
+
+test('Architecture V2.1 navigation facade changes stay compact', () => {
+  const selected = selectFocusedTests(['src/systems/navigation/api.js']);
+  assert.deepEqual(selected, [
+    'tests/architecture-v21.spec.js',
+    'tests/smoke-v1.spec.js'
+  ]);
+});
+
+test('Architecture V2.1 movement facade changes stay compact', () => {
+  const selected = selectFocusedTests(['src/systems/movement/api.js']);
+  assert.deepEqual(selected, [
+    'tests/architecture-v21.spec.js',
+    'tests/smoke-v1.spec.js'
+  ]);
+});
+
 test('documentation-only changes keep browser coverage minimal', () => {
   const selected = selectFocusedTests(['docs/testing-architecture.md']);
   assert.deepEqual(selected, ['tests/smoke-v1.spec.js']);

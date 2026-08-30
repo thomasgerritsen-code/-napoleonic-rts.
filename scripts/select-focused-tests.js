@@ -28,12 +28,25 @@ function selectFocusedTests(files) {
     selected.add('tests/village-renderer-v2.spec.js');
   };
 
+  const addArchitectureV21 = () => {
+    selected.add('tests/architecture-v21.spec.js');
+  };
+
   for (const file of normalized) {
     if (/^tests\/[^/]+\.spec\.js$/.test(file)) selected.add(file);
 
     if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') {
       selected.add('tests/foundation-v071.spec.js');
     }
+
+    if (
+      file === 'src/foundation/runtime.js' ||
+      file === 'src/foundation/config.js' ||
+      file === 'src/systems/world/api.js' ||
+      file === 'src/systems/navigation/api.js' ||
+      file === 'src/systems/movement/api.js' ||
+      file === 'tests/architecture-v21.spec.js'
+    ) addArchitectureV21();
 
     if (
       file === 'index.html' ||
@@ -57,18 +70,20 @@ function selectFocusedTests(files) {
       file === 'src/systems/navigation/route-planner.js' ||
       file === 'src/systems/navigation/village-obstacles-v7.js'
     );
-    if (!isV7NavigationInfrastructure && (
+    const isNavigationFacadeOnly = file === 'src/systems/navigation/api.js';
+    if (!isV7NavigationInfrastructure && !isNavigationFacadeOnly && (
       file.startsWith('src/systems/navigation/') ||
       /^src\/v0(66|67|68)\.js$/.test(file) ||
       /^tests\/(navigation-v2|traffic-v068|water-v067)\.spec\.js$/.test(file)
     )) addNavigation();
 
-    if (
+    const isMovementFacadeOnly = file === 'src/systems/movement/api.js';
+    if (!isMovementFacadeOnly && (
       file.startsWith('src/systems/movement/') ||
       file.startsWith('src/systems/formation/') ||
       /^src\/v0(63|64|69|70|71)\.js$/.test(file) ||
       /^tests\/(movement-formation-consolidation|motion-v069|motion-v070|motion-v071|speed-v071)\.spec\.js$/.test(file)
-    ) addMovement();
+    )) addMovement();
 
     if (
       file.startsWith('src/systems/ai/') ||
