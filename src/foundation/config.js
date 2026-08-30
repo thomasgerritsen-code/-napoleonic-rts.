@@ -64,8 +64,21 @@
         columnFormStartClearance: 90,
         columnFormFullClearance: 24,
         columnLateralScale: 0.72,
+        memberDeckClearance: 8,
+        memberAdvanceStep: 28,
+        memberReleasePadding: 90,
         stallSeconds: 0.70,
         stallMovementEpsilon: 0.35
+      })
+    }),
+    rendering: Object.freeze({
+      musketeerSprites: Object.freeze({
+        displayHeight: 44,
+        displayWidth: 32,
+        frameRate: 7.5,
+        idleFrame: 1,
+        directions: 8,
+        walkFrames: 4
       })
     }),
     world: Object.freeze({
