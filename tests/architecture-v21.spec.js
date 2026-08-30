@@ -17,6 +17,7 @@ test('Architecture V2.1 centralizes world tuning and exposes stable services', a
     const world = window.NRTS.services.require('world');
     const navigation = window.NRTS.services.require('navigation');
     const movement = window.NRTS.services.require('movement');
+    const formation = window.NRTS.services.require('formation');
     const config = window.NRTS_CONFIG;
     const worldSnapshot = world.snapshot();
     const diagnostic = window.NRTS.diagnostics.snapshot();
@@ -39,7 +40,11 @@ test('Architecture V2.1 centralizes world tuning and exposes stable services', a
       movementOwner: window.NRTS.services.owner('movement'),
       formationOwner: window.NRTS.services.owner('formation'),
       navigationHasVillageAvoidance: navigation.villageAvoidance()?.version === 'village-navigation-v7',
+      navigationHasRoadLookup: typeof navigation.roadAt === 'function' && typeof navigation.nearestRoadPoint === 'function',
+      navigationHasWaterLookup: typeof navigation.waterAt === 'function' && typeof navigation.crossingAt === 'function',
       movementCanOrder: typeof movement.orderBattalion === 'function',
+      movementFieldSpeed: movement.terrainSpeed('infantry', 700, 1200),
+      formationCanArrange: typeof formation.arrangeBattalion === 'function' && typeof formation.members === 'function',
       rejectedLegacyTakeover,
       worldOwnerAfterRejectedTakeover: window.NRTS.services.owner('world'),
       diagnosticServiceNames: diagnostic.services.map(item => item.name),
@@ -59,7 +64,11 @@ test('Architecture V2.1 centralizes world tuning and exposes stable services', a
   expect(result.movementOwner).toBe('src/systems/movement/api.js');
   expect(result.formationOwner).toBe('src/systems/formation');
   expect(result.navigationHasVillageAvoidance).toBe(true);
+  expect(result.navigationHasRoadLookup).toBe(true);
+  expect(result.navigationHasWaterLookup).toBe(true);
   expect(result.movementCanOrder).toBe(true);
+  expect(result.movementFieldSpeed).toBeGreaterThan(0);
+  expect(result.formationCanArrange).toBe(true);
   expect(result.rejectedLegacyTakeover).toBe(true);
   expect(result.worldOwnerAfterRejectedTakeover).toBe('src/systems/world/api.js');
   expect(result.diagnosticServiceNames).toEqual(expect.arrayContaining(['world','navigation','movement','formation']));
