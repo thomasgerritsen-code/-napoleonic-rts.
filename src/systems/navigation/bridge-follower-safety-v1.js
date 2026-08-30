@@ -29,15 +29,17 @@
     const radius=Number(TYPES[u.type]?.radius)||7;
     const safeHalf=Math.max(8,c.width/2-radius-deckClearance);
     const targetBlocked=segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY);
-    const targetOutsideDeck=Math.abs(current.along)<=c.length/2+30&&Math.abs(target.perp)>safeHalf;
-    if(!targetBlocked&&!targetOutsideDeck){
+    const onBridgeLength=Math.abs(current.along)<=c.length/2+30;
+    const currentOutsideSafeLane=onBridgeLength&&Math.abs(current.perp)>safeHalf;
+    const targetOutsideSafeLane=onBridgeLength&&Math.abs(target.perp)>safeHalf;
+    if(!targetBlocked&&!currentOutsideSafeLane&&!targetOutsideSafeLane){
       if(u.bridgeFollowerSafetyV1){u.bridgeFollowerSafetyV1=null;stats.resumes++;}
       return null;
     }
 
-    // First priority at a bridge edge is a purely lateral move back toward the
-    // center lane. Advancing diagonally from the corner can cut across a sliver of
-    // river even when both endpoints are technically on the bridge rectangle.
+    // A member that is already near the deck edge must move sideways first, even
+    // when its newly generated formation target happens to be legal. Otherwise a
+    // subsequent forward step can clip the river at the bridge corner.
     const centeredPerp=Math.max(-safeHalf*.35,Math.min(safeHalf*.35,current.perp));
     let point=crossingPointArchitectureV2(c,current.along,centeredPerp);
     if(legalSegment(u,point))return point;
