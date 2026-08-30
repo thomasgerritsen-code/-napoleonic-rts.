@@ -37,13 +37,11 @@
     const goalSide=bankSign(goal)||pathEndSide;
     if(!routeStartSide||!goalSide||routeStartSide===goalSide) return null;
 
-    // Prefer a designated crossing already present in the coarse route.
     for(let i=1;i<points.length;i++){
       const hit=segmentWaterCrossingV067(points[i-1].x,points[i-1].y,points[i].x,points[i].y);
       if(hit?.crossing) return {crossing:hit.crossing,initialSide:routeStartSide,index:i};
     }
 
-    // Then locate an actual bank-change segment in the generated route.
     let previousSide=routeStartSide;
     for(let i=1;i<points.length;i++){
       const side=bankSign(points[i])||previousSide;
@@ -54,15 +52,30 @@
       previousSide=side;
     }
 
-    // Crucial fallback: compare against the REAL command target, not merely the
-    // final A* waypoint. If A* stopped on the near bank, this still resolves the
-    // crossing needed to reach the requested opposite bank.
     const c=nearestCrossingV067(start.x,start.y,goal?.x??points[points.length-1]?.x??start.x,goal?.y??points[points.length-1]?.y??start.y,kind);
     return c?{crossing:c,initialSide:routeStartSide,index:Math.max(1,points.length-1),fallback:true,incomplete:!pathEndsNear(path,goal)}:null;
   }
 
+  function genericCrossingCorridor(candidate){
+    const c=candidate.crossing;
+    const side=candidate.initialSide>=0?1:-1;
+    const approachDistance=c.length/2+18;
+    const portalDistance=Math.min(Math.max(24,c.length/2-18),RIVER_NAV_HALF_WIDTH_V067+14);
+    return {
+      crossing:c,
+      initialSide:side,
+      approach:crossingPointArchitectureV2(c,side*approachDistance,0),
+      entry:crossingPointArchitectureV2(c,side*portalDistance,0),
+      exit:crossingPointArchitectureV2(c,-side*portalDistance,0),
+      clear:crossingPointArchitectureV2(c,-side*approachDistance,0),
+      approachDistance,
+      portalDistance
+    };
+  }
+
   function corridorPoints(candidate) {
-    const corridor=global.NRTS_NAVIGATION_V2.bridgeCorridor(candidate.crossing.id,candidate.initialSide);
+    const bridgeCorridor=global.NRTS_NAVIGATION_V2.bridgeCorridor(candidate.crossing.id,candidate.initialSide);
+    const corridor=bridgeCorridor||genericCrossingCorridor(candidate);
     return corridor?{corridor,points:[corridor.approach,corridor.entry,corridor.exit,corridor.clear]}:null;
   }
 
@@ -94,8 +107,6 @@
     const oppositeSide=-initialSide;
     const approachDistance=corridor.approachDistance;
 
-    // Preserve legal waypoints on the starting bank until the route reaches the
-    // crossing approach envelope. This retains road routing where it is valid.
     let resumeIndex=source.length;
     for(let i=0;i<source.length;i++){
       const p=source[i];
@@ -108,8 +119,6 @@
 
     for(const p of data.points) uniquePush(out,p);
 
-    // Drop diagonal/river waypoints and resume an existing route only once it is
-    // safely on the opposite bank beyond the clear point.
     let resumed=false;
     for(let i=resumeIndex;i<source.length;i++){
       const p=source[i];
@@ -122,10 +131,6 @@
       uniquePush(out,p);
     }
 
-    // If the original path was truncated on the near bank, build a fresh same-bank
-    // tail from the crossing clear point to the actual command target. This keeps
-    // building avoidance/A* authoritative after the river while guaranteeing that
-    // deployment never happens 1000+ px short on the wrong bank.
     if(goal&&bankSign(goal)===oppositeSide){
       const from=out[out.length-1]||corridor.clear;
       if(!pathEndsNear(out,goal)) appendSafeTail(out,from,goal);
