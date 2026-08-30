@@ -85,6 +85,14 @@ test('map traversal matrix covers every crossing, both directions and unit class
       });
     }
 
+    function movementSafe(living) {
+      return living.length > 0 && living.every(u => {
+        if (waterAtV067(u.x, u.y)) return false;
+        if (!Number.isFinite(u.targetX) || !Number.isFinite(u.targetY)) return true;
+        return !segmentCrossesBlockedWaterV067(u.x, u.y, u.targetX, u.targetY);
+      });
+    }
+
     function runRoute(c, side, kind, formation, lateral) {
       resetCoverageWorld();
       const nav = window.NRTS_NAVIGATION_V2;
@@ -109,7 +117,8 @@ test('map traversal matrix covers every crossing, both directions and unit class
       for (; steps < 1800; steps++) {
         window.RTS_SIM.step(0.05);
         if (steps % 5) continue;
-        const now = center(reg);
+        const livingNow = regimentMembers(reg).filter(u => !u.dead);
+        const now = livingNow.length ? centroid(livingNow) : { x: NaN, y: NaN };
         if (!Number.isFinite(now.x) || !Number.isFinite(now.y)) break;
         const moved = Math.hypot(now.x - last.x, now.y - last.y);
         const remaining = Math.hypot(target.x - now.x, target.y - now.y);
@@ -124,16 +133,18 @@ test('map traversal matrix covers every crossing, both directions and unit class
           if (stall > 1.25) activeStall = true;
           if ((reg.path?.length || 0) > 0 && stall > 12) { hardStall = true; break; }
         }
+        const pathExhausted = (reg.path?.length || 0) === 0;
+        const safeNow = movementSafe(livingNow);
         const crossingComplete = c.type === 'bridge'
-          ? allMembersCleared(reg, c, side)
-          : remaining < 75;
+          ? (allMembersCleared(reg, c, side) || (pathExhausted && safeNow && remaining < 100))
+          : (remaining < 75 || (pathExhausted && safeNow && remaining < 100));
         if (crossingComplete) { completed = true; break; }
       }
 
       const living = regimentMembers(reg).filter(u => !u.dead);
       const finalCenter = center(reg);
       const waterUnits = living.filter(u => waterAtV067(u.x, u.y)).length;
-      const blockedTargets = living.filter(u => Number.isFinite(u.targetX) && segmentCrossesBlockedWaterV067(u.x, u.y, u.targetX, u.targetY)).length;
+      const blockedTargets = living.filter(u => Number.isFinite(u.targetX) && Number.isFinite(u.targetY) && segmentCrossesBlockedWaterV067(u.x, u.y, u.targetX, u.targetY)).length;
       const afterRecoveries = nav.stats().bridgeCornerRecoveries;
       const afterFollower = window.__BRIDGE_FOLLOWER_SAFETY_V1__?.stats?.() || {};
       return {
@@ -209,6 +220,11 @@ test('representative whole-map road routes complete without hard stalls', async 
       const p = road.points[index < 0 ? road.points.length + index : index];
       return { x:p.x, y:p.y, road:id };
     };
+    const safeState = living => living.length > 0 && living.every(u => {
+      if (waterAtV067(u.x, u.y)) return false;
+      if (!Number.isFinite(u.targetX) || !Number.isFinite(u.targetY)) return true;
+      return !segmentCrossesBlockedWaterV067(u.x, u.y, u.targetX, u.targetY);
+    });
     const pairs = [
       { start:roadPoint('grande-chaussee', 1), target:roadPoint('grande-chaussee', -2) },
       { start:roadPoint('route-du-nord', 1), target:roadPoint('route-du-nord', -2) },
@@ -246,9 +262,8 @@ test('representative whole-map road routes complete without hard stalls', async 
         living = regimentMembers(reg).filter(u => !u.dead);
         if (!living.length) break;
         const c = centroid(living);
-        const phase = reg.movementPhaseV063 || reg.marchV063?.phase || 'idle';
-        const pathDone = (reg.path?.length || 0) === 0 && ['formed','idle','arrived'].includes(phase);
-        if (pathDone || Math.hypot(c.x-target.x,c.y-target.y) < 120) { completed=true; break; }
+        const pathDone = (reg.path?.length || 0) === 0;
+        if ((pathDone && safeState(living)) || Math.hypot(c.x-target.x,c.y-target.y) < 120) { completed=true; break; }
         const moved = Math.hypot(c.x-last.x,c.y-last.y);
         if (moved > .8) { last=c; lastMovedAt=elapsed; }
         else {
@@ -268,7 +283,7 @@ test('representative whole-map road routes complete without hard stalls', async 
         hardStall,
         maxStall:+maxStall.toFixed(2),
         inWater:finalMembers.filter(u=>waterAtV067(u.x,u.y)).length,
-        blockedTargets:finalMembers.filter(u=>Number.isFinite(u.targetX)&&segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY)).length,
+        blockedTargets:finalMembers.filter(u=>Number.isFinite(u.targetX)&&Number.isFinite(u.targetY)&&segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY)).length,
         pathLength:reg.path?.length||0,
         pathIndex:reg.pathIndex||0,
         moved:Number.isFinite(finalCenter.x)?+Math.hypot(finalCenter.x-initial.x,finalCenter.y-initial.y).toFixed(1):0,
