@@ -64,15 +64,20 @@ test('battalion state contract rejects impossible direct transitions', async ({ 
   expect(result.routeToEngage).toBe(true);
 });
 
-test('legacy stack is inventoried so patches can be retired subsystem by subsystem', async ({ page }) => {
+test('legacy stack inventories active and retired layers explicitly', async ({ page }) => {
   await openFoundation(page);
   const manifest = await page.evaluate(() => window.NRTS_LEGACY_MANIFEST);
   expect(manifest.baseline).toBe('0.7.1');
   expect(manifest.baselineCommit).toBe('29b038d3655d05be968bff6a80cb8f3162f1c8e8');
   expect(manifest.core).toContain('src/navigation.js');
-  expect(manifest.legacyPatches).toContain('src/v071-motion.js');
-  expect(manifest.legacyPatches).toContain('src/v071-speed-hotfix.js');
-  expect(manifest.simulationAdapters).toContain('src/v071-sim.js');
+  expect(manifest.retiredFromRuntime).toEqual(expect.arrayContaining([
+    'src/v071-motion.js',
+    'src/v071-speed-hotfix.js',
+    'src/v071-sim.js'
+  ]));
+  expect(manifest.legacyPatches).not.toContain('src/v071-motion.js');
+  expect(manifest.legacyPatches).not.toContain('src/v071-speed-hotfix.js');
+  expect(manifest.simulationAdapters).toEqual(['src/foundation/legacy-simulation-adapter.js']);
   expect(manifest.debugAdapters).toContain('src/v071-debug.js');
 });
 
