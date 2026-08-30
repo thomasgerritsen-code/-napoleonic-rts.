@@ -16,6 +16,7 @@
 
   const ROUTE_MARGIN=Object.freeze({infantry:15,cavalry:20,artillery:23,worker:8});
   const UNIT_MARGIN=3.5;
+  const RING_BUFFER=26;
 
   function kindMargin(kind){return ROUTE_MARGIN[kind] ?? ROUTE_MARGIN.infantry;}
   function routeRadius(obstacle,kind){return Math.hypot(obstacle.w,obstacle.h)*.5+kindMargin(kind);}
@@ -44,54 +45,132 @@
     return p.x>=margin&&p.y>=margin&&p.x<=WORLD.width-margin&&p.y<=WORLD.height-margin;
   }
 
-  function candidatePenalty(a,p1,p2,b,kind,hitObstacle){
-    if(!inWorld(p1)||!inWorld(p2)) return Infinity;
-    const segments=[[a,p1],[p1,p2],[p2,b]];
-    const hitRadius=routeRadius(hitObstacle,kind);
-    for(const [s,e] of segments){
-      if(segmentCircleHit(s,e,hitObstacle,hitRadius)) return Infinity;
+  function routePointClear(point,kind,extra=3){
+    if(!inWorld(point,8)) return false;
+    for(const obstacle of obstacles){
+      if(Math.hypot(point.x-obstacle.x,point.y-obstacle.y)<=routeRadius(obstacle,kind)+extra) return false;
     }
-    let penalty=Math.hypot(p1.x-a.x,p1.y-a.y)+Math.hypot(p2.x-p1.x,p2.y-p1.y)+Math.hypot(b.x-p2.x,b.y-p2.y);
-    for(const [s,e] of segments){
-      for(const other of obstacles){
-        if(other.id===hitObstacle.id) continue;
-        if(segmentCircleHit(s,e,other,routeRadius(other,kind))) penalty+=10000;
+    return true;
+  }
+
+  function relevantObstacles(a,b,kind,pad){
+    if(!Number.isFinite(pad)) return obstacles;
+    return obstacles.filter(obstacle=>segmentCircleHit(a,b,obstacle,routeRadius(obstacle,kind)+pad));
+  }
+
+  function visibilityNodes(a,b,kind,pad,samples){
+    const relevant=relevantObstacles(a,b,kind,pad);
+    const nodes=[{x:a.x,y:a.y,role:'start'},{x:b.x,y:b.y,role:'goal'}];
+    for(const obstacle of relevant){
+      const ring=routeRadius(obstacle,kind)+RING_BUFFER;
+      for(let i=0;i<samples;i++){
+        const angle=(i/samples)*Math.PI*2;
+        const p={
+          x:obstacle.x+Math.cos(angle)*ring,
+          y:obstacle.y+Math.sin(angle)*ring,
+          role:'ring',obstacleId:obstacle.id
+        };
+        if(routePointClear(p,kind,2)) nodes.push(p);
       }
     }
-    return penalty;
+    return nodes;
   }
 
-  function bypassFor(a,b,kind,obstacle){
-    let dx=b.x-a.x,dy=b.y-a.y;
-    const len=Math.hypot(dx,dy)||1;dx/=len;dy/=len;
-    const nx=-dy,ny=dx;
-    const r=routeRadius(obstacle,kind);
-    const options=[];
-    for(const side of [-1,1]){
-      // Keep both corner waypoints comfortably outside the clearance circle. The old values
-      // were too close to a tangent and could re-enter the same roof on the approach segment.
-      const lateral=r*1.62+12;
-      const along=r*1.38+8;
-      const p1={x:obstacle.x-dx*along+nx*side*lateral,y:obstacle.y-dy*along+ny*side*lateral};
-      const p2={x:obstacle.x+dx*along+nx*side*lateral,y:obstacle.y+dy*along+ny*side*lateral};
-      options.push({p1,p2,penalty:candidatePenalty(a,p1,p2,b,kind,obstacle)});
+  function reconstructVisibilityPath(nodes,previous,goalIndex){
+    const indexes=[];
+    let cursor=goalIndex;
+    while(cursor>=0){
+      indexes.push(cursor);
+      if(cursor===0) break;
+      cursor=previous[cursor];
+      if(cursor===undefined || cursor===null || cursor<0) return null;
     }
-    options.sort((p,q)=>p.penalty-q.penalty);
-    return options[0];
+    indexes.reverse();
+    return indexes.slice(1).map(index=>({x:nodes[index].x,y:nodes[index].y}));
   }
 
-  function avoidSegment(a,b,kind,depth=0){
-    if(depth>10) return [b];
-    const blocked=firstRouteHit(a,b,kind);
-    if(!blocked) return [b];
-    const bypass=bypassFor(a,b,kind,blocked.obstacle);
-    if(!bypass||!Number.isFinite(bypass.penalty)) return [b];
-    const first=avoidSegment(a,bypass.p1,kind,depth+1);
-    const c1=first[first.length-1]||a;
-    const middle=avoidSegment(c1,bypass.p2,kind,depth+1);
-    const c2=middle[middle.length-1]||c1;
-    const last=avoidSegment(c2,b,kind,depth+1);
-    return [...first,...middle,...last];
+  function simplifyClearPath(start,path,kind){
+    const source=path||[];
+    if(source.length<2) return source.map(p=>({x:p.x,y:p.y}));
+    const out=[];
+    let cursor={x:start.x,y:start.y};
+    let index=0;
+    while(index<source.length){
+      let chosen=index;
+      for(let candidate=source.length-1;candidate>=index;candidate--){
+        if(!firstRouteHit(cursor,source[candidate],kind)){
+          chosen=candidate;
+          break;
+        }
+      }
+      const point={x:source[chosen].x,y:source[chosen].y};
+      out.push(point);
+      cursor=point;
+      index=chosen+1;
+    }
+    return out;
+  }
+
+  function visibilityRoute(a,b,kind,pad=220,samples=12){
+    if(!firstRouteHit(a,b,kind)) return [{x:b.x,y:b.y}];
+    const nodes=visibilityNodes(a,b,kind,pad,samples);
+    if(nodes.length<3) return null;
+
+    const count=nodes.length;
+    const g=new Array(count).fill(Infinity);
+    const f=new Array(count).fill(Infinity);
+    const previous=new Array(count).fill(-1);
+    const open=new Set([0]);
+    const closed=new Set();
+    g[0]=0;
+    f[0]=Math.hypot(b.x-a.x,b.y-a.y);
+
+    for(let iteration=0;open.size && iteration<count*3;iteration++){
+      let current=-1,best=Infinity;
+      for(const index of open){
+        if(f[index]<best){best=f[index];current=index;}
+      }
+      if(current<0) break;
+      if(current===1){
+        const raw=reconstructVisibilityPath(nodes,previous,1);
+        if(!raw) return null;
+        const simplified=simplifyClearPath(a,raw,kind);
+        return pathClear(a,simplified,kind)?simplified:raw;
+      }
+
+      open.delete(current);
+      closed.add(current);
+      const from=nodes[current];
+
+      for(let next=0;next<count;next++){
+        if(next===current || closed.has(next)) continue;
+        const to=nodes[next];
+        if(firstRouteHit(from,to,kind)) continue;
+        const step=Math.hypot(to.x-from.x,to.y-from.y);
+        const tentative=g[current]+step;
+        if(tentative>=g[next]) continue;
+        previous[next]=current;
+        g[next]=tentative;
+        f[next]=tentative+Math.hypot(b.x-to.x,b.y-to.y);
+        open.add(next);
+      }
+    }
+    return null;
+  }
+
+  function avoidSegment(a,b,kind){
+    if(!firstRouteHit(a,b,kind)) return [{x:b.x,y:b.y}];
+    const attempts=[
+      {pad:180,samples:12},
+      {pad:340,samples:16},
+      {pad:560,samples:16},
+      {pad:Infinity,samples:16}
+    ];
+    for(const attempt of attempts){
+      const route=visibilityRoute(a,b,kind,attempt.pad,attempt.samples);
+      if(route && pathClear(a,route,kind)) return route;
+    }
+    return [{x:b.x,y:b.y}];
   }
 
   function dedupe(points,epsilon=2){
@@ -106,10 +185,10 @@
 
   function nearestOpenPoint(point,kind='infantry'){
     let p={x:point.x,y:point.y};
-    for(let pass=0;pass<10;pass++){
+    for(let pass=0;pass<12;pass++){
       let moved=false;
       for(const obstacle of obstacles){
-        const r=routeRadius(obstacle,kind)+5;
+        const r=routeRadius(obstacle,kind)+6;
         const dx=p.x-obstacle.x,dy=p.y-obstacle.y,d=Math.hypot(dx,dy);
         if(d>=r) continue;
         const angle=d>1e-4?Math.atan2(dy,dx):(obstacle.angle+Math.PI/2);
@@ -148,7 +227,7 @@
 
   function resolveUnitPoint(point){
     let p={x:point.x,y:point.y},corrected=false;
-    for(let pass=0;pass<6;pass++){
+    for(let pass=0;pass<8;pass++){
       let changed=false;
       for(const obstacle of obstacles){
         const next=localRoofCorrection(p,obstacle);
@@ -214,6 +293,7 @@
     formationAwareRouting:true,
     finalTargetSanitization:true,
     perUnitRoofGuard:true,
+    clusteredVisibilityRouting:true,
     routeMargin:Object.freeze({...ROUTE_MARGIN}),
     avoidPath,
     pathClear,
