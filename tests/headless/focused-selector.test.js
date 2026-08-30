@@ -48,6 +48,16 @@ test('village renderer changes stay lightweight but always verify the settlement
   ]);
 });
 
+test('village collision and building placement changes verify settlement exclusion', () => {
+  for (const file of ['src/systems/world/village-collision-v4.js','src/systems/world/building-placement.js']) {
+    const selected = selectFocusedTests([file]);
+    assert.deepEqual(selected, [
+      'tests/smoke-v1.spec.js',
+      'tests/village-renderer-v2.spec.js'
+    ]);
+  }
+});
+
 test('documentation-only changes keep browser coverage minimal', () => {
   const selected = selectFocusedTests(['docs/testing-architecture.md']);
   assert.deepEqual(selected, ['tests/smoke-v1.spec.js']);
