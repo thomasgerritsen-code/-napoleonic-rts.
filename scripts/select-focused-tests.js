@@ -28,12 +28,25 @@ function selectFocusedTests(files) {
     selected.add('tests/village-renderer-v2.spec.js');
   };
 
+  const addArchitectureV21 = () => {
+    selected.add('tests/architecture-v21.spec.js');
+  };
+
   for (const file of normalized) {
     if (/^tests\/[^/]+\.spec\.js$/.test(file)) selected.add(file);
 
     if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') {
       selected.add('tests/foundation-v071.spec.js');
     }
+
+    if (
+      file === 'src/foundation/runtime.js' ||
+      file === 'src/foundation/config.js' ||
+      file === 'src/systems/world/api.js' ||
+      file === 'src/systems/navigation/api.js' ||
+      file === 'src/systems/movement/api.js' ||
+      file === 'tests/architecture-v21.spec.js'
+    ) addArchitectureV21();
 
     if (
       file === 'index.html' ||
