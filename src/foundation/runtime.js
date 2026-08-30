@@ -6,6 +6,7 @@
   const gameVersion = global.RTS_VERSION || '1.0.0';
   const listeners = new Map();
   const subsystems = new Map();
+  const services = new Map();
   const machines = new Map();
   const bootStartedAt = performance.now();
   const runtimeErrors = [];
@@ -76,6 +77,53 @@
     }
   });
 
+  // Architecture v2.1 stable service registry. New code consumes services instead of
+  // mutable legacy globals. A service can only be superseded by a strictly newer
+  // generation, preventing an older patch loaded later from silently taking ownership.
+  const serviceApi = Object.freeze({
+    provide(name, owner, api = {}, options = {}) {
+      if (!name || typeof name !== 'string') throw new TypeError('Service name must be a non-empty string.');
+      if (!owner || typeof owner !== 'string') throw new TypeError('Service owner must be a non-empty string.');
+      const generation = Number.isFinite(options.generation) ? options.generation : 0;
+      const previous = services.get(name) || null;
+      if (previous && previous.owner !== owner && generation <= previous.generation) {
+        throw new Error(`Service ${name} is owned by ${previous.owner} at generation ${previous.generation}; ${owner} must provide a newer generation.`);
+      }
+      if (previous && previous.owner === owner && generation < previous.generation) {
+        throw new Error(`Service ${name} cannot move backwards from generation ${previous.generation} to ${generation}.`);
+      }
+      const record = Object.freeze({
+        name,
+        owner,
+        api,
+        generation,
+        meta: Object.freeze({ phase: 'architecture-v2.1', ...options }),
+        providedAt: performance.now()
+      });
+      services.set(name, record);
+      events.emit(previous ? 'service:replaced' : 'service:provided', { previous, current: record });
+      return api;
+    },
+    has(name) { return services.has(name); },
+    get(name) { return services.get(name)?.api || null; },
+    require(name) {
+      const api = this.get(name);
+      if (!api) throw new Error(`Required service not provided: ${name}`);
+      return api;
+    },
+    owner(name) { return services.get(name)?.owner || null; },
+    generation(name) { return services.get(name)?.generation ?? null; },
+    list() {
+      return [...services.values()].map(record => ({
+        name: record.name,
+        owner: record.owner,
+        generation: record.generation,
+        meta: record.meta,
+        providedAt: record.providedAt
+      }));
+    }
+  });
+
   const stateApi = Object.freeze({
     define(name, definition) {
       if (!name || typeof name !== 'string') throw new TypeError('State machine name must be a non-empty string.');
@@ -123,6 +171,7 @@
         bootStartedAt,
         uptimeMs: performance.now() - bootStartedAt,
         subsystems: subsystemApi.list(),
+        services: serviceApi.list(),
         stateMachines: stateApi.list(),
         errors: runtimeErrors.slice(),
         warnings: runtimeWarnings.slice()
@@ -142,6 +191,7 @@
     foundationVersion: '1.0.0',
     events,
     subsystems: subsystemApi,
+    services: serviceApi,
     states: stateApi,
     diagnostics
   });
