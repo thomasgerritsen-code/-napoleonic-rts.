@@ -31,8 +31,10 @@
       village: Object.freeze({
         routeMargin: Object.freeze({ infantry: 15, cavalry: 20, artillery: 23, worker: 8 }),
         unitRoofMargin: 3.5,
-        openPointPadding: 5,
-        maxResolvePasses: 10
+        routeRingBuffer: 26,
+        openPointPadding: 6,
+        maxOpenPointResolvePasses: 12,
+        maxUnitResolvePasses: 8
       }),
       bridge: Object.freeze({
         // Start centering before the bridge mouth. 54 px keeps the approach portal
