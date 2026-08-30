@@ -76,3 +76,4 @@ const staminaDisciplineScript=document.createElement('script');staminaDiscipline
 const cavArtScript=document.createElement('script');cavArtScript.src='src/systems/combat/cavalry-artillery.js?build=ca1';cavArtScript.async=false;document.body.appendChild(cavArtScript);
 const weatherScript=document.createElement('script');weatherScript.src='src/systems/world/battlefield-weather.js?build=bw1';weatherScript.async=false;document.body.appendChild(weatherScript);
 const objectiveScript=document.createElement('script');objectiveScript.src='src/systems/scenario/objectives.js?build=os1';objectiveScript.async=false;document.body.appendChild(objectiveScript);
+const frameStabilityScript=document.createElement('script');frameStabilityScript.src='src/systems/rendering/frame-stability-v1.js?build=smooth1';frameStabilityScript.async=false;document.body.appendChild(frameStabilityScript);
