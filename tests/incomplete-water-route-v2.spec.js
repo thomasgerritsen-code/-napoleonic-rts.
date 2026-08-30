@@ -19,7 +19,7 @@ test('long opposite-bank routes are complete and every waypoint segment is water
   const diagnostics = await page.evaluate(() => {
     const cases = [
       {name:'moulin-verger',start:{x:330,y:1320},goal:{x:2520,y:1540},formation:'line'},
-      {name:'ferme-lisiere',start:{x:980,y:1890},goal:{x:2870,y:520},formation:'column'}
+      {name:'ferme-lisiere',start:{x:1000,y:620},goal:{x:2760,y:1010},formation:'column'}
     ];
     const out=[];
     for(const item of cases){
@@ -48,6 +48,7 @@ test('long opposite-bank routes are complete and every waypoint segment is water
         last,
         remaining:last?Math.hypot(last.x-item.goal.x,last.y-item.goal.y):null,
         blocked,
+        path,
         routeCrossings:reg.routeCrossingsV067||[],
         navigation:reg.navigationV2||null,
         resolver:window.NRTS_BRIDGE_ROUTE_RESOLVER_V2?.stats?.()||null
