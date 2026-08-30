@@ -1,6 +1,7 @@
 'use strict';
 // Consolidated compatibility adapter for historical simulation-version test pages.
-// Production keeps the authoritative v1.x RTS_SIM facade from simulation-api.js.
+// Production exposes the current release version even when the older simulation
+// implementation still carries a historical literal internally.
 (function installLegacySimulationAdapter(root) {
   const sim = root.RTS_SIM;
   if (!sim) return;
@@ -16,14 +17,14 @@
     v070: '0.7.0',
     v071: '0.7.1'
   });
-  const legacyVersion = historicalVersionByMode[testMode];
-  if (!legacyVersion) return;
+  const exposedVersion = historicalVersionByMode[testMode] || root.RTS_VERSION || sim.version;
+  if (sim.version === exposedVersion) return;
 
   root.RTS_SIM = Object.freeze({
-    version: legacyVersion,
+    version: exposedVersion,
     snapshot() {
       const snapshot = sim.snapshot();
-      return { ...snapshot, version: legacyVersion };
+      return { ...snapshot, version: exposedVersion };
     },
     audit: (...args) => sim.audit(...args),
     dispatch: (...args) => sim.dispatch(...args),
