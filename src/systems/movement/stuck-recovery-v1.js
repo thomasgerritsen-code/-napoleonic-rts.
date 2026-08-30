@@ -8,7 +8,7 @@
   const sampleSeconds=cfg.sampleSeconds??.8,triggerSeconds=cfg.triggerSeconds??2.4,minTravel=cfg.minExpectedTravel??8,cooldown=cfg.replanCooldownSeconds??2.8,nudge=cfg.nudgeDistance??18;
   const clearance=avoidCfg.clearance??7,cornerClearance=avoidCfg.cornerClearance??13,waypointArrival=avoidCfg.waypointArrival??7,maxWaypointSeconds=avoidCfg.maxWaypointSeconds??3.2;
   const groupState=new Map(),unitState=new Map();
-  const stats={groupReplans:0,unitNudges:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0,crossingReplansSuppressed:0,plannedCrossingReplansSuppressed:0};
+  const stats={groupReplans:0,unitNudges:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0,crossingReplansSuppressed:0};
 
   function villageObstacles(){
     const villages=global.VILLAGE_SCENERY_V4 || global.__VILLAGE_SCENERY_V4_DATA__ || [];
@@ -118,26 +118,13 @@
   }
 
   function groupCenter(reg){const m=regimentMembers(reg);return m.length?centroid(m):null;}
-  function activeCrossingOwnsRecovery(reg){
+  function crossingOwnsRecovery(reg){
     const info=reg?.crossingTrafficV068;
     return !!(info?.forcedColumn && ['queued','waiting','approach','crossing','clearing'].includes(info.state));
   }
-  function hasPendingPlannedCrossing(reg){
-    const route=Array.isArray(reg?.routeCrossingsV067)?reg.routeCrossingsV067:[];
-    if(!route.length)return false;
-    const cleared=reg?.crossingClearedV068 instanceof Set?reg.crossingClearedV068:new Set();
-    return route.some(c=>c?.id&&!cleared.has(c.id));
-  }
-  function waterRouteOwnsRecovery(reg){
-    return activeCrossingOwnsRecovery(reg)||hasPendingPlannedCrossing(reg);
-  }
   function activeGroupMove(reg){return !!reg&&!reg.destroyed&&Array.isArray(reg.path)&&reg.path.length>0&&reg.movementPhaseV063!=='deploying';}
   function replanGroup(reg,now){
-    if(waterRouteOwnsRecovery(reg)){
-      if(activeCrossingOwnsRecovery(reg))stats.crossingReplansSuppressed++;
-      else stats.plannedCrossingReplansSuppressed++;
-      return false;
-    }
+    if(crossingOwnsRecovery(reg)){stats.crossingReplansSuppressed++;return false;}
     const target=reg.finalTarget||{x:reg.targetX,y:reg.targetY};
     if(!target||!Number.isFinite(target.x)||!Number.isFinite(target.y))return false;
     const state=groupState.get(reg.id)||{};
@@ -148,14 +135,7 @@
   function sampleGroups(dt){
     for(const reg of regiments){
       if(!activeGroupMove(reg)){groupState.delete(reg.id);continue;}
-      if(waterRouteOwnsRecovery(reg)){
-        // A validated route that still contains an uncleared bridge/ford is owned by
-        // the crossing navigation subsystem from planning through passage. Generic
-        // non-progress recovery must not swap it to a different crossing before the
-        // traffic manager enters its approach radius. Local obstacle avoidance still
-        // remains active on individual members during the march.
-        if(activeCrossingOwnsRecovery(reg))stats.crossingReplansSuppressed++;
-        else stats.plannedCrossingReplansSuppressed++;
+      if(crossingOwnsRecovery(reg)){
         groupState.delete(reg.id);
         continue;
       }
@@ -229,7 +209,7 @@
   };
 
   const api=Object.freeze({
-    version:'stuck-recovery-v2',groupReplanning:true,looseUnitEscape:true,localBuildingAvoidance:true,formationSlotResume:true,crossingRecoveryIsolation:true,plannedCrossingRouteIsolation:true,
+    version:'stuck-recovery-v2',groupReplanning:true,looseUnitEscape:true,localBuildingAvoidance:true,formationSlotResume:true,crossingRecoveryIsolation:true,
     stats:()=>({...stats,trackedGroups:groupState.size,trackedUnits:unitState.size}),
     localWaypoint:(a,b)=>localWaypoint(a,b,null),
     segmentBlocked:(a,b)=>Boolean(firstBlocker(a,b,null,clearance))
@@ -239,6 +219,6 @@
   if(nrts.subsystems.has('stuck-recovery')){
     nrts.services?.provide?.('stuck-recovery','src/systems/movement/stuck-recovery-v1.js',api,{generation:22,legacyBridge:false});
   }else{
-    nrts.subsystems.register('stuck-recovery',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'detect non-progressing troop movement and locally route units around gameplay and village buildings without replacing validated water-crossing routes'});
+    nrts.subsystems.register('stuck-recovery',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'detect non-progressing troop movement and locally route units around gameplay and village buildings'});
   }
 })(window);
