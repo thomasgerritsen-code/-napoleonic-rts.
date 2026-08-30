@@ -12,33 +12,43 @@ function selectFocusedTests(files) {
     file === 'tests/village-navigation-v7.spec.js'
   );
 
+  const restorationFiles = new Set([
+    'index.html',
+    'src/foundation/config.js',
+    'src/systems/world/gameplay-building-scale-v1.js',
+    'src/systems/world/ecology-v1.js',
+    'src/systems/rendering/map-realism.js',
+    'src/systems/rendering/natural-resources-v1.js',
+    'src/systems/rendering/characters.js',
+    'src/systems/rendering/artillery-topdown-v1.js',
+    'src/systems/artillery/crew-approach-v1.js',
+    'src/systems/movement/stuck-recovery-v1.js',
+    'src/systems/ai/authority-v2.js',
+    'src/systems/input/formation-drag-v1.js',
+    'tests/restoration-batch-v1.spec.js'
+  ]);
+
   const addNavigation = () => {
     selected.add('tests/navigation-v2.spec.js');
     selected.add('tests/traffic-v068.spec.js');
     selected.add('tests/water-v067.spec.js');
   };
-
   const addMovement = () => {
     selected.add('tests/movement-formation-consolidation.spec.js');
     selected.add('tests/motion-v071.spec.js');
     selected.add('tests/speed-v071.spec.js');
   };
-
-  const addVillage = () => {
-    selected.add('tests/village-renderer-v2.spec.js');
-  };
-
-  const addArchitectureV21 = () => {
-    selected.add('tests/architecture-v21.spec.js');
-  };
+  const addVillage = () => selected.add('tests/village-renderer-v2.spec.js');
+  const addArchitectureV21 = () => selected.add('tests/architecture-v21.spec.js');
+  const addRestoration = () => selected.add('tests/restoration-batch-v1.spec.js');
 
   for (const file of normalized) {
     if (/^tests\/[^/]+\.spec\.js$/.test(file)) selected.add(file);
+    if (restorationFiles.has(file)) addRestoration();
 
     if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') {
       selected.add('tests/foundation-v071.spec.js');
     }
-
     if (
       file === 'src/foundation/runtime.js' ||
       file === 'src/foundation/config.js' ||
@@ -55,6 +65,8 @@ function selectFocusedTests(files) {
       file === 'src/systems/world/topdown-buildings.js' ||
       file.startsWith('src/systems/world/village-') ||
       file === 'src/systems/world/building-placement.js' ||
+      file === 'src/systems/world/gameplay-building-scale-v1.js' ||
+      file === 'src/systems/world/ecology-v1.js' ||
       file === 'tests/village-renderer-v2.spec.js'
     ) addVillage();
 
