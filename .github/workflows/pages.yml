@@ -78,6 +78,42 @@ jobs:
           CI_SYSTEM_CHROME: '1'
         run: npx playwright test $TEST_FILES --project=chromium
 
+      - name: Upload Playwright failure report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  health:
+    name: Game health 520-unit gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify preinstalled Chrome
+        run: google-chrome --version
+
+      - name: Run automated game health scenario
+        env:
+          CI_RELEASE: '0'
+          CI_SYSTEM_CHROME: '1'
+        run: npx playwright test tests/game-health-observer.spec.js --project=chromium --workers=1
+
       - name: Upload game health report
         if: ${{ always() }}
         uses: actions/upload-artifact@v5
@@ -87,11 +123,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Upload Playwright failure report
+      - name: Upload game health failure report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-report-${{ github.run_id }}
+          name: game-health-playwright-${{ github.run_id }}
           path: |
             playwright-report/
             test-results/
@@ -142,7 +178,7 @@ jobs:
   deploy:
     name: Deploy GitHub Pages
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    needs: [fast, focused]
+    needs: [fast, focused, health]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
