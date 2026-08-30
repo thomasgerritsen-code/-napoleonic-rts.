@@ -19,7 +19,7 @@
     <div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button>
   </header>
   <aside class="hud help"><strong>Besturing</strong><span>Sleep: selecteren</span><span>Klik groepslid: hele groep</span><span>Rechtsklik: lopen / verzamelen</span><span>Rechts vasthouden + slepen: doel + front</span><span>Q/E: groep 15° draaien</span><span>F3: test/debugpaneel</span><span>Minimap: camera verplaatsen</span><span>WASD / pijltjes: camera</span><span>Muiswiel: zoom</span></aside>
-  <aside class="hud objective"><strong>Britse ontwikkeling</strong><span id="aiEconomy">Economie: —</span><span id="aiBuildings">Gebouwen: —</span><span id="aiRegiments">Regimenten: —</span><span id="aiPlan">Plan: opbouwen</span></aside>
+  <aside class="hud objective"><strong>Britse ontwikkeling</strong><span>Economie: —</span><span id="aiBuildings">Gebouwen: —</span><span id="aiRegiments">Regimenten: —</span><span id="aiPlan">Plan: opbouwen</span></aside>
   <section class="hud bottombar">
     <div class="selection-panel"><span class="label">Selectie</span><strong id="selectionTitle">Niets geselecteerd</strong><span id="selectionDetails">Selecteer troepen of een gebouw.</span></div>
     <div class="actions" id="actions"><button type="button" data-action="build-barracks">Barracks<br><small>300 🪵</small></button><button type="button" data-action="build-house">House<br><small>120 🪵</small></button><button type="button" data-formation="line">Linie</button><button type="button" data-formation="column">Colonne</button><button type="button" data-formation="square">Carré</button></div>
@@ -63,20 +63,22 @@
 <script src="src/v068.js"></script>
 <script src="src/v069-motion.js"></script>
 <script src="src/v069-combat.js"></script>
-<script src="src/v069-map.js?build=village5"></script>
-<script src="src/systems/world/village-collision-v4.js?build=village5"></script>
+<script src="src/v069-map.js?build=village6"></script>
+<script src="src/systems/world/village-layout-v6.js?build=village6"></script>
+<script src="src/systems/world/village-collision-v4.js?build=village6"></script>
 
 <!-- Architecture v2 owns building footprints, road exclusion and village scenery exclusion. -->
-<script src="src/systems/world/building-placement.js?build=village5"></script>
-<script src="src/systems/world/topdown-buildings.js?build=village5"></script>
-<script src="src/systems/world/village-renderer-v2.js?build=village5"></script>
-<script src="src/systems/world/village-yard-blend-v5.js?build=village5"></script>
+<script src="src/systems/world/building-placement.js?build=village6"></script>
+<script src="src/systems/world/topdown-buildings.js?build=village6"></script>
+<script src="src/systems/world/village-renderer-v2.js?build=village6"></script>
+<script src="src/systems/world/village-yard-blend-v5.js?build=village6"></script>
+<script src="src/systems/world/village-landscape-v6.js?build=village6"></script>
 
 <script src="src/v070.js?build=070"></script>
 <script src="src/v070-motion.js?build=070c"></script>
 <script src="src/v070-regression-fixes.js?build=070d"></script>
-<!-- Reassert collision-safe, naturally blended settlement rendering after legacy v0.7.0. -->
-<script src="src/systems/world/village-authority-v4.js?build=village5"></script>
+<!-- Reassert hierarchical collision-safe Village V6 rendering after legacy v0.7.0. -->
+<script src="src/systems/world/village-authority-v6.js?build=village6"></script>
 <script src="src/systems/navigation/bridge-corridors.js?build=a2"></script>
 <script src="src/systems/navigation/bridge-route-resolver.js?build=a2"></script>
 <script src="src/systems/navigation/bridge-safety.js?build=a2"></script>
