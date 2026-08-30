@@ -7,7 +7,8 @@ async function openConsolidatedMovement(page) {
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('/?test=v071', { waitUntil:'networkidle' });
   await page.waitForFunction(() => Boolean(
-    window.RTS_SIM?.version === '0.7.1' &&
+    window.RTS_VERSION &&
+    window.RTS_SIM?.version === window.RTS_VERSION &&
     window.NRTS?.subsystems.has('movement') &&
     window.NRTS?.subsystems.has('formation') &&
     window.__RTS_DEBUG__?.motionStatsV071 &&
