@@ -35,10 +35,7 @@ function selectFocusedTests(files) {
       file === 'index.html' ||
       file === 'src/v069-map.js' ||
       file === 'src/systems/world/topdown-buildings.js' ||
-      file === 'src/systems/world/village-renderer-v2.js' ||
-      file === 'src/systems/world/village-yard-blend-v5.js' ||
-      file === 'src/systems/world/village-collision-v4.js' ||
-      file === 'src/systems/world/village-authority-v4.js' ||
+      file.startsWith('src/systems/world/village-') ||
       file === 'src/systems/world/building-placement.js' ||
       file === 'tests/village-renderer-v2.spec.js'
     ) addVillage();

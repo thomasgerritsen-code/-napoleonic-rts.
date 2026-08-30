@@ -3,7 +3,10 @@
 (function installVillageCollisionV4(global) {
   const nrts = global.NRTS;
   if (!nrts) throw new Error('NRTS foundation runtime must load before village collision normalization.');
-  if (typeof VILLAGE_SCENERY_V069 === 'undefined') throw new Error('Village layout v2 must load before village collision normalization.');
+  if (typeof VILLAGE_SCENERY_V069 === 'undefined') throw new Error('Village layout must load before village collision normalization.');
+
+  const sourceVillages = global.__VILLAGE_LAYOUT_V6_DATA__ || VILLAGE_SCENERY_V069;
+  const sourceVersion = global.__VILLAGE_LAYOUT_V6__?.version || 'village-layout-v2';
 
   const YARD_MULTIPLIERS = Object.freeze({
     cottage:[2.0,2.35],
@@ -17,7 +20,6 @@
     const [mw,mh] = YARD_MULTIPLIERS[house.kind] || YARD_MULTIPLIERS.cottage;
     const w = house.w * mw;
     const h = house.h * mh;
-    // Circumscribed radius makes the check rotation-safe and includes the complete rendered yard.
     return {w,h,radius:Math.hypot(w,h) * .5 + 5};
   }
 
@@ -65,8 +67,6 @@
     const base = {...house,plotW:plot.w,plotH:plot.h,plotRadius:plot.radius};
     if (safeCandidate(base,plot.radius,occupied)) return {...base,collisionShift:0};
 
-    // Search around the original roadside position. Sampling is deterministic so repeated
-    // resets produce the same village while still guaranteeing global plot separation.
     const phase = ((sequence * 137.508) % 360) * Math.PI / 180;
     for (let ring=1; ring<=14; ring++) {
       const distance = ring * 18;
@@ -91,7 +91,7 @@
   let removedCount = 0;
   let sequence = 0;
 
-  for (const village of VILLAGE_SCENERY_V069) {
+  for (const village of sourceVillages) {
     const houses = [];
     for (const house of village.houses) {
       const normalized = normalizeStructure(house,occupied,sequence++);
@@ -108,16 +108,21 @@
       counts[house.kind] = (counts[house.kind] || 0) + 1;
       return counts;
     },{});
+    const zoneCounts = houses.reduce((counts,house) => {
+      const zone=house.zone || 'legacy';
+      counts[zone]=(counts[zone]||0)+1;
+      return counts;
+    },{});
     villages.push(Object.freeze({
       ...village,
       structureCount:houses.length,
       kindCounts:Object.freeze(kindCounts),
+      zoneCounts:Object.freeze(zoneCounts),
       houses:Object.freeze(houses)
     }));
   }
 
   const VILLAGE_SCENERY_V4_LOCAL = Object.freeze(villages);
-  // Classic scripts share this global lexical binding with later architecture modules.
   global.__VILLAGE_SCENERY_V4_DATA__ = VILLAGE_SCENERY_V4_LOCAL;
   global.VILLAGE_SCENERY_V4 = VILLAGE_SCENERY_V4_LOCAL;
 
@@ -136,11 +141,17 @@
     x:occupied[0].x,
     y:occupied[0].y,
     kind:occupied[0].kind,
+    zone:occupied[0].zone || null,
     plotRadius:occupied[0].plotRadius
   }) : null;
 
+  const normalizedZones=occupied.reduce((counts,h)=>{
+    const zone=h.zone||'legacy';counts[zone]=(counts[zone]||0)+1;return counts;
+  },{});
+
   const api = Object.freeze({
     version:'village-collision-v4',
+    sourceVersion,
     villageCount:villages.length,
     structureCount:occupied.length,
     shiftedCount,
@@ -148,6 +159,7 @@
     overlapCount,
     minPlotGap:Number.isFinite(minPlotGap) ? minPlotGap : null,
     sampleObstacle:sample,
+    zones:Object.freeze(normalizedZones),
     globalSeparation:true,
     includesRenderedYards:true
   });
