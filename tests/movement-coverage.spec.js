@@ -118,7 +118,7 @@ test('map traversal matrix covers every crossing, both directions and unit class
       const living = regimentMembers(reg).filter(u => !u.dead);
       const finalCenter = center(reg);
       const waterUnits = living.filter(u => waterAtV067(u.x, u.y)).length;
-      const blockedTargets = living.filter(u => Number.isFinite(u.targetX) && segmentCrossesBlockedWaterV067(u.x, u.y, u.targetX, u.targetY)).length;
+      const blockedTargets = living.filter(u => Number.isFinite(u.targetX) && segmentCrossesBlockedWaterV067(u.x, u.y,u.targetX,u.targetY)).length;
       const afterRecoveries = nav.stats().bridgeCornerRecoveries;
       return {
         crossing: c.id,
@@ -202,10 +202,9 @@ test('representative whole-map routes complete without hard stalls', async ({ pa
       for (const u of units) u.dead = true;
       for (const r of regiments) r.destroyed = true;
       const { start, target } = pairs[index];
-      const made = [];
-      for (let i = 0; i < 12; i++) made.push(createUnit('france', 'infantry', start.x + (i % 6) * 17, start.y + Math.floor(i / 6) * 19));
-      made.push(createUnit('france', 'officer', start.x + 40, start.y - 28));
-      const reg = createRegiment('france', made);
+      const regId = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', start.x, start.y);
+      const reg = getRegiment(regId);
+      if (!reg) { results.push({ index, completed:false, maxStall:0, inWater:0, pathLength:0, reason:'group-create-failed' }); continue; }
       orderGroupPathV06(reg, target.x, target.y, index % 2 ? 'column' : 'line', 0);
       let last = centroid(regimentMembers(reg));
       let lastMovedAt = elapsed;
@@ -214,7 +213,9 @@ test('representative whole-map routes complete without hard stalls', async ({ pa
       for (let step = 0; step < 1800; step++) {
         window.RTS_SIM.step(.05);
         if (step % 8) continue;
-        const c = centroid(regimentMembers(reg).filter(u => !u.dead));
+        const living = regimentMembers(reg).filter(u => !u.dead);
+        if (!living.length) break;
+        const c = centroid(living);
         if (Math.hypot(c.x - last.x, c.y - last.y) > 3) { last = c; lastMovedAt = elapsed; }
         else maxStall = Math.max(maxStall, elapsed - lastMovedAt);
         if (Math.hypot(c.x - target.x, c.y - target.y) < 110) { completed = true; break; }
