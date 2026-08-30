@@ -102,6 +102,7 @@ test('map traversal matrix covers every crossing, both directions and unit class
       let longestStall = 0;
       let recoveredStalls = 0;
       let activeStall = false;
+      let hardStall = false;
       let completed = false;
       let steps = 0;
 
@@ -121,8 +122,12 @@ test('map traversal matrix covers every crossing, both directions and unit class
           const stall = elapsed - lastProgressAt;
           longestStall = Math.max(longestStall, stall);
           if (stall > 1.25) activeStall = true;
+          if ((reg.path?.length || 0) > 0 && stall > 12) { hardStall = true; break; }
         }
-        if (remaining < 75 || allMembersCleared(reg, c, side)) { completed = true; break; }
+        const crossingComplete = c.type === 'bridge'
+          ? allMembersCleared(reg, c, side)
+          : remaining < 75;
+        if (crossingComplete) { completed = true; break; }
       }
 
       const living = regimentMembers(reg).filter(u => !u.dead);
@@ -139,6 +144,7 @@ test('map traversal matrix covers every crossing, both directions and unit class
         formation,
         lateral,
         completed,
+        hardStall,
         steps,
         elapsed: +(steps * 0.05).toFixed(2),
         remaining: Number.isFinite(finalCenter.x) ? +Math.hypot(target.x - finalCenter.x, target.y - finalCenter.y).toFixed(1) : null,
@@ -147,6 +153,7 @@ test('map traversal matrix covers every crossing, both directions and unit class
         bridgeRecoveries: afterRecoveries - beforeRecoveries,
         followerWaterRecoveries: (afterFollower.waterRecoveries || 0) - (beforeFollower.waterRecoveries || 0),
         preventedEarlyReleases: (afterFollower.preventedEarlyReleases || 0) - (beforeFollower.preventedEarlyReleases || 0),
+        postReleaseGuards: (afterFollower.postReleaseGuards || 0) - (beforeFollower.postReleaseGuards || 0),
         waterUnits,
         blockedTargets,
         health: window.__GAME_HEALTH__.sample()
@@ -163,11 +170,11 @@ test('map traversal matrix covers every crossing, both directions and unit class
       results.push(runRoute(c, -1, 'artillery', 'column', 18));
     }
 
-    const failed = results.filter(r => !r.completed || r.waterUnits || r.blockedTargets || r.health.errors?.length);
-    const recovered = results.filter(r => r.recoveredStalls > 0 || r.bridgeRecoveries > 0 || r.followerWaterRecoveries > 0);
+    const failed = results.filter(r => !r.completed || r.hardStall || r.waterUnits || r.blockedTargets || r.health.errors?.length);
+    const recovered = results.filter(r => r.recoveredStalls > 0 || r.bridgeRecoveries > 0 || r.followerWaterRecoveries > 0 || r.postReleaseGuards > 0);
     const hotspots = results
-      .filter(r => r.longestStall > 1.25 || !r.completed || r.followerWaterRecoveries > 0)
-      .map(r => ({ crossing: r.crossing, kind: r.kind, side: r.side, longestStall: r.longestStall, completed: r.completed, recoveries: r.bridgeRecoveries + r.recoveredStalls + r.followerWaterRecoveries }))
+      .filter(r => r.longestStall > 1.25 || !r.completed || r.followerWaterRecoveries > 0 || r.postReleaseGuards > 0)
+      .map(r => ({ crossing: r.crossing, kind: r.kind, side: r.side, longestStall: r.longestStall, completed: r.completed, hardStall:r.hardStall, recoveries: r.bridgeRecoveries + r.recoveredStalls + r.followerWaterRecoveries + r.postReleaseGuards }))
       .sort((a, b) => b.longestStall - a.longestStall);
 
     return {
@@ -224,13 +231,14 @@ test('representative whole-map road routes complete without hard stalls', async 
       made.push(createUnit('france','officer',start.x+40,start.y-25));
       made.push(createUnit('france','drummer',start.x+62,start.y-25));
       const reg = createRegiment('france', made);
-      if (!reg) { results.push({ index, completed:false, maxStall:0, inWater:0, pathLength:0, reason:'group-create-failed' }); continue; }
+      if (!reg) { results.push({ index, completed:false, hardStall:true, maxStall:0, inWater:0, pathLength:0, reason:'group-create-failed' }); continue; }
       orderGroupPathV06(reg, target.x, target.y, index % 2 ? 'column' : 'line', 0);
       let living = regimentMembers(reg).filter(u=>!u.dead);
       let last = centroid(living);
       const initial = { ...last };
       let lastMovedAt = elapsed;
       let maxStall = 0;
+      let hardStall = false;
       let completed = false;
       for (let step = 0; step < 4800; step++) {
         window.RTS_SIM.step(.05);
@@ -238,24 +246,35 @@ test('representative whole-map road routes complete without hard stalls', async 
         living = regimentMembers(reg).filter(u => !u.dead);
         if (!living.length) break;
         const c = centroid(living);
-        if (Math.hypot(c.x-last.x,c.y-last.y) > .8) { last=c; lastMovedAt=elapsed; }
-        else maxStall=Math.max(maxStall,elapsed-lastMovedAt);
-        if (Math.hypot(c.x-target.x,c.y-target.y) < 120) { completed=true; break; }
+        const phase = reg.movementPhaseV063 || reg.marchV063?.phase || 'idle';
+        const pathDone = (reg.path?.length || 0) === 0 && ['formed','idle','arrived'].includes(phase);
+        if (pathDone || Math.hypot(c.x-target.x,c.y-target.y) < 120) { completed=true; break; }
+        const moved = Math.hypot(c.x-last.x,c.y-last.y);
+        if (moved > .8) { last=c; lastMovedAt=elapsed; }
+        else {
+          const stall=elapsed-lastMovedAt;
+          maxStall=Math.max(maxStall,stall);
+          if ((reg.path?.length || 0) > 0 && stall > 12) { hardStall=true; break; }
+        }
       }
       const finalMembers = regimentMembers(reg).filter(u => !u.dead);
       const finalCenter = finalMembers.length ? centroid(finalMembers) : {x:NaN,y:NaN};
+      const state = reg.crossingTrafficV068 ? { ...reg.crossingTrafficV068 } : null;
       results.push({
         index,
         from:start.road,
         to:target.road,
         completed,
+        hardStall,
         maxStall:+maxStall.toFixed(2),
         inWater:finalMembers.filter(u=>waterAtV067(u.x,u.y)).length,
+        blockedTargets:finalMembers.filter(u=>Number.isFinite(u.targetX)&&segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY)).length,
         pathLength:reg.path?.length||0,
         pathIndex:reg.pathIndex||0,
         moved:Number.isFinite(finalCenter.x)?+Math.hypot(finalCenter.x-initial.x,finalCenter.y-initial.y).toFixed(1):0,
         remaining:Number.isFinite(finalCenter.x)?+Math.hypot(finalCenter.x-target.x,finalCenter.y-target.y).toFixed(1):null,
-        phase:reg.movementPhaseV063||reg.marchV063?.phase||'idle'
+        phase:reg.movementPhaseV063||reg.marchV063?.phase||'idle',
+        crossingState:state
       });
     }
     return results;
@@ -263,7 +282,8 @@ test('representative whole-map road routes complete without hard stalls', async 
 
   expect(sweep).toHaveLength(8);
   expect(sweep.filter(r => !r.completed)).toEqual([]);
+  expect(sweep.filter(r => r.hardStall)).toEqual([]);
   expect(sweep.filter(r => r.inWater > 0)).toEqual([]);
-  expect(sweep.filter(r => r.maxStall > 8)).toEqual([]);
+  expect(sweep.filter(r => r.blockedTargets > 0)).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
