@@ -12,7 +12,8 @@
   const deckClearance=Math.max(4,Number(cfg.memberDeckClearance)||8);
   const advanceStep=Math.max(12,Number(cfg.memberAdvanceStep)||28);
   const releasePadding=Math.max(35,Number(cfg.memberReleasePadding)||90);
-  const stats={corrections:0,resumes:0,regiments:new Set()};
+  const releaseMemberMargin=Math.max(14,Number(cfg.memberReleaseMargin)||24);
+  const stats={corrections:0,resumes:0,preventedEarlyReleases:0,regiments:new Set()};
 
   function legalSegment(u,point){
     return point&&Number.isFinite(point.x)&&Number.isFinite(point.y)&&
@@ -84,10 +85,45 @@
     }
   };
 
+  function everyLivingMemberSafelyCleared(reg,c,info){
+    const direction=-info.initialSide;
+    const clearAlong=c.length/2+releaseMemberMargin;
+    const members=regimentMembers(reg).filter(u=>u&&!u.dead);
+    if(!members.length)return true;
+    return members.every(u=>{
+      if(waterAtV067(u.x,u.y))return false;
+      const local=crossingLocalArchitectureV2(c,u.x,u.y);
+      return local.along*direction>clearAlong;
+    });
+  }
+
+  // The traffic owner releases a bridge when the regiment anchor has cleared it.
+  // A long formation (especially cavalry) can still have a rear member at the
+  // bridge edge at that moment. If normal formation targets resume immediately,
+  // that rear member may be pulled diagonally through blocked water. Re-open the
+  // bridge state until every living member is physically on the far bank.
+  const previousUpdateHolderState=updateHolderStateV068;
+  updateHolderStateV068=function updateHolderStateFollowerReleaseSafetyV1(reg,march,info,c){
+    const wasActive=!!(c&&c.type==='bridge'&&info?.forcedColumn&&!['waiting','clearing'].includes(info.state));
+    previousUpdateHolderState(reg,march,info,c);
+    if(!wasActive||!reg||reg.destroyed||everyLivingMemberSafelyCleared(reg,c,info))return;
+    if(reg.crossingTrafficV068?.state!=='clearing')return;
+
+    info.state='crossing';
+    info.entered=true;
+    info.forcedColumn=true;
+    reg.crossingTrafficV068=info;
+    const traffic=CROSSING_TRAFFIC_V068.get(c.id);
+    if(traffic&&!traffic.holderIds.includes(reg.id))traffic.holderIds.push(reg.id);
+    forceBridgeColumnTargetsV068(reg,march,info);
+    stats.preventedEarlyReleases++;
+    stats.regiments.add(reg.id);
+  };
+
   const api=Object.freeze({
-    version:'bridge-follower-safety-v1',deckCorridor:true,formationResume:true,
-    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,regiments:stats.regiments.size}),
-    config:Object.freeze({deckClearance,advanceStep,releasePadding})
+    version:'bridge-follower-safety-v1',deckCorridor:true,formationResume:true,memberReleaseGate:true,
+    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,regiments:stats.regiments.size}),
+    config:Object.freeze({deckClearance,advanceStep,releasePadding,releaseMemberMargin})
   });
   global.__BRIDGE_FOLLOWER_SAFETY_V1__=api;
   nrts.subsystems.register('bridge-follower-safety',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'keep lagging formation members on the legal bridge deck until direct formation-slot travel is safe again'});
