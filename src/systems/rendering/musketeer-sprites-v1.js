@@ -2,43 +2,39 @@
 (function installMusketeerSpritesV1(global){
   const nrts=global.NRTS;
   if(!nrts)throw new Error('NRTS foundation runtime must load before musketeer sprites.');
-  const asset=global.__MUSKETEER_SPRITE_ASSET_V1__;
-  if(!asset)throw new Error('Top-down musketeer sprite asset must load before the sprite renderer.');
+
+  // Keep the rendering owner independent from the embedded-reference helper. The
+  // repository already contains the approved WebP sprite sheets, so loading those
+  // files directly avoids a fragile script-order dependency while preserving the
+  // same 8-direction x 4-frame layout used by the tests and renderer.
+  const asset=Object.freeze({
+    width:145,height:109,columns:8,rows:4,framesPerDirection:4,
+    directions:Object.freeze(['north','north-east','east','south-east','south','south-west','west','north-west']),
+    france:'assets/units/musketeer-france-topdown-v1.webp',
+    britain:'assets/units/musketeer-britain-topdown-v1.webp'
+  });
+  global.NRTS_MUSKETEER_SPRITE_V1=asset;
 
   const previousDrawUnit=drawUnit;
   const cfg=global.NRTS_CONFIG?.rendering?.musketeerSprites||{};
-  const FRAMES=asset.framesPerDirection||4,DIRECTIONS=asset.directions?.length||8;
-  const SOURCE_COLS=asset.columns||8,SOURCE_ROWS=asset.rows||4;
+  const FRAMES=asset.framesPerDirection,DIRECTIONS=asset.directions.length;
+  const SOURCE_COLS=asset.columns,SOURCE_ROWS=asset.rows;
   const sourceCellW=asset.width/SOURCE_COLS,sourceCellH=asset.height/SOURCE_ROWS;
   const displayHeight=cfg.displayHeight||44;
   const displayWidth=cfg.displayWidth||Math.round(displayHeight*(sourceCellW/sourceCellH)*1.48);
   const frameRate=cfg.frameRate||7.5;
   const idleFrame=Math.max(0,Math.min(FRAMES-1,cfg.idleFrame??1));
-  const image=new Image();
-  image.decoding='async';
-  const sheets={france:image,britain:null};
-  let loaded=false;
+  const sheets={france:new Image(),britain:new Image()};
+  const loaded={france:false,britain:false};
   const stats={spriteDraws:0,fallbackDraws:0,framesUsed:new Set(),directionsUsed:new Set()};
 
-  function makeBritishSheet(){
-    const canvas=document.createElement('canvas');canvas.width=asset.width;canvas.height=asset.height;
-    const c=canvas.getContext('2d',{willReadFrequently:true});c.drawImage(image,0,0);
-    const data=c.getImageData(0,0,canvas.width,canvas.height),p=data.data;
-    for(let i=0;i<p.length;i+=4){
-      if(p[i+3]<12)continue;
-      const r=p[i],g=p[i+1],b=p[i+2];
-      if(b>r*1.22&&b>g*1.08&&b-r>22){
-        const luminance=(r*0.22+g*0.34+b*0.44);
-        p[i]=Math.min(190,luminance*1.34+38);
-        p[i+1]=Math.min(78,luminance*.42+18);
-        p[i+2]=Math.min(72,luminance*.34+16);
-      }
-    }
-    c.putImageData(data,0,0);sheets.britain=canvas;
+  for(const side of ['france','britain']){
+    const image=sheets[side];
+    image.decoding='async';
+    image.onload=()=>{loaded[side]=image.naturalWidth===asset.width&&image.naturalHeight===asset.height;};
+    image.onerror=()=>{loaded[side]=false;};
+    image.src=asset[side];
   }
-  image.onload=()=>{loaded=image.naturalWidth===asset.width&&image.naturalHeight===asset.height;if(loaded)makeBritishSheet();};
-  image.onerror=()=>{loaded=false;};
-  image.src=asset.src;
 
   function directionForFacing(facing=0){
     const raw=Math.round((facing+Math.PI/2)/(Math.PI/4));
@@ -54,7 +50,7 @@
     const col=(direction%2)*FRAMES+frame;
     return{x:col*sourceCellW,y:row*sourceCellH,w:sourceCellW,h:sourceCellH};
   }
-  function ready(){return loaded&&!!sheets.britain;}
+  function ready(){return loaded.france&&loaded.britain;}
   function drawOverlay(u){
     const radius=TYPES[u.type]?.radius||7;
     if(selectedUnits.has(u)){
@@ -91,10 +87,10 @@
   const api=Object.freeze({
     version:'musketeer-sprites-v1',projection:'orthographic-top-down',directions:DIRECTIONS,frames:FRAMES,
     usesGeneratedReference:true,usesImageAssets:true,sourceLayout:'8-columns-by-4-rows / two directions per row',
-    source:'embedded-generated-reference',
+    source:'repository-webp-sheets',
     ready,directionForFacing,frameFor,sourceRect,
-    stats:()=>({spriteDraws:stats.spriteDraws,fallbackDraws:stats.fallbackDraws,framesUsed:[...stats.framesUsed],directionsUsed:[...stats.directionsUsed],loaded,hasBritishVariant:!!sheets.britain})
+    stats:()=>({spriteDraws:stats.spriteDraws,fallbackDraws:stats.fallbackDraws,framesUsed:[...stats.framesUsed],directionsUsed:[...stats.directionsUsed],loaded:ready(),hasBritishVariant:loaded.britain})
   });
   global.__MUSKETEER_SPRITES_V1__=api;
-  nrts.subsystems.register('infantry-sprite-renderer',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'animated eight-direction true top-down Napoleonic infantry sprites from the approved reference asset'});
+  nrts.subsystems.register('infantry-sprite-renderer',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'animated eight-direction true top-down Napoleonic infantry sprites from repository WebP sheets'});
 })(window);
