@@ -8,7 +8,7 @@
   const sampleSeconds=cfg.sampleSeconds??.8,triggerSeconds=cfg.triggerSeconds??2.4,minTravel=cfg.minExpectedTravel??8,cooldown=cfg.replanCooldownSeconds??2.8,nudge=cfg.nudgeDistance??18;
   const clearance=avoidCfg.clearance??7,cornerClearance=avoidCfg.cornerClearance??13,waypointArrival=avoidCfg.waypointArrival??7,maxWaypointSeconds=avoidCfg.maxWaypointSeconds??3.2;
   const groupState=new Map(),unitState=new Map();
-  const stats={groupReplans:0,unitNudges:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0};
+  const stats={groupReplans:0,unitNudges:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0,crossingReplansSuppressed:0};
 
   function villageObstacles(){
     const villages=global.VILLAGE_SCENERY_V4 || global.__VILLAGE_SCENERY_V4_DATA__ || [];
@@ -118,8 +118,13 @@
   }
 
   function groupCenter(reg){const m=regimentMembers(reg);return m.length?centroid(m):null;}
+  function crossingOwnsRecovery(reg){
+    const info=reg?.crossingTrafficV068;
+    return !!(info?.forcedColumn && ['queued','waiting','approach','crossing','clearing'].includes(info.state));
+  }
   function activeGroupMove(reg){return !!reg&&!reg.destroyed&&Array.isArray(reg.path)&&reg.path.length>0&&reg.movementPhaseV063!=='deploying';}
   function replanGroup(reg,now){
+    if(crossingOwnsRecovery(reg)){stats.crossingReplansSuppressed++;return false;}
     const target=reg.finalTarget||{x:reg.targetX,y:reg.targetY};
     if(!target||!Number.isFinite(target.x)||!Number.isFinite(target.y))return false;
     const state=groupState.get(reg.id)||{};
@@ -130,6 +135,13 @@
   function sampleGroups(dt){
     for(const reg of regiments){
       if(!activeGroupMove(reg)){groupState.delete(reg.id);continue;}
+      if(crossingOwnsRecovery(reg)){
+        // Queueing, alignment and passage can intentionally be slower than the
+        // generic stuck threshold. The crossing subsystem owns recovery here and
+        // must retain the already validated post-crossing route.
+        groupState.delete(reg.id);
+        continue;
+      }
       const c=groupCenter(reg);if(!c)continue;
       let s=groupState.get(reg.id);
       if(!s){s={x:c.x,y:c.y,clock:0,stillSeconds:0,lastRecovery:-Infinity};groupState.set(reg.id,s);continue;}
@@ -165,9 +177,6 @@
     }
   }
 
-  // This is intentionally the outermost moveToward wrapper. It does not change final
-  // formation targets; it only supplies a temporary local waypoint while a building blocks
-  // the direct step. Once line-of-sight is clear, the unit immediately rejoins its slot.
   const previousMoveToward=moveToward;
   moveToward=function moveTowardWithLocalAvoidanceV2(u,tx,ty,dt,speed=TYPES[u.type].speed){
     if(!u||u.dead||!(dt>0))return previousMoveToward(u,tx,ty,dt,speed);
@@ -203,7 +212,7 @@
   };
 
   const api=Object.freeze({
-    version:'stuck-recovery-v2',groupReplanning:true,looseUnitEscape:true,localBuildingAvoidance:true,formationSlotResume:true,
+    version:'stuck-recovery-v2',groupReplanning:true,looseUnitEscape:true,localBuildingAvoidance:true,formationSlotResume:true,crossingRecoveryIsolation:true,
     stats:()=>({...stats,trackedGroups:groupState.size,trackedUnits:unitState.size}),
     localWaypoint:(a,b)=>localWaypoint(a,b,null),
     segmentBlocked:(a,b)=>Boolean(firstBlocker(a,b,null,clearance))
