@@ -16,7 +16,6 @@ test('navigation changes select navigation, traffic and water coverage', () => {
 
 test('Battlefield V7 bundle keeps browser coverage targeted on smoke and village regressions', () => {
   const selected = selectFocusedTests([
-    'index.html',
     'src/systems/world/map-expansion-v7.js',
     'src/systems/world/village-scale-v7.js',
     'src/systems/navigation/road-index.js',
@@ -49,9 +48,10 @@ test('AI changes stay focused on AI plus the lightweight smoke test', () => {
   ]);
 });
 
-test('index changes include the village regression because the settlement bundle is loaded there', () => {
+test('index changes include village plus the restoration regression', () => {
   const selected = selectFocusedTests(['index.html']);
   assert.deepEqual(selected, [
+    'tests/restoration-batch-v1.spec.js',
     'tests/smoke-v1.spec.js',
     'tests/village-renderer-v2.spec.js'
   ]);
@@ -75,11 +75,12 @@ test('village collision and building placement changes verify settlement exclusi
   }
 });
 
-test('Architecture V2.1 config changes select foundation plus the compact service regression', () => {
+test('Architecture V2.1 config changes select foundation, architecture and restoration regressions', () => {
   const selected = selectFocusedTests(['src/foundation/config.js']);
   assert.deepEqual(selected, [
     'tests/architecture-v21.spec.js',
     'tests/foundation-v071.spec.js',
+    'tests/restoration-batch-v1.spec.js',
     'tests/smoke-v1.spec.js'
   ]);
 });
@@ -104,6 +105,41 @@ test('Architecture V2.1 movement facade changes stay compact', () => {
   const selected = selectFocusedTests(['src/systems/movement/api.js']);
   assert.deepEqual(selected, [
     'tests/architecture-v21.spec.js',
+    'tests/smoke-v1.spec.js'
+  ]);
+});
+
+test('restoration visual and ecology changes use one targeted browser regression', () => {
+  for (const file of [
+    'src/systems/world/ecology-v1.js',
+    'src/systems/rendering/map-realism.js',
+    'src/systems/rendering/characters.js',
+    'src/systems/rendering/natural-resources-v1.js',
+    'src/systems/rendering/artillery-topdown-v1.js',
+    'src/systems/input/formation-drag-v1.js'
+  ]) {
+    const selected = selectFocusedTests([file]);
+    assert(selected.includes('tests/restoration-batch-v1.spec.js'));
+    assert(selected.includes('tests/smoke-v1.spec.js'));
+  }
+});
+
+test('stuck recovery keeps movement regressions plus restoration coverage', () => {
+  const selected = selectFocusedTests(['src/systems/movement/stuck-recovery-v1.js']);
+  assert.deepEqual(selected, [
+    'tests/motion-v071.spec.js',
+    'tests/movement-formation-consolidation.spec.js',
+    'tests/restoration-batch-v1.spec.js',
+    'tests/smoke-v1.spec.js',
+    'tests/speed-v071.spec.js'
+  ]);
+});
+
+test('final AI authority keeps AI separation plus restoration coverage', () => {
+  const selected = selectFocusedTests(['src/systems/ai/authority-v2.js']);
+  assert.deepEqual(selected, [
+    'tests/ai-separation.spec.js',
+    'tests/restoration-batch-v1.spec.js',
     'tests/smoke-v1.spec.js'
   ]);
 });
