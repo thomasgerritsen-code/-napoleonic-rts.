@@ -4,7 +4,8 @@
   "private": true,
   "description": "Browser Napoleonic RTS with Playwright Chromium regression, stress and soak tests",
   "scripts": {
-    "test:fast": "node --test tests/headless/*.test.js",
+    "audit": "node scripts/audit-codebase.js",
+    "test:fast": "npm run audit && node --test tests/headless/*.test.js",
     "test:e2e": "playwright test --project=chromium",
     "test:ci": "npm run test:fast && npm run test:e2e",
     "test:soak": "playwright test --project=chromium -g \"10-minute accelerated soak\""
