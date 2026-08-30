@@ -13,7 +13,7 @@
   const advanceStep=Math.max(12,Number(cfg.memberAdvanceStep)||28);
   const releasePadding=Math.max(35,Number(cfg.memberReleasePadding)||90);
   const releaseMemberMargin=Math.max(14,Number(cfg.memberReleaseMargin)||24);
-  const stats={corrections:0,resumes:0,preventedEarlyReleases:0,regiments:new Set()};
+  const stats={corrections:0,resumes:0,preventedEarlyReleases:0,waterRecoveries:0,regiments:new Set()};
 
   function legalSegment(u,point){
     return point&&Number.isFinite(point.x)&&Number.isFinite(point.y)&&
@@ -38,9 +38,6 @@
       return null;
     }
 
-    // A member that is already near the deck edge must move sideways first, even
-    // when its newly generated formation target happens to be legal. Otherwise a
-    // subsequent forward step can clip the river at the bridge corner.
     const centeredPerp=Math.max(-safeHalf*.35,Math.min(safeHalf*.35,current.perp));
     let point=crossingPointArchitectureV2(c,current.along,centeredPerp);
     if(legalSegment(u,point))return point;
@@ -48,8 +45,6 @@
     point=crossingPointArchitectureV2(c,current.along,0);
     if(legalSegment(u,point))return point;
 
-    // Once centered, advance in short legal centerline steps until the original
-    // formation slot can be reached without crossing blocked water.
     const candidates=[Math.min(18,advanceStep),12,6];
     for(const step of candidates){
       let along=current.along+direction*step;
@@ -57,9 +52,6 @@
       point=crossingPointArchitectureV2(c,along,0);
       if(legalSegment(u,point))return point;
     }
-
-    // Last resort: retain the current legal position rather than assigning an
-    // impossible target that continually pushes the follower into the river.
     return {x:u.x,y:u.y};
   }
 
@@ -97,11 +89,6 @@
     });
   }
 
-  // The traffic owner releases a bridge when the regiment anchor has cleared it.
-  // A long formation (especially cavalry) can still have a rear member at the
-  // bridge edge at that moment. If normal formation targets resume immediately,
-  // that rear member may be pulled diagonally through blocked water. Re-open the
-  // bridge state until every living member is physically on the far bank.
   const previousUpdateHolderState=updateHolderStateV068;
   updateHolderStateV068=function updateHolderStateFollowerReleaseSafetyV1(reg,march,info,c){
     const wasActive=!!(c&&c.type==='bridge'&&info?.forcedColumn&&!['waiting','clearing'].includes(info.state));
@@ -120,9 +107,45 @@
     stats.regiments.add(reg.id);
   };
 
+  function recoverBlockedWaterMember(reg,info,u){
+    if(!u||u.dead||u.type==='artillery'||!waterAtV067(u.x,u.y))return false;
+    const c=WATER_CROSSINGS_V067.find(item=>item.id===info?.crossingId);
+    if(!c||c.type!=='bridge')return false;
+    const local=crossingLocalArchitectureV2(c,u.x,u.y);
+    const direction=-info.initialSide;
+    const safeAlong=Math.max(-c.length/2-releaseMemberMargin,Math.min(c.length/2+releaseMemberMargin,local.along));
+    const rescue=crossingPointArchitectureV2(c,safeAlong,0);
+    u.x=rescue.x;u.y=rescue.y;
+    const nextAlong=Math.max(-c.length/2-releasePadding,Math.min(c.length/2+releasePadding,safeAlong+direction*advanceStep));
+    const next=crossingPointArchitectureV2(c,nextAlong,0);
+    u.targetX=next.x;u.targetY=next.y;u.arrivedAtTarget=false;
+    const facing=crossingHeadingV068(c,info.initialSide);
+    u.facing=facing;u.formationFacing=facing;
+    u.bridgeFollowerSafetyV1={crossingId:c.id,correctedAt:elapsed,recoveredFromWater:true};
+    stats.waterRecoveries++;stats.regiments.add(reg.id);
+    reg.navigationV2={...(reg.navigationV2||{}),bridgeWaterRecoveries:(reg.navigationV2?.bridgeWaterRecoveries||0)+1};
+    return true;
+  }
+
+  // The legacy water guard rolls a movement step back when its segment touches
+  // blocked water. If a formation member is already a few pixels beyond a bridge
+  // corner, that rollback can pin it there forever. Clamp only that exceptional
+  // bridge-straggler case back to the centreline, then let normal movement resume.
+  const previousUpdateGroupPaths=updateGroupPathsV06;
+  updateGroupPathsV06=function updateGroupPathsFollowerWaterRecoveryV1(){
+    previousUpdateGroupPaths();
+    for(const reg of regiments){
+      const info=reg?.crossingTrafficV068;
+      if(!reg||reg.destroyed||!info?.forcedColumn)continue;
+      let recovered=false;
+      for(const u of regimentMembers(reg))recovered=recoverBlockedWaterMember(reg,info,u)||recovered;
+      if(recovered)forceBridgeColumnTargetsV068(reg,reg.marchV063,info);
+    }
+  };
+
   const api=Object.freeze({
-    version:'bridge-follower-safety-v1',deckCorridor:true,formationResume:true,memberReleaseGate:true,
-    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,regiments:stats.regiments.size}),
+    version:'bridge-follower-safety-v1',deckCorridor:true,formationResume:true,memberReleaseGate:true,waterStragglerRecovery:true,
+    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,waterRecoveries:stats.waterRecoveries,regiments:stats.regiments.size}),
     config:Object.freeze({deckClearance,advanceStep,releasePadding,releaseMemberMargin})
   });
   global.__BRIDGE_FOLLOWER_SAFETY_V1__=api;
