@@ -84,8 +84,24 @@ test('Architecture V2.1 config changes select foundation plus the compact servic
   ]);
 });
 
-test('Architecture V2.1 service API changes always select the compact service regression', () => {
+test('Architecture V2.1 world service changes stay compact', () => {
   const selected = selectFocusedTests(['src/systems/world/api.js']);
+  assert.deepEqual(selected, [
+    'tests/architecture-v21.spec.js',
+    'tests/smoke-v1.spec.js'
+  ]);
+});
+
+test('Architecture V2.1 navigation facade changes stay compact', () => {
+  const selected = selectFocusedTests(['src/systems/navigation/api.js']);
+  assert.deepEqual(selected, [
+    'tests/architecture-v21.spec.js',
+    'tests/smoke-v1.spec.js'
+  ]);
+});
+
+test('Architecture V2.1 movement facade changes stay compact', () => {
+  const selected = selectFocusedTests(['src/systems/movement/api.js']);
   assert.deepEqual(selected, [
     'tests/architecture-v21.spec.js',
     'tests/smoke-v1.spec.js'
