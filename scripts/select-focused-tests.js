@@ -41,6 +41,12 @@ function selectFocusedTests(files) {
     ) addVillage();
 
     if (
+      file === 'src/systems/world/village-scale-v7.js' ||
+      file === 'src/systems/navigation/village-obstacles-v7.js' ||
+      file === 'tests/village-navigation-v7.spec.js'
+    ) selected.add('tests/village-navigation-v7.spec.js');
+
+    if (
       file.startsWith('src/systems/navigation/') ||
       /^src\/v0(66|67|68)\.js$/.test(file) ||
       /^tests\/(navigation-v2|traffic-v068|water-v067)\.spec\.js$/.test(file)
