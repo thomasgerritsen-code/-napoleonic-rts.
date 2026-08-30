@@ -82,7 +82,7 @@
     ctx.strokeStyle=COLORS.grid;
     ctx.lineWidth=1/camera.zoom;
     for(let x=0;x<WORLD.width;x+=100){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,WORLD.height);ctx.stroke();}
-    for(let y=0;y<WORLD.height;y+=100){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(x=WORLD.width,y);ctx.stroke();}
+    for(let y=0;y<WORLD.height;y+=100){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(WORLD.width,y);ctx.stroke();}
     ctx.save();
     for(const w of TERRAIN_WOODS){ctx.fillStyle='rgba(37,67,38,.18)';ctx.fillRect(w.x,w.y,w.w,w.h);}
     for(const h of TERRAIN_HILLS){
