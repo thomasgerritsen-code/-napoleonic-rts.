@@ -22,14 +22,14 @@
       navigationBridgeCorridors: 'src/systems/navigation/bridge-corridors.js',
       navigationBridgeRouteResolver: 'src/systems/navigation/bridge-route-resolver.js',
       navigationBridgeSafety: 'src/systems/navigation/bridge-safety.js',
-      navigationApi: 'src/systems/navigation/api.js'
+      navigationApi: 'src/systems/navigation/api.js',
+      legacySimulationAdapter: 'src/foundation/legacy-simulation-adapter.js'
     }),
     legacyPatches: Object.freeze([
       'src/v05.js', 'src/v06.js', 'src/v061.js', 'src/v063.js', 'src/simulation-api.js',
       'src/input.js', 'src/v063-fixes.js', 'src/v064.js', 'src/v065.js', 'src/v066.js',
       'src/v067.js', 'src/v068.js', 'src/v069-motion.js', 'src/v069-combat.js',
-      'src/v069-map.js', 'src/v070.js', 'src/v070-motion.js', 'src/v070-regression-fixes.js',
-      'src/v071-motion.js', 'src/v071-speed-hotfix.js'
+      'src/v069-map.js', 'src/v070.js', 'src/v070-motion.js', 'src/v070-regression-fixes.js'
     ]),
     navigationCompatibility: Object.freeze([
       'src/v066.js',
@@ -41,11 +41,18 @@
       'src/v066-road-index.js',
       'src/v066-route-fixes.js',
       'src/v071-motion.js',
-      'src/v071-speed-hotfix.js'
+      'src/v071-speed-hotfix.js',
+      'src/v064-sim.js',
+      'src/v065-sim.js',
+      'src/v066-sim.js',
+      'src/v067-sim.js',
+      'src/v068-sim.js',
+      'src/v069-sim.js',
+      'src/v070-sim.js',
+      'src/v071-sim.js'
     ]),
     simulationAdapters: Object.freeze([
-      'src/v064-sim.js', 'src/v065-sim.js', 'src/v066-sim.js', 'src/v067-sim.js',
-      'src/v068-sim.js', 'src/v069-sim.js', 'src/v070-sim.js', 'src/v071-sim.js'
+      'src/foundation/legacy-simulation-adapter.js'
     ]),
     debugAdapters: Object.freeze([
       'src/v05-debug.js', 'src/v06-debug.js', 'src/v061-debug.js', 'src/v063-debug.js',
