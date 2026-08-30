@@ -12,7 +12,7 @@
   const advanceStep=Math.max(12,Number(cfg.memberAdvanceStep)||28);
   const releasePadding=Math.max(35,Number(cfg.memberReleasePadding)||90);
   const releaseMemberMargin=Math.max(14,Number(cfg.memberReleaseMargin)||24);
-  const stats={corrections:0,resumes:0,preventedEarlyReleases:0,waterRecoveries:0,postReleaseGuards:0,regiments:new Set()};
+  const stats={corrections:0,resumes:0,preventedEarlyReleases:0,waterRecoveries:0,postReleaseGuards:0,forwardCorrections:0,regiments:new Set()};
 
   function legalSegment(u,point){
     return point&&Number.isFinite(point.x)&&Number.isFinite(point.y)&&
@@ -39,18 +39,32 @@
     }
 
     const centeredPerp=Math.max(-safeHalf*.35,Math.min(safeHalf*.35,current.perp));
-    let point=crossingPointArchitectureV2(c,current.along,centeredPerp);
-    if(legalSegment(u,point))return point;
-    point=crossingPointArchitectureV2(c,current.along,0);
-    if(legalSegment(u,point))return point;
 
-    const candidates=[Math.min(18,advanceStep),12,6];
+    // If a member is actually outside the crossing lane, centre it first at the
+    // same longitudinal position. Otherwise a "safe" target at the current along
+    // coordinate can freeze a perfectly centred rear file forever. Every normal
+    // water-safety correction therefore advances the member toward the far bank.
+    if(currentOutsideSafeLane){
+      let point=crossingPointArchitectureV2(c,current.along,centeredPerp);
+      if(legalSegment(u,point)&&Math.hypot(point.x-u.x,point.y-u.y)>1.5)return point;
+      point=crossingPointArchitectureV2(c,current.along,0);
+      if(legalSegment(u,point)&&Math.hypot(point.x-u.x,point.y-u.y)>1.5)return point;
+    }
+
+    const candidates=[advanceStep,Math.max(18,advanceStep*.72),12,6];
     for(const step of candidates){
       let along=current.along+direction*step;
       along=Math.max(-releaseAlong,Math.min(releaseAlong,along));
+      let point=crossingPointArchitectureV2(c,along,centeredPerp);
+      if(legalSegment(u,point)&&Math.hypot(point.x-u.x,point.y-u.y)>1.5){stats.forwardCorrections++;return point;}
       point=crossingPointArchitectureV2(c,along,0);
-      if(legalSegment(u,point))return point;
+      if(legalSegment(u,point)&&Math.hypot(point.x-u.x,point.y-u.y)>1.5){stats.forwardCorrections++;return point;}
     }
+
+    // Last-resort lateral correction is preferable to stepping into blocked water,
+    // but only return a stationary target when absolutely no legal progress exists.
+    let point=crossingPointArchitectureV2(c,current.along,0);
+    if(legalSegment(u,point)&&Math.hypot(point.x-u.x,point.y-u.y)>1.5)return point;
     return {x:u.x,y:u.y};
   }
 
@@ -159,10 +173,10 @@
   };
 
   const api=Object.freeze({
-    version:'bridge-follower-safety-v1',deckCorridor:true,fordCorridor:true,formationResume:true,memberReleaseGate:true,waterStragglerRecovery:true,postReleaseGuard:true,
-    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,waterRecoveries:stats.waterRecoveries,postReleaseGuards:stats.postReleaseGuards,regiments:stats.regiments.size}),
+    version:'bridge-follower-safety-v1',deckCorridor:true,fordCorridor:true,formationResume:true,memberReleaseGate:true,waterStragglerRecovery:true,postReleaseGuard:true,forwardProgressGuard:true,
+    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,waterRecoveries:stats.waterRecoveries,postReleaseGuards:stats.postReleaseGuards,forwardCorrections:stats.forwardCorrections,regiments:stats.regiments.size}),
     config:Object.freeze({deckClearance,advanceStep,releasePadding,releaseMemberMargin})
   });
   global.__BRIDGE_FOLLOWER_SAFETY_V1__=api;
-  nrts.subsystems.register('bridge-follower-safety',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'keep lagging formation members inside legal bridge and ford lanes until direct formation-slot travel is safe again'});
+  nrts.subsystems.register('bridge-follower-safety',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'keep lagging formation members inside legal bridge and ford lanes while guaranteeing forward progress until direct formation-slot travel is safe again'});
 })(window);
