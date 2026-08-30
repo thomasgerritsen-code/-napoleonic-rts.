@@ -4,7 +4,7 @@
   const nrts = global.NRTS;
   if (!nrts) throw new Error('NRTS foundation runtime must load before game health observer.');
 
-  const SAMPLE_INTERVAL = 0.5;
+  const SAMPLE_INTERVAL_MS = 500;
   const STUCK_AFTER = 6;
   const STUCK_MOVE_EPSILON = 2.5;
   const TARGET_DISTANCE_MIN = 16;
@@ -25,7 +25,6 @@
     unhandledRejections: 0
   };
   const performanceSamples = [];
-  let sampleClock = 0;
   let lastReport = null;
 
   function pushEvent(type, message, data = null) {
@@ -217,7 +216,6 @@
     recentEvents.length = 0;
     performanceSamples.length = 0;
     for (const key of Object.keys(counters)) counters[key] = 0;
-    sampleClock = 0;
     lastReport = null;
     return true;
   }
@@ -231,21 +229,24 @@
     pushEvent('unhandled-rejection', String(event.reason || 'unhandled rejection'));
   });
 
-  const updateBeforeHealthObserver = update;
-  update = function updateWithGameHealthObserver(dt) {
-    updateBeforeHealthObserver(dt);
-    sampleClock += dt;
-    if (sampleClock >= SAMPLE_INTERVAL) {
-      sampleClock %= SAMPLE_INTERVAL;
+  // Keep diagnostics independent from the simulation wrapper chain. Several late-loaded
+  // compatibility systems can replace `update`; a wall-clock sampler keeps observing even
+  // when that chain changes and adds negligible cost at two samples per second.
+  const timerId = global.setInterval(() => {
+    try {
       sample();
+    } catch (error) {
+      counters.runtimeErrors++;
+      pushEvent('observer-error', error?.message || String(error));
     }
-  };
+  }, SAMPLE_INTERVAL_MS);
 
   const api = Object.freeze({
     version: 'game-health-v1',
     sample,
     report: buildReport,
     reset,
+    timerId,
     getRecentEvents: () => [...recentEvents],
     getPerformanceSamples: () => [...performanceSamples]
   });
