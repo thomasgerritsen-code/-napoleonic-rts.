@@ -37,8 +37,8 @@
   }
 
   // Orthographic standing silhouette. A standing person must stay compact in plan view:
-  // shoulders dominate, the head overlaps the front of the torso and only the feet peek
-  // out behind it. Long head-to-foot stacking reads as a prone/crawling body and is avoided.
+  // shoulders dominate, the enlarged head overlaps the torso and only the feet peek out
+  // behind it. Long head-to-foot stacking reads as a prone/crawling body and is avoided.
   function drawTopDownSoldierAt(u,state,opts={}){
     const p=palette(u),scale=opts.scale||1;
     const marching=['moving','marching','routing','carrying'].includes(state);
@@ -70,57 +70,68 @@
     ctx.beginPath();ctx.moveTo(-3.1*scale,-3.5*scale);ctx.lineTo(3.2*scale,3.4*scale);ctx.stroke();
     ctx.beginPath();ctx.moveTo(-3.1*scale,3.5*scale);ctx.lineTo(3.2*scale,-3.4*scale);ctx.stroke();
 
-    // The head/shako overlaps the front edge of the shoulders, as it would for a
-    // vertically standing soldier viewed straight down, instead of lying ahead of them.
-    ctx.fillStyle='#c89d79';ctx.beginPath();ctx.arc(2.9*scale,0,2.45*scale,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle=opts.shako||p.shako;ctx.beginPath();ctx.ellipse(3.8*scale,0,2.3*scale,3.05*scale,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='rgba(238,232,216,.65)';ctx.lineWidth=.65*scale;ctx.beginPath();ctx.moveTo(3.9*scale,-2.6*scale);ctx.lineTo(3.9*scale,2.6*scale);ctx.stroke();
-    ctx.fillStyle=opts.plume||p.plume;ctx.beginPath();ctx.arc(5.55*scale,-1.65*scale,.95*scale,0,Math.PI*2);ctx.fill();
+    // v1.1.2: larger head moved rearward into the shoulder mass. This keeps facing
+    // readable without making the soldier look stretched out along the ground.
+    ctx.fillStyle='#c89d79';ctx.beginPath();ctx.arc(2.15*scale,0,2.85*scale,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=opts.shako||p.shako;ctx.beginPath();ctx.ellipse(3.05*scale,0,2.6*scale,3.35*scale,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(238,232,216,.65)';ctx.lineWidth=.65*scale;ctx.beginPath();ctx.moveTo(3.1*scale,-2.85*scale);ctx.lineTo(3.1*scale,2.85*scale);ctx.stroke();
+    ctx.fillStyle=opts.plume||p.plume;ctx.beginPath();ctx.arc(4.75*scale,-1.7*scale,1.05*scale,0,Math.PI*2);ctx.fill();
 
     if(opts.musket!==false){
-      // Musket is a separate side silhouette; it must not become the apparent body axis.
-      ctx.strokeStyle='#493322';ctx.lineWidth=1.35*scale;ctx.beginPath();ctx.moveTo(-4.2*scale,6.2*scale);ctx.lineTo(6.5*scale,6.2*scale);ctx.stroke();
-      ctx.strokeStyle='#97948c';ctx.lineWidth=.8*scale;ctx.beginPath();ctx.moveTo(5.4*scale,6.2*scale);ctx.lineTo(9.3*scale,6.2*scale);ctx.stroke();
+      // Slightly shorter musket keeps the weapon distinct without lengthening the body.
+      ctx.strokeStyle='#493322';ctx.lineWidth=1.35*scale;ctx.beginPath();ctx.moveTo(-3.7*scale,6.05*scale);ctx.lineTo(5.8*scale,6.05*scale);ctx.stroke();
+      ctx.strokeStyle='#97948c';ctx.lineWidth=.8*scale;ctx.beginPath();ctx.moveTo(4.9*scale,6.05*scale);ctx.lineTo(8.0*scale,6.05*scale);ctx.stroke();
     }
   }
 
   function drawInfantry(u,state){drawTopDownSoldierAt(u,state,{musket:true});}
   function drawOfficer(u,state){
-    drawTopDownSoldierAt(u,state,{scale:1.07,musket:false,plume:'#f0d86b'});
-    ctx.strokeStyle='#d4c9a6';ctx.lineWidth=1.15;ctx.beginPath();ctx.moveTo(-2,-6.1);ctx.lineTo(8,-6.1);ctx.stroke();
-    ctx.fillStyle='#d2b556';ctx.beginPath();ctx.arc(0,0,1.4,0,Math.PI*2);ctx.fill();
+    drawTopDownSoldierAt(u,state,{scale:1.08,musket:false,plume:'#f0d86b'});
+    // Officer sabre stays close to the shoulder line so the unit remains compact.
+    ctx.strokeStyle='#d4c9a6';ctx.lineWidth=1.15;ctx.beginPath();ctx.moveTo(-1.5,-5.4);ctx.lineTo(7.5,-5.4);ctx.stroke();
+    ctx.fillStyle='#d2b556';ctx.beginPath();ctx.arc(.8,0,1.45,0,Math.PI*2);ctx.fill();
   }
   function drawDrummer(u,state){
     drawTopDownSoldierAt(u,state,{musket:false});
-    ctx.fillStyle='#b9843f';ctx.beginPath();ctx.ellipse(-.8,5.8,4.2,2.45,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#ead9ac';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(-.8,5.8,4.2,2.45,0,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#b9843f';ctx.beginPath();ctx.ellipse(-.6,5.35,4.3,2.55,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#ead9ac';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(-.6,5.35,4.3,2.55,0,0,Math.PI*2);ctx.stroke();
   }
   function drawWorker(u,state){
-    drawTopDownSoldierAt(u,state,{coat:'#77684f',turnback:'#6d5d46',trousers:'#9c9078',belt:'#b6a98d',shako:'#685642',plume:'#685642',musket:false,scale:.94});
-    const swing=['building','gathering'].includes(state)?Math.sin(phase(u,2.0))*1.8:0;
-    ctx.strokeStyle='#5a402b';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(-1,-5.4);ctx.lineTo(7,-6.4+swing);ctx.stroke();
-    ctx.fillStyle='#77736b';ctx.fillRect(6,-7.5+swing,4,2.7);
-    if(u.carry>0){ctx.fillStyle=u.carryType==='wood'?'#805a36':'#7f3d46';ctx.beginPath();ctx.ellipse(-4.5,6.2,4,3,0,0,Math.PI*2);ctx.fill();}
+    drawTopDownSoldierAt(u,state,{coat:'#77684f',turnback:'#6d5d46',trousers:'#9c9078',belt:'#b6a98d',shako:'#685642',plume:'#685642',musket:false,scale:.95});
+    const swing=['building','gathering'].includes(state)?Math.sin(phase(u,2.0))*1.7:0;
+    // Tool is kept near the shoulder rather than extending the visual body axis.
+    ctx.strokeStyle='#5a402b';ctx.lineWidth=1.45;ctx.beginPath();ctx.moveTo(-.5,-4.9);ctx.lineTo(6.8,-5.9+swing);ctx.stroke();
+    ctx.fillStyle='#77736b';ctx.fillRect(5.8,-7.0+swing,3.8,2.5);
+    if(u.carry>0){ctx.fillStyle=u.carryType==='wood'?'#805a36':'#7f3d46';ctx.beginPath();ctx.ellipse(-4.2,5.7,3.8,2.9,0,0,Math.PI*2);ctx.fill();}
   }
 
   function drawCavalry(u,state){
     const p=palette(u),gallop=['moving','marching','charging','routing'].includes(state);
-    const stride=gallop?Math.sin(phase(u,state==='charging'?2.7:1.9))*1.8:0;
+    const stride=gallop?Math.sin(phase(u,state==='charging'?2.7:1.9))*1.55:0;
     const horse=u.side==='france'?'#5a4434':'#49392f';
     // Horse body, neck, head and tail all lie along +X/-X in true plan view.
-    ctx.fillStyle=horse;ctx.beginPath();ctx.ellipse(-1,0,12.4,5.6,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.ellipse(9.0,0,6.2,3.5,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#3b2d25';ctx.beginPath();ctx.ellipse(14.1,0,3.8,2.8,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#3a2a22';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-12,0);ctx.lineTo(-17,-2);ctx.stroke();
+    ctx.fillStyle=horse;ctx.beginPath();ctx.ellipse(-1,0,12.4,5.8,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(8.8,0,6.0,3.6,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#3b2d25';ctx.beginPath();ctx.ellipse(13.8,0,3.8,2.9,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#3a2a22';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-12.2,0);ctx.lineTo(-16.8,-2);ctx.stroke();
     ctx.fillStyle='#332720';
-    for(const [x,y,s] of [[-6,-5,1],[-6,5,-1],[5,-5,-1],[5,5,1]]){
-      ctx.beginPath();ctx.ellipse(x+stride*s,y,3.1,1.35,0,0,Math.PI*2);ctx.fill();
+    for(const [x,y,s] of [[-6.5,-5,1],[-6.5,5,-1],[4.8,-5,-1],[4.8,5,1]]){
+      ctx.beginPath();ctx.ellipse(x+stride*s,y,2.8,1.25,0,0,Math.PI*2);ctx.fill();
     }
-    ctx.fillStyle='#6b352d';ctx.beginPath();ctx.ellipse(-1,0,5.5,4.2,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle=p.coat;ctx.beginPath();ctx.ellipse(-.2,0,4.0,3.3,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle=p.belt;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-3,-2.5);ctx.lineTo(3,2.5);ctx.stroke();
-    ctx.fillStyle=p.shako;ctx.beginPath();ctx.ellipse(3.4,0,2.0,2.5,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#b9b0a1';ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(-2,-5.3);ctx.lineTo(12,-6.4);ctx.stroke();
+
+    // Saddle and compact upright rider mass.
+    ctx.fillStyle='#6b352d';ctx.beginPath();ctx.ellipse(-1.2,0,5.6,4.4,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=p.coat;ctx.beginPath();ctx.ellipse(0,0,4.3,3.55,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=p.belt;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-2.8,-2.4);ctx.lineTo(2.8,2.4);ctx.stroke();
+
+    // v1.1.2: rider gets the same larger/rearward head logic as troops on foot.
+    // The skin circle is intentionally visible around the shako to read as a person.
+    ctx.fillStyle='#c89d79';ctx.beginPath();ctx.arc(1.85,0,2.0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=p.shako;ctx.beginPath();ctx.ellipse(2.75,0,1.95,2.55,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=p.plume;ctx.beginPath();ctx.arc(4.05,-1.05,.78,0,Math.PI*2);ctx.fill();
+
+    // Shorter sabre/carbine accent keeps rider readable without stretching silhouette.
+    ctx.strokeStyle='#b9b0a1';ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(-1.5,-5.15);ctx.lineTo(9.8,-5.9);ctx.stroke();
   }
 
   drawUnit=function drawUnitCharacterVisualsV2(u){
@@ -149,8 +160,10 @@
     supportedTypes:Object.freeze(['worker','infantry','officer','drummer','cavalry']),
     projection:'orthographic-top-down',
     standingSilhouette:true,
+    enlargedRearwardHead:true,
+    cavalryRiderHead:true,
     napoleonicUniforms:true,
-    version:'character-visuals-v2.1'
+    version:'character-visuals-v2.2'
   });
   if(nrts.subsystems.has('character-renderer')){
     global.__CHARACTER_VISUALS_V2__=api;
