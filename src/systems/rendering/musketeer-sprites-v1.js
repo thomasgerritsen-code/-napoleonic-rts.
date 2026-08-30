@@ -2,7 +2,7 @@
 (function installMusketeerSpritesV1(global){
   const nrts=global.NRTS;
   if(!nrts)throw new Error('NRTS foundation runtime must load before musketeer sprites.');
-  const asset=global.NRTS_MUSKETEER_SPRITE_V1;
+  const asset=global.__MUSKETEER_SPRITE_ASSET_V1__;
   if(!asset)throw new Error('Top-down musketeer sprite asset must load before the sprite renderer.');
 
   const previousDrawUnit=drawUnit;
@@ -27,7 +27,6 @@
     for(let i=0;i<p.length;i+=4){
       if(p[i+3]<12)continue;
       const r=p[i],g=p[i+1],b=p[i+2];
-      // Select only the strongly blue/navy uniform pixels; skin, leather, white belts and muskets stay unchanged.
       if(b>r*1.22&&b>g*1.08&&b-r>22){
         const luminance=(r*0.22+g*0.34+b*0.44);
         p[i]=Math.min(190,luminance*1.34+38);
@@ -51,7 +50,6 @@
     return Math.floor(elapsed*frameRate+(u.id%4)*.73)%FRAMES;
   }
   function sourceRect(direction,frame){
-    // Generated source layout: each of four rows stores two directions, four frames each.
     const row=Math.floor(direction/2);
     const col=(direction%2)*FRAMES+frame;
     return{x:col*sourceCellW,y:row*sourceCellH,w:sourceCellW,h:sourceCellH};
@@ -93,6 +91,7 @@
   const api=Object.freeze({
     version:'musketeer-sprites-v1',projection:'orthographic-top-down',directions:DIRECTIONS,frames:FRAMES,
     usesGeneratedReference:true,usesImageAssets:true,sourceLayout:'8-columns-by-4-rows / two directions per row',
+    source:'embedded-generated-reference',
     ready,directionForFacing,frameFor,sourceRect,
     stats:()=>({spriteDraws:stats.spriteDraws,fallbackDraws:stats.fallbackDraws,framesUsed:[...stats.framesUsed],directionsUsed:[...stats.directionsUsed],loaded,hasBritishVariant:!!sheets.britain})
   });
