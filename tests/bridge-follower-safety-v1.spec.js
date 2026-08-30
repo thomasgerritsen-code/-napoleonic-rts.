@@ -10,7 +10,7 @@ async function openBridgeSafety(page){
   return errors;
 }
 
-test('rear soldier at a bridge corner gets a legal deck target instead of pushing into water',async({page})=>{
+test('rear soldier at a bridge edge gets a legal deck target instead of pushing into water',async({page})=>{
   const errors=await openBridgeSafety(page);
   const result=await page.evaluate(()=>{
     window.__RTS_DEBUG__.setPeaceMode(true);
@@ -23,8 +23,8 @@ test('rear soldier at a bridge corner gets a legal deck target instead of pushin
     reg.crossingTrafficV068=info;
     march.anchorX=c.x+90;march.anchorY=c.y;march.marchFacing=c.angle;
     const members=regimentMembers(reg),lagger=members[members.length-1];
-    const corner=crossingPointV068(c,-c.length/2-24,c.width/2+24);
-    lagger.x=corner.x;lagger.y=corner.y;
+    const deckEdge=crossingPointV068(c,-c.length/2+18,c.width/2-12);
+    lagger.x=deckEdge.x;lagger.y=deckEdge.y;
     forceBridgeColumnTargetsV068(reg,march,info);
     const blocked=segmentCrossesBlockedWaterV067(lagger.x,lagger.y,lagger.targetX,lagger.targetY);
     return{
