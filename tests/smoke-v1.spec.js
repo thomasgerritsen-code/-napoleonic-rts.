@@ -12,8 +12,10 @@ async function openGame(page) {
   });
   await page.goto('/?test=smoke', { waitUntil: 'networkidle' });
   await page.waitForFunction(() => Boolean(
-    window.RTS_VERSION === '1.0.0' &&
+    window.RTS_VERSION &&
     window.RTS_SIM?.version === window.RTS_VERSION &&
+    window.NRTS?.gameVersion === window.RTS_VERSION &&
+    window.NRTS?.foundationVersion === window.RTS_VERSION &&
     window.__RTS_DEBUG__?.getState &&
     window.__RTS_DEBUG__?.createFreshInfantryRegiment &&
     window.__RTS_DEBUG__?.formationState
@@ -23,17 +25,21 @@ async function openGame(page) {
 
 test('game boots with current version and essential UI', async ({ page }) => {
   const errors = await openGame(page);
-  await expect(page).toHaveTitle('Napoleonic RTS v1.0.0');
-  await expect(page.locator('.version')).toHaveText('v1.0.0');
+  const release = await page.evaluate(() => window.RTS_VERSION);
+  await expect(page).toHaveTitle(`Napoleonic RTS v${release}`);
+  await expect(page.locator('.version')).toHaveText(`v${release}`);
   await expect(page.locator('#game')).toBeVisible();
   await expect(page.locator('#minimap')).toBeVisible();
 
   const versions = await page.evaluate(() => ({
     release: window.RTS_VERSION,
     simulation: window.RTS_SIM.version,
-    foundation: window.NRTS?.gameVersion
+    foundation: window.NRTS?.gameVersion,
+    foundationRuntime: window.NRTS?.foundationVersion
   }));
-  expect(versions).toEqual({ release: '1.0.0', simulation: '1.0.0', foundation: '1.0.0' });
+  expect(versions.simulation).toBe(versions.release);
+  expect(versions.foundation).toBe(versions.release);
+  expect(versions.foundationRuntime).toBe(versions.release);
   expect(errors).toEqual([]);
 });
 

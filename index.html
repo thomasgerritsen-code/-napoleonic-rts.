@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="theme-color" content="#111713" />
-  <title>Napoleonic RTS v1.0.0</title>
+  <title>Napoleonic RTS v1.1.0</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="v05.css" />
   <link rel="stylesheet" href="v06.css" />
@@ -14,7 +14,7 @@
 <div id="app">
   <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
   <header class="hud topbar">
-    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v1.0.0</span></div>
+    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v1.1.0</span></div>
     <div class="resources"><span>🇫🇷 🍞 <strong id="food">0</strong></span><span>🪵 <strong id="wood">0</strong></span><span>👥 <strong id="population">0/0</strong></span></div>
     <div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button>
   </header>
@@ -27,7 +27,7 @@
   </section>
   <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div><div id="message" class="message hidden"></div>
 </div>
-<script src="src/foundation/version.js?build=100d"></script>
+<script src="src/foundation/version.js?build=110a"></script>
 <script src="src/foundation/runtime.js?build=arch21"></script>
 <script src="src/foundation/config.js?build=spritebridge1"></script>
 <script src="src/foundation/contracts.js"></script>
@@ -92,12 +92,10 @@
 <script src="src/systems/rendering/map-realism.js?build=restore1"></script>
 <script src="src/systems/rendering/map-ambient-motion.js?build=ambient1"></script>
 <script src="src/systems/rendering/natural-resources-v1.js?build=restore1"></script>
-<script src="src/assets/musketeer-sprite-v1.js?build=sprite1"></script>
-<script src="src/systems/rendering/characters.js?build=restore1"></script>
-<script src="src/systems/rendering/musketeer-sprites-v1.js?build=sprite1"></script>
-<script src="src/systems/rendering/artillery-topdown-v1.js?build=restore1"></script>
+<script src="src/systems/rendering/characters.js?build=110a"></script>
+<script src="src/systems/rendering/artillery-topdown-v1.js?build=110a"></script>
 <script src="src/systems/rendering/combat-animations.js?build=ca1"></script>
-<script src="src/foundation/legacy-simulation-adapter.js?build=arch22"></script>
+<script src="src/foundation/legacy-simulation-adapter.js?build=110a"></script>
 <script src="src/systems/artillery/crew-approach-v1.js?build=restore1"></script>
 <script src="src/systems/movement/stuck-recovery-v1.js?build=avoid2"></script>
 <script src="src/systems/ai/authority-v2.js?build=restore1"></script>

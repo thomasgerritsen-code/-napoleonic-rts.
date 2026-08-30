@@ -8,7 +8,7 @@
   function drawCrew(member,ox,oy,moving){
     const renderer=global.__CHARACTER_VISUALS_V2__;
     ctx.save();ctx.translate(ox,oy);
-    if(renderer?.drawTopDownSoldier)renderer.drawTopDownSoldier(member,moving?'marching':'idle',{scale:.92,musket:true});
+    if(renderer?.drawTopDownSoldier)renderer.drawTopDownSoldier(member,moving?'marching':'idle',{scale:.92,musket:false});
     else{ctx.fillStyle=member.side==='france'?COLORS.france:COLORS.britain;ctx.beginPath();ctx.arc(0,0,6,0,Math.PI*2);ctx.fill();}
     ctx.restore();
   }
@@ -49,7 +49,7 @@
     ctx.restore();
   };
 
-  const api=Object.freeze({version:'artillery-topdown-v1',projection:'orthographic-top-down',crewUsesNapoleonicRenderer:true});
+  const api=Object.freeze({version:'artillery-topdown-v1.1',projection:'orthographic-top-down',crewUsesNapoleonicRenderer:true,crewUsesMuskets:false});
   global.__ARTILLERY_TOPDOWN_V1__=api;
-  nrts.subsystems.register('artillery-renderer',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'strict top-down cannon, carriage and musketier crew rendering'});
+  nrts.subsystems.register('artillery-renderer',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'strict top-down cannon, carriage and unified crew rendering'});
 })(window);

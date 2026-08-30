@@ -3,7 +3,8 @@
 (function installFoundation(global) {
   if (global.NRTS) return;
 
-  const gameVersion = global.RTS_VERSION || '1.0.0';
+  const gameVersion = global.RTS_VERSION || '1.1.0';
+  const foundationVersion = gameVersion;
   const listeners = new Map();
   const subsystems = new Map();
   const services = new Map();
@@ -167,7 +168,7 @@
     snapshot() {
       return {
         gameVersion,
-        foundationVersion: '1.0.0',
+        foundationVersion,
         bootStartedAt,
         uptimeMs: performance.now() - bootStartedAt,
         subsystems: subsystemApi.list(),
@@ -188,7 +189,7 @@
 
   global.NRTS = Object.freeze({
     gameVersion,
-    foundationVersion: '1.0.0',
+    foundationVersion,
     events,
     subsystems: subsystemApi,
     services: serviceApi,
@@ -196,5 +197,5 @@
     diagnostics
   });
 
-  events.emit('foundation:ready', { gameVersion, foundationVersion: '1.0.0' });
+  events.emit('foundation:ready', { gameVersion, foundationVersion });
 })(window);
