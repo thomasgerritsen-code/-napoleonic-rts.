@@ -134,6 +134,51 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  movement:
+    name: Movement coverage gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify preinstalled Chrome
+        run: google-chrome --version
+
+      - name: Traverse map, bridges, ford and unit classes
+        env:
+          CI_RELEASE: '0'
+          CI_SYSTEM_CHROME: '1'
+        run: npx playwright test tests/movement-coverage.spec.js --project=chromium --workers=1
+
+      - name: Upload movement coverage report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: movement-coverage-${{ github.run_id }}
+          path: test-results/movement-coverage-report.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload movement failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: movement-playwright-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
   release:
     name: Full Chromium release gate (${{ matrix.shard }}/2)
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')) }}
@@ -178,7 +223,7 @@ jobs:
   deploy:
     name: Deploy GitHub Pages
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    needs: [fast, focused, health]
+    needs: [fast, focused, health, movement]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
