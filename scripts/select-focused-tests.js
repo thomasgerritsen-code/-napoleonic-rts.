@@ -93,6 +93,7 @@ function selectFocusedTests(files) {
     if (!isMovementFacadeOnly && (
       file.startsWith('src/systems/movement/') ||
       file.startsWith('src/systems/formation/') ||
+      file === 'src/systems/rendering/frame-stability-v1.js' ||
       /^src\/v0(63|64|69|70|71)\.js$/.test(file) ||
       /^tests\/(movement-formation-consolidation|motion-v069|motion-v070|motion-v071|speed-v071)\.spec\.js$/.test(file)
     )) addMovement();

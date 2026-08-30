@@ -11,6 +11,8 @@ async function openConsolidatedMovement(page) {
     window.RTS_SIM?.version === window.RTS_VERSION &&
     window.NRTS?.subsystems.has('movement') &&
     window.NRTS?.subsystems.has('formation') &&
+    window.NRTS?.subsystems.has('frame-stability') &&
+    window.__FRAME_STABILITY_V1__ &&
     window.__RTS_DEBUG__?.motionStatsV071 &&
     window.__V071_SPEED_PARITY__?.version === '0.7.1-hotfix2'
   ));
@@ -60,6 +62,26 @@ test('central config preserves v0.7.1 follower and speed tuning', async ({ page 
   expect(values.roadLookAhead).toBe(.075);
   expect(values.roadMultiplier).toBe(1.24);
   expect(values.speedParity.infantryField).toBeGreaterThan(0);
+});
+
+test('final render frame uses one coherent smoothed snapshot', async ({ page }) => {
+  const errors = await openConsolidatedMovement(page);
+  const stability = await page.evaluate(() => ({
+    api: window.__FRAME_STABILITY_V1__,
+    subsystem: window.NRTS.diagnostics.snapshot().subsystems.find(s => s.name === 'frame-stability'),
+    hasRenderer: typeof window.renderStableFrameV1 === 'function'
+  }));
+  expect(stability.api.version).toBe('frame-stability-v1');
+  expect(stability.api.phase).toBe('architecture-v2.2');
+  expect(stability.api.outerFrameSnapshot).toBe(true);
+  expect(stability.api.unitInterpolation).toBe(true);
+  expect(stability.api.microJitterFilter).toBe(true);
+  expect(stability.api.cameraSmoothing).toBe(true);
+  expect(stability.api.simulationStatePreserved).toBe(true);
+  expect(stability.subsystem?.meta?.phase).toBe('architecture-v2.2');
+  expect(stability.subsystem?.meta?.legacyBridge).toBe(false);
+  expect(stability.hasRenderer).toBe(true);
+  expect(errors).toEqual([]);
 });
 
 test('consolidated systems preserve existing smooth march debug contract', async ({ page }) => {
