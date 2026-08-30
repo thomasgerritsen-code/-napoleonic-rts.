@@ -31,11 +31,26 @@
     return d<=r?{t,d}:null;
   }
 
+  function exitsExistingBuffer(a,b,obstacle,r){
+    const ax=a.x-obstacle.x,ay=a.y-obstacle.y;
+    const startDistance=Math.hypot(ax,ay);
+    if(startDistance>=r) return false;
+    const vx=b.x-a.x,vy=b.y-a.y;
+    const outwardDerivative=ax*vx+ay*vy;
+    const endDistance=Math.hypot(b.x-obstacle.x,b.y-obstacle.y);
+    // A segment that begins in a formation-clearance buffer may leave it, but may never
+    // initially move deeper through that buffer. This keeps units from becoming trapped by
+    // a safety margin while preserving the actual roof as a hard per-unit obstacle.
+    return outwardDerivative>=-1e-6 && endDistance>startDistance+0.5;
+  }
+
   function firstRouteHit(a,b,kind,ignoreId=null){
     let best=null;
     for(const obstacle of obstacles){
       if(obstacle.id===ignoreId) continue;
-      const hit=segmentCircleHit(a,b,obstacle,routeRadius(obstacle,kind));
+      const r=routeRadius(obstacle,kind);
+      if(exitsExistingBuffer(a,b,obstacle,r)) continue;
+      const hit=segmentCircleHit(a,b,obstacle,r);
       if(hit && (!best || hit.t<best.hit.t)) best={obstacle,hit};
     }
     return best;
@@ -294,6 +309,7 @@
     finalTargetSanitization:true,
     perUnitRoofGuard:true,
     clusteredVisibilityRouting:true,
+    routeBufferEscape:true,
     routeMargin:Object.freeze({...ROUTE_MARGIN}),
     avoidPath,
     pathClear,
