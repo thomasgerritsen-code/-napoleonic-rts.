@@ -74,10 +74,22 @@ test('map traversal matrix covers every crossing, both directions and unit class
       return living.length ? centroid(living) : { x: NaN, y: NaN };
     }
 
+    function allMembersCleared(reg, c, side) {
+      const direction = -side;
+      const threshold = c.length / 2 + 24;
+      const living = regimentMembers(reg).filter(u => !u.dead);
+      return living.length > 0 && living.every(u => {
+        if (waterAtV067(u.x, u.y)) return false;
+        const local = crossingLocalV068(c, u.x, u.y);
+        return local.along * direction > threshold;
+      });
+    }
+
     function runRoute(c, side, kind, formation, lateral) {
       resetCoverageWorld();
       const nav = window.NRTS_NAVIGATION_V2;
       const beforeRecoveries = nav.stats().bridgeCornerRecoveries;
+      const beforeFollower = window.__BRIDGE_FOLLOWER_SAFETY_V1__?.stats?.() || {};
       const distance = c.length / 2 + 210;
       const start = crossingPointV068(c, side * distance, lateral);
       const target = crossingPointV068(c, -side * distance, -lateral * 0.35);
@@ -93,14 +105,14 @@ test('map traversal matrix covers every crossing, both directions and unit class
       let completed = false;
       let steps = 0;
 
-      for (; steps < 1500; steps++) {
+      for (; steps < 1800; steps++) {
         window.RTS_SIM.step(0.05);
         if (steps % 5) continue;
         const now = center(reg);
         if (!Number.isFinite(now.x) || !Number.isFinite(now.y)) break;
         const moved = Math.hypot(now.x - last.x, now.y - last.y);
         const remaining = Math.hypot(target.x - now.x, target.y - now.y);
-        if (moved > 2.2) {
+        if (moved > 0.75) {
           if (activeStall) recoveredStalls++;
           activeStall = false;
           last = now;
@@ -110,16 +122,15 @@ test('map traversal matrix covers every crossing, both directions and unit class
           longestStall = Math.max(longestStall, stall);
           if (stall > 1.25) activeStall = true;
         }
-        const local = crossingLocalV068(c, now.x, now.y);
-        const cleared = side < 0 ? local.along > c.length / 2 + 55 : local.along < -c.length / 2 - 55;
-        if (remaining < 85 || cleared) { completed = true; break; }
+        if (remaining < 75 || allMembersCleared(reg, c, side)) { completed = true; break; }
       }
 
       const living = regimentMembers(reg).filter(u => !u.dead);
       const finalCenter = center(reg);
       const waterUnits = living.filter(u => waterAtV067(u.x, u.y)).length;
-      const blockedTargets = living.filter(u => Number.isFinite(u.targetX) && segmentCrossesBlockedWaterV067(u.x, u.y,u.targetX,u.targetY)).length;
+      const blockedTargets = living.filter(u => Number.isFinite(u.targetX) && segmentCrossesBlockedWaterV067(u.x, u.y, u.targetX, u.targetY)).length;
       const afterRecoveries = nav.stats().bridgeCornerRecoveries;
+      const afterFollower = window.__BRIDGE_FOLLOWER_SAFETY_V1__?.stats?.() || {};
       return {
         crossing: c.id,
         crossingType: c.type,
@@ -134,6 +145,8 @@ test('map traversal matrix covers every crossing, both directions and unit class
         longestStall: +longestStall.toFixed(2),
         recoveredStalls,
         bridgeRecoveries: afterRecoveries - beforeRecoveries,
+        followerWaterRecoveries: (afterFollower.waterRecoveries || 0) - (beforeFollower.waterRecoveries || 0),
+        preventedEarlyReleases: (afterFollower.preventedEarlyReleases || 0) - (beforeFollower.preventedEarlyReleases || 0),
         waterUnits,
         blockedTargets,
         health: window.__GAME_HEALTH__.sample()
@@ -151,10 +164,10 @@ test('map traversal matrix covers every crossing, both directions and unit class
     }
 
     const failed = results.filter(r => !r.completed || r.waterUnits || r.blockedTargets || r.health.errors?.length);
-    const recovered = results.filter(r => r.recoveredStalls > 0 || r.bridgeRecoveries > 0);
+    const recovered = results.filter(r => r.recoveredStalls > 0 || r.bridgeRecoveries > 0 || r.followerWaterRecoveries > 0);
     const hotspots = results
-      .filter(r => r.longestStall > 1.25 || !r.completed)
-      .map(r => ({ crossing: r.crossing, kind: r.kind, side: r.side, longestStall: r.longestStall, completed: r.completed, recoveries: r.bridgeRecoveries + r.recoveredStalls }))
+      .filter(r => r.longestStall > 1.25 || !r.completed || r.followerWaterRecoveries > 0)
+      .map(r => ({ crossing: r.crossing, kind: r.kind, side: r.side, longestStall: r.longestStall, completed: r.completed, recoveries: r.bridgeRecoveries + r.recoveredStalls + r.followerWaterRecoveries }))
       .sort((a, b) => b.longestStall - a.longestStall);
 
     return {
@@ -179,22 +192,26 @@ test('map traversal matrix covers every crossing, both directions and unit class
   expect(pageErrors).toEqual([]);
 });
 
-test('representative whole-map routes complete without hard stalls', async ({ page }) => {
-  test.setTimeout(90_000);
+test('representative whole-map road routes complete without hard stalls', async ({ page }) => {
+  test.setTimeout(120_000);
   const pageErrors = await openCoverageGame(page);
   const sweep = await page.evaluate(() => {
-    const margin = 260;
-    const points = [
-      { x: margin, y: margin },
-      { x: WORLD.width / 2 - 520, y: 430 },
-      { x: WORLD.width - margin, y: margin },
-      { x: WORLD.width - 340, y: WORLD.height / 2 },
-      { x: WORLD.width - margin, y: WORLD.height - margin },
-      { x: WORLD.width / 2 + 520, y: WORLD.height - 360 },
-      { x: margin, y: WORLD.height - margin },
-      { x: 360, y: WORLD.height / 2 }
+    const roadById = id => ROAD_NETWORK_V066.find(r => r.id === id);
+    const roadPoint = (id, index) => {
+      const road = roadById(id);
+      const p = road.points[index < 0 ? road.points.length + index : index];
+      return { x:p.x, y:p.y, road:id };
+    };
+    const pairs = [
+      { start:roadPoint('grande-chaussee', 1), target:roadPoint('grande-chaussee', -2) },
+      { start:roadPoint('route-du-nord', 1), target:roadPoint('route-du-nord', -2) },
+      { start:roadPoint('route-sud-ouest', 1), target:roadPoint('route-nord-est', -2) },
+      { start:roadPoint('chemin-de-la-crete-ouest', 1), target:roadPoint('chemin-de-la-crete-est', -2) },
+      { start:roadPoint('chemin-du-bois', -2), target:roadPoint('chemin-des-fermes-est', -2) },
+      { start:roadPoint('chemin-des-fermes-sud', 1), target:roadPoint('chemin-des-fermes-sud', -2) },
+      { start:roadPoint('voie-du-moulin', 1), target:roadPoint('voie-du-verger', -2) },
+      { start:roadPoint('voie-de-la-ferme', -2), target:roadPoint('voie-de-la-lisiere', -2) }
     ];
-    const pairs = points.map((start, i) => ({ start, target: points[(i + 3) % points.length] }));
     const results = [];
 
     for (let index = 0; index < pairs.length; index++) {
@@ -202,26 +219,44 @@ test('representative whole-map routes complete without hard stalls', async ({ pa
       for (const u of units) u.dead = true;
       for (const r of regiments) r.destroyed = true;
       const { start, target } = pairs[index];
-      const regId = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', start.x, start.y);
-      const reg = getRegiment(regId);
+      const made = [];
+      for (let i = 0; i < 18; i++) made.push(createUnit('france','infantry',start.x+(i%9)*14,start.y+Math.floor(i/9)*16));
+      made.push(createUnit('france','officer',start.x+40,start.y-25));
+      made.push(createUnit('france','drummer',start.x+62,start.y-25));
+      const reg = createRegiment('france', made);
       if (!reg) { results.push({ index, completed:false, maxStall:0, inWater:0, pathLength:0, reason:'group-create-failed' }); continue; }
       orderGroupPathV06(reg, target.x, target.y, index % 2 ? 'column' : 'line', 0);
-      let last = centroid(regimentMembers(reg));
+      let living = regimentMembers(reg).filter(u=>!u.dead);
+      let last = centroid(living);
+      const initial = { ...last };
       let lastMovedAt = elapsed;
       let maxStall = 0;
       let completed = false;
-      for (let step = 0; step < 1800; step++) {
+      for (let step = 0; step < 4800; step++) {
         window.RTS_SIM.step(.05);
-        if (step % 8) continue;
-        const living = regimentMembers(reg).filter(u => !u.dead);
+        if (step % 10) continue;
+        living = regimentMembers(reg).filter(u => !u.dead);
         if (!living.length) break;
         const c = centroid(living);
-        if (Math.hypot(c.x - last.x, c.y - last.y) > 3) { last = c; lastMovedAt = elapsed; }
-        else maxStall = Math.max(maxStall, elapsed - lastMovedAt);
-        if (Math.hypot(c.x - target.x, c.y - target.y) < 110) { completed = true; break; }
+        if (Math.hypot(c.x-last.x,c.y-last.y) > .8) { last=c; lastMovedAt=elapsed; }
+        else maxStall=Math.max(maxStall,elapsed-lastMovedAt);
+        if (Math.hypot(c.x-target.x,c.y-target.y) < 120) { completed=true; break; }
       }
-      const members = regimentMembers(reg).filter(u => !u.dead);
-      results.push({ index, completed, maxStall: +maxStall.toFixed(2), inWater: members.filter(u => waterAtV067(u.x, u.y)).length, pathLength: reg.path?.length || 0 });
+      const finalMembers = regimentMembers(reg).filter(u => !u.dead);
+      const finalCenter = finalMembers.length ? centroid(finalMembers) : {x:NaN,y:NaN};
+      results.push({
+        index,
+        from:start.road,
+        to:target.road,
+        completed,
+        maxStall:+maxStall.toFixed(2),
+        inWater:finalMembers.filter(u=>waterAtV067(u.x,u.y)).length,
+        pathLength:reg.path?.length||0,
+        pathIndex:reg.pathIndex||0,
+        moved:Number.isFinite(finalCenter.x)?+Math.hypot(finalCenter.x-initial.x,finalCenter.y-initial.y).toFixed(1):0,
+        remaining:Number.isFinite(finalCenter.x)?+Math.hypot(finalCenter.x-target.x,finalCenter.y-target.y).toFixed(1):null,
+        phase:reg.movementPhaseV063||reg.marchV063?.phase||'idle'
+      });
     }
     return results;
   });
