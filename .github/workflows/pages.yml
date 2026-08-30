@@ -157,7 +157,7 @@ jobs:
         env:
           CI_RELEASE: '0'
           CI_SYSTEM_CHROME: '1'
-        run: npx playwright test tests/movement-coverage.spec.js --project=chromium --workers=1
+        run: npx playwright test tests/movement-coverage.spec.js tests/incomplete-water-route-v2.spec.js --project=chromium --workers=1
 
       - name: Upload movement coverage report
         if: ${{ always() }}
