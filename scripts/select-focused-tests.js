@@ -30,10 +30,15 @@ function selectFocusedTests(files) {
   const addArchitectureV21 = () => selected.add('tests/architecture-v21.spec.js');
   const addRestoration = () => selected.add('tests/restoration-batch-v1.spec.js');
   const addBuildingAvoidance = () => selected.add('tests/building-avoidance-v2.spec.js');
+  const addBridgeFollowerSafety = () => selected.add('tests/bridge-follower-safety-v1.spec.js');
+  const addMusketeerSprites = () => selected.add('tests/musketeer-sprites-v1.spec.js');
 
   for (const file of normalized) {
     if (/^tests\/[^/]+\.spec\.js$/.test(file)) selected.add(file);
     if (restorationFiles.has(file)) addRestoration();
+
+    if (file === 'src/systems/navigation/bridge-follower-safety-v1.js' || file === 'tests/bridge-follower-safety-v1.spec.js') addBridgeFollowerSafety();
+    if (file === 'src/assets/musketeer-sprite-v1.js' || file === 'src/systems/rendering/musketeer-sprites-v1.js' || file === 'tests/musketeer-sprites-v1.spec.js') addMusketeerSprites();
 
     if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') selected.add('tests/foundation-v071.spec.js');
     if (file === 'src/foundation/runtime.js' || file === 'src/foundation/config.js' || file === 'src/systems/world/api.js' || file === 'src/systems/navigation/api.js' || file === 'src/systems/movement/api.js' || file === 'tests/architecture-v21.spec.js') addArchitectureV21();
@@ -46,7 +51,8 @@ function selectFocusedTests(files) {
 
     const isV7NavigationInfrastructure = battlefieldV7Bundle && (file === 'src/systems/navigation/road-index.js' || file === 'src/systems/navigation/route-planner.js' || file === 'src/systems/navigation/village-obstacles-v7.js');
     const isNavigationFacadeOnly = file === 'src/systems/navigation/api.js';
-    if (!isV7NavigationInfrastructure && !isNavigationFacadeOnly && (file.startsWith('src/systems/navigation/') || /^src\/v0(66|67|68)\.js$/.test(file) || /^tests\/(navigation-v2|traffic-v068|water-v067)\.spec\.js$/.test(file))) addNavigation();
+    const isBridgeFollowerOnly = file === 'src/systems/navigation/bridge-follower-safety-v1.js';
+    if (!isV7NavigationInfrastructure && !isNavigationFacadeOnly && !isBridgeFollowerOnly && (file.startsWith('src/systems/navigation/') || /^src\/v0(66|67|68)\.js$/.test(file) || /^tests\/(navigation-v2|traffic-v068|water-v067)\.spec\.js$/.test(file))) addNavigation();
 
     const isMovementFacadeOnly = file === 'src/systems/movement/api.js';
     if (!isMovementFacadeOnly && (file.startsWith('src/systems/movement/') || file.startsWith('src/systems/formation/') || file === 'src/systems/rendering/frame-stability-v1.js' || /^src\/v0(63|64|69|70|71)\.js$/.test(file) || /^tests\/(movement-formation-consolidation|motion-v069|motion-v070|motion-v071|speed-v071)\.spec\.js$/.test(file))) addMovement();

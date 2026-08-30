@@ -1,0 +1,1 @@
+Binary sprite atlases are committed through Git object blobs to preserve WebP bytes.
