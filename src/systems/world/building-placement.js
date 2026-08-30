@@ -3,6 +3,7 @@
 (function installBuildingPlacement(global) {
   const nrts = global.NRTS;
   if (!nrts) throw new Error('NRTS foundation runtime must load before building placement.');
+  const activeRoadNetwork = global.NRTS_ROAD_NETWORK_V7 || ROAD_NETWORK_V066;
 
   function footprintRadius(type) {
     const def = BUILDINGS[type];
@@ -26,7 +27,7 @@
   function roadClearanceForBuilding(type, x, y) {
     const radius = footprintRadius(type);
     let nearest = Infinity;
-    for (const road of ROAD_NETWORK_V066) {
+    for (const road of activeRoadNetwork) {
       for (let i = 1; i < road.points.length; i++) {
         const hit = closestPointOnSegmentV066(x, y, road.points[i - 1], road.points[i]);
         nearest = Math.min(nearest, hit.distance - road.width * 0.5 - radius);
@@ -119,10 +120,12 @@
     clearOfRoad,
     clearOfVillage,
     nearestSafe: nearestPlacementSafePosition,
-    villageObstacleCount: villageStructures().length
+    villageObstacleCount: villageStructures().length,
+    roadCount: activeRoadNetwork.length,
+    battlefieldV7: Boolean(global.NRTS_ROAD_NETWORK_V7)
   }), {
     phase: 'architecture-v2',
     legacyBridge: false,
-    responsibility: 'building footprint placement with road and village scenery exclusion'
+    responsibility: 'building footprint placement with active-road and village scenery exclusion'
   });
 })(window);

@@ -14,6 +14,23 @@ test('navigation changes select navigation, traffic and water coverage', () => {
   ]);
 });
 
+test('Battlefield V7 bundle keeps browser coverage targeted on smoke and village regressions', () => {
+  const selected = selectFocusedTests([
+    'index.html',
+    'src/systems/world/map-expansion-v7.js',
+    'src/systems/world/village-scale-v7.js',
+    'src/systems/navigation/road-index.js',
+    'src/systems/navigation/route-planner.js',
+    'src/systems/navigation/village-obstacles-v7.js',
+    'tests/village-navigation-v7.spec.js'
+  ]);
+  assert.deepEqual(selected, [
+    'tests/smoke-v1.spec.js',
+    'tests/village-navigation-v7.spec.js',
+    'tests/village-renderer-v2.spec.js'
+  ]);
+});
+
 test('movement changes select movement, motion and speed coverage', () => {
   const selected = selectFocusedTests(['src/systems/movement/speed-model.js']);
   assert.deepEqual(selected, [

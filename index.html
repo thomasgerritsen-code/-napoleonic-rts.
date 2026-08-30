@@ -57,28 +57,31 @@
 <script src="src/v064.js"></script>
 <script src="src/v065.js"></script>
 <script src="src/v066.js"></script>
-<script src="src/systems/navigation/road-index.js?build=a2"></script>
-<script src="src/systems/navigation/route-planner.js?build=a2"></script>
+<!-- V7 battlefield authority expands the world and removes redundant close parallel roads. -->
+<script src="src/systems/world/map-expansion-v7.js?build=village7b"></script>
+<script src="src/systems/navigation/road-index.js?build=a3"></script>
+<script src="src/systems/navigation/route-planner.js?build=a3"></script>
 <script src="src/v067.js"></script>
 <script src="src/v068.js"></script>
 <script src="src/v069-motion.js"></script>
 <script src="src/v069-combat.js"></script>
-<script src="src/v069-map.js?build=village6"></script>
-<script src="src/systems/world/village-layout-v6.js?build=village6"></script>
-<script src="src/systems/world/village-collision-v4.js?build=village6"></script>
+<script src="src/v069-map.js?build=village7b"></script>
+<script src="src/systems/world/village-layout-v6.js?build=village7b"></script>
+<script src="src/systems/world/village-scale-v7.js?build=village7b"></script>
+<script src="src/systems/world/village-collision-v4.js?build=village7b"></script>
 
 <!-- Architecture v2 owns building footprints, road exclusion and village scenery exclusion. -->
-<script src="src/systems/world/building-placement.js?build=village6"></script>
-<script src="src/systems/world/topdown-buildings.js?build=village6"></script>
-<script src="src/systems/world/village-renderer-v2.js?build=village6"></script>
-<script src="src/systems/world/village-yard-blend-v5.js?build=village6"></script>
-<script src="src/systems/world/village-landscape-v6.js?build=village6"></script>
+<script src="src/systems/world/building-placement.js?build=village7b"></script>
+<script src="src/systems/world/topdown-buildings.js?build=village7b"></script>
+<script src="src/systems/world/village-renderer-v2.js?build=village7b"></script>
+<script src="src/systems/world/village-yard-blend-v5.js?build=village7b"></script>
+<script src="src/systems/world/village-landscape-v6.js?build=village7b"></script>
 
 <script src="src/v070.js?build=070"></script>
 <script src="src/v070-motion.js?build=070c"></script>
 <script src="src/v070-regression-fixes.js?build=070d"></script>
 <!-- Reassert hierarchical collision-safe Village V6 rendering after legacy v0.7.0. -->
-<script src="src/systems/world/village-authority-v6.js?build=village6"></script>
+<script src="src/systems/world/village-authority-v6.js?build=village7b"></script>
 <script src="src/systems/navigation/bridge-corridors.js?build=a2"></script>
 <script src="src/systems/navigation/bridge-route-resolver.js?build=a2"></script>
 <script src="src/systems/navigation/bridge-safety.js?build=a2"></script>
@@ -89,6 +92,8 @@
 <script src="src/systems/movement/speed-model.js?build=a2"></script>
 <script src="src/systems/movement/road-exit-stability.js?build=a2"></script>
 <script src="src/systems/movement/api.js?build=a2"></script>
+<!-- Final movement authority: enlarged settlement roofs are physical obstacles for routes and soldiers. -->
+<script src="src/systems/navigation/village-obstacles-v7.js?build=village7b"></script>
 <script src="src/systems/rendering/map-realism.js?build=mapv1"></script>
 <script src="src/systems/rendering/map-ambient-motion.js?build=ambient1"></script>
 <script src="src/systems/rendering/characters.js?build=cv1"></script>

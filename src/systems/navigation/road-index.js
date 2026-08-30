@@ -4,6 +4,7 @@
 // function name remains available while navigation is migrated subsystem-by-subsystem.
 
 const ROAD_INDEX_CELL_V066 = window.NRTS_CONFIG?.navigation?.roadIndexCell || 180;
+const ACTIVE_ROAD_NETWORK_V2 = window.NRTS_ROAD_NETWORK_V7 || ROAD_NETWORK_V066;
 const roadSegmentsV066 = [];
 const roadBucketsV066 = new Map();
 
@@ -11,7 +12,7 @@ function roadBucketKeyV066(gx, gy) {
   return `${gx},${gy}`;
 }
 
-for (const road of ROAD_NETWORK_V066) {
+for (const road of ACTIVE_ROAD_NETWORK_V2) {
   for (let i = 1; i < road.points.length; i++) {
     const a = road.points[i - 1], b = road.points[i], pad = road.width / 2;
     const seg = { road, a, b, segmentIndex:i - 1 };
@@ -47,5 +48,7 @@ roadNetworkAtV066 = function roadNetworkAtArchitectureV2(x,y) {
 window.NRTS_ROAD_INDEX_V2 = Object.freeze({
   cell:ROAD_INDEX_CELL_V066,
   segments:roadSegmentsV066.length,
-  buckets:roadBucketsV066.size
+  buckets:roadBucketsV066.size,
+  roadCount:ACTIVE_ROAD_NETWORK_V2.length,
+  battlefieldV7:Boolean(window.NRTS_ROAD_NETWORK_V7)
 });

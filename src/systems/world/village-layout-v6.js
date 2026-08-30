@@ -10,6 +10,9 @@
     throw new Error('Village road geometry helpers must load before Village V6 layout.');
   }
 
+  const activeRoadNetwork=global.NRTS_ROAD_NETWORK_V7 || ROAD_NETWORK_V066;
+  const activeHamlets=global.NRTS_ROAD_HAMLETS_V7 || ROAD_HAMLETS_V066;
+
   function hashText(text) {
     let h = 2166136261;
     for (let i = 0; i < text.length; i++) {
@@ -48,12 +51,16 @@
 
   function roadBranchesAt(hamlet) {
     const branches=[];
-    for (const road of ROAD_NETWORK_V066) {
+    for (const road of activeRoadNetwork) {
       const g=roadGeometryV069(road,hamlet.x,hamlet.y);
       if (g && g.distance <= road.width/2 + 28) branches.push(g);
     }
     if (!branches.length) {
-      const nearest=nearestRoadGeometryV069(hamlet.x,hamlet.y);
+      let nearest=null;
+      for(const road of activeRoadNetwork){
+        const g=roadGeometryV069(road,hamlet.x,hamlet.y);
+        if(g&&(!nearest||g.edgeClearance<nearest.edgeClearance)) nearest=g;
+      }
       if (nearest) branches.push(nearest);
     }
     return branches;
@@ -66,6 +73,15 @@
       if(Math.hypot(candidate.x-other.x,candidate.y-other.y)<r+or+gap) return false;
     }
     return true;
+  }
+
+  function nearestActiveRoadGeometry(x,y){
+    let best=null;
+    for(const road of activeRoadNetwork){
+      const g=roadGeometryV069(road,x,y);
+      if(g&&(!best||g.edgeClearance<best.edgeClearance)) best=g;
+    }
+    return best;
   }
 
   function makeCandidate(hamlet,branch,zone,slot,kind,state,occupied,options={}) {
@@ -87,7 +103,7 @@
       const y=hamlet.y + branch.ty*direction*(along+lateralJitter) + branch.tx*side*offset;
       if(x<70||y<70||x>WORLD.width-70||y>WORLD.height-70) continue;
 
-      const nearest=nearestRoadGeometryV069(x,y);
+      const nearest=nearestActiveRoadGeometry(x,y);
       if(!nearest) continue;
       const roofRadius=Math.hypot(size.w,size.h)*.5;
       if(nearest.edgeClearance-roofRadius<9 || nearest.edgeClearance>cfg.roadMax) continue;
@@ -128,13 +144,11 @@
     const houses=[];
     const roadCount=branches.length;
 
-    // 1) A readable village core: one civic anchor plus a few close roadside buildings.
     const anchorKind=roadCount>=3 || random(state)>.48 ? 'chapel' : 'inn';
     pushStructure(houses,hamlet,branches[0],'core',0,anchorKind,state,{clusterId:'core',clusterRole:'anchor'});
     pushStructure(houses,hamlet,branches[roadCount>1?1:0],'core',1,'cottage',state,{clusterId:'core',clusterRole:'core-house'});
     pushStructure(houses,hamlet,branches[0],'core',2,random(state)>.55?'inn':'cottage',state,{clusterId:'core',clusterRole:'core-house'});
 
-    // 2) Residential ribbon: varied spacing and mixed cottages/farmhouses along all road arms.
     const residentialCount=5+Math.min(3,roadCount)+Math.floor(random(state)*2);
     for(let i=0;i<residentialCount;i++){
       const branch=branches[(i+1)%branches.length];
@@ -145,7 +159,6 @@
       });
     }
 
-    // 3) Agricultural edge: farmhouse + barn compounds at the settlement fringe.
     const compoundCount=2+(roadCount>=3?1:0);
     for(let c=0;c<compoundCount;c++){
       const branch=branches[(c*2+villageIndex)%branches.length];
@@ -173,7 +186,7 @@
     });
   }
 
-  const villages=Object.freeze(ROAD_HAMLETS_V066.map(buildVillage).filter(Boolean));
+  const villages=Object.freeze(activeHamlets.map(buildVillage).filter(Boolean));
   let structureCount=0,compoundCount=0;
   const zones={core:0,residential:0,'farm-edge':0};
   for(const village of villages){
@@ -191,7 +204,9 @@
     zones:Object.freeze(zones),
     hierarchical:true,
     roadOriented:true,
-    farmCompounds:true
+    farmCompounds:true,
+    roadCount:activeRoadNetwork.length,
+    battlefieldV7:Boolean(global.NRTS_ROAD_NETWORK_V7)
   });
 
   global.__VILLAGE_LAYOUT_V6_DATA__=villages;
@@ -199,6 +214,6 @@
   global.__VILLAGE_LAYOUT_V6__=api;
   nrts.subsystems.register('village-layout-v6',api,{
     phase:'architecture-v2',legacyBridge:false,
-    responsibility:'hierarchical settlement generation with village core, residential ribbon and agricultural edge compounds'
+    responsibility:'hierarchical settlement generation along the active strategic road network'
   });
 })(window);

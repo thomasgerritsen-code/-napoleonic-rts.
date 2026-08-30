@@ -3,6 +3,7 @@
 // Behaviour-compatible extraction of the v0.6.6 route graph. Long marches use
 // actual road junctions; short tactical orders remain ordinary field A* routes.
 
+const ACTIVE_ROUTE_NETWORK_V2 = window.NRTS_ROAD_NETWORK_V7 || ROAD_NETWORK_V066;
 const ROAD_GRAPH_V066 = new Map();
 
 function roadGraphKeyV066(p) { return `${p.x},${p.y}`; }
@@ -12,7 +13,7 @@ function ensureRoadGraphNodeV066(p) {
   return ROAD_GRAPH_V066.get(key);
 }
 
-for (const road of ROAD_NETWORK_V066) {
+for (const road of ACTIVE_ROUTE_NETWORK_V2) {
   for (let i=1;i<road.points.length;i++) {
     const a=ensureRoadGraphNodeV066(road.points[i-1]);
     const b=ensureRoadGraphNodeV066(road.points[i]);
@@ -140,5 +141,7 @@ buildRegimentPathV06=function buildRegimentPathArchitectureV2(start,goal) {
 
 window.NRTS_ROAD_GRAPH_V2 = Object.freeze({
   nodes:ROAD_GRAPH_V066.size,
-  edges:[...ROAD_GRAPH_V066.values()].reduce((sum,node)=>sum+node.edges.length,0)/2
+  edges:[...ROAD_GRAPH_V066.values()].reduce((sum,node)=>sum+node.edges.length,0)/2,
+  roadCount:ACTIVE_ROUTE_NETWORK_V2.length,
+  battlefieldV7:Boolean(window.NRTS_ROAD_NETWORK_V7)
 });
