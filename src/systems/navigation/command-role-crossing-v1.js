@@ -1,11 +1,13 @@
 'use strict';
 // ---------- v1.2.2: command-role crossing continuity ----------
 // Officers and drummers are visually distinct formation members and must not be
-// left behind while the rest of a battalion clears a bridge or ford.
+// left behind while the rest of a battalion clears a bridge or ford. Queue
+// ownership remains authoritative: command roles never advance ahead of a
+// waiting battalion onto a single-lane crossing.
 (function installCommandRoleCrossingV1(global){
   const nrts=global.NRTS;
   if(!nrts||typeof forceBridgeColumnTargetsV068!=='function')return;
-  const stats={roleCorrections:0,drummerCorrections:0,officerCorrections:0};
+  const stats={roleCorrections:0,drummerCorrections:0,officerCorrections:0,queueHolds:0};
 
   function roleMember(reg,u){
     if(!reg||!u)return false;
@@ -39,6 +41,15 @@
   forceBridgeColumnTargetsV068=function forceBridgeColumnTargetsCommandRolesV1(reg,march,info){
     previousForce(reg,march,info);
     if(!reg||reg.destroyed||!info?.forcedColumn)return;
+
+    // The bridge/ford queue owns admission. A waiting battalion must keep every
+    // member, including drummer/officer, behind the hold point. The normal
+    // bridge-column targets produced above already do that correctly.
+    if(info.state==='waiting'||info.state==='queued'){
+      stats.queueHolds++;
+      return;
+    }
+
     const c=WATER_CROSSINGS_V067.find(item=>item.id===info.crossingId);
     if(!c)return;
     const facing=crossingHeadingV068(c,info.initialSide);
@@ -49,14 +60,14 @@
       if(!p)continue;
       u.targetX=p.x;u.targetY=p.y;u.arrivedAtTarget=false;
       u.formationFacing=facing;u.facing=facing;
-      u.commandRoleCrossingV1={crossingId:c.id,correctedAt:elapsed};
+      u.commandRoleCrossingV1={crossingId:c.id,state:info.state,correctedAt:elapsed};
       stats.roleCorrections++;
       if(u.type==='drummer'||u.id===reg.drummerId)stats.drummerCorrections++;
       if(u.type==='officer'||u.id===reg.officerId)stats.officerCorrections++;
     }
   };
 
-  const api=Object.freeze({version:'command-role-crossing-v1.0',stats:()=>({...stats})});
+  const api=Object.freeze({version:'command-role-crossing-v1.1',stats:()=>({...stats})});
   global.__COMMAND_ROLE_CROSSING_V1__=api;
-  nrts.subsystems.register('command-role-crossing',api,{phase:'v1.2.2',legacyBridge:false,responsibility:'keep drummer and officer committed to the active legal bridge/ford corridor until they clear the far exit'});
+  nrts.subsystems.register('command-role-crossing',api,{phase:'v1.2.2',legacyBridge:false,responsibility:'keep drummer and officer committed to the active legal bridge/ford corridor after queue admission, without violating crossing capacity'});
 })(window);
