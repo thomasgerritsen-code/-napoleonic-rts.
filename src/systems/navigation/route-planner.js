@@ -5,6 +5,9 @@
 
 const ACTIVE_ROUTE_NETWORK_V2 = window.NRTS_ROAD_NETWORK_V7 || ROAD_NETWORK_V066;
 const ROAD_GRAPH_V066 = new Map();
+const ROAD_SEEK_MIN_DISTANCE_V122 = Math.min(ROAD_SEEK_MIN_DISTANCE_V065, 520);
+const ROAD_MIN_MEANINGFUL_DISTANCE_V122 = 180;
+const ROAD_MIN_MEANINGFUL_SHARE_V122 = 0.18;
 
 function roadGraphKeyV066(p) { return `${p.x},${p.y}`; }
 function ensureRoadGraphNodeV066(p) {
@@ -101,7 +104,7 @@ buildRegimentPathV06=function buildRegimentPathArchitectureV2(start,goal) {
   const basePath=dedupePathV065(buildRegimentPathV064ForV065(start,goal));
   const baseStats=pathStatsV065(start,basePath,kind);
 
-  if (reference.distance<ROAD_SEEK_MIN_DISTANCE_V065 || kind==='artillery') {
+  if (reference.distance<ROAD_SEEK_MIN_DISTANCE_V122 || kind==='artillery') {
     return attachPlanV065(basePath,{
       choice:'direct',reason:'short-order',kind,
       directTime:reference.time,chosenTime:baseStats.time,
@@ -113,12 +116,13 @@ buildRegimentPathV06=function buildRegimentPathArchitectureV2(start,goal) {
   if (!candidate) return buildRegimentPathV065ForArchitectureV2(start,goal);
 
   const detourRatio=candidate.stats.distance/Math.max(1,reference.distance);
-  const enoughRoad=candidate.stats.roadShare>=0.28 && candidate.stats.roadDistance>=360;
-  const reasonableDetour=detourRatio<=1.65;
-  const worthwhileTime=candidate.stats.time<=reference.time*1.08;
-  const baseIsRoad=baseStats.roadShare>=0.28 && baseStats.roadDistance>=360;
-  const baseWorthwhile=baseStats.time<=reference.time*1.08;
-  const useBaseRoad=baseIsRoad && baseWorthwhile && baseStats.time+0.35<candidate.stats.time;
+  const enoughRoad=candidate.stats.roadShare>=ROAD_MIN_MEANINGFUL_SHARE_V122 && candidate.stats.roadDistance>=ROAD_MIN_MEANINGFUL_DISTANCE_V122;
+  const reasonableDetour=detourRatio<=1.75;
+  const candidateBeatsBase=candidate.stats.time<=baseStats.time*0.985;
+  const worthwhileTime=candidate.stats.time<=reference.time*1.03 || candidateBeatsBase;
+  const baseIsRoad=baseStats.roadShare>=ROAD_MIN_MEANINGFUL_SHARE_V122 && baseStats.roadDistance>=ROAD_MIN_MEANINGFUL_DISTANCE_V122;
+  const baseWorthwhile=baseStats.time<=reference.time*1.03;
+  const useBaseRoad=baseIsRoad && baseWorthwhile && baseStats.time<=candidate.stats.time*1.01;
   const chooseRoad=(enoughRoad&&reasonableDetour&&worthwhileTime)||useBaseRoad;
 
   if (!chooseRoad) {
@@ -135,7 +139,8 @@ buildRegimentPathV06=function buildRegimentPathArchitectureV2(start,goal) {
     choice:'road',reason:'faster-road-route',kind,
     directTime:reference.time,roadTime:stats.time,chosenTime:stats.time,
     detourRatio:stats.distance/Math.max(1,reference.distance),roadShare:stats.roadShare,roadDistance:stats.roadDistance,
-    roadGraph:true
+    roadGraph:true,
+    restoredRoadPreferenceV122:true
   });
 };
 
@@ -143,5 +148,6 @@ window.NRTS_ROAD_GRAPH_V2 = Object.freeze({
   nodes:ROAD_GRAPH_V066.size,
   edges:[...ROAD_GRAPH_V066.values()].reduce((sum,node)=>sum+node.edges.length,0)/2,
   roadCount:ACTIVE_ROUTE_NETWORK_V2.length,
-  battlefieldV7:Boolean(window.NRTS_ROAD_NETWORK_V7)
+  battlefieldV7:Boolean(window.NRTS_ROAD_NETWORK_V7),
+  roadPreferenceV122:true
 });
