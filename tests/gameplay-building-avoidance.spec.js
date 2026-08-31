@@ -53,6 +53,7 @@ test('infantry, cavalry and artillery route around gameplay buildings without st
       const reg=makeGroup(kind,testLane.start);
       if(!reg)throw new Error(`Could not create ${kind} test group`);
       const startCenter=centroid(regimentMembers(reg));
+      const directBlocked=window.__GAMEPLAY_BUILDING_ROUTING_V1__.segmentBlocked(startCenter,testLane.goal,kind);
       orderGroupPathV06(reg,testLane.goal.x,testLane.goal.y,'line',0);
       const initialPath=(reg.path||[]).slice();
       let cursor={x:reg.marchV063?.anchorX??startCenter.x,y:reg.marchV063?.anchorY??startCenter.y};
@@ -71,14 +72,14 @@ test('infantry, cavalry and artillery route around gameplay buildings without st
         }
       }
       const end=centroid(regimentMembers(reg));
-      cases.push({kind,rerouted:!!reg.gameplayBuildingRouteV1?.rerouted,pathLength:initialPath.length,blockedSegments,remaining:+Math.hypot(testLane.goal.x-end.x,testLane.goal.y-end.y).toFixed(1),maxStillSeconds:maxStill,penetrations,progress:+minProgress.toFixed(1),routeStats:window.__GAMEPLAY_BUILDING_ROUTING_V1__.stats()});
+      cases.push({kind,directBlocked,rerouted:!!reg.gameplayBuildingRouteV1?.rerouted,pathLength:initialPath.length,blockedSegments,remaining:+Math.hypot(testLane.goal.x-end.x,testLane.goal.y-end.y).toFixed(1),maxStillSeconds:maxStill,penetrations,progress:+minProgress.toFixed(1),routeStats:window.__GAMEPLAY_BUILDING_ROUTING_V1__.stats()});
     }
-    return{cases,errors:[]};
+    return{cases};
   });
 
   for(const c of result.cases){
-    expect(c.rerouted,`${c.kind} route should be rerouted`).toBe(true);
-    expect(c.pathLength,`${c.kind} should receive a route`).toBeGreaterThan(1);
+    expect(c.directBlocked,`${c.kind} direct line must actually intersect the building`).toBe(true);
+    expect(c.pathLength,`${c.kind} should receive a route`).toBeGreaterThan(0);
     expect(c.blockedSegments,`${c.kind} route must not cross building footprint`).toBe(0);
     expect(c.penetrations,`${c.kind} units must not enter building footprint`).toBe(0);
     expect(c.maxStillSeconds,`${c.kind} must not remain stuck against building`).toBeLessThan(5);
