@@ -1,6 +1,6 @@
 {
   "name": "napoleonic-rts",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Browser Napoleonic RTS with Playwright Chromium regression, stress and soak tests",
   "scripts": {

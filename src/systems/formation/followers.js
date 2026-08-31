@@ -34,6 +34,36 @@ function formalFollowerEligibleV071(u, reg) {
   return !!reg.marchV063?.v064;
 }
 
+function waterSafeFollowerTargetV071(u, tx, ty) {
+  const memory = u?.bridgeLastCrossingV1;
+  if (!memory || !Number.isFinite(tx) || !Number.isFinite(ty) || !segmentCrossesBlockedWaterV067(u.x,u.y,tx,ty)) return {x:tx,y:ty,guarded:false};
+  const c = WATER_CROSSINGS_V067.find(item => item.id === memory.crossingId);
+  if (!c) return {x:tx,y:ty,guarded:false};
+  const direction = -memory.initialSide;
+  const local = crossingLocalArchitectureV2(c,u.x,u.y);
+  const radius = Number(TYPES[u.type]?.radius)||7;
+  const safeHalf = Math.max(8,c.width/2-radius-8);
+  const centeredPerp = Math.max(-safeHalf*.2,Math.min(safeHalf*.2,local.perp));
+  const maxAlong = c.length/2+90;
+  let safe = null;
+  for (const step of [28,18,10,5]) {
+    const along = Math.max(-maxAlong,Math.min(maxAlong,local.along+direction*step));
+    for (const perp of [centeredPerp,0]) {
+      const p = crossingPointArchitectureV2(c,along,perp);
+      if (!waterAtV067(p.x,p.y) && !segmentCrossesBlockedWaterV067(u.x,u.y,p.x,p.y) && Math.hypot(p.x-u.x,p.y-u.y)>1) { safe=p; break; }
+    }
+    if (safe) break;
+  }
+  if (!safe) {
+    const p = crossingPointArchitectureV2(c,Math.max(-maxAlong,Math.min(maxAlong,local.along)),0);
+    if (!waterAtV067(p.x,p.y) && !segmentCrossesBlockedWaterV067(u.x,u.y,p.x,p.y)) safe=p;
+  }
+  if (!safe) return {x:tx,y:ty,guarded:false};
+  u.targetX=safe.x;u.targetY=safe.y;u.arrivedAtTarget=false;
+  u.bridgeFollowerSafetyV1={crossingId:c.id,correctedAt:elapsed,motionGuard:true};
+  return {x:safe.x,y:safe.y,guarded:true};
+}
+
 function dampedSlotMoveV071(u, reg, tx, ty, dt) {
   const cfg = window.NRTS_CONFIG?.formation?.followers || {};
   const movementCfg = window.NRTS_CONFIG?.movement || {};
@@ -131,7 +161,10 @@ if (V071_ACTIVE) {
   const moveTowardV070ForV071 = moveToward;
   moveToward = function moveTowardV071(u, tx, ty, dt, speed = TYPES[u.type].speed) {
     const reg = u.regimentId ? getRegiment(u.regimentId) : null;
-    if (formalFollowerEligibleV071(u, reg)) return dampedSlotMoveV071(u, reg, tx, ty, dt);
+    if (formalFollowerEligibleV071(u, reg)) {
+      const guarded = waterSafeFollowerTargetV071(u,tx,ty);
+      return dampedSlotMoveV071(u, reg, guarded.x, guarded.y, dt);
+    }
     if (u.slotFollowerV071 && (!reg || !reg.marchV063?.v064 || u.routing)) u.slotFollowerV071 = null;
     return moveTowardV070ForV071(u, tx, ty, dt, speed);
   };

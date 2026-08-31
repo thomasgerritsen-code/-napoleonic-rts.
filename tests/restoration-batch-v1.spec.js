@@ -145,12 +145,14 @@ test('final AI and stuck-recovery authorities survive the legacy stack',async({p
       stuck:window.__STUCK_RECOVERY_V1__.stats(),
       aiVersion:window.__AI_AUTHORITY_V2__.version,
       stuckVersion:window.__STUCK_RECOVERY_V1__.version,
+      crossingRecoveryIsolation:window.__STUCK_RECOVERY_V2__?.crossingRecoveryIsolation===true,
       localAvoidance:window.__STUCK_RECOVERY_V2__?.localBuildingAvoidance===true,
       plan:aiPlan
     };
   });
   expect(result.aiVersion).toBe('ai-authority-v2');
-  expect(result.stuckVersion).toBe('stuck-recovery-v2');
+  expect(result.stuckVersion).toMatch(/^stuck-recovery-v2(?:\.\d+)?$/);
+  expect(result.crossingRecoveryIsolation).toBe(true);
   expect(result.localAvoidance).toBe(true);
   expect(result.after.developmentTicks-result.before.developmentTicks).toBe(8);
   expect(result.after.militaryTicks-result.before.militaryTicks).toBe(1);

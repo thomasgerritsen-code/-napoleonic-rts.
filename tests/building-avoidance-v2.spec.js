@@ -61,10 +61,12 @@ test('stuck recovery v2 exposes local avoidance contract', async ({page})=>{
     version:window.__STUCK_RECOVERY_V2__.version,
     localBuildingAvoidance:window.__STUCK_RECOVERY_V2__.localBuildingAvoidance,
     formationSlotResume:window.__STUCK_RECOVERY_V2__.formationSlotResume,
+    crossingRecoveryIsolation:window.__STUCK_RECOVERY_V2__.crossingRecoveryIsolation,
     config:window.NRTS_CONFIG.movement.stuckRecovery.localAvoidance
   }));
-  expect(api.version).toBe('stuck-recovery-v2');
+  expect(api.version).toMatch(/^stuck-recovery-v2(?:\.\d+)?$/);
   expect(api.localBuildingAvoidance).toBe(true);
   expect(api.formationSlotResume).toBe(true);
+  expect(api.crossingRecoveryIsolation).toBe(true);
   expect(api.config.cornerClearance).toBeGreaterThan(api.config.clearance);
 });

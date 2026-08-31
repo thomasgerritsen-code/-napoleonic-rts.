@@ -77,3 +77,4 @@ const cavArtScript=document.createElement('script');cavArtScript.src='src/system
 const weatherScript=document.createElement('script');weatherScript.src='src/systems/world/battlefield-weather.js?build=bw1';weatherScript.async=false;document.body.appendChild(weatherScript);
 const objectiveScript=document.createElement('script');objectiveScript.src='src/systems/scenario/objectives.js?build=os1';objectiveScript.async=false;document.body.appendChild(objectiveScript);
 const frameStabilityScript=document.createElement('script');frameStabilityScript.src='src/systems/rendering/frame-stability-v1.js?build=smooth1';frameStabilityScript.async=false;document.body.appendChild(frameStabilityScript);
+const postCrossingTargetSafetyScript=document.createElement('script');postCrossingTargetSafetyScript.src='src/systems/navigation/post-crossing-target-safety-v1.js?build=pcts1';postCrossingTargetSafetyScript.async=false;document.body.appendChild(postCrossingTargetSafetyScript);
