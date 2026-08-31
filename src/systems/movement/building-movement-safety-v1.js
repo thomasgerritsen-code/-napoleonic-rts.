@@ -4,7 +4,7 @@
   const nrts=global.NRTS;
   if(!nrts)throw new Error('NRTS foundation runtime must load before building movement safety.');
 
-  const stats={followerDetours:0,penetrationCorrections:0,duplicateReplansSuppressed:0,routeFailures:0};
+  const stats={followerDetours:0,penetrationCorrections:0,duplicateReplansSuppressed:0,routeFailures:0,stableLocalDetours:0};
   const cornerExtra=10;
   const arrival=8;
 
@@ -128,6 +128,14 @@
     const previousDamped=dampedSlotMoveV071;
     dampedSlotMoveV071=function dampedSlotMoveBuildingSafetyV122(u,reg,tx,ty,dt){
       const safe=guardedFollowerTarget(u,reg,tx,ty);
+      // The generic local-avoidance layer has a short anti-stale timeout. A building
+      // follower detour is authoritative while its corner is still valid, so keep the
+      // nested local waypoint alive until we actually reach/clear that corner instead
+      // of allowing a 3.2 s timeout to make the unit alternate corners indefinitely.
+      if(u.buildingFollowerSafetyV122&&u.localAvoidanceV2){
+        u.localAvoidanceV2.startedAt=elapsed;
+        stats.stableLocalDetours++;
+      }
       const result=previousDamped(u,reg,safe.x,safe.y,dt);
       resolvePenetration(u);
       return result;
@@ -142,13 +150,17 @@
       const sameTarget=target&&Math.hypot(target.x-x,target.y-y)<2;
       const sameFormation=!formation||formation===reg?.formation;
       const crossingBusy=!!(reg?.crossingTrafficV068?.forcedColumn&&['queued','waiting','approach','crossing','clearing'].includes(reg.crossingTrafficV068.state));
-      if(buildingRoute?.rerouted&&sameTarget&&sameFormation&&!crossingBusy&&Array.isArray(reg.path)&&reg.path.length){
-        const members=typeof regimentMembers==='function'?regimentMembers(reg):[];
-        let cursor=members.length?centroid(members):null,safe=!!cursor;
+      if(buildingRoute?.active&&!buildingRoute.failed&&sameTarget&&sameFormation&&!crossingBusy&&Array.isArray(reg.path)&&reg.path.length){
+        // Validate the route chain itself. The current formation centroid may already
+        // have passed the first waypoint; validating centroid -> path[0] then creates
+        // a false blocker and made stuck-recovery rebuild the same route every ~3 s.
         const api=global.__GAMEPLAY_BUILDING_ROUTING_V1__;
-        if(api?.segmentBlocked&&cursor){
-          for(const p of reg.path){if(api.segmentBlocked(cursor,p,buildingRoute.kind,buildingRoute.pad)){safe=false;break;}cursor=p;}
-        }else safe=false;
+        let safe=!!api?.segmentBlocked;
+        if(safe){
+          for(let i=1;i<reg.path.length;i++){
+            if(api.segmentBlocked(reg.path[i-1],reg.path[i],buildingRoute.kind,buildingRoute.pad)){safe=false;break;}
+          }
+        }
         if(safe){stats.duplicateReplansSuppressed++;return;}
       }
       return previousOrder(reg,x,y,formation,finalFacing);
@@ -162,7 +174,7 @@
     for(const u of units)resolvePenetration(u);
   };
 
-  const api=Object.freeze({version:'building-movement-safety-v1.0',formalFollowerDetours:true,physicalBuildingSeparation:true,stableBuildingReplans:true,stats:()=>({...stats})});
+  const api=Object.freeze({version:'building-movement-safety-v1.1',formalFollowerDetours:true,physicalBuildingSeparation:true,stableBuildingReplans:true,stableNestedDetours:true,stats:()=>({...stats})});
   global.__BUILDING_MOVEMENT_SAFETY_V1__=api;
   nrts.subsystems.register('building-movement-safety',api,{phase:'v1.2.2',legacyBridge:false,responsibility:'keep moving troop envelopes outside gameplay-building footprints and stabilize already-safe building detours'});
 })(window);
