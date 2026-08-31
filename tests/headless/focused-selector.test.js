@@ -23,7 +23,7 @@ test('musketeer sprite authority stays focused on sprite rendering', () => {
 
 test('Battlefield V7 bundle keeps browser coverage targeted on smoke and village regressions', () => {
   const selected = selectFocusedTests(['src/systems/world/map-expansion-v7.js','src/systems/world/village-scale-v7.js','src/systems/navigation/road-index.js','src/systems/navigation/route-planner.js','src/systems/navigation/village-obstacles-v7.js','tests/village-navigation-v7.spec.js']);
-  assert.deepEqual(selected, ['tests/building-avoidance-v2.spec.js','tests/smoke-v1.spec.js','tests/village-navigation-v7.spec.js','tests/village-renderer-v2.spec.js']);
+  assert.deepEqual(selected, ['tests/building-avoidance-v2.spec.js','tests/gameplay-building-avoidance.spec.js','tests/smoke-v1.spec.js','tests/village-navigation-v7.spec.js','tests/village-renderer-v2.spec.js']);
 });
 
 test('movement changes select movement, motion and speed coverage', () => {
@@ -83,7 +83,14 @@ test('restoration visual and ecology changes use one targeted browser regression
 
 test('stuck recovery keeps movement regressions plus restoration and local avoidance coverage', () => {
   const selected = selectFocusedTests(['src/systems/movement/stuck-recovery-v1.js']);
-  assert.deepEqual(selected, ['tests/building-avoidance-v2.spec.js','tests/motion-v071.spec.js','tests/movement-formation-consolidation.spec.js','tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js','tests/speed-v071.spec.js']);
+  assert.deepEqual(selected, ['tests/building-avoidance-v2.spec.js','tests/gameplay-building-avoidance.spec.js','tests/motion-v071.spec.js','tests/movement-formation-consolidation.spec.js','tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js','tests/speed-v071.spec.js']);
+});
+
+test('gameplay building routing always selects its dedicated regression', () => {
+  const selected = selectFocusedTests(['src/systems/navigation/gameplay-building-routing-v1.js']);
+  assert(selected.includes('tests/gameplay-building-avoidance.spec.js'));
+  assert(selected.includes('tests/building-avoidance-v2.spec.js'));
+  assert(selected.includes('tests/navigation-v2.spec.js'));
 });
 
 test('final AI authority keeps AI separation plus restoration coverage', () => {
