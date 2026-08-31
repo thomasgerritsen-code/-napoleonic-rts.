@@ -29,7 +29,10 @@ function selectFocusedTests(files) {
   const addVillage = () => selected.add('tests/village-renderer-v2.spec.js');
   const addArchitectureV21 = () => selected.add('tests/architecture-v21.spec.js');
   const addRestoration = () => selected.add('tests/restoration-batch-v1.spec.js');
-  const addBuildingAvoidance = () => selected.add('tests/building-avoidance-v2.spec.js');
+  const addBuildingAvoidance = () => {
+    selected.add('tests/building-avoidance-v2.spec.js');
+    selected.add('tests/gameplay-building-avoidance.spec.js');
+  };
   const addBridgeFollowerSafety = () => selected.add('tests/bridge-follower-safety-v1.spec.js');
   const addMusketeerSprites = () => selected.add('tests/musketeer-sprites-v1.spec.js');
 
@@ -47,7 +50,7 @@ function selectFocusedTests(files) {
 
     if (file === 'src/systems/world/map-expansion-v7.js' || file === 'src/systems/world/village-scale-v7.js' || file === 'src/systems/navigation/village-obstacles-v7.js' || file === 'tests/village-navigation-v7.spec.js') selected.add('tests/village-navigation-v7.spec.js');
 
-    if (file === 'src/systems/movement/stuck-recovery-v1.js' || file === 'src/systems/navigation/village-obstacles-v7.js' || file === 'src/systems/world/gameplay-building-scale-v1.js' || file === 'tests/building-avoidance-v2.spec.js') addBuildingAvoidance();
+    if (file === 'src/systems/movement/stuck-recovery-v1.js' || file === 'src/systems/navigation/village-obstacles-v7.js' || file === 'src/systems/navigation/gameplay-building-routing-v1.js' || file === 'src/systems/world/gameplay-building-scale-v1.js' || file === 'tests/building-avoidance-v2.spec.js' || file === 'tests/gameplay-building-avoidance.spec.js') addBuildingAvoidance();
 
     const isV7NavigationInfrastructure = battlefieldV7Bundle && (file === 'src/systems/navigation/road-index.js' || file === 'src/systems/navigation/route-planner.js' || file === 'src/systems/navigation/village-obstacles-v7.js');
     const isNavigationFacadeOnly = file === 'src/systems/navigation/api.js';

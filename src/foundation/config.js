@@ -22,10 +22,11 @@
         nudgeDistance: 18,
         localAvoidance: Object.freeze({
           clearance: 7,
+          unitPadding: 12,
           cornerClearance: 13,
           waypointArrival: 7,
           directResumeClearance: 2,
-          maxWaypointSeconds: 3.2
+          maxWaypointSeconds: 4.2
         })
       })
     }),
@@ -55,6 +56,11 @@
         openPointPadding: 6,
         maxOpenPointResolvePasses: 12,
         maxUnitResolvePasses: 8
+      }),
+      gameplayBuildings: Object.freeze({
+        routeMargin: Object.freeze({ infantry:34, cavalry:42, artillery:46, worker:24 }),
+        cornerExtra: 14,
+        maxResolvePasses: 10
       }),
       bridge: Object.freeze({
         approachClearance: 54,
