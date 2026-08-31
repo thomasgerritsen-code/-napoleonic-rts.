@@ -4,7 +4,7 @@
   const nrts=global.NRTS;
   if(!nrts)throw new Error('NRTS foundation runtime must load before building movement safety.');
 
-  const stats={followerDetours:0,penetrationCorrections:0,duplicateReplansSuppressed:0,routeFailures:0,stableLocalDetours:0};
+  const stats={followerDetours:0,penetrationCorrections:0,routeFailures:0,stableFollowerDetours:0,commandResets:0};
   const cornerExtra=10;
   const arrival=8;
 
@@ -90,21 +90,35 @@
     while(c>=0){ids.push(c);if(c===0)break;c=prev[c];if(c<0){stats.routeFailures++;return null;}}
     ids.reverse();return ids.slice(1).map(i=>nodes[i]);
   }
+  function commandTarget(reg){
+    const t=reg?.finalTarget;
+    return t&&Number.isFinite(t.x)&&Number.isFinite(t.y)?t:null;
+  }
   function guardedFollowerTarget(u,reg,tx,ty){
-    const final={x:tx,y:ty},pad=padFor(u),kind=groupKindV06(reg);
+    const final={x:tx,y:ty},pad=padFor(u),kind=groupKindV06(reg),command=commandTarget(reg);
     let state=u.buildingFollowerSafetyV122||null;
     const directClear=edgeClear({x:u.x,y:u.y},final,pad,kind);
     if(directClear){u.buildingFollowerSafetyV122=null;return final;}
     if(state){
       const waypoint={x:state.x,y:state.y};
-      const targetMoved=Math.hypot(final.x-state.finalX,final.y-state.finalY)>28;
-      if(Math.hypot(u.x-waypoint.x,u.y-waypoint.y)<=arrival||targetMoved||!edgeClear({x:u.x,y:u.y},waypoint,pad,kind))state=null;
+      const commandChanged=!!(command&&Number.isFinite(state.commandX)&&Math.hypot(command.x-state.commandX,command.y-state.commandY)>24);
+      const invalidWaypoint=!edgeClear({x:u.x,y:u.y},waypoint,pad,kind);
+      if(Math.hypot(u.x-waypoint.x,u.y-waypoint.y)<=arrival||commandChanged||invalidWaypoint){
+        if(commandChanged)stats.commandResets++;
+        state=null;
+      }else{
+        // Formation slots move continuously while the battalion rounds a corner. That is
+        // not a new order: preserve the chosen safe corner and only refresh the slot goal.
+        state.finalX=final.x;state.finalY=final.y;
+        if(command){state.commandX=command.x;state.commandY=command.y;}
+        stats.stableFollowerDetours++;
+      }
     }
     if(!state){
       const hit=firstHit({x:u.x,y:u.y},final,pad);
       const path=route({x:u.x,y:u.y},final,u,hit?.id||null);
       if(path?.length&&Math.hypot(path[0].x-final.x,path[0].y-final.y)>2){
-        state={x:path[0].x,y:path[0].y,finalX:final.x,finalY:final.y,buildingId:hit?.id||null,startedAt:elapsed};
+        state={x:path[0].x,y:path[0].y,finalX:final.x,finalY:final.y,commandX:command?.x??null,commandY:command?.y??null,buildingId:hit?.id||null,startedAt:elapsed};
         u.buildingFollowerSafetyV122=state;stats.followerDetours++;
       }
     }
@@ -128,42 +142,9 @@
     const previousDamped=dampedSlotMoveV071;
     dampedSlotMoveV071=function dampedSlotMoveBuildingSafetyV122(u,reg,tx,ty,dt){
       const safe=guardedFollowerTarget(u,reg,tx,ty);
-      // The generic local-avoidance layer has a short anti-stale timeout. A building
-      // follower detour is authoritative while its corner is still valid, so keep the
-      // nested local waypoint alive until we actually reach/clear that corner instead
-      // of allowing a 3.2 s timeout to make the unit alternate corners indefinitely.
-      if(u.buildingFollowerSafetyV122&&u.localAvoidanceV2){
-        u.localAvoidanceV2.startedAt=elapsed;
-        stats.stableLocalDetours++;
-      }
       const result=previousDamped(u,reg,safe.x,safe.y,dt);
       resolvePenetration(u);
       return result;
-    };
-  }
-
-  if(typeof orderGroupPathV06==='function'){
-    const previousOrder=orderGroupPathV06;
-    orderGroupPathV06=function orderGroupPathBuildingStabilityV122(reg,x,y,formation=reg?.formation,finalFacing=null){
-      const buildingRoute=reg?.gameplayBuildingRouteV1;
-      const target=reg?.finalTarget;
-      const sameTarget=target&&Math.hypot(target.x-x,target.y-y)<2;
-      const sameFormation=!formation||formation===reg?.formation;
-      const crossingBusy=!!(reg?.crossingTrafficV068?.forcedColumn&&['queued','waiting','approach','crossing','clearing'].includes(reg.crossingTrafficV068.state));
-      if(buildingRoute?.active&&!buildingRoute.failed&&sameTarget&&sameFormation&&!crossingBusy&&Array.isArray(reg.path)&&reg.path.length){
-        // Validate the route chain itself. The current formation centroid may already
-        // have passed the first waypoint; validating centroid -> path[0] then creates
-        // a false blocker and made stuck-recovery rebuild the same route every ~3 s.
-        const api=global.__GAMEPLAY_BUILDING_ROUTING_V1__;
-        let safe=!!api?.segmentBlocked;
-        if(safe){
-          for(let i=1;i<reg.path.length;i++){
-            if(api.segmentBlocked(reg.path[i-1],reg.path[i],buildingRoute.kind,buildingRoute.pad)){safe=false;break;}
-          }
-        }
-        if(safe){stats.duplicateReplansSuppressed++;return;}
-      }
-      return previousOrder(reg,x,y,formation,finalFacing);
     };
   }
 
@@ -174,7 +155,7 @@
     for(const u of units)resolvePenetration(u);
   };
 
-  const api=Object.freeze({version:'building-movement-safety-v1.1',formalFollowerDetours:true,physicalBuildingSeparation:true,stableBuildingReplans:true,stableNestedDetours:true,stats:()=>({...stats})});
+  const api=Object.freeze({version:'building-movement-safety-v1.2',formalFollowerDetours:true,physicalBuildingSeparation:true,stableFollowerDetours:true,stats:()=>({...stats})});
   global.__BUILDING_MOVEMENT_SAFETY_V1__=api;
-  nrts.subsystems.register('building-movement-safety',api,{phase:'v1.2.2',legacyBridge:false,responsibility:'keep moving troop envelopes outside gameplay-building footprints and stabilize already-safe building detours'});
+  nrts.subsystems.register('building-movement-safety',api,{phase:'v1.2.2',legacyBridge:false,responsibility:'keep moving troop envelopes outside gameplay-building footprints while preserving one safe follower corner across moving formation slots'});
 })(window);
