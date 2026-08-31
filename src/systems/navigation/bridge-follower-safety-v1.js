@@ -12,7 +12,7 @@
   const advanceStep=Math.max(12,Number(cfg.memberAdvanceStep)||28);
   const releasePadding=Math.max(35,Number(cfg.memberReleasePadding)||90);
   const releaseMemberMargin=Math.max(14,Number(cfg.memberReleaseMargin)||24);
-  const stats={corrections:0,resumes:0,preventedEarlyReleases:0,acceptedLocalAxisReleases:0,waterRecoveries:0,postReleaseGuards:0,motionGuards:0,forwardCorrections:0,regiments:new Set()};
+  const stats={corrections:0,resumes:0,preventedEarlyReleases:0,acceptedLocalAxisReleases:0,waterRecoveries:0,postReleaseGuards:0,motionGuards:0,memoryReleases:0,forwardCorrections:0,regiments:new Set()};
 
   function legalSegment(u,point){
     return point&&Number.isFinite(point.x)&&Number.isFinite(point.y)&&
@@ -24,7 +24,9 @@
     const current=crossingLocalArchitectureV2(c,u.x,u.y);
     const target=crossingLocalArchitectureV2(c,u.targetX,u.targetY);
     const releaseAlong=c.length/2+releasePadding;
-    if(Math.abs(current.along)>releaseAlong&&Math.abs(target.along)>releaseAlong)return null;
+    const currentProgress=current.along*direction;
+    const targetProgress=target.along*direction;
+    if(currentProgress>releaseAlong&&targetProgress>releaseAlong)return null;
 
     const radius=Number(TYPES[u.type]?.radius)||7;
     const laneClearance=c.type==='ford'?Math.max(6,deckClearance*.75):deckClearance;
@@ -155,12 +157,18 @@
     const remembered=crossingMemory(u);
     if(!remembered)return false;
     const {memory,c}=remembered;
+    const direction=-memory.initialSide;
     const local=crossingLocalArchitectureV2(c,u.x,u.y);
     const targetBlocked=Number.isFinite(u.targetX)&&Number.isFinite(u.targetY)&&segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY);
-    const nearExit=Math.abs(local.along)<=c.length/2+releasePadding;
     const inWater=waterAtV067(u.x,u.y);
+    const safelyPastFarExit=local.along*direction>c.length/2+releasePadding;
 
-    if(!nearExit&&!inWater&&!targetBlocked){u.bridgeLastCrossingV1=null;return false;}
+    if(safelyPastFarExit&&!inWater&&!targetBlocked){
+      u.bridgeLastCrossingV1=null;
+      if(u.bridgeFollowerSafetyV1)u.bridgeFollowerSafetyV1=null;
+      stats.memoryReleases++;
+      return false;
+    }
     if(!inWater&&!targetBlocked)return false;
 
     if(inWater){
@@ -189,11 +197,6 @@
     }
   };
 
-  // Final movement owner for a remembered crossing. The generic smooth follower is
-  // allowed to create its normal formation slot first; if that direct segment would
-  // cut through blocked water, this guard replaces the actual unit target and motion
-  // with a forward corridor waypoint for this tick. Normal formation resumes as soon
-  // as the direct slot segment is safe.
   const previousMoveToward=moveToward;
   moveToward=function moveTowardWithCrossingFollowerGuardV1(u,tx,ty,dt,speed=TYPES[u.type].speed){
     if(!u||u.dead||u.type==='artillery')return previousMoveToward(u,tx,ty,dt,speed);
@@ -208,13 +211,11 @@
     return previousMoveToward(u,safe.x,safe.y,dt,speed);
   };
 
-  nrts.events.on('game:reset',()=>{});
-
   const api=Object.freeze({
-    version:'bridge-follower-safety-v1.2',deckCorridor:true,fordCorridor:true,formationResume:true,memberReleaseGate:true,localAxisReleaseCompatible:true,waterStragglerRecovery:true,postReleaseGuard:true,motionGuard:true,forwardProgressGuard:true,
-    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,acceptedLocalAxisReleases:stats.acceptedLocalAxisReleases,waterRecoveries:stats.waterRecoveries,postReleaseGuards:stats.postReleaseGuards,motionGuards:stats.motionGuards,forwardCorrections:stats.forwardCorrections,regiments:stats.regiments.size}),
+    version:'bridge-follower-safety-v1.3',deckCorridor:true,fordCorridor:true,formationResume:true,memberReleaseGate:true,directionalMemoryRelease:true,localAxisReleaseCompatible:true,waterStragglerRecovery:true,postReleaseGuard:true,motionGuard:true,forwardProgressGuard:true,
+    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,acceptedLocalAxisReleases:stats.acceptedLocalAxisReleases,waterRecoveries:stats.waterRecoveries,postReleaseGuards:stats.postReleaseGuards,motionGuards:stats.motionGuards,memoryReleases:stats.memoryReleases,forwardCorrections:stats.forwardCorrections,regiments:stats.regiments.size}),
     config:Object.freeze({deckClearance,advanceStep,releasePadding,releaseMemberMargin})
   });
   global.__BRIDGE_FOLLOWER_SAFETY_V1__=api;
-  nrts.subsystems.register('bridge-follower-safety',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'keep lagging formation members inside legal bridge and ford lanes through target assignment and final follower motion until their direct formation-slot segment is water-safe'});
+  nrts.subsystems.register('bridge-follower-safety',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'retain per-member crossing ownership until each follower is directionally beyond the far bridge/ford exit, keeping all intermediate formation targets water-safe'});
 })(window);
