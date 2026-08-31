@@ -12,7 +12,7 @@
   const advanceStep=Math.max(12,Number(cfg.memberAdvanceStep)||28);
   const releasePadding=Math.max(35,Number(cfg.memberReleasePadding)||90);
   const releaseMemberMargin=Math.max(14,Number(cfg.memberReleaseMargin)||24);
-  const stats={corrections:0,resumes:0,preventedEarlyReleases:0,waterRecoveries:0,postReleaseGuards:0,forwardCorrections:0,regiments:new Set()};
+  const stats={corrections:0,resumes:0,preventedEarlyReleases:0,acceptedLocalAxisReleases:0,waterRecoveries:0,postReleaseGuards:0,forwardCorrections:0,regiments:new Set()};
 
   function legalSegment(u,point){
     return point&&Number.isFinite(point.x)&&Number.isFinite(point.y)&&
@@ -39,11 +39,6 @@
     }
 
     const centeredPerp=Math.max(-safeHalf*.35,Math.min(safeHalf*.35,current.perp));
-
-    // If a member is actually outside the crossing lane, centre it first at the
-    // same longitudinal position. Otherwise a "safe" target at the current along
-    // coordinate can freeze a perfectly centred rear file forever. Every normal
-    // water-safety correction therefore advances the member toward the far bank.
     if(currentOutsideSafeLane){
       let point=crossingPointArchitectureV2(c,current.along,centeredPerp);
       if(legalSegment(u,point)&&Math.hypot(point.x-u.x,point.y-u.y)>1.5)return point;
@@ -61,8 +56,6 @@
       if(legalSegment(u,point)&&Math.hypot(point.x-u.x,point.y-u.y)>1.5){stats.forwardCorrections++;return point;}
     }
 
-    // Last-resort lateral correction is preferable to stepping into blocked water,
-    // but only return a stationary target when absolutely no legal progress exists.
     let point=crossingPointArchitectureV2(c,current.along,0);
     if(legalSegment(u,point)&&Math.hypot(point.x-u.x,point.y-u.y)>1.5)return point;
     return {x:u.x,y:u.y};
@@ -106,13 +99,27 @@
       return local.along*direction>clearAlong;
     });
   }
+  function anyLivingMemberInWater(reg){
+    return regimentMembers(reg).some(u=>u&&!u.dead&&waterAtV067(u.x,u.y));
+  }
 
   const previousUpdateHolderState=updateHolderStateV068;
   updateHolderStateV068=function updateHolderStateFollowerReleaseSafetyV1(reg,march,info,c){
     const wasActive=!!(c&&info?.forcedColumn&&!['waiting','clearing'].includes(info.state));
     previousUpdateHolderState(reg,march,info,c);
     if(!wasActive||!reg||reg.destroyed||everyLivingMemberSafelyCleared(reg,c,info))return;
-    if(reg.crossingTrafficV068?.state!=='clearing')return;
+    const released=reg.crossingTrafficV068;
+    if(released?.state!=='clearing')return;
+
+    // A deliberate local-axis release exists specifically to break the circular
+    // dependency where the anchor cannot advance until bridge-column mode ends.
+    // Keep it when nobody is actually in blocked water; the per-member crossing
+    // memory below then guards trailing files until their normal slots are safe.
+    if(released.localAxisRelease&&!anyLivingMemberInWater(reg)){
+      stats.acceptedLocalAxisReleases++;stats.regiments.add(reg.id);
+      return;
+    }
+
     info.state='crossing';info.entered=true;info.forcedColumn=true;
     reg.crossingTrafficV068=info;
     const traffic=CROSSING_TRAFFIC_V068.get(c.id);
@@ -157,9 +164,6 @@
     return true;
   }
 
-  // Keep a short per-member memory after group traffic releases a crossing. This
-  // prevents restored formation slots from pulling a rear file diagonally outside
-  // a bridge deck or ford lane, and rescues an exceptional water excursion.
   const previousUpdateGroupPaths=updateGroupPathsV06;
   updateGroupPathsV06=function updateGroupPathsFollowerWaterRecoveryV1(){
     previousUpdateGroupPaths();
@@ -173,8 +177,8 @@
   };
 
   const api=Object.freeze({
-    version:'bridge-follower-safety-v1',deckCorridor:true,fordCorridor:true,formationResume:true,memberReleaseGate:true,waterStragglerRecovery:true,postReleaseGuard:true,forwardProgressGuard:true,
-    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,waterRecoveries:stats.waterRecoveries,postReleaseGuards:stats.postReleaseGuards,forwardCorrections:stats.forwardCorrections,regiments:stats.regiments.size}),
+    version:'bridge-follower-safety-v1.1',deckCorridor:true,fordCorridor:true,formationResume:true,memberReleaseGate:true,localAxisReleaseCompatible:true,waterStragglerRecovery:true,postReleaseGuard:true,forwardProgressGuard:true,
+    stats:()=>({corrections:stats.corrections,resumes:stats.resumes,preventedEarlyReleases:stats.preventedEarlyReleases,acceptedLocalAxisReleases:stats.acceptedLocalAxisReleases,waterRecoveries:stats.waterRecoveries,postReleaseGuards:stats.postReleaseGuards,forwardCorrections:stats.forwardCorrections,regiments:stats.regiments.size}),
     config:Object.freeze({deckClearance,advanceStep,releasePadding,releaseMemberMargin})
   });
   global.__BRIDGE_FOLLOWER_SAFETY_V1__=api;
