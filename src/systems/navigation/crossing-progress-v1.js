@@ -6,7 +6,17 @@
   if(!global.NRTS||typeof updateHolderStateV068!=='function')return;
   const previousUpdateHolderState=updateHolderStateV068;
   const progressState=new Map();
-  const stats={updates:0,localAxisReleases:0,releaseWithTrailingFollowers:0,stalledAxisReleases:0,upstreamReleases:0};
+  const stats={updates:0,localAxisReleases:0,releaseWithTrailingFollowers:0,stalledAxisReleases:0,upstreamReleases:0,lifecycleResets:0};
+
+  function resetTransientCrossingState(){
+    progressState.clear();
+    if(typeof CROSSING_TRAFFIC_V068!=='undefined')for(const state of CROSSING_TRAFFIC_V068.values()){
+      state.holderIds=[];
+      state.queue=[];
+    }
+    stats.lifecycleResets++;
+  }
+  global.NRTS.events.on('game:reset',resetTransientCrossingState);
 
   function normalReleaseThreshold(c){
     return c.length/2+Math.max(28,Math.min(48,CROSSING_RELEASE_DISTANCE_V068-c.length/2));
@@ -84,17 +94,18 @@
   };
 
   const api=Object.freeze({
-    version:'crossing-progress-v1.2',
+    version:'crossing-progress-v1.3',
     wrapsActiveGuidance:true,
     localAxisRelease:true,
     stalledAxisRelease:true,
+    lifecycleReset:true,
     followerSafetyOwnsTail:true,
     stats:()=>({...stats,tracked:progressState.size})
   });
   global.__CROSSING_PROGRESS_V1__=api;
   if(global.NRTS.subsystems.has('crossing-progress')){
-    global.NRTS.services?.provide?.('crossing-progress','src/systems/navigation/crossing-progress-v1.js',api,{generation:29,legacyBridge:false});
+    global.NRTS.services?.provide?.('crossing-progress','src/systems/navigation/crossing-progress-v1.js',api,{generation:30,legacyBridge:false});
   }else{
-    global.NRTS.subsystems.register('crossing-progress',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'post-process active bridge/ford guidance and release self-locking crossing traffic from local-axis progress'});
+    global.NRTS.subsystems.register('crossing-progress',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'post-process active bridge/ford guidance, reset transient crossing ownership between battles and release self-locking crossing traffic from local-axis progress'});
   }
 })(window);
