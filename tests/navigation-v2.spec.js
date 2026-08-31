@@ -20,7 +20,7 @@ async function openNavigationV2(page) {
   return pageErrors;
 }
 
-test('Architecture v2 owns road lookup and route planning without legacy v066 runtime patches', async ({page}) => {
+test('Architecture v2.1 owns road lookup and route planning without legacy v066 runtime patches', async ({page}) => {
   const errors=await openNavigationV2(page);
   const nav=await page.evaluate(() => ({
     diagnostics:window.NRTS.diagnostics.snapshot().subsystems.find(s=>s.name==='navigation'),
@@ -31,7 +31,7 @@ test('Architecture v2 owns road lookup and route planning without legacy v066 ru
     retired:window.NRTS_LEGACY_MANIFEST.retiredFromRuntime
   }));
 
-  expect(nav.diagnostics.meta.phase).toBe('architecture-v2');
+  expect(nav.diagnostics.meta.phase).toBe('architecture-v2.1');
   expect(nav.diagnostics.meta.legacyBridge).toBe(false);
   expect(nav.stats.roadIndex.segments).toBeGreaterThan(20);
   expect(nav.stats.roadGraph.nodes).toBeGreaterThan(20);
