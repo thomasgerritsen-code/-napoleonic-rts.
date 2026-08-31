@@ -8,14 +8,15 @@ async function openGame(page) {
     Math.random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
   });
   await page.goto('/?test=1', { waitUntil: 'networkidle' });
-  await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__?.waterSystemV067 && window.__RTS_DEBUG__?.routeWaterAuditV067 && window.RTS_SIM));
+  await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__?.waterSystemV067 && window.__RTS_DEBUG__?.routeWaterAuditV067 && window.RTS_SIM?.version));
   return pageErrors;
 }
 
-test('v0.6.9 loads with river systems, simulation facade and no JavaScript errors', async ({ page }, testInfo) => {
+test('current runtime loads with river systems, simulation facade and no JavaScript errors', async ({ page }, testInfo) => {
   const errors = await openGame(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.9/);
-  await expect(page.locator('.version')).toHaveText('v0.6.9');
+  const runtimeVersion = await page.evaluate(() => window.RTS_SIM.version);
+  await expect(page).toHaveTitle(new RegExp(`Napoleonic RTS v${runtimeVersion.replace(/\./g,'\\.')}`));
+  await expect(page.locator('.version')).toHaveText(`v${runtimeVersion}`);
   await expect(page.locator('#minimap')).toBeVisible();
   const facade = await page.evaluate(() => ({
     version: window.RTS_SIM.version,
@@ -23,7 +24,7 @@ test('v0.6.9 loads with river systems, simulation facade and no JavaScript error
     hasDispatch: typeof window.RTS_SIM.dispatch === 'function',
     hasAudit: typeof window.RTS_SIM.audit === 'function'
   }));
-  expect(facade).toEqual({ version:'0.6.9', hasSnapshot:true, hasDispatch:true, hasAudit:true });
+  expect(facade).toEqual({ version:runtimeVersion, hasSnapshot:true, hasDispatch:true, hasAudit:true });
   const water = await page.evaluate(() => window.__RTS_DEBUG__.waterSystemV067());
   expect(water.name).toBe('Ruisseau de la Campagne');
   expect(water.bridges).toBe(3);
@@ -46,7 +47,7 @@ test('v0.6.9 loads with river systems, simulation facade and no JavaScript error
     ford: window.__RTS_DEBUG__.crossingSpeedV067('infantry','gue-colline')
   }));
   expect(speeds.bridge).toBeGreaterThan(speeds.ford);
-  await testInfo.attach('v069-river-crossings', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  await testInfo.attach('river-crossings', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
 
@@ -77,18 +78,21 @@ test('a cross-river battalion order is routed through legal water infrastructure
   expect(errors).toEqual([]);
 });
 
-test('F3 test lab and bug reports expose v0.6.9', async ({ page }) => {
+test('F3 test lab and bug reports expose the active runtime version', async ({ page }) => {
   const errors = await openGame(page);
   await page.keyboard.press('F3');
   await expect(page.locator('#debugPanel')).toBeVisible();
   await page.selectOption('#debugScenario','artillery-3');
   await page.locator('[data-debug-action="run"]').click();
-  const snap = await page.evaluate(() => window.__RTS_DEBUG__.simulationSnapshot());
-  expect(snap.version).toBe('0.6.9');
-  expect(snap.groups.filter(g=>g.kind==='artillery'&&!g.destroyed)).toHaveLength(3);
-  const report = await page.evaluate(() => JSON.parse(window.__RTS_DEBUG__.createBugReport()));
-  expect(report.version).toBe('0.6.9');
-  expect(report.scenario).toBe('artillery-3');
-  expect(report.audit).toBeTruthy();
+  const result = await page.evaluate(() => ({
+    runtimeVersion: window.RTS_SIM.version,
+    snap: window.__RTS_DEBUG__.simulationSnapshot(),
+    report: JSON.parse(window.__RTS_DEBUG__.createBugReport())
+  }));
+  expect(result.snap.version).toBe(result.runtimeVersion);
+  expect(result.snap.groups.filter(g=>g.kind==='artillery'&&!g.destroyed)).toHaveLength(3);
+  expect(result.report.version).toBe(result.runtimeVersion);
+  expect(result.report.scenario).toBe('artillery-3');
+  expect(result.report.audit).toBeTruthy();
   expect(errors).toEqual([]);
 });
