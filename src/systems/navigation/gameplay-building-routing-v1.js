@@ -9,7 +9,7 @@
   const paddingByKind=cfg.routeMargin||{infantry:34,cavalry:42,artillery:46,worker:24};
   const cornerExtra=cfg.cornerExtra??14;
   const maxResolvePasses=cfg.maxResolvePasses??10;
-  const stats={orders:0,reroutedOrders:0,insertedWaypoints:0,adjustedGoals:0,failedSections:0,fallbackSections:0,waypointActivations:0};
+  const stats={orders:0,reroutedOrders:0,insertedWaypoints:0,adjustedGoals:0,failedSections:0,fallbackSections:0,waypointActivations:0,marchStateUpdates:0};
 
   function kindOf(reg){return typeof groupKindV06==='function'?groupKindV06(reg):(reg?.kind||'infantry');}
   function baseMargin(kind){return Number(paddingByKind[kind]??paddingByKind.infantry??34);}
@@ -165,14 +165,18 @@
     const changed=newPath.length!==oldLength||newPath.some((p,i)=>!oldPath[i]||Math.hypot(p.x-oldPath[i].x,p.y-oldPath[i].y)>2);
     if(changed){stats.reroutedOrders++;stats.insertedWaypoints+=Math.max(0,newPath.length-oldLength);}
     reg.path=newPath;reg.pathIndex=0;reg.finalTarget={x:safeGoal.x,y:safeGoal.y};
-    if(reg.marchV063?.v064){reg.marchV063.finalX=safeGoal.x;reg.marchV063.finalY=safeGoal.y;}
-    // orderBefore already activated its old first waypoint. Activate the replacement path now,
-    // otherwise units keep walking toward stale targets while the regiment owns a different path.
-    if(typeof setGroupWaypointV06==='function'){setGroupWaypointV06(reg);stats.waypointActivations++;}
+    if(reg.marchV063){
+      const first=newPath[0]||safeGoal;
+      reg.marchV063.marchFacing=Math.atan2(first.y-start.y,first.x-start.x);
+      if(reg.marchV063.v064){reg.marchV063.finalX=safeGoal.x;reg.marchV063.finalY=safeGoal.y;}
+      stats.marchStateUpdates++;
+    }else if(kind==='artillery'&&typeof setGroupWaypointV06==='function'){
+      setGroupWaypointV06(reg);stats.waypointActivations++;
+    }
     reg.gameplayBuildingRouteV1={active:true,rerouted:changed,kind,pad,waypoints:newPath.length,failed:false};
   };
 
-  const api=Object.freeze({version:'gameplay-building-routing-v1.1',dynamicBuildings:true,formationAware:true,physicalFormationEnvelope:true,avoidPath,nearestOpenGoal,segmentBlocked:(a,b,kind='infantry',pad=baseMargin(kind))=>Boolean(firstBuildingHit(a,b,pad)),stats:()=>({...stats,activeBuildings:obstacles().length})});
+  const api=Object.freeze({version:'gameplay-building-routing-v1.2',dynamicBuildings:true,formationAware:true,physicalFormationEnvelope:true,marchOwnerCompatible:true,avoidPath,nearestOpenGoal,segmentBlocked:(a,b,kind='infantry',pad=baseMargin(kind))=>Boolean(firstBuildingHit(a,b,pad)),stats:()=>({...stats,activeBuildings:obstacles().length})});
   global.__GAMEPLAY_BUILDING_ROUTING_V1__=api;
-  nrts.subsystems.register('gameplay-building-routing',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'route battalion anchors and their physical formation envelopes around dynamic gameplay-building footprints'});
+  nrts.subsystems.register('gameplay-building-routing',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'route battalion anchors around dynamic gameplay-building footprints without overriding the active formation movement owner'});
 })(window);
