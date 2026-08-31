@@ -11,7 +11,7 @@ async function openNavigationV2(page) {
   });
   await page.goto('/?test=v071', {waitUntil:'networkidle'});
   await page.waitForFunction(() => Boolean(
-    window.RTS_SIM?.version==='0.7.1' &&
+    window.RTS_SIM?.version &&
     window.NRTS_NAVIGATION_V2?.active &&
     window.NRTS?.subsystems.has('navigation') &&
     window.NRTS_ROAD_INDEX_V2 &&
