@@ -71,12 +71,14 @@ test('infantry, cavalry and artillery route around gameplay buildings without st
           maxStill=Math.max(maxStill,still);minProgress=Math.max(minProgress,Math.hypot(c.x-startCenter.x,c.y-startCenter.y));previous=c;
         }
       }
-      const end=centroid(regimentMembers(reg));
-      cases.push({kind,directBlocked,rerouted:!!reg.gameplayBuildingRouteV1?.rerouted,pathLength:initialPath.length,blockedSegments,remaining:+Math.hypot(testLane.goal.x-end.x,testLane.goal.y-end.y).toFixed(1),maxStillSeconds:maxStill,penetrations,progress:+minProgress.toFixed(1),routeStats:window.__GAMEPLAY_BUILDING_ROUTING_V1__.stats()});
+      const members=regimentMembers(reg),end=centroid(members),anchor=reg.marchV063?.v064?{x:+reg.marchV063.anchorX.toFixed(1),y:+reg.marchV063.anchorY.toFixed(1)}:null;
+      const nearestMember=members.reduce((best,u)=>{const d=Math.hypot(u.x-b.x,u.y-b.y);return !best||d<best.d?{id:u.id,type:u.type,d:+d.toFixed(1),x:+u.x.toFixed(1),y:+u.y.toFixed(1),targetX:+(u.targetX??u.x).toFixed(1),targetY:+(u.targetY??u.y).toFixed(1),localAvoidance:u.localAvoidanceV2||null}:best;},null);
+      cases.push({kind,directBlocked,rerouted:!!reg.gameplayBuildingRouteV1?.rerouted,pathLength:initialPath.length,blockedSegments,remaining:+Math.hypot(testLane.goal.x-end.x,testLane.goal.y-end.y).toFixed(1),maxStillSeconds:maxStill,penetrations,progress:+minProgress.toFixed(1),end:{x:+end.x.toFixed(1),y:+end.y.toFixed(1)},anchor,pathIndex:reg.pathIndex||0,currentPathLength:reg.path?.length||0,phase:reg.movementPhaseV063||null,nearestMember,routeStats:window.__GAMEPLAY_BUILDING_ROUTING_V1__.stats(),stuckStats:window.__STUCK_RECOVERY_V2__.stats()});
     }
     return{cases};
   });
 
+  console.log('BUILDING_AVOIDANCE_CASES',JSON.stringify(result.cases));
   for(const c of result.cases){
     expect(c.directBlocked,`${c.kind} direct line must actually intersect the building`).toBe(true);
     expect(c.pathLength,`${c.kind} should receive a route`).toBeGreaterThan(0);
