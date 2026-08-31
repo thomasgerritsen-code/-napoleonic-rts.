@@ -1,19 +1,21 @@
 'use strict';
 // ---------- Architecture v2.1: crossing progress authority ----------
-// Determines crossing completion in the local bridge/ford coordinate system.
-// This avoids deadlocks caused by the meandering river bank-side approximation.
+// Adds release/deadlock decisions after the active bridge/ford guidance layer.
+// It deliberately does not own steering, path choice or formation targets.
 (function installCrossingProgressV1(global){
   if(!global.NRTS||typeof updateHolderStateV068!=='function')return;
+  const previousUpdateHolderState=updateHolderStateV068;
   const progressState=new Map();
-  const stats={updates:0,localAxisReleases:0,releaseWithTrailingFollowers:0,stalledAxisReleases:0};
+  const stats={updates:0,localAxisReleases:0,releaseWithTrailingFollowers:0,stalledAxisReleases:0,upstreamReleases:0};
 
   function normalReleaseThreshold(c){
     return c.length/2+Math.max(28,Math.min(48,CROSSING_RELEASE_DISTANCE_V068-c.length/2));
   }
   function safeFallbackThreshold(c){
-    // Once the battalion anchor is clearly past the crossing midpoint, forcing the
-    // complete column to stay active can become self-locking on angled bridges.
-    // Follower-safety owns the remaining tail after this point.
+    // An anchor clearly beyond the crossing midpoint may otherwise be held in a
+    // self-locking forced column by its trailing files. Follower-safety owns those
+    // files after release, so this threshold intentionally stays inside the far
+    // bridge mouth while still requiring substantial positive-axis progress.
     return Math.max(48,Math.min(c.length/2-24,c.length*.24));
   }
   function release(reg,c,info,touches,reason){
@@ -41,23 +43,28 @@
 
   updateHolderStateV068=function updateHolderStateWithLocalProgressV1(reg,march,info,c){
     stats.updates++;
-    const desiredHeading=crossingHeadingV068(c,info.initialSide);
-    const distance=Math.hypot(march.anchorX-c.x,march.anchorY-c.y);
-    if(distance<CROSSING_APPROACH_RADIUS_V068)march.marchFacing=turnTowardV064(march.marchFacing,desiredHeading,false,distance);
+    previousUpdateHolderState(reg,march,info,c);
 
-    const touches=groupTouchesCrossingV068(reg,c);
-    const anchorInPassage=crossingPassageContainsV067(c,march.anchorX,march.anchorY);
-    if(touches||anchorInPassage)info.entered=true;
-    info.state=info.entered?'crossing':'approach';
-    info.forcedColumn=true;
-    forceBridgeColumnTargetsV068(reg,march,info);
+    const current=reg?.crossingTrafficV068;
+    if(current?.state==='clearing'){
+      stats.upstreamReleases++;
+      progressState.delete(reg.id);
+      return;
+    }
+    if(!reg||reg.destroyed||!march?.v064||!c||!info?.forcedColumn||!info.entered){
+      if(reg?.id)progressState.delete(reg.id);
+      return;
+    }
 
-    if(!info.entered){progressState.delete(reg.id);return;}
     const local=crossingLocalV068(c,march.anchorX,march.anchorY);
     const direction=info.initialSide<0?1:-1;
     const forwardProgress=local.along*direction;
-    const normalThreshold=normalReleaseThreshold(c);
-    if(forwardProgress>=normalThreshold){release(reg,c,info,touches,'normal-axis');return;}
+    const touches=groupTouchesCrossingV068(reg,c);
+
+    if(forwardProgress>=normalReleaseThreshold(c)){
+      release(reg,c,info,touches,'normal-axis');
+      return;
+    }
 
     let tracked=progressState.get(reg.id);
     if(!tracked||tracked.crossingId!==c.id){
@@ -70,15 +77,15 @@
       tracked.maxProgress=forwardProgress;
     }
 
-    const fallbackThreshold=safeFallbackThreshold(c);
     const axisStalled=elapsed-tracked.lastAdvanceAt>=1.15;
-    if(tracked.maxProgress>=fallbackThreshold&&axisStalled){
+    if(tracked.maxProgress>=safeFallbackThreshold(c)&&axisStalled){
       release(reg,c,info,touches,'axis-stall');
     }
   };
 
   const api=Object.freeze({
-    version:'crossing-progress-v1.1',
+    version:'crossing-progress-v1.2',
+    wrapsActiveGuidance:true,
     localAxisRelease:true,
     stalledAxisRelease:true,
     followerSafetyOwnsTail:true,
@@ -86,8 +93,8 @@
   });
   global.__CROSSING_PROGRESS_V1__=api;
   if(global.NRTS.subsystems.has('crossing-progress')){
-    global.NRTS.services?.provide?.('crossing-progress','src/systems/navigation/crossing-progress-v1.js',api,{generation:28,legacyBridge:false});
+    global.NRTS.services?.provide?.('crossing-progress','src/systems/navigation/crossing-progress-v1.js',api,{generation:29,legacyBridge:false});
   }else{
-    global.NRTS.subsystems.register('crossing-progress',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'release bridge and ford traffic from local crossing-axis progress while follower safety clears trailing soldiers'});
+    global.NRTS.subsystems.register('crossing-progress',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'post-process active bridge/ford guidance and release self-locking crossing traffic from local-axis progress'});
   }
 })(window);
