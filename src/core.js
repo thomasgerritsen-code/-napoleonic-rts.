@@ -191,12 +191,16 @@
   }
 
   function resetGame() {
+    const previousElapsed = elapsed;
+    const previousUnitCount = units.length;
+    const previousRegimentCount = regiments.length;
     units.length = buildings.length = resources.length = projectiles.length = particles.length = regiments.length = 0;
     selectedUnits.clear();
     selectedBuilding = null;
     nextId = 1; nextRegimentId = 1;
     gameOver = false; buildMode = null; currentFormation = 'line';
     actionSignature = ''; volleyClock = 0; aiDecisionClock = 0; aiAttackClock = 0; elapsed = 0; aiPlan = 'opbouwen';
+    window.NRTS?.events?.emit?.('game:reset', { previousElapsed, previousUnitCount, previousRegimentCount });
 
     economies.france.food = 1100; economies.france.wood = 1100; economies.france.popCap = 45;
     economies.britain.food = 850; economies.britain.wood = 850; economies.britain.popCap = 35;
