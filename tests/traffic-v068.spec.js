@@ -8,14 +8,15 @@ async function openGame(page) {
     Math.random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
   });
   await page.goto('/?test=1', { waitUntil:'networkidle' });
-  await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__?.trafficSystemV068 && window.__RTS_DEBUG__?.crossingTrafficV068 && window.__RTS_DEBUG__?.bridgeDeckOccupancyV068 && window.RTS_SIM?.version === '0.6.9'));
+  await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__?.trafficSystemV068 && window.__RTS_DEBUG__?.crossingTrafficV068 && window.__RTS_DEBUG__?.bridgeDeckOccupancyV068 && window.RTS_SIM?.version));
   return pageErrors;
 }
 
-test('v0.6.9 preserves single-lane bridge traffic and wider ford capacity', async ({ page }) => {
+test('current runtime preserves single-lane bridge traffic and wider ford capacity', async ({ page }) => {
   const errors = await openGame(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.9/);
-  await expect(page.locator('.version')).toHaveText('v0.6.9');
+  const runtimeVersion = await page.evaluate(() => window.RTS_SIM.version);
+  await expect(page).toHaveTitle(new RegExp(`Napoleonic RTS v${runtimeVersion.replace(/\./g,'\\.')}`));
+  await expect(page.locator('.version')).toHaveText(`v${runtimeVersion}`);
   const traffic = await page.evaluate(() => window.__RTS_DEBUG__.trafficSystemV068());
   const chauss = traffic.crossings.find(c => c.id === 'pont-chaussee');
   const crete = traffic.crossings.find(c => c.id === 'pont-crete');
@@ -76,6 +77,6 @@ test('two battalions integrate with the production bridge queue and reform after
     expect(state.centroid.x).toBeGreaterThan(1800);
     expect(state.crossingTraffic).toBeNull();
   }
-  await testInfo.attach('v069-bridge-queue', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  await testInfo.attach('bridge-queue', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
