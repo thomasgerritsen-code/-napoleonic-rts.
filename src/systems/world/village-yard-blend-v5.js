@@ -16,6 +16,13 @@
   function hash01(seed) { let x=(seed>>>0)||1;x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967296; }
   function seedFor(house,index) { return (house.yardSeed || (((Math.round(house.x)*73856093)^(Math.round(house.y)*19349663)^((index+1)*83492791))>>>0)); }
   function near(a,b,epsilon=.4) { return Math.abs(a-b)<=epsilon; }
+  function sameSharedYard(a,b) { return Boolean(a?.sharedYardId && b?.sharedYardId && a.sharedYardId===b.sharedYardId); }
+  function sharedGroupSize(house,village) {
+    if(!house?.sharedYardId || !village?.houses) return 1;
+    let count=0;
+    for(const other of village.houses) if(sameSharedYard(house,other)) count++;
+    return Math.max(1,count);
+  }
 
   function openSidesFor(house,village,yard) {
     const open={left:false,right:false,top:false,bottom:false};
@@ -27,7 +34,9 @@
         const distance=Math.hypot(dx,dy);
         const otherRadius=other.plotRadius || Math.hypot(other.w,other.h);
         const ownRadius=house.plotRadius || Math.hypot(yard.w,yard.h)*.5;
-        if (distance>ownRadius+otherRadius+92) continue;
+        const householdMate=sameSharedYard(house,other);
+        const neighbourReach=ownRadius+otherRadius+(householdMate?150:92);
+        if (distance>neighbourReach) continue;
         const lx=dx*ca+dy*sa,ly=-dx*sa+dy*ca;
         if (Math.abs(lx/yard.w)>Math.abs(ly/yard.h)) open[lx<0?'left':'right']=true;
         else open[ly<0?'top':'bottom']=true;
@@ -44,15 +53,17 @@
     return open;
   }
 
-  function drawOrganicPlot(yard,seed,fillStyle,zone) {
+  function drawOrganicPlot(yard,seed,fillStyle,zone,groupSize=1) {
     const hw=yard.w*.5,hh=yard.h*.5;
     const pts=[
       [-hw*.82,-hh],[-hw*.25,-hh*(.97+hash01(seed^0x11)*.05)],[hw*.42,-hh*(.96+hash01(seed^0x12)*.06)],[hw*.88,-hh*.84],
       [hw,-hh*.30],[hw*(.96+hash01(seed^0x13)*.04),hh*.36],[hw*.80,hh],[hw*.16,hh*(.96+hash01(seed^0x14)*.05)],
       [-hw*.48,hh*(.95+hash01(seed^0x15)*.06)],[-hw*.94,hh*.78],[-hw*(.96+hash01(seed^0x16)*.04),hh*.20],[-hw*.96,-hh*.42]
     ];
+    let alpha=zone==='core'?.24:zone==='residential'?.42:zone==='farm-edge'?.72:.65;
+    if(groupSize>1) alpha*=zone==='farm-edge'?.78:.68;
     ctx.save();
-    ctx.globalAlpha=zone==='core'?.24:zone==='residential'?.42:zone==='farm-edge'?.72:.65;
+    ctx.globalAlpha=alpha;
     ctx.fillStyle=fillStyle;ctx.beginPath();
     pts.forEach((p,i)=>{if(i===0)ctx.moveTo(p[0],p[1]);else ctx.lineTo(p[0],p[1]);});
     ctx.closePath();ctx.fill();ctx.restore();
@@ -70,7 +81,7 @@
     return [[[x,-hh*.90],[x+jitter*.12,-hh*gap]],[[x-jitter*.12,hh*gap],[x,hh*.90]]];
   }
 
-  function drawNaturalBoundary(yard,kind,seed,open,zone) {
+  function drawNaturalBoundary(yard,kind,seed,open,zone,groupSize=1) {
     if(zone==='core') return;
     ctx.save();ctx.setLineDash([]);ctx.lineCap='round';ctx.lineJoin='round';
     ctx.lineWidth=Math.max(.7,(kind==='chapel'?1.8:1.15)/camera.zoom);
@@ -80,6 +91,7 @@
       const segments=edgeSegments(side,yard,seed,open[side]);
       let alpha=open[side]?.22:1;
       if(zone==='residential') alpha*=.58;
+      if(groupSize>1) alpha*=.72;
       ctx.globalAlpha=alpha;
       for(const [[x1,y1],[x2,y2]] of segments){
         const mx=(x1+x2)*.5+(hash01(seed^(Math.round(x1*13)+Math.round(y1*17)))-.5)*4;
@@ -108,17 +120,17 @@
 
   const previousDrawHouse=drawHouseV069;
   drawHouseV069=function drawHouseVillageYardBlendV5(house,index,village){
-    const yard=yardGeometry(house),seed=seedFor(house,index),open=openSidesFor(house,village,yard),zone=house.zone||'legacy';
+    const yard=yardGeometry(house),seed=seedFor(house,index),open=openSidesFor(house,village,yard),zone=house.zone||'legacy',groupSize=sharedGroupSize(house,village);
     const originalFillRect=ctx.fillRect,originalStrokeRect=ctx.strokeRect;
     ctx.fillRect=function(x,y,w,h){
       if(near(w,yard.w)&&near(h,yard.h)&&near(x,-yard.w/2)&&near(y,-yard.h/2)){
-        drawOrganicPlot(yard,seed,ctx.fillStyle,zone);return;
+        drawOrganicPlot(yard,seed,ctx.fillStyle,zone,groupSize);return;
       }
       return originalFillRect.call(ctx,x,y,w,h);
     };
     ctx.strokeRect=function(x,y,w,h){
       if(near(w,yard.w)&&near(h,yard.h)&&near(x,-yard.w/2)&&near(y,-yard.h/2)){
-        drawNaturalBoundary(yard,house.kind||'cottage',seed,open,zone);return;
+        drawNaturalBoundary(yard,house.kind||'cottage',seed,open,zone,groupSize);return;
       }
       return originalStrokeRect.call(ctx,x,y,w,h);
     };
@@ -129,12 +141,12 @@
   const api=Object.freeze({
     version:'village-yard-blend-v5',fullRectBoundaries:false,sharedEdgesOpen:true,organicPlotShape:true,
     villageGroundConnections:true,collisionGeometryUnchanged:true,v6ZoneAware:true,coreBoundariesSuppressed:true,residentialSideBoundariesSuppressed:true,
-    drawVillageCommons:drawVillageCommonsV5
+    sharedHouseholdBlend:true,sharedBoundarySuppression:true,drawVillageCommons:drawVillageCommonsV5
   });
   global.drawVillageCommonsV5=drawVillageCommonsV5;
   global.__VILLAGE_YARD_BLEND_V5__=api;
   nrts.subsystems.register('village-yard-blend-v5',api,{
     phase:'architecture-v2',legacyBridge:false,
-    responsibility:'zone-aware natural parcel blending that suppresses individual plot boxes in Village V6 cores and residential ribbons'
+    responsibility:'zone-aware parcel blending with shared household ground and suppressed internal boundaries'
   });
 })(window);
