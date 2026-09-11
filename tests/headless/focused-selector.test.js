@@ -31,9 +31,11 @@ test('movement changes select movement, motion and speed coverage', () => {
   assert.deepEqual(selected, ['tests/motion-v071.spec.js','tests/movement-formation-consolidation.spec.js','tests/smoke-v1.spec.js','tests/speed-v071.spec.js']);
 });
 
-test('AI changes stay focused on AI plus the lightweight smoke test', () => {
-  const selected = selectFocusedTests(['src/systems/ai/production.js']);
-  assert.deepEqual(selected, ['tests/ai-separation.spec.js','tests/smoke-v1.spec.js']);
+test('AI changes include replenishment coverage plus the lightweight AI/smoke tests', () => {
+  for (const file of ['src/systems/ai/production.js','src/ai/production.js','src/ai/tactics.js']) {
+    const selected = selectFocusedTests([file]);
+    assert.deepEqual(selected, ['tests/ai-production-v125.spec.js','tests/ai-separation.spec.js','tests/smoke-v1.spec.js']);
+  }
 });
 
 test('index changes include village plus the restoration regression', () => {
@@ -86,9 +88,9 @@ test('stuck recovery keeps movement regressions plus restoration and local avoid
   assert.deepEqual(selected, ['tests/building-avoidance-v2.spec.js','tests/motion-v071.spec.js','tests/movement-formation-consolidation.spec.js','tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js','tests/speed-v071.spec.js']);
 });
 
-test('final AI authority keeps AI separation plus restoration coverage', () => {
+test('final AI authority keeps replenishment, AI separation and restoration coverage', () => {
   const selected = selectFocusedTests(['src/systems/ai/authority-v2.js']);
-  assert.deepEqual(selected, ['tests/ai-separation.spec.js','tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js']);
+  assert.deepEqual(selected, ['tests/ai-production-v125.spec.js','tests/ai-separation.spec.js','tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js']);
 });
 
 test('documentation-only changes keep browser coverage minimal', () => {
