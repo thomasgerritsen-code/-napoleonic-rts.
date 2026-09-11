@@ -23,6 +23,16 @@ test('Village V6 uses hierarchy, shared landscape and collision-safe placement',
     const landscape=window.__VILLAGE_LANDSCAPE_V6__;
     const authority=window.__VILLAGE_AUTHORITY_V6__;
     const placement=window.NRTS.subsystems.get('building-placement');
+    const villages=window.VILLAGE_SCENERY_V4 || window.__VILLAGE_SCENERY_V4_DATA__ || [];
+    const houses=villages.flatMap(v=>v.houses || []);
+    const sharedGroups=new Map();
+    for(const village of villages){
+      for(const house of village.houses || []){
+        if(!house.sharedYardId) continue;
+        const key=`${village.name}:${house.sharedYardId}`;
+        sharedGroups.set(key,(sharedGroups.get(key)||0)+1);
+      }
+    }
     const sample=collision.sampleObstacle;
     const sampleBlocked=sample ? !placement.validSpot('house',sample.x,sample.y) : false;
     const safe=sample ? placement.nearestSafe('house',sample.x,sample.y) : null;
@@ -31,7 +41,12 @@ test('Village V6 uses hierarchy, shared landscape and collision-safe placement',
       layout,collision,renderer,yardBlend,landscape,authority,
       activeAuthority:drawHamletsV066.__nrtsVillageAuthority || null,
       sampleBlocked,safe,safeValid,
-      placementObstacleCount:placement.villageObstacleCount
+      placementObstacleCount:placement.villageObstacleCount,
+      sharedGroupCount:sharedGroups.size,
+      pairedSharedGroupCount:[...sharedGroups.values()].filter(count=>count>1).length,
+      roadAccessCount:houses.filter(h=>Number.isFinite(h.accessX)&&Number.isFinite(h.accessY)&&Number.isFinite(h.roadClearance)).length,
+      clusteredHouseCount:houses.filter(h=>Boolean(h.clusterId&&h.sharedYardId)).length,
+      totalCanonicalHouses:houses.length
     };
   });
 
@@ -40,9 +55,15 @@ test('Village V6 uses hierarchy, shared landscape and collision-safe placement',
   expect(result.layout.hierarchical).toBe(true);
   expect(result.layout.roadOriented).toBe(true);
   expect(result.layout.farmCompounds).toBe(true);
+  expect(result.layout.clusteredFrontages).toBe(true);
+  expect(result.layout.sharedYardGroups).toBe(true);
+  expect(result.layout.roadAccessMetadata).toBe(true);
+  expect(result.layout.curvedRoadAlignment).toBe(true);
+  expect(result.layout.deterministicFabric).toBe(true);
   expect(result.layout.villageCount).toBeGreaterThanOrEqual(4);
   expect(result.layout.structureCount).toBeGreaterThan(result.layout.villageCount*8);
   expect(result.layout.compoundCount).toBeGreaterThanOrEqual(result.layout.villageCount*2);
+  expect(result.layout.frontageGroupCount).toBeGreaterThan(result.layout.villageCount);
   expect(result.layout.zones.core).toBeGreaterThan(0);
   expect(result.layout.zones.residential).toBeGreaterThan(0);
   expect(result.layout.zones['farm-edge']).toBeGreaterThan(0);
@@ -74,6 +95,15 @@ test('Village V6 uses hierarchy, shared landscape and collision-safe placement',
   expect(result.landscape.footpaths).toBe(true);
   expect(result.landscape.agriculturalFringe).toBe(true);
   expect(result.landscape.individualPlotDominance).toBe(false);
+  expect(result.landscape.clusterCommons).toBe(true);
+  expect(result.landscape.roadFrontageConnections).toBe(true);
+  expect(result.landscape.continuousVillageFabric).toBe(true);
+  expect(result.landscape.postCollisionPathAnchoring).toBe(true);
+
+  expect(result.sharedGroupCount).toBeGreaterThan(result.layout.villageCount);
+  expect(result.pairedSharedGroupCount).toBeGreaterThanOrEqual(result.layout.villageCount*3);
+  expect(result.roadAccessCount).toBe(result.totalCanonicalHouses);
+  expect(result.clusteredHouseCount).toBe(result.totalCanonicalHouses);
 
   expect(result.authority.version).toBe('village-authority-v6');
   expect(result.authority.sourceLayout).toBe('village-layout-v6');
