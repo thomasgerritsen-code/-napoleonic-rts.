@@ -18,6 +18,7 @@ test('3D battlefield renderer consumes live simulation without replacing gamepla
     const canvas = document.getElementById('battlefield3d');
     return {
       bridgeRegistered: window.NRTS.subsystems.has('battlefield-3d-bridge-v1'),
+      rendererName: window.__BATTLEFIELD_3D_V1__.renderer,
       world,
       snapshotUnits: snapshot.units.length,
       snapshotBuildings: snapshot.buildings.length,
@@ -31,12 +32,12 @@ test('3D battlefield renderer consumes live simulation without replacing gamepla
   });
 
   expect(state.bridgeRegistered).toBe(true);
+  expect(state.rendererName).toBe('three.js');
   expect(state.world.world.width).toBeGreaterThan(3200);
   expect(state.world.world.height).toBeGreaterThan(1850);
   expect(state.world.roads.length).toBeGreaterThan(2);
   expect(state.snapshotUnits).toBeGreaterThan(20);
   expect(state.snapshotBuildings).toBeGreaterThanOrEqual(2);
-  expect(state.diagnostics.renderer).toBeUndefined();
   expect(state.diagnostics.roads).toBe(state.world.roads.length);
   expect(state.diagnostics.unitMeshes).toBeGreaterThan(0);
   expect(state.auditOk).toBe(true);
