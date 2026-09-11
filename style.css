@@ -6,6 +6,10 @@
 html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body { background: #111713; color: #f5f1e8; }
 canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+#game { position: fixed; inset: 0; z-index: 1; }
+.battlefield-3d-canvas { position: fixed; inset: 0; z-index: 2; background: #9cb2bf; }
+.battlefield-3d-canvas.hidden { display: none; }
+.render-mode-button.active { outline: 2px solid #f4d86d; background: rgba(244,216,109,.16); }
 .hud {
   position: fixed; z-index: 10;
   background: rgba(20,24,20,.90);
@@ -16,7 +20,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: 
 .topbar {
   top: 12px; left: 12px; right: 12px; min-height: 58px;
   padding: 8px 12px; border-radius: 10px;
-  display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 18px;
+  display: grid; grid-template-columns: auto auto 1fr auto auto; align-items: center; gap: 12px;
 }
 .brand { white-space: nowrap; }
 .brand strong { letter-spacing: .08em; }
@@ -65,7 +69,7 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
 }
 .hidden { display: none; }
 @media (max-width: 860px) {
-  .topbar { grid-template-columns: 1fr auto; gap: 7px 10px; }
+  .topbar { grid-template-columns: 1fr auto auto; gap: 7px 8px; }
   .resources { grid-column: 1 / -1; grid-row: 2; overflow-x: auto; }
   #status { display: none; }
   .help, .objective { display: none; }
@@ -75,4 +79,5 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
   .actions { gap: 4px; }
   .actions button { min-width: 58px; min-height: 43px; padding: 5px; font-size: .63rem; }
   .army-counts { flex-direction: column; gap: 1px; font-size: .68rem; }
+  .render-mode-button { padding-inline: 8px; }
 }
