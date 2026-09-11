@@ -27,7 +27,13 @@ test('AI production uses central targets and keeps replenishing after attrition'
       barracks=livingBuildings('britain').filter(b=>b.type==='barracks');
     }
     barracks.forEach(b=>{b.complete=true;b.queue.length=0;b.production=0;});
-    if(!livingBuildings('britain').some(b=>b.type==='house')) createBuilding('britain','house',2500,1060,true);
+
+    // Give the deterministic fixture enough population headroom that this regression tests
+    // replenishment rather than stopping on the deliberately separate house-building branch.
+    while(livingBuildings('britain').filter(b=>b.type==='house'&&b.complete).length<3){
+      const i=livingBuildings('britain').filter(b=>b.type==='house').length;
+      createBuilding('britain','house',2500-i*75,1060,true);
+    }
     recalcPopCap('britain');
 
     // Remove existing British regiment bookkeeping and create a deliberately damaged field force.
@@ -41,7 +47,7 @@ test('AI production uses central targets and keeps replenishing after attrition'
       members.push(createUnit('britain','drummer',x-20,y-28));
       return createRegiment('britain',members);
     };
-    const healthy=makeReg(2380,820);
+    makeReg(2380,820);
     const damaged=makeReg(2380,980);
     const damagedInf=regimentMembers(damaged).filter(u=>u.type==='infantry');
     damagedInf.slice(5).forEach(u=>u.dead=true);
@@ -56,17 +62,29 @@ test('AI production uses central targets and keeps replenishing after attrition'
     for(let i=0;i<12;i++)createUnit('britain','infantry',2520+(i%6)*16,1020+Math.floor(i/6)*16);
     createUnit('britain','officer',2520,990);
     createUnit('britain','drummer',2500,990);
-    aiDevelop();
+
+    // Manual fixture units can consume the remaining cap. Keep the test focused on formation
+    // logic and allow multiple one-action production cycles, matching the real AI cadence.
+    recalcPopCap('britain');
+    while(economies.britain.popCap-populationUsed('britain')<20){
+      const i=livingBuildings('britain').filter(b=>b.type==='house').length;
+      createBuilding('britain','house',2500-i*75,1125,true);
+      recalcPopCap('britain');
+    }
+    const formedBefore=window.__AI_PRODUCTION_V125__.snapshot().formed;
+    for(let i=0;i<6 && window.__AI_PRODUCTION_V125__.snapshot().formed===formedBefore;i++) aiDevelop();
     const afterForm=window.__AI_PRODUCTION_V125__.snapshot();
 
     const queues=barracks.map(b=>b.queue.length);
     const diag=window.NRTS.diagnostics.snapshot().subsystems.find(s=>s.name==='ai-production');
+    const facade=window.NRTS.subsystems.get('ai-production');
     return {
       config:window.NRTS_CONFIG.ai,
       before,afterOne,afterForm,queues,
       diag,
       activeRegs:activeRegiments('britain').length,
-      damagedReadiness:aiRegimentReadiness(damaged)
+      damagedReadiness:aiRegimentReadiness(damaged),
+      developCallable:typeof facade?.develop==='function'
     };
   });
 
@@ -79,6 +97,7 @@ test('AI production uses central targets and keeps replenishing after attrition'
   expect(result.afterForm.formed).toBeGreaterThanOrEqual(1);
   expect(result.activeRegs).toBeGreaterThanOrEqual(3);
   expect(result.damagedReadiness).toBeLessThan(1);
+  expect(result.developCallable).toBe(true);
   expect(result.diag?.meta?.legacyBridge).toBe(false);
   expect(errors).toEqual([]);
 });
