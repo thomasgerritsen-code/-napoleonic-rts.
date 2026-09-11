@@ -1,5 +1,5 @@
 'use strict';
-// ---------- Village landscape v6: commons, footpaths and agricultural fringe ----------
+// ---------- Village landscape v6: commons, footpaths, archetype ground and agricultural fringe ----------
 (function installVillageLandscapeV6(global){
   const nrts=global.NRTS;
   if(!nrts) throw new Error('NRTS foundation runtime must load before Village V6 landscape.');
@@ -43,6 +43,60 @@
       if(geometry&&(!best||geometry.edgeClearance<best.edgeClearance)) best=geometry;
     }
     return best;
+  }
+
+  function archetypeGround(village,seed,coreCount){
+    const road=activeRoadGeometryAt(village.x,village.y);
+    const roadAngle=road?Math.atan2(road.ty,road.tx):0;
+    const type=village.archetype||'crossroads';
+    if(type==='ribbon'){
+      irregularBlob(village.x,village.y,158+coreCount*7,48+coreCount*4,seed,'rgba(137,127,84,.085)',roadAngle);
+      return {type,rotation:roadAngle,rx:158,ry:48};
+    }
+    if(type==='parish-centre'){
+      irregularBlob(village.x,village.y,124+coreCount*9,94+coreCount*7,seed,'rgba(137,127,84,.145)',roadAngle*.18);
+      irregularBlob(village.x,village.y,50,34,seed^0x51a7,'rgba(178,161,105,.10)',roadAngle*.12);
+      return {type,rotation:roadAngle*.18,rx:124,ry:94};
+    }
+    if(type==='agrarian'){
+      irregularBlob(village.x,village.y,88+coreCount*7,62+coreCount*5,seed,'rgba(137,127,84,.085)',roadAngle*.25);
+      return {type,rotation:roadAngle*.25,rx:88,ry:62};
+    }
+    if(type==='woodland'){
+      irregularBlob(village.x,village.y,94+coreCount*8,70+coreCount*6,seed,'rgba(117,126,78,.078)',roadAngle*.36);
+      return {type,rotation:roadAngle*.36,rx:94,ry:70};
+    }
+    irregularBlob(village.x,village.y,112+coreCount*9,80+coreCount*6,seed,'rgba(137,127,84,.115)',roadAngle*.12);
+    return {type:'crossroads',rotation:roadAngle*.12,rx:112,ry:80};
+  }
+
+  function drawCoreSpokes(village,core,seed){
+    const type=village.archetype||'crossroads';
+    for(let i=0;i<core.length;i++){
+      const h=core[i],hs=seedFor(village,70+i);
+      const width=type==='parish-centre'?4.8:type==='agrarian'?3.4:4.2;
+      const alpha=type==='woodland'?.12:type==='ribbon'?.14:.18;
+      curvedPath(h.x,h.y,village.x,village.y,hs,width,alpha);
+    }
+    if(type==='crossroads'){
+      const road=activeRoadGeometryAt(village.x,village.y);
+      if(road){
+        const span=56;
+        curvedPath(village.x-road.tx*span,village.y-road.ty*span,village.x+road.tx*span,village.y+road.ty*span,seed^0x771,4.1,.10);
+        curvedPath(village.x-road.ty*span*.68,village.y+road.tx*span*.68,village.x+road.ty*span*.68,village.y-road.tx*span*.68,seed^0x772,3.2,.075);
+      }
+    }
+  }
+
+  function drawWoodlandPocket(village,seed){
+    if(village.archetype!=='woodland') return;
+    for(let i=0;i<8;i++){
+      const a=hash01(seed^(i*101+0x801))*Math.PI*2;
+      const d=72+hash01(seed^(i*131+0x802))*64;
+      const x=village.x+Math.cos(a)*d,y=village.y+Math.sin(a)*d;
+      const r=3.5+hash01(seed^(i*151+0x803))*3.8;
+      ctx.fillStyle='rgba(45,73,42,.52)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+    }
   }
 
   function drawFarmStrip(house,seed){
@@ -105,7 +159,9 @@
       const maxDy=Math.max(...members.map(h=>Math.abs(h.y-cy)+h.h*.9),22);
       const angle=members.reduce((sum,h)=>sum+(h.angle||0),0)/members.length;
       const zone=members[0].zone;
-      const fill=zone==='core'?'rgba(139,128,86,.085)':zone==='residential'?'rgba(117,130,78,.058)':'rgba(126,109,70,.070)';
+      const type=village.archetype||'crossroads';
+      const baseAlpha=type==='agrarian'?.080:type==='woodland'?.050:type==='parish-centre'?.072:.060;
+      const fill=zone==='core'?`rgba(139,128,86,${baseAlpha+.025})`:zone==='residential'?`rgba(117,130,78,${baseAlpha})`:`rgba(126,109,70,${baseAlpha+.012})`;
       const groupSeed=(seed ^ Math.imul(id.length+1,2654435761) ^ Math.imul(gi+1,2246822519))>>>0;
       irregularBlob(cx,cy,maxDx*1.05,maxDy*1.12,groupSeed,fill,angle);
 
@@ -127,7 +183,9 @@
       const ax=road?.px ?? h.accessX;
       const ay=road?.py ?? h.accessY;
       if(Number.isFinite(ax)&&Number.isFinite(ay)){
-        curvedPath(h.x,h.y,ax,ay,hs,h.zone==='core'?5.2:h.zone==='farm-edge'?3.8:3.0,h.zone==='core'?.30:h.zone==='farm-edge'?.16:.18);
+        const type=village.archetype||'crossroads';
+        const alphaScale=type==='woodland'?.82:type==='ribbon'?.90:1;
+        curvedPath(h.x,h.y,ax,ay,hs,h.zone==='core'?5.2:h.zone==='farm-edge'?3.8:3.0,(h.zone==='core'?.30:h.zone==='farm-edge'?.16:.18)*alphaScale);
       }
     }
   }
@@ -139,26 +197,19 @@
     const residential=houses.filter(h=>h.zone==='residential');
     const farm=houses.filter(h=>h.zone==='farm-edge');
 
-    // A continuous village floor plus cluster-shaped household commons prevents every house
-    // from reading as a separate rectangular plot while preserving collision-safe spacing.
-    irregularBlob(village.x,village.y,92+core.length*11,66+core.length*8,seed,'rgba(137,127,84,.12)',0);
+    archetypeGround(village,seed,core.length);
     drawSharedHouseholdGround(village,houses,seed^0x2f31);
-
-    // Road frontage paths start from the actual post-collision position and are resolved only
-    // against the active V7 network, so hidden legacy roads never attract visible access tracks.
     drawRoadFrontageConnections(village,houses);
+    drawCoreSpokes(village,core,seed);
+    drawWoodlandPocket(village,seed^0x9551);
 
-    for(let i=0;i<core.length;i++){
-      const h=core[i],hs=seedFor(village,70+i);
-      curvedPath(h.x,h.y,village.x,village.y,hs,4.2,.18);
-    }
     for(let i=0;i<residential.length;i++){
       const h=residential[i],hs=seedFor(village,110+i);
       const n=nearestHouse(h,houses,o=>o.zone==='residential'||o.zone==='core');
-      if(n&&Math.hypot(n.x-h.x,n.y-h.y)<165) curvedPath(h.x,h.y,n.x,n.y,hs^0x411,2.3,.085);
+      const maxLink=village.archetype==='ribbon'?190:village.archetype==='agrarian'?145:165;
+      if(n&&Math.hypot(n.x-h.x,n.y-h.y)<maxLink) curvedPath(h.x,h.y,n.x,n.y,hs^0x411,2.3,village.archetype==='woodland'?.065:.085);
     }
 
-    // Agricultural fringe: paired farm buildings share tracks, cultivated ground and vegetation.
     const compounds=new Map();
     for(const h of farm){
       if(h.kind==='farmhouse') drawFarmStrip(h,seedFor(village,houses.indexOf(h)+33));
@@ -175,12 +226,13 @@
 
   const api=Object.freeze({
     version:'village-landscape-v6',sharedGround:true,footpaths:true,agriculturalFringe:true,farmTracks:true,individualPlotDominance:false,
-    clusterCommons:true,roadFrontageConnections:true,continuousVillageFabric:true,postCollisionPathAnchoring:true,activeRoadNetworkAware:true
+    clusterCommons:true,roadFrontageConnections:true,continuousVillageFabric:true,postCollisionPathAnchoring:true,activeRoadNetworkAware:true,
+    archetypeGroundProfiles:true,parishCommon:true,ribbonGroundAxis:true,woodlandPockets:true,archetypePathDensity:true
   });
   global.drawVillageLandscapeV6=drawVillageLandscapeV6;
   global.__VILLAGE_LANDSCAPE_V6__=api;
   nrts.subsystems.register('village-landscape-v6',api,{
     phase:'architecture-v2',legacyBridge:false,
-    responsibility:'continuous settlement fabric with shared household commons and active-road frontage paths'
+    responsibility:'archetype-aware settlement ground with shared household commons, footpaths and agricultural transition'
   });
 })(window);
