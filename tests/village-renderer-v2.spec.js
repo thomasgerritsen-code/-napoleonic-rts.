@@ -25,6 +25,7 @@ test('Village V6 uses hierarchy, shared landscape and collision-safe placement',
     const placement=window.NRTS.subsystems.get('building-placement');
     const villages=window.VILLAGE_SCENERY_V4 || window.__VILLAGE_SCENERY_V4_DATA__ || [];
     const houses=villages.flatMap(v=>v.houses || []);
+    const activeRoadNames=new Set((window.NRTS_ROAD_NETWORK_V7 || []).map(r=>r.name));
     const sharedGroups=new Map();
     for(const village of villages){
       for(const house of village.houses || []){
@@ -46,6 +47,7 @@ test('Village V6 uses hierarchy, shared landscape and collision-safe placement',
       pairedSharedGroupCount:[...sharedGroups.values()].filter(count=>count>1).length,
       roadAccessCount:houses.filter(h=>Number.isFinite(h.accessX)&&Number.isFinite(h.accessY)&&Number.isFinite(h.roadClearance)).length,
       clusteredHouseCount:houses.filter(h=>Boolean(h.clusterId&&h.sharedYardId)).length,
+      inactiveRoadReferenceCount:houses.filter(h=>activeRoadNames.size&&!activeRoadNames.has(h.roadName)).length,
       totalCanonicalHouses:houses.length
     };
   });
@@ -99,11 +101,13 @@ test('Village V6 uses hierarchy, shared landscape and collision-safe placement',
   expect(result.landscape.roadFrontageConnections).toBe(true);
   expect(result.landscape.continuousVillageFabric).toBe(true);
   expect(result.landscape.postCollisionPathAnchoring).toBe(true);
+  expect(result.landscape.activeRoadNetworkAware).toBe(true);
 
   expect(result.sharedGroupCount).toBeGreaterThan(result.layout.villageCount);
   expect(result.pairedSharedGroupCount).toBeGreaterThanOrEqual(result.layout.villageCount*3);
   expect(result.roadAccessCount).toBe(result.totalCanonicalHouses);
   expect(result.clusteredHouseCount).toBe(result.totalCanonicalHouses);
+  expect(result.inactiveRoadReferenceCount).toBe(0);
 
   expect(result.authority.version).toBe('village-authority-v6');
   expect(result.authority.sourceLayout).toBe('village-layout-v6');
