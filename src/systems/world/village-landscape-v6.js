@@ -72,6 +72,56 @@
     return best;
   }
 
+  function groupedHouses(houses){
+    const groups=new Map();
+    for(const house of houses){
+      const id=house.sharedYardId||house.clusterId;
+      if(!id) continue;
+      if(!groups.has(id)) groups.set(id,[]);
+      groups.get(id).push(house);
+    }
+    return groups;
+  }
+
+  function drawSharedHouseholdGround(village,houses,seed){
+    const groups=groupedHouses(houses);
+    let gi=0;
+    for(const [id,members] of groups){
+      if(!members.length) continue;
+      const cx=members.reduce((sum,h)=>sum+h.x,0)/members.length;
+      const cy=members.reduce((sum,h)=>sum+h.y,0)/members.length;
+      const maxDx=Math.max(...members.map(h=>Math.abs(h.x-cx)+h.w*.7),28);
+      const maxDy=Math.max(...members.map(h=>Math.abs(h.y-cy)+h.h*.9),22);
+      const angle=members.reduce((sum,h)=>sum+(h.angle||0),0)/members.length;
+      const zone=members[0].zone;
+      const fill=zone==='core'?'rgba(139,128,86,.085)':zone==='residential'?'rgba(117,130,78,.058)':'rgba(126,109,70,.070)';
+      const groupSeed=(seed ^ Math.imul(id.length+1,2654435761) ^ Math.imul(gi+1,2246822519))>>>0;
+      irregularBlob(cx,cy,maxDx*1.05,maxDy*1.12,groupSeed,fill,angle);
+
+      if(members.length>1){
+        const sorted=[...members].sort((a,b)=>Math.atan2(a.y-cy,a.x-cx)-Math.atan2(b.y-cy,b.x-cx));
+        for(let i=1;i<sorted.length;i++){
+          const a=sorted[i-1],b=sorted[i];
+          curvedPath(a.x,a.y,b.x,b.y,seed^(gi*811+i*97),zone==='farm-edge'?4.6:2.6,zone==='core'?.15:.10);
+        }
+      }
+      gi++;
+    }
+  }
+
+  function drawRoadFrontageConnections(village,houses){
+    for(let i=0;i<houses.length;i++){
+      const h=houses[i],hs=seedFor(village,i+1);
+      let road=null;
+      if(typeof nearestRoadGeometryV069==='function') road=nearestRoadGeometryV069(h.x,h.y);
+      const ax=road?.px ?? h.accessX;
+      const ay=road?.py ?? h.accessY;
+      if(Number.isFinite(ax)&&Number.isFinite(ay)){
+        curvedPath(h.x,h.y,ax,ay,hs,h.zone==='core'?5.2:h.zone==='farm-edge'?3.8:3.0,h.zone==='core'?.30:h.zone==='farm-edge'?.16:.18);
+      }
+    }
+  }
+
   function drawVillageLandscapeV6(village){
     const houses=village?.houses||[];if(!houses.length)return;
     const seed=seedFor(village);
@@ -79,26 +129,26 @@
     const residential=houses.filter(h=>h.zone==='residential');
     const farm=houses.filter(h=>h.zone==='farm-edge');
 
-    // One shared village floor instead of one visible rectangle per property.
+    // A continuous village floor plus cluster-shaped household commons prevents every house
+    // from reading as a separate rectangular plot while preserving collision-safe spacing.
     irregularBlob(village.x,village.y,92+core.length*11,66+core.length*8,seed,'rgba(137,127,84,.12)',0);
-    for(let i=0;i<core.length;i++) irregularBlob(core[i].x,core[i].y,58,42,seed^(i+1)*101,'rgba(139,128,86,.075)',core[i].angle||0);
-    for(let i=0;i<residential.length;i++) irregularBlob(residential[i].x,residential[i].y,43,30,seed^(i+1)*211,'rgba(117,130,78,.045)',residential[i].angle||0);
+    drawSharedHouseholdGround(village,houses,seed^0x2f31);
 
-    // Pedestrian network: houses connect to the road, core and nearby neighbours.
-    for(let i=0;i<houses.length;i++){
-      const h=houses[i],hs=seedFor(village,i+1);
-      if(typeof nearestRoadGeometryV069==='function'){
-        const road=nearestRoadGeometryV069(h.x,h.y);
-        if(road) curvedPath(h.x,h.y,road.px,road.py,hs, h.zone==='core'?5.2:3.2, h.zone==='core'?.30:.19);
-      }
-      if(h.zone==='core') curvedPath(h.x,h.y,village.x,village.y,hs^0x311,4.2,.18);
-      if(h.zone==='residential'){
-        const n=nearestHouse(h,houses,o=>o.zone==='residential'||o.zone==='core');
-        if(n&&Math.hypot(n.x-h.x,n.y-h.y)<150) curvedPath(h.x,h.y,n.x,n.y,hs^0x411,2.3,.095);
-      }
+    // Road frontage paths start from the actual post-collision position, so paths remain correct
+    // when the collision normalizer has shifted a building away from its generated anchor.
+    drawRoadFrontageConnections(village,houses);
+
+    for(let i=0;i<core.length;i++){
+      const h=core[i],hs=seedFor(village,70+i);
+      curvedPath(h.x,h.y,village.x,village.y,hs,4.2,.18);
+    }
+    for(let i=0;i<residential.length;i++){
+      const h=residential[i],hs=seedFor(village,110+i);
+      const n=nearestHouse(h,houses,o=>o.zone==='residential'||o.zone==='core');
+      if(n&&Math.hypot(n.x-h.x,n.y-h.y)<165) curvedPath(h.x,h.y,n.x,n.y,hs^0x411,2.3,.085);
     }
 
-    // Agricultural fringe: paired farm buildings share tracks and cultivated ground.
+    // Agricultural fringe: paired farm buildings share tracks, cultivated ground and vegetation.
     const compounds=new Map();
     for(const h of farm){
       if(h.kind==='farmhouse') drawFarmStrip(h,seedFor(village,houses.indexOf(h)+33));
@@ -114,12 +164,13 @@
   }
 
   const api=Object.freeze({
-    version:'village-landscape-v6',sharedGround:true,footpaths:true,agriculturalFringe:true,farmTracks:true,individualPlotDominance:false
+    version:'village-landscape-v6',sharedGround:true,footpaths:true,agriculturalFringe:true,farmTracks:true,individualPlotDominance:false,
+    clusterCommons:true,roadFrontageConnections:true,continuousVillageFabric:true,postCollisionPathAnchoring:true
   });
   global.drawVillageLandscapeV6=drawVillageLandscapeV6;
   global.__VILLAGE_LANDSCAPE_V6__=api;
   nrts.subsystems.register('village-landscape-v6',api,{
     phase:'architecture-v2',legacyBridge:false,
-    responsibility:'shared settlement ground, footpath network and agricultural transition around Village V6 structures'
+    responsibility:'continuous settlement fabric with shared household commons, road frontage paths and agricultural transition'
   });
 })(window);
