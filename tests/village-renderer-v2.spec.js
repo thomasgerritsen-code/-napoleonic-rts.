@@ -91,6 +91,8 @@ test('Village V6 uses hierarchy, shared landscape and collision-safe placement',
   expect(result.yardBlend.coreBoundariesSuppressed).toBe(true);
   expect(result.yardBlend.residentialSideBoundariesSuppressed).toBe(true);
   expect(result.yardBlend.collisionGeometryUnchanged).toBe(true);
+  expect(result.yardBlend.sharedHouseholdBlend).toBe(true);
+  expect(result.yardBlend.sharedBoundarySuppression).toBe(true);
 
   expect(result.landscape.version).toBe('village-landscape-v6');
   expect(result.landscape.sharedGround).toBe(true);
