@@ -11,6 +11,7 @@
   if (!villageConfig) throw new Error('Central village config must load before village collision normalization.');
   const YARD_MULTIPLIERS = villageConfig.yardMultipliers;
   const PLOT_GAP = villageConfig.plotGap;
+  const activeRoadNetwork=global.NRTS_ROAD_NETWORK_V7 || (typeof ROAD_NETWORK_V066!=='undefined'?ROAD_NETWORK_V066:[]);
 
   function plotGeometry(house) {
     const [mw,mh] = YARD_MULTIPLIERS[house.kind] || YARD_MULTIPLIERS.cottage;
@@ -19,9 +20,18 @@
     return {w,h,radius:Math.hypot(w,h) * .5 + 5};
   }
 
+  function nearestActiveRoadGeometry(x,y) {
+    if(typeof roadGeometryV069!=='function') return null;
+    let best=null;
+    for(const road of activeRoadNetwork){
+      const geometry=roadGeometryV069(road,x,y);
+      if(geometry&&(!best||geometry.edgeClearance<best.edgeClearance)) best=geometry;
+    }
+    return best;
+  }
+
   function clearOfRoads(candidate) {
-    if (typeof nearestRoadGeometryV069 !== 'function') return true;
-    const nearest = nearestRoadGeometryV069(candidate.x,candidate.y);
+    const nearest = nearestActiveRoadGeometry(candidate.x,candidate.y);
     if (!nearest) return true;
     const roofRadius = Math.hypot(candidate.w,candidate.h) * .5;
     const roofEdgeGap = nearest.edgeClearance - roofRadius;
@@ -157,15 +167,18 @@
     sampleObstacle:sample,
     zones:Object.freeze(normalizedZones),
     plotGap:PLOT_GAP,
+    activeRoadCount:activeRoadNetwork.length,
     configDriven:true,
     globalSeparation:true,
-    includesRenderedYards:true
+    includesRenderedYards:true,
+    activeRoadNetworkAware:true,
+    hiddenLegacyRoadsIgnored:true
   });
 
   global.__VILLAGE_COLLISION_V4__ = api;
   nrts.subsystems.register('village-collision-v4',api,{
     phase:'architecture-v2',
     legacyBridge:false,
-    responsibility:'global scenery plot separation and canonical village collision obstacle data'
+    responsibility:'global scenery plot separation against active roads and canonical village collision obstacle data'
   });
 })(window);
