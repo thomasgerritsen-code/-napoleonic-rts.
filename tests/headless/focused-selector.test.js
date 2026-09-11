@@ -22,7 +22,7 @@ test('musketeer sprite authority stays focused on sprite rendering', () => {
 });
 
 test('3D renderer changes select the WebGL regression plus smoke', () => {
-  for (const file of ['src/systems/rendering/battlefield-3d-bridge-v1.js','src/systems/rendering/battlefield-3d-v1.js','style.css']) {
+  for (const file of ['src/systems/rendering/battlefield-3d-bridge-v1.js','src/systems/rendering/battlefield-3d-v1.mjs','style.css']) {
     const selected = selectFocusedTests([file]);
     assert.deepEqual(selected, ['tests/battlefield-3d-v1.spec.js','tests/smoke-v1.spec.js']);
   }
