@@ -94,6 +94,9 @@ test('Village V6 uses hierarchy, archetypes, shared landscape and collision-safe
   expect(result.collision.sourceVersion).toBe('village-layout-v6');
   expect(result.collision.globalSeparation).toBe(true);
   expect(result.collision.includesRenderedYards).toBe(true);
+  expect(result.collision.activeRoadNetworkAware).toBe(true);
+  expect(result.collision.hiddenLegacyRoadsIgnored).toBe(true);
+  expect(result.collision.activeRoadCount).toBe(result.layout.roadCount);
   expect(result.collision.structureCount).toBeGreaterThan(20);
   expect(result.collision.overlapCount).toBe(0);
   expect(result.collision.minPlotGap).toBeGreaterThanOrEqual(9.99);
