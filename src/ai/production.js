@@ -205,6 +205,7 @@ window.__AI_PRODUCTION_V125__=Object.freeze({
     desiredBarracks:aiDesiredBarracksCount(),
     queueLimit:Math.max(1,Number(AI_PRODUCTION_CFG.productionQueueLimit)||2)
   }),
+  develop:()=>aiDevelop(),
   tick:()=>aiDevelop()
 });
 
