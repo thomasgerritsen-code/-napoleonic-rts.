@@ -32,6 +32,10 @@ function selectFocusedTests(files) {
   const addBuildingAvoidance = () => selected.add('tests/building-avoidance-v2.spec.js');
   const addBridgeFollowerSafety = () => selected.add('tests/bridge-follower-safety-v1.spec.js');
   const addMusketeerSprites = () => selected.add('tests/musketeer-sprites-v1.spec.js');
+  const addAi = () => {
+    selected.add('tests/ai-separation.spec.js');
+    selected.add('tests/ai-production-v125.spec.js');
+  };
 
   for (const file of normalized) {
     if (/^tests\/[^/]+\.spec\.js$/.test(file)) selected.add(file);
@@ -57,7 +61,7 @@ function selectFocusedTests(files) {
     const isMovementFacadeOnly = file === 'src/systems/movement/api.js';
     if (!isMovementFacadeOnly && (file.startsWith('src/systems/movement/') || file.startsWith('src/systems/formation/') || file === 'src/systems/rendering/frame-stability-v1.js' || /^src\/v0(63|64|69|70|71)\.js$/.test(file) || /^tests\/(movement-formation-consolidation|motion-v069|motion-v070|motion-v071|speed-v071)\.spec\.js$/.test(file))) addMovement();
 
-    if (file.startsWith('src/systems/ai/') || /(^|\/)ai[^/]*\.js$/.test(file) || file === 'tests/ai-separation.spec.js') selected.add('tests/ai-separation.spec.js');
+    if (file.startsWith('src/systems/ai/') || /(^|\/)ai[^/]*\.js$/.test(file) || file === 'src/ai/production.js' || file === 'src/ai/tactics.js' || file === 'tests/ai-separation.spec.js' || file === 'tests/ai-production-v125.spec.js') addAi();
   }
 
   return [...selected].sort();
