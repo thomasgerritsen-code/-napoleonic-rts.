@@ -32,6 +32,7 @@ function selectFocusedTests(files) {
   const addBuildingAvoidance = () => selected.add('tests/building-avoidance-v2.spec.js');
   const addBridgeFollowerSafety = () => selected.add('tests/bridge-follower-safety-v1.spec.js');
   const addMusketeerSprites = () => selected.add('tests/musketeer-sprites-v1.spec.js');
+  const addBattlefield3D = () => selected.add('tests/battlefield-3d-v1.spec.js');
   const addAi = () => {
     selected.add('tests/ai-separation.spec.js');
     selected.add('tests/ai-production-v125.spec.js');
@@ -43,6 +44,7 @@ function selectFocusedTests(files) {
 
     if (file === 'src/systems/navigation/bridge-follower-safety-v1.js' || file === 'tests/bridge-follower-safety-v1.spec.js') addBridgeFollowerSafety();
     if (file === 'src/assets/musketeer-sprite-v1.js' || file === 'src/systems/rendering/musketeer-sprites-v1.js' || file === 'tests/musketeer-sprites-v1.spec.js') addMusketeerSprites();
+    if (file === 'index.html' || file === 'style.css' || file.startsWith('src/systems/rendering/battlefield-3d') || file === 'tests/battlefield-3d-v1.spec.js') addBattlefield3D();
 
     if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') selected.add('tests/foundation-v071.spec.js');
     if (file === 'src/foundation/runtime.js' || file === 'src/foundation/config.js' || file === 'src/systems/world/api.js' || file === 'src/systems/navigation/api.js' || file === 'src/systems/movement/api.js' || file === 'tests/architecture-v21.spec.js') addArchitectureV21();
