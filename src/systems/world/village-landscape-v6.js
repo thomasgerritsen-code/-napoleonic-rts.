@@ -34,6 +34,17 @@
     ctx.strokeStyle=`rgba(103,88,62,${alpha*.26})`;ctx.lineWidth=Math.max(1.1,width*.18/camera.zoom);ctx.beginPath();ctx.moveTo(ax,ay);ctx.quadraticCurveTo(mx,my,bx,by);ctx.stroke();ctx.restore();
   }
 
+  function activeRoadGeometryAt(x,y){
+    if(typeof roadGeometryV069!=='function') return null;
+    const network=global.NRTS_ROAD_NETWORK_V7 || (typeof ROAD_NETWORK_V066!=='undefined'?ROAD_NETWORK_V066:[]);
+    let best=null;
+    for(const road of network){
+      const geometry=roadGeometryV069(road,x,y);
+      if(geometry&&(!best||geometry.edgeClearance<best.edgeClearance)) best=geometry;
+    }
+    return best;
+  }
+
   function drawFarmStrip(house,seed){
     const rear=house.side>0?1:-1;
     const w=Math.max(56,house.w*1.45),h=Math.max(34,house.h*1.55);
@@ -112,8 +123,7 @@
   function drawRoadFrontageConnections(village,houses){
     for(let i=0;i<houses.length;i++){
       const h=houses[i],hs=seedFor(village,i+1);
-      let road=null;
-      if(typeof nearestRoadGeometryV069==='function') road=nearestRoadGeometryV069(h.x,h.y);
+      const road=activeRoadGeometryAt(h.x,h.y);
       const ax=road?.px ?? h.accessX;
       const ay=road?.py ?? h.accessY;
       if(Number.isFinite(ax)&&Number.isFinite(ay)){
@@ -134,8 +144,8 @@
     irregularBlob(village.x,village.y,92+core.length*11,66+core.length*8,seed,'rgba(137,127,84,.12)',0);
     drawSharedHouseholdGround(village,houses,seed^0x2f31);
 
-    // Road frontage paths start from the actual post-collision position, so paths remain correct
-    // when the collision normalizer has shifted a building away from its generated anchor.
+    // Road frontage paths start from the actual post-collision position and are resolved only
+    // against the active V7 network, so hidden legacy roads never attract visible access tracks.
     drawRoadFrontageConnections(village,houses);
 
     for(let i=0;i<core.length;i++){
@@ -165,12 +175,12 @@
 
   const api=Object.freeze({
     version:'village-landscape-v6',sharedGround:true,footpaths:true,agriculturalFringe:true,farmTracks:true,individualPlotDominance:false,
-    clusterCommons:true,roadFrontageConnections:true,continuousVillageFabric:true,postCollisionPathAnchoring:true
+    clusterCommons:true,roadFrontageConnections:true,continuousVillageFabric:true,postCollisionPathAnchoring:true,activeRoadNetworkAware:true
   });
   global.drawVillageLandscapeV6=drawVillageLandscapeV6;
   global.__VILLAGE_LANDSCAPE_V6__=api;
   nrts.subsystems.register('village-landscape-v6',api,{
     phase:'architecture-v2',legacyBridge:false,
-    responsibility:'continuous settlement fabric with shared household commons, road frontage paths and agricultural transition'
+    responsibility:'continuous settlement fabric with shared household commons and active-road frontage paths'
   });
 })(window);
