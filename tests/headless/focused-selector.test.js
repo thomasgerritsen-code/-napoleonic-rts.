@@ -21,6 +21,13 @@ test('musketeer sprite authority stays focused on sprite rendering', () => {
   }
 });
 
+test('3D renderer changes select the WebGL regression plus smoke', () => {
+  for (const file of ['src/systems/rendering/battlefield-3d-bridge-v1.js','src/systems/rendering/battlefield-3d-v1.js','style.css']) {
+    const selected = selectFocusedTests([file]);
+    assert.deepEqual(selected, ['tests/battlefield-3d-v1.spec.js','tests/smoke-v1.spec.js']);
+  }
+});
+
 test('Battlefield V7 bundle keeps browser coverage targeted on smoke and village regressions', () => {
   const selected = selectFocusedTests(['src/systems/world/map-expansion-v7.js','src/systems/world/village-scale-v7.js','src/systems/navigation/road-index.js','src/systems/navigation/route-planner.js','src/systems/navigation/village-obstacles-v7.js','tests/village-navigation-v7.spec.js']);
   assert.deepEqual(selected, ['tests/building-avoidance-v2.spec.js','tests/smoke-v1.spec.js','tests/village-navigation-v7.spec.js','tests/village-renderer-v2.spec.js']);
@@ -38,9 +45,9 @@ test('AI changes include replenishment coverage plus the lightweight AI/smoke te
   }
 });
 
-test('index changes include village plus the restoration regression', () => {
+test('index changes include 3D, village and restoration regressions', () => {
   const selected = selectFocusedTests(['index.html']);
-  assert.deepEqual(selected, ['tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js','tests/village-renderer-v2.spec.js']);
+  assert.deepEqual(selected, ['tests/battlefield-3d-v1.spec.js','tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js','tests/village-renderer-v2.spec.js']);
 });
 
 test('village renderer changes stay lightweight but always verify the settlement model', () => {
