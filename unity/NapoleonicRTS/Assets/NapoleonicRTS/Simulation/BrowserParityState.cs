@@ -11,6 +11,9 @@ namespace NapoleonicRTS.Simulation
     public enum CommanderState { Defend, Mass, Advance, Attack, Flank, Retreat, Regroup }
     public enum DisciplineState { Steady, Shaken, Wavering, Routing }
     public enum VictorySide { None, France, Britain }
+    public enum WeatherKind { Clear, Rain, Mist }
+    public enum TimeOfDayKind { Morning, Midday, Evening }
+    public enum TacticalTerrainKind { Open, Road, Woods, Hill, Village }
 
     public sealed class EconomyState
     {
@@ -25,6 +28,7 @@ namespace NapoleonicRTS.Simulation
         public float HitPoints;
         public float MaxHitPoints;
         public float Morale = 100f;
+        public float Stamina = 100f;
         public float ReloadRemaining;
         public float RecentHit;
         public float ChargeTimer;
@@ -32,6 +36,7 @@ namespace NapoleonicRTS.Simulation
         public AttackMode AttackMode = AttackMode.Fire;
         public ArtilleryMode ArtilleryMode = ArtilleryMode.RoundShot;
         public bool Routing;
+        public bool ArtilleryCrew;
         public int ShotsFired;
         public int Kills;
     }
@@ -39,6 +44,8 @@ namespace NapoleonicRTS.Simulation
     public sealed class RegimentBattleState
     {
         public float Morale = 100f;
+        public float MeanStamina = 100f;
+        public float DisciplineFactor = 1f;
         public DisciplineState Discipline = DisciplineState.Steady;
         public float CommandBonus;
         public int InitialStrength;
@@ -116,6 +123,23 @@ namespace NapoleonicRTS.Simulation
         public bool Impact;
     }
 
+    public sealed class BattlefieldScarState
+    {
+        public Float2 Position;
+        public ArmySide Side;
+        public float CreatedAt;
+    }
+
+    public sealed class SightingState
+    {
+        public int Id;
+        public bool Building;
+        public Float2 Position;
+        public float SeenAt;
+        public UnitKind UnitKind;
+        public BuildingKind BuildingKind;
+    }
+
     public sealed class ObjectivePointState
     {
         public string Id;
@@ -127,6 +151,7 @@ namespace NapoleonicRTS.Simulation
 
     public sealed class ObjectiveState
     {
+        public string Scenario = "crossroads";
         public string Name = "Kruispunt";
         public int TargetScore = 120;
         public int FranceScore;
@@ -144,6 +169,7 @@ namespace NapoleonicRTS.Simulation
         {
             switch (kind)
             {
+                case UnitKind.Worker: return new CombatProfile(65f, .24f, 7f, 1.1f, 0f, 5f);
                 case UnitKind.Officer: return new CombatProfile(125f, 1.80f, 24f, 2.6f, 8.0f, 10f);
                 case UnitKind.Drummer: return new CombatProfile(80f, .22f, 5f, 1.0f, 0f, 7f);
                 case UnitKind.Cavalry: return new CombatProfile(155f, .36f, 30f, .9f, 0f, 12f);
