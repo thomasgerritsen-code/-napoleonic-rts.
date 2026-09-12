@@ -64,12 +64,16 @@
     ctx.restore();
   }
 
-  drawTerrain=function drawTerrainAmbientMotionV1(){
-    baseDrawTerrain();
+  function drawAmbientTerrainOverlay(){
     const t=clock(),b=visibleBounds(35);
     drawGrassMotion(t,b);
     drawFieldRipple(t,b);
     drawWoodSway(t,b);
+  }
+
+  drawTerrain=function drawTerrainAmbientMotionV1(){
+    baseDrawTerrain();
+    drawAmbientTerrainOverlay();
   };
 
   drawParticles=function drawParticlesAmbientMotionV1(){
@@ -94,6 +98,8 @@
     wind:Object.freeze({...wind}),
     visualOnly:true,
     viewportCulling:true,
+    baseTerrainDraw:baseDrawTerrain,
+    drawOverlay:drawAmbientTerrainOverlay,
     features:Object.freeze(['grass-sway','tree-canopy-sway','field-ripple','smoke-drift'])
   });
   nrts.subsystems.register('map-ambient-motion',api,{
