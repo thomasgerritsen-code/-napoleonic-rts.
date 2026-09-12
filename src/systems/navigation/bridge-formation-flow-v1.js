@@ -36,6 +36,26 @@
     return result;
   }
 
+  function compressionBlend(c,march,info){
+    if(info?.entered||['crossing','clearing'].includes(info?.state))return 1;
+    const local=crossingLocalV068(c,march.anchorX,march.anchorY);
+    const clearance=local.along*info.initialSide-c.length/2;
+    const config=global.NRTS_CONFIG?.navigation?.bridge||{};
+    const start=Math.max(1,Number(config.columnFormStartClearance)||90);
+    const full=Math.max(0,Math.min(start-1,Number(config.columnFormFullClearance)||24));
+    if(clearance>=start)return 0;
+    if(clearance<=full)return 1;
+    const t=(start-clearance)/Math.max(1,start-full);
+    return t*t*(3-2*t);
+  }
+
+  function normalOffsets(reg,march){
+    const roadMarch=typeof roadAtV064==='function'
+      ? roadAtV064(march.anchorX,march.anchorY)
+      : Boolean(typeof roadNetworkAtV066==='function'&&roadNetworkAtV066(march.anchorX,march.anchorY));
+    return roadMarch?marchColumnOffsetsV063(reg):finalFormationOffsetsV063(reg,reg.formation);
+  }
+
   const previousForceBridgeColumn=forceBridgeColumnTargetsV068;
   forceBridgeColumnTargetsV068=function forceBridgeColumnTargetsCompactV132(reg,march,info){
     previousForceBridgeColumn(reg,march,info);
@@ -43,10 +63,26 @@
     const c=WATER_CROSSINGS_V067.find(item=>item.id===info.crossingId);
     if(!c)return;
 
-    const desired=compactOffsets(reg,c);
+    // Reservation/steering can start far from a bridge. Do not collapse a field line
+    // at that point. Keep the existing field/road formation until the configured
+    // bridge-mouth transition begins, then blend smoothly into the compact files.
+    const blend=compressionBlend(c,march,info);
+    if(blend<=.001)return;
+    const normal=normalOffsets(reg,march);
+    const compact=compactOffsets(reg,c);
+    const desired=new Map();
+    const ids=new Set([...normal.keys(),...compact.keys()]);
+    for(const id of ids){
+      const a=normal.get(id)||compact.get(id)||{ox:0,oy:0};
+      const b=compact.get(id)||a;
+      desired.set(id,{ox:a.ox+(b.ox-a.ox)*blend,oy:a.oy+(b.oy-a.oy)*blend});
+    }
+
     const rate=info.state==='waiting'?4.4:3.8;
     const offsets=blendFormationOffsetsV064(reg,march,desired,rate);
-    const facing=crossingHeadingV068(c,info.initialSide);
+    const bridgeFacing=crossingHeadingV068(c,info.initialSide);
+    const facingDelta=normalizeAngleV063(bridgeFacing-march.marchFacing);
+    const facing=normalizeAngleV063(march.marchFacing+facingDelta*blend);
     const phase=info.state==='waiting'?'bridge-waiting':info.state==='clearing'?'bridge-clearing':info.state==='crossing'?'bridge-crossing':'bridge-forming';
     applyFormationTargetsV063(reg,march.anchorX,march.anchorY,offsets,facing,phase);
     reg.movementPhaseV063=phase;
@@ -56,7 +92,7 @@
     stats.applications++;
   };
 
-  const api=Object.freeze({version:'bridge-formation-flow-v1',compactColumn:true,stats:()=>({...stats})});
+  const api=Object.freeze({version:'bridge-formation-flow-v1',compactColumn:true,progressiveCompression:true,stats:()=>({...stats})});
   global.__BRIDGE_FORMATION_FLOW_V1__=api;
-  nrts.subsystems.register('bridge-formation-flow',api,{phase:'v1.3.2',legacyBridge:false,responsibility:'compress bridge and ford traffic into a stable one/two-file column before per-member water-safety correction'});
+  nrts.subsystems.register('bridge-formation-flow',api,{phase:'v1.3.2',legacyBridge:false,responsibility:'progressively compress bridge and ford traffic into a stable one/two-file column near the crossing before per-member water-safety correction'});
 })(window);
