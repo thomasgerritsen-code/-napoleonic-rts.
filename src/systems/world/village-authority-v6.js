@@ -24,17 +24,17 @@
   drawCanonicalVillagesV6.__nrtsVillageAuthority='village-authority-v6';
   drawHamletsV066=drawCanonicalVillagesV6;
 
-  const activeLandscape=global.__VILLAGE_LANDSCAPE_V7__||global.__VILLAGE_LANDSCAPE_V6__||null;
   const api=Object.freeze({
     version:'village-authority-v6',
     sourceLayout:global.__VILLAGE_COLLISION_V4__?.sourceVersion||null,
     collisionLayer:'village-collision-v4',
     sourceRenderer:'village-renderer-v2',
     yardBlend:global.__VILLAGE_YARD_BLEND_V5__?.version||null,
-    landscape:activeLandscape?.version||null,
+    landscape:global.__VILLAGE_LANDSCAPE_V6__?.version||null,
+    landscapeCharacter:global.__VILLAGE_LANDSCAPE_V7__?.version||null,
     hierarchical:Boolean(global.__VILLAGE_LAYOUT_V6__),
     collisionSafe:true,
-    naturalVillageFabric:Boolean(activeLandscape),
+    naturalVillageFabric:Boolean(global.__VILLAGE_LANDSCAPE_V6__),
     archetypeCharacter:Boolean(global.__VILLAGE_LANDSCAPE_V7__),
     visibleFacades:false
   });
