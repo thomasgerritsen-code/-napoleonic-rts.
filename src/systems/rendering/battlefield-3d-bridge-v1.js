@@ -1,5 +1,5 @@
 'use strict';
-// ---------- v1.3.0: renderer-neutral bridge for the experimental 3D battlefield ----------
+// ---------- v1.3.1: lightweight renderer-neutral bridge for the 3D battlefield ----------
 (function installBattlefield3DBridge(global) {
   const nrts = global.NRTS;
   if (!nrts) throw new Error('NRTS runtime must load before the 3D renderer bridge.');
@@ -59,11 +59,31 @@
     };
   }
 
+  // The v1.3.0 bridge used RTS_SIM.snapshot() here. That routine intentionally performs
+  // a complete audit and serializes every regiment plus its members, which is useful for
+  // diagnostics but far too expensive for a renderer requesting state ~30 times/second.
+  // The 3D renderer only needs live units/buildings/selection, so keep this path shallow.
+  function getRenderState() {
+    const liveUnits = typeof units === 'undefined' ? [] : units.filter(unit => !unit.dead);
+    const liveBuildings = typeof buildings === 'undefined' ? [] : buildings.filter(building => !building.dead);
+    const selectionIds = typeof selectedUnits === 'undefined'
+      ? []
+      : [...selectedUnits].filter(unit => !unit.dead).map(unit => unit.id);
+    return {
+      elapsed: typeof elapsed === 'number' ? elapsed : 0,
+      units: liveUnits,
+      buildings: liveBuildings,
+      selection: {
+        unitIds: selectionIds,
+        buildingId: typeof selectedBuilding !== 'undefined' && selectedBuilding ? selectedBuilding.id : null
+      }
+    };
+  }
+
   const api = Object.freeze({
-    version: 'battlefield-3d-bridge-v1',
-    snapshot() {
-      return global.RTS_SIM?.snapshot?.() || null;
-    },
+    version: 'battlefield-3d-bridge-v1.3.1',
+    snapshotMode: 'lightweight-live-render-state',
+    snapshot: getRenderState,
     staticWorld: getStaticWorld,
     resources: cloneResources,
     camera() {
@@ -82,6 +102,6 @@
   nrts.subsystems.register('battlefield-3d-bridge-v1', api, {
     phase: 'rendering-v3',
     legacyBridge: false,
-    responsibility: 'expose renderer-neutral simulation and world data to the WebGL battlefield renderer'
+    responsibility: 'expose lightweight live simulation state and static world data to the WebGL battlefield renderer'
   });
 })(window);
