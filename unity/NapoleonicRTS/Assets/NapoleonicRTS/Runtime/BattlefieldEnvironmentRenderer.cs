@@ -30,6 +30,7 @@ namespace NapoleonicRTS.Runtime
         private readonly Material _mist;
         private readonly Material _rain;
         private readonly Material _evening;
+        private readonly VillageVisualRenderer _village;
         private readonly Bounds _bounds = new Bounds(Vector3.zero, new Vector3(100f, 70f, 10f));
 
         private static readonly RectVisual[] Woods =
@@ -48,6 +49,7 @@ namespace NapoleonicRTS.Runtime
         {
             _quad = CreateQuad();
             _circle = CreateCircle(36);
+            _village = new VillageVisualRenderer(BrowserBattlefieldMap.Create());
             var shader = Shader.Find("NapoleonicRTS/InstancedUnit");
             if (shader == null) throw new InvalidOperationException("NapoleonicRTS/InstancedUnit shader not found.");
             _woods = CreateMaterial(shader, new Color(.12f, .25f, .10f, .28f));
@@ -68,6 +70,7 @@ namespace NapoleonicRTS.Runtime
             if (world == null) return;
             Graphics.RenderMeshInstanced(new RenderParams(_woods) { worldBounds = _bounds }, _quad, 0, _woodsMatrices, _woodsMatrices.Length);
             Graphics.RenderMeshInstanced(new RenderParams(_hill) { worldBounds = _bounds }, _circle, 0, _hillMatrices, _hillMatrices.Length);
+            _village.Render();
 
             var rules = world.Combat.Rules;
             if (rules.Weather == WeatherKind.Mist)
@@ -161,6 +164,7 @@ namespace NapoleonicRTS.Runtime
 
         public void Dispose()
         {
+            _village.Dispose();
             Destroy(_woods); Destroy(_hill); Destroy(_mist); Destroy(_rain); Destroy(_evening);
             Destroy(_quad); Destroy(_circle);
         }
