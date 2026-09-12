@@ -5,7 +5,7 @@ namespace NapoleonicRTS.Simulation
 {
     public enum ResourceKind { Food, Wood }
     public enum BuildingKind { TownCenter, Barracks, House }
-    public enum WorkerTask { Idle, Gather, Return, Build }
+    public enum WorkerTask { Idle, Move, Gather, Return, Build }
     public enum AttackMode { Fire, Bayonet }
     public enum ArtilleryMode { RoundShot, GrapeShot }
     public enum CommanderState { Defend, Mass, Advance, Attack, Flank, Retreat, Regroup }
