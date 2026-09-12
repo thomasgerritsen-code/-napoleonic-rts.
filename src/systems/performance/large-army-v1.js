@@ -8,13 +8,31 @@
   const MAX_2D_DPR = 1.5;
   const LOD_UNIT_THRESHOLD = 360;
   const LOD_ZOOM_THRESHOLD = 0.82;
+  const STATIC_TERRAIN_REFRESH_MS = 250;
   const combatGrid = { france: new Map(), britain: new Map() };
   const regimentById = new Map();
   const membersByRegiment = new Map();
   const getRegimentBeforePerformanceV12 = getRegiment;
   const regimentMembersBeforePerformanceV12 = regimentMembers;
-  const renderStats = { fullUnits:0, lodUnits:0, culledUnits:0, dprResizes:0 };
+  const renderStats = {
+    fullUnits:0,lodUnits:0,culledUnits:0,dprResizes:0,
+    staticTerrainCaptures:0,staticTerrainHits:0,staticTerrainInvalidations:0
+  };
   let livingUnitCount = 0;
+  let cameraFrame = { x:0, y:0, halfW:0, halfH:0, zoom:1 };
+
+  const staticCanvas = document.createElement('canvas');
+  staticCanvas.id = 'game-static';
+  staticCanvas.setAttribute('aria-hidden', 'true');
+  Object.assign(staticCanvas.style, {
+    position:'fixed', inset:'0', zIndex:'0', pointerEvents:'none', cursor:'default'
+  });
+  const gameCanvas = document.getElementById('game');
+  gameCanvas.insertAdjacentElement('afterend', staticCanvas);
+  const staticCtx = staticCanvas.getContext('2d', { alpha:false });
+
+  let staticTerrainKey = '';
+  let staticTerrainCapturedAt = -Infinity;
 
   const cellKey = (x, y) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
 
@@ -106,10 +124,21 @@
     updateBeforePerformanceV12(dt);
   };
 
+  function refreshCameraFrame() {
+    const zoom = Math.max(.05, camera.zoom);
+    cameraFrame = {
+      x:camera.x,
+      y:camera.y,
+      zoom,
+      halfW:innerWidth / (2 * zoom),
+      halfH:innerHeight / (2 * zoom)
+    };
+  }
+
   function isOnCamera(x, y, margin = 100) {
-    const halfW = innerWidth / (2 * camera.zoom) + margin;
-    const halfH = innerHeight / (2 * camera.zoom) + margin;
-    return x >= camera.x - halfW && x <= camera.x + halfW && y >= camera.y - halfH && y <= camera.y + halfH;
+    const f = cameraFrame;
+    return x >= f.x - f.halfW - margin && x <= f.x + f.halfW + margin &&
+      y >= f.y - f.halfH - margin && y <= f.y + f.halfH + margin;
   }
 
   function useUnitLod(unit) {
@@ -119,28 +148,30 @@
   function drawUnitLod(unit) {
     const radius = TYPES[unit.type]?.radius || 6;
     const sideColor = unit.side === 'france' ? COLORS.france : COLORS.britain;
-    ctx.save();
-    ctx.translate(unit.x, unit.y);
-    ctx.rotate(unit.facing || 0);
+    const facing = Number.isFinite(unit.facing) ? unit.facing : 0;
+    const cos = Math.cos(facing), sin = Math.sin(facing);
+
     if (unit.type === 'cavalry') {
       ctx.fillStyle = '#493a2e';
-      ctx.beginPath();ctx.ellipse(0,0,10,4.5,0,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle = sideColor;ctx.beginPath();ctx.arc(1,0,3.2,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(unit.x,unit.y,10,4.5,facing,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle = sideColor;ctx.beginPath();ctx.arc(unit.x+cos,unit.y+sin,3.2,0,Math.PI*2);ctx.fill();
     } else if (unit.type === 'artillery') {
+      const px=-sin,py=cos;
       ctx.strokeStyle = '#3e3328';ctx.lineWidth = 3;
-      ctx.beginPath();ctx.moveTo(-9,3);ctx.lineTo(11,-2);ctx.stroke();
-      ctx.fillStyle = '#282522';ctx.beginPath();ctx.arc(-5,5,3,0,Math.PI*2);ctx.arc(5,4,3,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.moveTo(unit.x-cos*9+px*2,unit.y-sin*9+py*2);ctx.lineTo(unit.x+cos*11-px*2,unit.y+sin*11-py*2);ctx.stroke();
+      ctx.fillStyle = '#282522';ctx.beginPath();
+      ctx.arc(unit.x-cos*4+px*5,unit.y-sin*4+py*5,3,0,Math.PI*2);
+      ctx.arc(unit.x+cos*4+px*5,unit.y+sin*4+py*5,3,0,Math.PI*2);ctx.fill();
     } else {
       ctx.fillStyle = unit.routing ? '#777' : sideColor;
-      ctx.beginPath();ctx.arc(0,0,Math.max(4,radius*.82),0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(unit.x,unit.y,Math.max(4,radius*.82),0,Math.PI*2);ctx.fill();
       ctx.strokeStyle = unit.side === 'france' ? COLORS.franceLight : COLORS.britainLight;
       ctx.lineWidth = 1.2;
-      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(radius+4,0);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(unit.x,unit.y);ctx.lineTo(unit.x+cos*(radius+4),unit.y+sin*(radius+4));ctx.stroke();
       if (unit.type === 'officer') {
-        ctx.fillStyle = COLORS.selected;ctx.beginPath();ctx.arc(0,0,2,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle = COLORS.selected;ctx.beginPath();ctx.arc(unit.x,unit.y,2,0,Math.PI*2);ctx.fill();
       }
     }
-    ctx.restore();
   }
 
   const drawUnitBeforePerformanceV12 = drawUnit;
@@ -170,21 +201,77 @@
     }
   };
 
+  const drawProjectileBeforePerformanceV12 = drawProjectile;
+  drawProjectile = function drawProjectileCameraCulledV12(projectile) {
+    if (projectile && isOnCamera(projectile.x, projectile.y, 30)) drawProjectileBeforePerformanceV12(projectile);
+  };
+
+  const ambientTerrain = global.__MAP_AMBIENT_MOTION_V1__;
+  const drawStaticTerrainSource = ambientTerrain?.baseTerrainDraw || drawTerrain;
+  const drawAmbientTerrainOverlay = ambientTerrain?.drawOverlay || null;
+
+  function terrainCacheKey() {
+    return [
+      canvas.width, canvas.height,
+      Math.round(camera.x * 100) / 100,
+      Math.round(camera.y * 100) / 100,
+      Math.round(camera.zoom * 10000) / 10000
+    ].join(':');
+  }
+
+  function clearStaticTerrain() {
+    staticCtx.setTransform(1,0,0,1,0,0);
+    staticCtx.clearRect(0,0,staticCanvas.width,staticCanvas.height);
+  }
+
+  drawTerrain = function drawTerrainCachedV132() {
+    refreshCameraFrame();
+    const now = performance.now();
+    const key = terrainCacheKey();
+    const cameraChanged = key !== staticTerrainKey;
+    const refreshExpired = now - staticTerrainCapturedAt >= STATIC_TERRAIN_REFRESH_MS;
+
+    if (cameraChanged || refreshExpired) {
+      if (cameraChanged && staticTerrainKey) renderStats.staticTerrainInvalidations++;
+      clearStaticTerrain();
+      drawStaticTerrainSource();
+      staticCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+      staticTerrainKey = key;
+      staticTerrainCapturedAt = now;
+      renderStats.staticTerrainCaptures++;
+    } else {
+      renderStats.staticTerrainHits++;
+    }
+
+    if (drawAmbientTerrainOverlay) drawAmbientTerrainOverlay();
+  };
+
   function resize2DCanvasForPerformance() {
     const desiredDpr = Math.min(devicePixelRatio || 1, MAX_2D_DPR);
     const desiredWidth = Math.max(1, Math.floor(innerWidth * desiredDpr));
     const desiredHeight = Math.max(1, Math.floor(innerHeight * desiredDpr));
-    if (canvas.width === desiredWidth && canvas.height === desiredHeight) return;
+    const sameMain = canvas.width === desiredWidth && canvas.height === desiredHeight;
+    const sameStatic = staticCanvas.width === desiredWidth && staticCanvas.height === desiredHeight;
+    if (sameMain && sameStatic) return;
+
     canvas.width = desiredWidth;
     canvas.height = desiredHeight;
     canvas.style.width = `${innerWidth}px`;
     canvas.style.height = `${innerHeight}px`;
     ctx.setTransform(desiredDpr, 0, 0, desiredDpr, 0, 0);
+
+    staticCanvas.width = desiredWidth;
+    staticCanvas.height = desiredHeight;
+    staticCanvas.style.width = `${innerWidth}px`;
+    staticCanvas.style.height = `${innerHeight}px`;
+    staticTerrainKey = '';
+    staticTerrainCapturedAt = -Infinity;
     renderStats.dprResizes++;
   }
 
   addEventListener('resize', resize2DCanvasForPerformance);
   resize2DCanvasForPerformance();
+  refreshCameraFrame();
 
   addEventListener('load', () => {
     const params = new URLSearchParams(location.search);
@@ -208,6 +295,9 @@
     unitLod: true,
     unitLodThreshold: LOD_UNIT_THRESHOLD,
     unitLodZoomThreshold: LOD_ZOOM_THRESHOLD,
+    staticTerrainCache: true,
+    staticTerrainRefreshMs: STATIC_TERRAIN_REFRESH_MS,
+    staticTerrainCanvasId: staticCanvas.id,
     livingUnitCount: () => livingUnitCount,
     renderStats: () => ({ ...renderStats })
   });
@@ -216,7 +306,7 @@
     nrts.subsystems.register('large-army-performance', api, {
       phase: 'v1.3.2',
       legacyBridge: false,
-      responsibility: 'large-army combat query caching, viewport culling, 2D canvas scaling and density-aware unit rendering'
+      responsibility: 'large-army combat query caching, viewport culling, static 2D battlefield caching, canvas scaling and density-aware unit rendering'
     });
   }
 })(window);
