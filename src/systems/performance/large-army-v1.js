@@ -144,7 +144,7 @@
   }
 
   const drawUnitBeforePerformanceV12 = drawUnit;
-  drawUnit = function drawUnitCameraCulledV132(unit) {
+  drawUnit = function drawUnitCameraCulledV12(unit) {
     if (unit.dead || !isOnCamera(unit.x, unit.y, 70)) {
       renderStats.culledUnits++;
       return;
@@ -186,7 +186,6 @@
   addEventListener('resize', resize2DCanvasForPerformance);
   resize2DCanvasForPerformance();
 
-  // 3D stays available for explicit experiments/tests, but normal play now starts in 2D.
   addEventListener('load', () => {
     const params = new URLSearchParams(location.search);
     const explicit3D = params.get('view') === '3d' || params.get('test') === '3d';
