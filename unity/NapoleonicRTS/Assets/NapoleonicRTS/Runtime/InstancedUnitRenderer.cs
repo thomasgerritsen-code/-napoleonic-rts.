@@ -42,22 +42,23 @@ namespace NapoleonicRTS.Runtime
             _selectedParams = new RenderParams(_selected) { worldBounds = bounds };
         }
 
-        public void Render(SimulationWorld world, float alpha, ISet<int> selectedRegiments)
+        public void Render(SimulationWorld world, float alpha, ISet<int> selectedRegiments, BrowserParityWorld gameplay = null)
         {
             if (world == null) return;
-            RenderSide(world, ArmySide.France, alpha, _franceParams, null, false);
-            RenderSide(world, ArmySide.Britain, alpha, _britainParams, null, false);
+            RenderSide(world, ArmySide.France, alpha, _franceParams, null, false, gameplay);
+            RenderSide(world, ArmySide.Britain, alpha, _britainParams, null, false, gameplay);
             if (selectedRegiments != null && selectedRegiments.Count > 0)
-                RenderSide(world, ArmySide.France, alpha, _selectedParams, selectedRegiments, true);
+                RenderSide(world, ArmySide.France, alpha, _selectedParams, selectedRegiments, true, gameplay);
         }
 
-        private void RenderSide(SimulationWorld world, ArmySide side, float alpha, RenderParams renderParams, ISet<int> selectedRegiments, bool selectedOnly)
+        private void RenderSide(SimulationWorld world, ArmySide side, float alpha, RenderParams renderParams, ISet<int> selectedRegiments, bool selectedOnly, BrowserParityWorld gameplay)
         {
             Array.Clear(_counts, 0, _counts.Length);
             for (var i = 0; i < world.Units.Count; i++)
             {
                 var unit = world.Units[i];
                 if (!unit.Alive || unit.Side != side || unit.Kind == UnitKind.Worker) continue;
+                if (side == ArmySide.Britain && gameplay != null && !gameplay.Combat.Rules.CanSee(ArmySide.France, unit)) continue;
                 if (selectedOnly && (selectedRegiments == null || !selectedRegiments.Contains(unit.RegimentId))) continue;
 
                 var kindIndex = (int)unit.Kind;
