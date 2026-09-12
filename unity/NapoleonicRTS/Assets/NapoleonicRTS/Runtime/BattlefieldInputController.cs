@@ -21,6 +21,8 @@ namespace NapoleonicRTS.Runtime
         {
 #if ENABLE_LEGACY_INPUT_MANAGER
             if (_battlefield == null || _camera == null) return;
+            if (Input.GetKeyDown(KeyCode.Escape)) _battlefield.CancelPlacement();
+
             if (Input.GetMouseButtonDown(0) && !PointerOverPanel())
             {
                 _dragStart = Input.mousePosition;
@@ -31,17 +33,22 @@ namespace NapoleonicRTS.Runtime
             if (_dragging && Input.GetMouseButtonUp(0))
             {
                 _dragCurrent = Input.mousePosition;
-                var a = ScreenToBattlefield(_dragStart);
-                var b = ScreenToBattlefield(_dragCurrent);
+                var additive = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
                 if ((_dragCurrent - _dragStart).sqrMagnitude < 20f)
                 {
-                    a -= new Float2(1.4f, 1.4f);
-                    b += new Float2(1.4f, 1.4f);
+                    _battlefield.SelectAt(ScreenToBattlefield(_dragCurrent), additive);
                 }
-                _battlefield.SelectFranceInRect(a, b, Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+                else
+                {
+                    var a = ScreenToBattlefield(_dragStart);
+                    var b = ScreenToBattlefield(_dragCurrent);
+                    _battlefield.SelectFranceInRect(a, b, additive);
+                }
                 _dragging = false;
             }
-            if (Input.GetMouseButtonDown(1) && !PointerOverPanel() && _battlefield.SelectedRegiments.Count > 0)
+
+            if (Input.GetMouseButtonDown(1) && !PointerOverPanel() &&
+                (_battlefield.SelectedRegiments.Count > 0 || _battlefield.SelectedWorkers.Count > 0))
                 _battlefield.MoveSelection(ScreenToBattlefield(Input.mousePosition));
 
             if (Input.GetKeyDown(KeyCode.Alpha1)) _battlefield.SetSelectionFormation(FormationKind.Line);
@@ -65,7 +72,7 @@ namespace NapoleonicRTS.Runtime
         {
 #if ENABLE_LEGACY_INPUT_MANAGER
             var mouse = Input.mousePosition;
-            return mouse.x <= 420f && Screen.height - mouse.y <= 500f;
+            return mouse.x <= 430f && Screen.height - mouse.y <= 575f;
 #else
             return false;
 #endif
