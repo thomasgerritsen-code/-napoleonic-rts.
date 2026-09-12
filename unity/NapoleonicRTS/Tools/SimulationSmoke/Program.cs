@@ -13,6 +13,19 @@ Require(map.Roads.Count == 8, $"Expected 8 active V7 roads, got {map.Roads.Count
 Require(map.Crossings.Count == 4, "Expected four legal river crossings.");
 Require(planner.NodeCount > 40, "Road graph did not build enough strategic nodes.");
 
+var village = NativeVillageLayout.Create(map);
+var villageAgain = NativeVillageLayout.Create(map);
+Require(village.Structures.Count >= 45, $"Native village generator produced too few structures: {village.Structures.Count}.");
+Require(village.Structures.Count == villageAgain.Structures.Count, "Village generation is not deterministic.");
+for (var i = 0; i < village.Structures.Count; i++)
+{
+    var a = village.Structures[i];
+    var b = villageAgain.Structures[i];
+    Require(a.Id == b.Id && Float2.Distance(a.Position, b.Position) < .0001f, $"Village structure {i} changed between deterministic builds.");
+    Require(village.Collides(a.Position, .05f), $"Village collision source missed {a.Id}.");
+    Require(Float2.Distance(a.Position, a.AccessPoint) > a.CollisionRadius, $"Village roof {a.Id} intrudes on its road access point.");
+}
+
 var blockedA = BrowserBattlefieldMap.MapToNative(1300, 1450);
 var blockedB = BrowserBattlefieldMap.MapToNative(1900, 1450);
 Require(map.SegmentWaterCrossing(blockedA, blockedB)?.Blocked == true, "Deep-water segment was not blocked.");
@@ -85,4 +98,4 @@ foreach (var unit in world.Units)
 Require(worstSlotError < 3.0f, $"Formation cohesion exceeded smoke threshold: {worstSlotError:0.00}.");
 Require(MathF.Abs(world.Units[first.UnitIndices[0]].SlotOffset.X) <= 1.2f, "Column layout did not become narrow.");
 
-Console.WriteLine($"PASS native simulation smoke | units={world.Units.Count} regiments={world.Regiments.Count} roads={map.Roads.Count} crossing={bridgePlan.CrossingIds[0]} bridgeCompression={maxBridgeCompression:0.00} bridgeFinalError={finalBridgeSlotError:0.00} selected={selected.Count} ticks={world.Tick} worstSlotError={worstSlotError:0.00}");
+Console.WriteLine($"PASS native simulation smoke | units={world.Units.Count} regiments={world.Regiments.Count} roads={map.Roads.Count} villageStructures={village.Structures.Count} crossing={bridgePlan.CrossingIds[0]} bridgeCompression={maxBridgeCompression:0.00} bridgeFinalError={finalBridgeSlotError:0.00} selected={selected.Count} ticks={world.Tick} worstSlotError={worstSlotError:0.00}");
