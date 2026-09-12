@@ -33,10 +33,18 @@ test('a moving line keeps actively forming instead of dissolving into loose sold
     const start=(0,eval)(`(${findLane})`)();
     const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',start.x,start.y);
     const reg=getRegiment(id);
+
+    // Deliberately disturb several files: the moving battalion should close these gaps
+    // while still advancing instead of waiting motionless for a perfect parade line.
+    regimentMembers(reg).filter(u=>u.type==='infantry').slice(0,4).forEach((u,i)=>{
+      u.x-=18+i*4;
+      u.y+=34+i*5;
+    });
+
     window.__RTS_DEBUG__.selectRegiment(id);
     window.__RTS_DEBUG__.orderSelectedWithFacing(start.x+720,start.y,0);
     const before=centroid(regimentMembers(reg));
-    window.RTS_SIM.step(4.0);
+    window.RTS_SIM.step(5.0);
     const after=centroid(regimentMembers(reg));
     const members=regimentMembers(reg).filter(u=>!u.dead);
     const facing=reg.marchV063?.marchFacing??reg.facing??0;
@@ -75,9 +83,12 @@ test('two friendly lines moving toward each other choose passing lanes instead o
     orderGroupPathV06(b,start.x-200,start.y-20,'line',Math.PI);
     const initialA=centroid(regimentMembers(a)),initialB=centroid(regimentMembers(b));
     let crossed=false;
-    for(let i=0;i<420;i++){
-      window.RTS_SIM.step(.05);
-      if(i%10)continue;
+
+    // Use fewer, larger deterministic simulation advances so this remains a fast
+    // regression while still covering the whole head-on encounter.
+    for(let i=0;i<90;i++){
+      window.RTS_SIM.step(.15);
+      if(i%2)continue;
       const ca=centroid(regimentMembers(a)),cb=centroid(regimentMembers(b));
       if(ca.x>cb.x){crossed=true;break;}
     }
@@ -102,19 +113,23 @@ test('bridge traffic is compressed before follower water safety takes over',asyn
   const errors=await openTraffic(page);
   const result=await page.evaluate(()=>{
     const c=WATER_CROSSINGS_V067.find(item=>item.id==='pont-chaussee');
-    const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',c.x-260,c.y+80);
+    const initialSide=-1;
+    const start=crossingPointV068(c,initialSide*(c.length/2+130),0);
+    const exit=crossingPointV068(c,-initialSide*(c.length/2+180),0);
+    const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',start.x,start.y);
     const reg=getRegiment(id);
-    orderGroupPathV06(reg,c.x+320,c.y-40,'line',0);
-    const info={crossingId:c.id,crossingName:c.name,state:'crossing',queuePosition:0,initialSide:-1,entered:true,forcedColumn:true};
+    orderGroupPathV06(reg,exit.x,exit.y,'line',crossingHeadingV068(c,initialSide));
+    const info={crossingId:c.id,crossingName:c.name,state:'crossing',queuePosition:0,initialSide,entered:true,forcedColumn:true};
     reg.crossingTrafficV068=info;
     reg.marchV063.anchorX=c.x;
     reg.marchV063.anchorY=c.y;
     forceBridgeColumnTargetsV068(reg,reg.marchV063,info);
-    const targetLocal=regimentMembers(reg).filter(u=>!u.dead).map(u=>crossingLocalV068(c,u.targetX,u.targetY));
+    const members=regimentMembers(reg).filter(u=>!u.dead);
+    const targetLocal=members.map(u=>crossingLocalV068(c,u.targetX,u.targetY));
     return{
       maxPerp:Math.max(...targetLocal.map(p=>Math.abs(p.perp))),
       halfWidth:c.width/2,
-      blocked:regimentMembers(reg).filter(u=>!u.dead).filter(u=>segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY)).length,
+      blocked:members.filter(u=>segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY)).length,
       flow:window.__BRIDGE_FORMATION_FLOW_V1__.stats()
     };
   });
