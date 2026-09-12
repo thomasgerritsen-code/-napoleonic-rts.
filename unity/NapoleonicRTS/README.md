@@ -6,7 +6,9 @@ On first import the Editor bootstrap creates `Assets/Scenes/Prototype.unity` and
 
 The prototype deliberately uses no prefab or GameObject per soldier. It creates 1,000 soldiers as simulation records and sends their transforms to the GPU with `Graphics.RenderMeshInstanced` in batches. The simulation runs at a fixed 60 Hz and rendering interpolates between simulation states.
 
-The native map now contains the same eight active strategic roads from Battlefield V7 plus the browser river and four legal crossings. The route graph rejects road edges that cut through blocked water; crossing delays are included in route cost. Right-click movement uses this planner.
+The native map contains the same eight active strategic roads from Battlefield V7 plus the browser river and four legal crossings. The route graph rejects road edges that cut through blocked water; crossing delays are included in route cost. Right-click movement uses this planner.
+
+Regiments now progressively compress from their chosen field formation into a narrow bridge column near a crossing. The bridge formation is temporary: after clearing the crossing the stored line/column/square formation redeploys. Followers that would otherwise cut a river corner are redirected to the legal bridge mouth/exit rather than entering blocked water.
 
 Controls:
 

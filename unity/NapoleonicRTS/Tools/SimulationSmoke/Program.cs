@@ -29,7 +29,30 @@ foreach (var point in bridgePlan.Points)
     previousPoint = point;
 }
 
-var world = new SimulationWorld();
+var bridgeWorld = new SimulationWorld(map);
+var bridgeRegiment = bridgeWorld.SpawnRegiment(ArmySide.France, west, 32, FormationKind.Line, 0f);
+bridgeWorld.SetRoute(bridgeRegiment, bridgePlan);
+var maxBridgeCompression = 0f;
+var worstBridgeSlotError = 0f;
+for (var tick = 0; tick < 720; tick++)
+{
+    bridgeWorld.Step(SimulationWorld.FixedStepSeconds);
+    maxBridgeCompression = MathF.Max(maxBridgeCompression, bridgeRegiment.BridgeCompression);
+    foreach (var unitIndex in bridgeRegiment.UnitIndices)
+    {
+        var unit = bridgeWorld.Units[unitIndex];
+        Require(!map.IsWater(unit.Position), $"Bridge follower {unit.Id} entered blocked water at tick {tick}.");
+        var error = Float2.Distance(unit.Position, bridgeWorld.GetSlotTarget(unit));
+        worstBridgeSlotError = MathF.Max(worstBridgeSlotError, error);
+    }
+}
+Require(maxBridgeCompression > 0.95f, $"Bridge formation never fully compressed: {maxBridgeCompression:0.00}.");
+Require(bridgeRegiment.PeakBridgeCompression > 0.95f, "Bridge compression peak was not retained for diagnostics.");
+Require(bridgeRegiment.BridgeCompression < 0.05f, "Regiment did not redeploy after clearing the bridge.");
+Require(Float2.Distance(bridgeRegiment.Anchor, east) < 0.15f, "Bridge regiment did not finish its legal route.");
+Require(worstBridgeSlotError < 3.0f, $"Bridge formation cohesion exceeded threshold: {worstBridgeSlotError:0.00}.");
+
+var world = new SimulationWorld(map);
 PrototypeScenario.Populate(world);
 Require(world.Units.Count == PrototypeScenario.TotalUnits, $"Expected {PrototypeScenario.TotalUnits} units, got {world.Units.Count}.");
 Require(world.Regiments.Count == PrototypeScenario.RegimentCountPerSide * 2, "Unexpected regiment count.");
@@ -58,4 +81,4 @@ foreach (var unit in world.Units)
 Require(worstSlotError < 3.0f, $"Formation cohesion exceeded smoke threshold: {worstSlotError:0.00}.");
 Require(MathF.Abs(world.Units[first.UnitIndices[0]].SlotOffset.X) <= 1.2f, "Column layout did not become narrow.");
 
-Console.WriteLine($"PASS native simulation smoke | units={world.Units.Count} regiments={world.Regiments.Count} roads={map.Roads.Count} crossings={bridgePlan.CrossingIds.Count} selected={selected.Count} ticks={world.Tick} worstSlotError={worstSlotError:0.00}");
+Console.WriteLine($"PASS native simulation smoke | units={world.Units.Count} regiments={world.Regiments.Count} roads={map.Roads.Count} crossing={bridgePlan.CrossingIds[0]} bridgeCompression={maxBridgeCompression:0.00} bridgeError={worstBridgeSlotError:0.00} selected={selected.Count} ticks={world.Tick} worstSlotError={worstSlotError:0.00}");

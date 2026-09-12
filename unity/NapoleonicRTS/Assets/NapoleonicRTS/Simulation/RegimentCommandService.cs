@@ -36,9 +36,8 @@ namespace NapoleonicRTS.Simulation
                 if (planner == null) world.SetDestination(regiment, destination);
                 else
                 {
-                    var kind = UnitTravelKind.Infantry;
-                    var plan = planner.Plan(regiment.Anchor, destination, kind);
-                    if (plan.IsValid) world.SetRoute(regiment, plan.Points); else world.SetDestination(regiment, destination);
+                    var plan = planner.Plan(regiment.Anchor, destination, UnitTravelKind.Infantry);
+                    if (plan.IsValid) world.SetRoute(regiment, plan); else world.SetDestination(regiment, destination);
                 }
             }
         }

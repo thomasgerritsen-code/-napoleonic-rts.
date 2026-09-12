@@ -19,5 +19,11 @@ namespace NapoleonicRTS.Simulation
         public List<int> UnitIndices { get; } = new List<int>();
         public List<Float2> Route { get; } = new List<Float2>();
         public int RouteIndex { get; internal set; }
+        public List<string> RouteCrossingIds { get; } = new List<string>();
+        public int RouteCrossingIndex { get; internal set; }
+        public int CrossingInitialSide { get; internal set; }
+        public float BridgeCompression { get; internal set; }
+        public float PeakBridgeCompression { get; internal set; }
+        public string ActiveCrossingId { get; internal set; }
     }
 }

@@ -26,8 +26,8 @@ namespace NapoleonicRTS.Runtime
         {
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
-            _world = new SimulationWorld();
             _map = BrowserBattlefieldMap.Create();
+            _world = new SimulationWorld(_map);
             _planner = new StrategicRoutePlanner(_map);
             PrototypeScenario.Populate(_world);
             _renderer = new InstancedUnitRenderer();
@@ -80,16 +80,19 @@ namespace NapoleonicRTS.Runtime
 
         private void OnGUI()
         {
-            GUI.Box(new Rect(12, 12, 328, 214), "Napoleonic RTS — Native Prototype");
+            var maxCompression = 0f;
+            if (_world != null) for (var i = 0; i < _world.Regiments.Count; i++) if (_world.Regiments[i].BridgeCompression > maxCompression) maxCompression = _world.Regiments[i].BridgeCompression;
+            GUI.Box(new Rect(12, 12, 328, 234), "Napoleonic RTS — Native Prototype");
             GUI.Label(new Rect(24, 42, 300, 22), $"Units: {_world?.Units.Count ?? 0}  Regiments: {_world?.Regiments.Count ?? 0}");
             GUI.Label(new Rect(24, 62, 300, 22), $"Selected regiments: {_selectedRegiments.Count}");
             GUI.Label(new Rect(24, 82, 300, 22), $"Road graph: {_planner?.NodeCount ?? 0} nodes · 4 legal river crossings");
-            GUI.Label(new Rect(24, 102, 300, 22), $"Fixed sim: 60 Hz  Tick: {_world?.Tick ?? 0}  Steps/frame: {_lastSteps}");
-            GUI.Label(new Rect(24, 122, 300, 22), $"GPU instances · FPS: {(1f / Mathf.Max(0.0001f, Time.unscaledDeltaTime)):0}");
-            if (GUI.Button(new Rect(24, 150, 82, 26), "Line")) SetSelectionFormation(FormationKind.Line);
-            if (GUI.Button(new Rect(112, 150, 82, 26), "Column")) SetSelectionFormation(FormationKind.Column);
-            if (GUI.Button(new Rect(200, 150, 82, 26), "Square")) SetSelectionFormation(FormationKind.Square);
-            if (GUI.Button(new Rect(24, 184, 258, 26), _home ? "March to centre" : "Return home"))
+            GUI.Label(new Rect(24, 102, 300, 22), $"Bridge compression: {maxCompression * 100f:0}%");
+            GUI.Label(new Rect(24, 122, 300, 22), $"Fixed sim: 60 Hz  Tick: {_world?.Tick ?? 0}  Steps/frame: {_lastSteps}");
+            GUI.Label(new Rect(24, 142, 300, 22), $"GPU instances · FPS: {(1f / Mathf.Max(0.0001f, Time.unscaledDeltaTime)):0}");
+            if (GUI.Button(new Rect(24, 170, 82, 26), "Line")) SetSelectionFormation(FormationKind.Line);
+            if (GUI.Button(new Rect(112, 170, 82, 26), "Column")) SetSelectionFormation(FormationKind.Column);
+            if (GUI.Button(new Rect(200, 170, 82, 26), "Square")) SetSelectionFormation(FormationKind.Square);
+            if (GUI.Button(new Rect(24, 204, 258, 26), _home ? "March to centre" : "Return home"))
             {
                 _home = !_home;
                 PrototypeScenario.OrderMarch(_world, _home);
