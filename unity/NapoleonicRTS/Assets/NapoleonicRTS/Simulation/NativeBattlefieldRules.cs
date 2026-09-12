@@ -9,6 +9,7 @@ namespace NapoleonicRTS.Simulation
         private readonly Dictionary<int, float> _baseSpeeds = new Dictionary<int, float>();
         private readonly Dictionary<int, SightingState> _frenchSightings = new Dictionary<int, SightingState>();
         private float _disciplineClock;
+        private float _sightingClock;
 
         private readonly struct RectArea
         {
@@ -51,7 +52,12 @@ namespace NapoleonicRTS.Simulation
         {
             UpdateWeather();
             UpdateStamina(dt, combat);
-            UpdateSightings();
+            _sightingClock += dt;
+            if (_sightingClock >= .5f)
+            {
+                _sightingClock -= .5f;
+                UpdateSightings();
+            }
             _disciplineClock += dt;
             if (_disciplineClock >= 2f)
             {
@@ -242,20 +248,18 @@ namespace NapoleonicRTS.Simulation
             {
                 var unit = _world.Movement.Units[regiment.UnitIndices[i]];
                 if (!unit.Alive || unit.Kind == UnitKind.Officer || unit.Kind == UnitKind.Drummer) continue;
-                if (combatCrew(unit)) continue;
+                if (IsArtilleryCrew(unit)) continue;
                 return unit.Kind;
             }
             return UnitKind.Infantry;
         }
-        private bool combatCrew(UnitState unit)
+
+        private bool IsArtilleryCrew(UnitState unit)
         {
-            for (var r = 0; r < _world.Movement.Regiments.Count; r++)
-            {
-                var reg = _world.Movement.Regiments[r]; if (reg.Id != unit.RegimentId) continue;
-                var hasArtillery = false;
-                for (var i = 0; i < reg.UnitIndices.Count; i++) if (_world.Movement.Units[reg.UnitIndices[i]].Kind == UnitKind.Artillery) { hasArtillery = true; break; }
-                return hasArtillery && unit.Kind == UnitKind.Infantry;
-            }
+            var reg = _world.Movement.FindRegiment(unit.RegimentId);
+            if (reg == null || unit.Kind != UnitKind.Infantry) return false;
+            for (var i = 0; i < reg.UnitIndices.Count; i++)
+                if (_world.Movement.Units[reg.UnitIndices[i]].Kind == UnitKind.Artillery) return true;
             return false;
         }
 
@@ -265,6 +269,7 @@ namespace NapoleonicRTS.Simulation
             var b = BrowserBattlefieldMap.MapToNative(x + w, y + h);
             return new RectArea(MathF.Min(a.X, b.X), MathF.Min(a.Y, b.Y), MathF.Abs(b.X - a.X), MathF.Abs(b.Y - a.Y));
         }
+
         private static EllipseArea EllipseFromBrowser(float x, float y, float rx, float ry)
         {
             var c = BrowserBattlefieldMap.MapToNative(x, y);
@@ -276,7 +281,8 @@ namespace NapoleonicRTS.Simulation
 
     public static class ObjectiveScenarioService
     {
-        public static string[] Presets => new[] { "crossroads", "bridge", "threePoints" };
+        private static readonly string[] Names = { "crossroads", "bridge", "threePoints" };
+        public static IReadOnlyList<string> Presets => Names;
 
         public static void Select(ObjectiveState state, string preset)
         {
