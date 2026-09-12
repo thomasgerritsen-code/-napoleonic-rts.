@@ -40,7 +40,7 @@ test('Village landscape v7.1 adds archetype character and lived-in detail withou
   expect(result.landscape.importantGateposts).toBe(true);
   expect(result.landscape.navigationUnchanged).toBe(true);
   expect(result.authority.landscape).toBe('village-landscape-v6');
-  expect(result.authority.landscapeCharacter).toBe('village-landscape-v7');
+  expect(result.authority.landscapeCharacter).toBe('village-landscape-v7.1');
   expect(result.authority.archetypeCharacter).toBe(true);
   expect(result.activeAuthority).toBe('village-authority-v6');
   expect(result.archetypes.length).toBeGreaterThanOrEqual(4);
