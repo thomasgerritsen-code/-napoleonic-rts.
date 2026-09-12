@@ -10,6 +10,8 @@ namespace NapoleonicRTS.Runtime
         private readonly List<int> _selectionBuffer = new List<int>();
         private readonly List<int> _commandBuffer = new List<int>();
         private SimulationWorld _world;
+        private StrategicMap _map;
+        private StrategicRoutePlanner _planner;
         private InstancedUnitRenderer _renderer;
         private float _accumulator;
         private float _alpha;
@@ -17,6 +19,7 @@ namespace NapoleonicRTS.Runtime
         private int _lastSteps;
 
         public SimulationWorld World => _world;
+        public StrategicMap Map => _map;
         public ISet<int> SelectedRegiments => _selectedRegiments;
 
         private void Awake()
@@ -24,6 +27,8 @@ namespace NapoleonicRTS.Runtime
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
             _world = new SimulationWorld();
+            _map = BrowserBattlefieldMap.Create();
+            _planner = new StrategicRoutePlanner(_map);
             PrototypeScenario.Populate(_world);
             _renderer = new InstancedUnitRenderer();
         }
@@ -56,7 +61,7 @@ namespace NapoleonicRTS.Runtime
         public void MoveSelection(Float2 target)
         {
             CopySelectionToCommandBuffer();
-            RegimentCommandService.MoveRegiments(_world, _commandBuffer, target, 9f);
+            RegimentCommandService.MoveRegiments(_world, _commandBuffer, target, 5.5f, _planner);
         }
 
         public void SetSelectionFormation(FormationKind formation)
@@ -75,16 +80,16 @@ namespace NapoleonicRTS.Runtime
 
         private void OnGUI()
         {
-            GUI.Box(new Rect(12, 12, 312, 194), "Napoleonic RTS — Native Prototype");
-            GUI.Label(new Rect(24, 42, 280, 22), $"Units: {_world?.Units.Count ?? 0}  Regiments: {_world?.Regiments.Count ?? 0}");
-            GUI.Label(new Rect(24, 62, 280, 22), $"Selected regiments: {_selectedRegiments.Count}");
-            GUI.Label(new Rect(24, 82, 280, 22), $"Fixed sim: 60 Hz  Tick: {_world?.Tick ?? 0}  Steps/frame: {_lastSteps}");
-            GUI.Label(new Rect(24, 102, 280, 22), $"GPU instances · FPS: {(1f / Mathf.Max(0.0001f, Time.unscaledDeltaTime)):0}");
-
-            if (GUI.Button(new Rect(24, 130, 82, 26), "Line")) SetSelectionFormation(FormationKind.Line);
-            if (GUI.Button(new Rect(112, 130, 82, 26), "Column")) SetSelectionFormation(FormationKind.Column);
-            if (GUI.Button(new Rect(200, 130, 82, 26), "Square")) SetSelectionFormation(FormationKind.Square);
-            if (GUI.Button(new Rect(24, 164, 258, 26), _home ? "March to centre" : "Return home"))
+            GUI.Box(new Rect(12, 12, 328, 214), "Napoleonic RTS — Native Prototype");
+            GUI.Label(new Rect(24, 42, 300, 22), $"Units: {_world?.Units.Count ?? 0}  Regiments: {_world?.Regiments.Count ?? 0}");
+            GUI.Label(new Rect(24, 62, 300, 22), $"Selected regiments: {_selectedRegiments.Count}");
+            GUI.Label(new Rect(24, 82, 300, 22), $"Road graph: {_planner?.NodeCount ?? 0} nodes · 4 legal river crossings");
+            GUI.Label(new Rect(24, 102, 300, 22), $"Fixed sim: 60 Hz  Tick: {_world?.Tick ?? 0}  Steps/frame: {_lastSteps}");
+            GUI.Label(new Rect(24, 122, 300, 22), $"GPU instances · FPS: {(1f / Mathf.Max(0.0001f, Time.unscaledDeltaTime)):0}");
+            if (GUI.Button(new Rect(24, 150, 82, 26), "Line")) SetSelectionFormation(FormationKind.Line);
+            if (GUI.Button(new Rect(112, 150, 82, 26), "Column")) SetSelectionFormation(FormationKind.Column);
+            if (GUI.Button(new Rect(200, 150, 82, 26), "Square")) SetSelectionFormation(FormationKind.Square);
+            if (GUI.Button(new Rect(24, 184, 258, 26), _home ? "March to centre" : "Return home"))
             {
                 _home = !_home;
                 PrototypeScenario.OrderMarch(_world, _home);

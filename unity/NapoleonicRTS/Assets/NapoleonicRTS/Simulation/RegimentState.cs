@@ -17,5 +17,7 @@ namespace NapoleonicRTS.Simulation
         public float Speed { get; set; } = 4.2f;
         public bool Moving { get; internal set; }
         public List<int> UnitIndices { get; } = new List<int>();
+        public List<Float2> Route { get; } = new List<Float2>();
+        public int RouteIndex { get; internal set; }
     }
 }

@@ -14,6 +14,13 @@ namespace NapoleonicRTS.Runtime
                 battlefield = host.AddComponent<BattlefieldPrototype>();
             }
 
+            var mapRenderer = battlefield.GetComponent<StrategicMapRenderer>();
+            if (mapRenderer == null)
+            {
+                mapRenderer = battlefield.gameObject.AddComponent<StrategicMapRenderer>();
+                mapRenderer.Initialize(battlefield.Map);
+            }
+
             var camera = Camera.main;
             if (camera == null)
             {
@@ -22,11 +29,10 @@ namespace NapoleonicRTS.Runtime
                 camera.transform.position = new Vector3(0f, 0f, -10f);
             }
             camera.orthographic = true;
-            camera.orthographicSize = 34f;
+            camera.orthographicSize = 31f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.26f, 0.34f, 0.20f, 1f);
-            if (camera.GetComponent<PrototypeCameraController>() == null)
-                camera.gameObject.AddComponent<PrototypeCameraController>();
+            if (camera.GetComponent<PrototypeCameraController>() == null) camera.gameObject.AddComponent<PrototypeCameraController>();
 
             var input = battlefield.GetComponent<BattlefieldInputController>();
             if (input == null) input = battlefield.gameObject.AddComponent<BattlefieldInputController>();

@@ -17,44 +17,42 @@ namespace NapoleonicRTS.Simulation
         {
             var regiment = new RegimentState
             {
-                Id = _nextRegimentId++,
-                Side = side,
-                Formation = formation,
-                Anchor = anchor,
-                PreviousAnchor = anchor,
-                HomeAnchor = anchor,
-                Destination = anchor,
-                FacingRadians = facingRadians,
-                Moving = false
+                Id = _nextRegimentId++, Side = side, Formation = formation,
+                Anchor = anchor, PreviousAnchor = anchor, HomeAnchor = anchor, Destination = anchor,
+                FacingRadians = facingRadians, Moving = false
             };
-
             for (var i = 0; i < unitCount; i++)
             {
                 var slot = FormationLayout.Slot(formation, i, unitCount);
                 var position = TransformSlot(anchor, facingRadians, slot);
                 var unit = new UnitState
                 {
-                    Id = _nextUnitId++,
-                    RegimentId = regiment.Id,
-                    Side = side,
-                    Kind = UnitKind.Infantry,
-                    Position = position,
-                    PreviousPosition = position,
-                    SlotOffset = slot,
-                    FacingRadians = facingRadians
+                    Id = _nextUnitId++, RegimentId = regiment.Id, Side = side, Kind = UnitKind.Infantry,
+                    Position = position, PreviousPosition = position, SlotOffset = slot, FacingRadians = facingRadians
                 };
                 regiment.UnitIndices.Add(Units.Count);
                 Units.Add(unit);
             }
-
             Regiments.Add(regiment);
             return regiment;
         }
 
         public void SetDestination(RegimentState regiment, Float2 destination)
         {
+            regiment.Route.Clear();
+            regiment.RouteIndex = 0;
             regiment.Destination = destination;
             regiment.Moving = Float2.Distance(regiment.Anchor, destination) > 0.05f;
+        }
+
+        public void SetRoute(RegimentState regiment, IReadOnlyList<Float2> points)
+        {
+            regiment.Route.Clear();
+            regiment.RouteIndex = 0;
+            if (points == null || points.Count == 0) { regiment.Moving = false; return; }
+            for (var i = 0; i < points.Count; i++) regiment.Route.Add(points[i]);
+            regiment.Destination = points[points.Count - 1];
+            regiment.Moving = true;
         }
 
         public void SetFormation(RegimentState regiment, FormationKind formation)
@@ -64,10 +62,7 @@ namespace NapoleonicRTS.Simulation
                 Units[regiment.UnitIndices[i]].SlotOffset = FormationLayout.Slot(formation, i, regiment.UnitIndices.Count);
         }
 
-        public void SetFormationForAll(FormationKind formation)
-        {
-            foreach (var regiment in Regiments) SetFormation(regiment, formation);
-        }
+        public void SetFormationForAll(FormationKind formation) { foreach (var regiment in Regiments) SetFormation(regiment, formation); }
 
         public Float2 GetSlotTarget(UnitState unit)
         {
@@ -85,33 +80,10 @@ namespace NapoleonicRTS.Simulation
         {
             if (!(dt > 0f) || float.IsNaN(dt) || float.IsInfinity(dt)) throw new ArgumentOutOfRangeException(nameof(dt));
             Tick++;
-
             foreach (var regiment in Regiments)
             {
                 regiment.PreviousAnchor = regiment.Anchor;
-                if (regiment.Moving)
-                {
-                    var delta = regiment.Destination - regiment.Anchor;
-                    var distance = delta.Length;
-                    if (distance <= 0.02f)
-                    {
-                        regiment.Anchor = regiment.Destination;
-                        regiment.Moving = false;
-                    }
-                    else
-                    {
-                        var direction = delta / distance;
-                        regiment.FacingRadians = MathF.Atan2(direction.Y, direction.X);
-                        var step = regiment.Speed * dt;
-                        if (step >= distance)
-                        {
-                            regiment.Anchor = regiment.Destination;
-                            regiment.Moving = false;
-                        }
-                        else regiment.Anchor += direction * step;
-                    }
-                }
-
+                AdvanceRegiment(regiment, dt);
                 for (var i = 0; i < regiment.UnitIndices.Count; i++)
                 {
                     var unit = Units[regiment.UnitIndices[i]];
@@ -124,6 +96,36 @@ namespace NapoleonicRTS.Simulation
                     followerSpeed = MathF.Min(followerSpeed, regiment.Speed * 3.25f);
                     unit.Position = Float2.MoveTowards(unit.Position, target, followerSpeed * dt);
                 }
+            }
+        }
+
+        private static void AdvanceRegiment(RegimentState regiment, float dt)
+        {
+            if (!regiment.Moving) return;
+            while (true)
+            {
+                var target = regiment.Route.Count > 0 && regiment.RouteIndex < regiment.Route.Count ? regiment.Route[regiment.RouteIndex] : regiment.Destination;
+                var delta = target - regiment.Anchor;
+                var distance = delta.Length;
+                if (distance <= 0.03f)
+                {
+                    regiment.Anchor = target;
+                    if (regiment.Route.Count > 0 && regiment.RouteIndex + 1 < regiment.Route.Count) { regiment.RouteIndex++; continue; }
+                    regiment.Moving = false;
+                    return;
+                }
+                var direction = delta / distance;
+                regiment.FacingRadians = MathF.Atan2(direction.Y, direction.X);
+                var step = regiment.Speed * dt;
+                if (step >= distance)
+                {
+                    regiment.Anchor = target;
+                    if (regiment.Route.Count > 0 && regiment.RouteIndex + 1 < regiment.Route.Count) { regiment.RouteIndex++; continue; }
+                    regiment.Moving = false;
+                    return;
+                }
+                regiment.Anchor += direction * step;
+                return;
             }
         }
 

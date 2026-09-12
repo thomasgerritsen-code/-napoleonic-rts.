@@ -16,7 +16,7 @@ namespace NapoleonicRTS.Simulation
             }
         }
 
-        public static void MoveRegiments(SimulationWorld world, IReadOnlyList<int> regimentIds, Float2 centre, float spacing = 8f)
+        public static void MoveRegiments(SimulationWorld world, IReadOnlyList<int> regimentIds, Float2 centre, float spacing = 8f, StrategicRoutePlanner planner = null)
         {
             if (world == null) throw new ArgumentNullException(nameof(world));
             if (regimentIds == null) throw new ArgumentNullException(nameof(regimentIds));
@@ -32,9 +32,14 @@ namespace NapoleonicRTS.Simulation
                 var row = i / files;
                 var col = i % files;
                 var actualFiles = Math.Min(files, count - row * files);
-                var x = (col - (actualFiles - 1) * 0.5f) * spacing;
-                var y = (row - (ranks - 1) * 0.5f) * spacing;
-                world.SetDestination(regiment, centre + new Float2(x, y));
+                var destination = centre + new Float2((col - (actualFiles - 1) * 0.5f) * spacing, (row - (ranks - 1) * 0.5f) * spacing);
+                if (planner == null) world.SetDestination(regiment, destination);
+                else
+                {
+                    var kind = UnitTravelKind.Infantry;
+                    var plan = planner.Plan(regiment.Anchor, destination, kind);
+                    if (plan.IsValid) world.SetRoute(regiment, plan.Points); else world.SetDestination(regiment, destination);
+                }
             }
         }
     }
