@@ -91,7 +91,9 @@
 
   // ---------- Basics ----------
   function resize() {
-    const dpr = Math.min(devicePixelRatio || 1, 2);
+    // Canvas cost grows with DPR squared. A cap of 1.5 keeps the 2D battlefield crisp
+    // while avoiding 4x pixel fill on Retina/HiDPI displays at DPR 2.
+    const dpr = Math.min(devicePixelRatio || 1, 1.5);
     canvas.width = Math.floor(innerWidth * dpr);
     canvas.height = Math.floor(innerHeight * dpr);
     canvas.style.width = `${innerWidth}px`;
@@ -138,104 +140,50 @@
       dead: false, morale: 100, routing: false, recentHit: 0,
       regimentId: null, task: null, resourceTarget: null, returnResource: null,
       buildingTarget: null, carryType: null, carry: 0, gatherClock: 0,
-      attackMode: 'fire', artilleryMode: 'round', chargeTimer: 0
+      path: [], pathIndex: 0, gatherTarget: null,
+      stuckTime: 0, lastX: x, lastY: y
     };
-    units.push(u);
-    return u;
+    units.push(u); return u;
   }
 
   function createBuilding(side, type, x, y, complete = true) {
     const d = BUILDINGS[type];
-    const b = {
-      id: nextId++, kind: 'building', side, type, x, y, w: d.w, h: d.h,
-      hp: complete ? d.hp : Math.round(d.hp * 0.15), maxHp: d.hp,
-      complete, construction: complete ? 1 : 0.15, dead: false,
-      queue: [], production: 0
-    };
-    buildings.push(b);
-    return b;
+    const b = { id: nextId++, kind: 'building', side, type, x, y, w: d.w, h: d.h,
+      hp: d.hp, maxHp: d.hp, complete, construction: complete ? 1 : 0, queue: [], production: 0, dead: false };
+    buildings.push(b); return b;
   }
 
-  function createResource(type, x, y, amount) {
-    const r = {
-      id: nextId++, kind: 'resource', type, x, y, amount, maxAmount: amount,
-      radius: type === 'wood' ? 20 : 18, dead: false
-    };
-    resources.push(r);
-    return r;
+  function createResource(type, x, y, amount = 900) {
+    const r = { id: nextId++, kind: 'resource', type, x, y, amount, maxAmount: amount, dead: false };
+    resources.push(r); return r;
   }
 
-  function spawnLine(side, type, x, y, count, cols = 12, spacing = 18) {
-    const made = [];
-    for (let i = 0; i < count; i++) {
-      const col = i % cols, row = Math.floor(i / cols), dir = sideDir(side);
-      made.push(createUnit(side, type, x + dir * col * spacing, y + row * spacing));
+  function unitAt(x, y, side = null) {
+    let best = null, bestD = Infinity;
+    for (const u of units) {
+      if (u.dead || (side && u.side !== side)) continue;
+      const d = Math.hypot(u.x - x, u.y - y);
+      if (d < TYPES[u.type].radius + 8 && d < bestD) { best = u; bestD = d; }
     }
-    return made;
+    return best;
   }
 
-  function createResourceClusters() {
-    const clusters = [
-      ['wood', 360, 540], ['wood', 470, 620], ['wood', 850, 430],
-      ['food', 730, 610], ['food', 840, 690],
-      ['wood', 1450, 410], ['wood', 1530, 1370], ['food', 1520, 880],
-      ['wood', 2700, 520], ['wood', 2820, 650], ['wood', 2450, 1310],
-      ['food', 2530, 690], ['food', 2720, 1110]
-    ];
-    for (const [type, cx, cy] of clusters) {
-      const count = type === 'wood' ? 14 : 7;
-      for (let i = 0; i < count; i++) {
-        createResource(type, cx + (Math.random() - 0.5) * 150, cy + (Math.random() - 0.5) * 120, type === 'wood' ? 220 : 360);
-      }
-    }
+  function buildingAt(x, y, side = null) {
+    return buildings.find(b => !b.dead && (!side || b.side === side) && Math.abs(x - b.x) <= b.w / 2 && Math.abs(y - b.y) <= b.h / 2) || null;
   }
 
-  function resetGame() {
-    const previousElapsed = elapsed;
-    const previousUnitCount = units.length;
-    const previousRegimentCount = regiments.length;
-    units.length = buildings.length = resources.length = projectiles.length = particles.length = regiments.length = 0;
-    selectedUnits.clear();
-    selectedBuilding = null;
-    nextId = 1; nextRegimentId = 1;
-    gameOver = false; buildMode = null; currentFormation = 'line';
-    actionSignature = ''; volleyClock = 0; aiDecisionClock = 0; aiAttackClock = 0; elapsed = 0; aiPlan = 'opbouwen';
-    window.NRTS?.events?.emit?.('game:reset', { previousElapsed, previousUnitCount, previousRegimentCount });
-
-    economies.france.food = 1100; economies.france.wood = 1100; economies.france.popCap = 45;
-    economies.britain.food = 850; economies.britain.wood = 850; economies.britain.popCap = 35;
-    camera.x = 720; camera.y = 900; camera.zoom = 0.72;
-    messageEl.classList.add('hidden'); buildHintEl.classList.add('hidden');
-
-    createBuilding('france', 'towncenter', 560, 900, true);
-    for (let i = 0; i < 6; i++) createUnit('france', 'worker', 650 + (i % 3) * 24, 830 + Math.floor(i / 3) * 28);
-    spawnLine('france', 'infantry', 700, 1010, 12, 12, 18);
-    createUnit('france', 'officer', 805, 970);
-    createUnit('france', 'drummer', 775, 970);
-    spawnLine('france', 'cavalry', 660, 1130, 4, 4, 28);
-    spawnLine('france', 'artillery', 620, 1210, 2, 2, 48);
-
-    createBuilding('britain', 'towncenter', 2640, 900, true);
-    for (let i = 0; i < 6; i++) createUnit('britain', 'worker', 2540 - (i % 3) * 24, 830 + Math.floor(i / 3) * 28);
-    spawnLine('britain', 'infantry', 2460, 1030, 6, 6, 18);
-    spawnLine('britain', 'cavalry', 2630, 1140, 3, 3, 28);
-    spawnLine('britain', 'artillery', 2690, 1220, 1, 1, 48);
-
-    createResourceClusters();
-
-    recalcPopCap('france'); recalcPopCap('britain');
-    autoAssignAIWorkers();
-    updateHud(true);
-    statusEl.textContent = 'Selecteer 12 musketiers + 1 officier + 1 drummer en maak een regiment.';
+  function resourceAt(x, y) {
+    return resources.find(r => !r.dead && Math.hypot(r.x - x, r.y - y) < 28) || null;
   }
 
-  // ---------- Camera ----------
   function screenToWorld(sx, sy) {
     return { x: (sx - innerWidth / 2) / camera.zoom + camera.x, y: (sy - innerHeight / 2) / camera.zoom + camera.y };
   }
-  function worldToScreen(wx, wy) {
-    return { x: (wx - camera.x) * camera.zoom + innerWidth / 2, y: (wy - camera.y) * camera.zoom + innerHeight / 2 };
+
+  function worldToScreen(x, y) {
+    return { x: (x - camera.x) * camera.zoom + innerWidth / 2, y: (y - camera.y) * camera.zoom + innerHeight / 2 };
   }
+
   function clampCamera() {
     const halfW = innerWidth / (2 * camera.zoom), halfH = innerHeight / (2 * camera.zoom);
     camera.x = Math.max(halfW, Math.min(WORLD.width - halfW, camera.x));
