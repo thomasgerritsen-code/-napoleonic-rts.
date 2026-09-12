@@ -33,7 +33,11 @@ namespace NapoleonicRTS.Runtime
                 _dragCurrent = Input.mousePosition;
                 var a = ScreenToBattlefield(_dragStart);
                 var b = ScreenToBattlefield(_dragCurrent);
-                if ((_dragCurrent - _dragStart).sqrMagnitude < 20f) { a -= new Float2(1.4f, 1.4f); b += new Float2(1.4f, 1.4f); }
+                if ((_dragCurrent - _dragStart).sqrMagnitude < 20f)
+                {
+                    a -= new Float2(1.4f, 1.4f);
+                    b += new Float2(1.4f, 1.4f);
+                }
                 _battlefield.SelectFranceInRect(a, b, Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
                 _dragging = false;
             }
@@ -43,6 +47,9 @@ namespace NapoleonicRTS.Runtime
             if (Input.GetKeyDown(KeyCode.Alpha1)) _battlefield.SetSelectionFormation(FormationKind.Line);
             if (Input.GetKeyDown(KeyCode.Alpha2)) _battlefield.SetSelectionFormation(FormationKind.Column);
             if (Input.GetKeyDown(KeyCode.Alpha3)) _battlefield.SetSelectionFormation(FormationKind.Square);
+            if (Input.GetKeyDown(KeyCode.B)) _battlefield.BayonetCommand();
+            if (Input.GetKeyDown(KeyCode.C)) _battlefield.CavalryCharge();
+            if (Input.GetKeyDown(KeyCode.G)) _battlefield.ToggleArtillery();
 #endif
         }
 
@@ -58,7 +65,7 @@ namespace NapoleonicRTS.Runtime
         {
 #if ENABLE_LEGACY_INPUT_MANAGER
             var mouse = Input.mousePosition;
-            return mouse.x <= 335f && Screen.height - mouse.y <= 215f;
+            return mouse.x <= 420f && Screen.height - mouse.y <= 500f;
 #else
             return false;
 #endif
