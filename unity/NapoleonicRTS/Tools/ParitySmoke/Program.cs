@@ -49,6 +49,40 @@ var clickedResource = gameplay.Resources.First(r => !r.Depleted);
 WorkerOrderService.IssueContextOrder(gameplay, new[] { orderWorker.Id }, clickedResource.Position);
 Require(orderWorker.Task == WorkerTask.Gather && orderWorker.ResourceId == clickedResource.Id, "Resource context order did not bind the clicked resource.");
 
+// The player-side browser flow must visibly stage loose troops before a regiment is created.
+var productionMovement = new SimulationWorld(map);
+var productionWorld = new BrowserParityWorld(productionMovement, map, new StrategicRoutePlanner(map));
+productionWorld.FranceEconomy.Food = 6000f;
+productionWorld.FranceEconomy.Wood = 6000f;
+productionWorld.AddBuilding(ArmySide.France, BuildingKind.TownCenter, new Float2(-30f, 0f));
+productionWorld.AddBuilding(ArmySide.Britain, BuildingKind.TownCenter, new Float2(30f, 0f));
+var productionBarracks = productionWorld.AddBuilding(ArmySide.France, BuildingKind.Barracks, new Float2(-27f, 2f));
+for (var h = 0; h < 4; h++) productionWorld.AddBuilding(ArmySide.France, BuildingKind.House, new Float2(-32f + h * 1.5f, -4f));
+productionWorld.RecalculatePopulationCap(ArmySide.France);
+var playerProduction = new PlayerLooseProductionSystem(productionWorld);
+Require(playerProduction.QueueTraining(productionBarracks.Id, UnitKind.Infantry), "Browser-style loose infantry could not be queued.");
+for (var i = 0; i < 60 * 5; i++) playerProduction.Step(SimulationWorld.FixedStepSeconds);
+Require(playerProduction.LooseCount(UnitKind.Infantry) == 0, "Loose infantry spawned before its six second training time.");
+for (var i = 0; i < 75; i++) playerProduction.Step(SimulationWorld.FixedStepSeconds);
+Require(playerProduction.LooseCount(UnitKind.Infantry) == 1, "Finished infantry was not represented as a visible loose unit.");
+Require(productionMovement.Units.Count(u => u.Alive && u.Kind == UnitKind.Infantry) == 1, "Loose production did not enter the authoritative movement world.");
+
+for (var n = 1; n < 12; n++)
+{
+    Require(playerProduction.QueueTraining(productionBarracks.Id, UnitKind.Infantry), $"Loose infantry queue failed at {n + 1}/12.");
+    for (var i = 0; i < 60 * 7; i++) playerProduction.Step(SimulationWorld.FixedStepSeconds);
+}
+Require(playerProduction.QueueTraining(productionBarracks.Id, UnitKind.Officer), "Loose officer could not be queued.");
+for (var i = 0; i < 60 * 11; i++) playerProduction.Step(SimulationWorld.FixedStepSeconds);
+Require(playerProduction.QueueTraining(productionBarracks.Id, UnitKind.Drummer), "Loose drummer could not be queued.");
+for (var i = 0; i < 60 * 8; i++) playerProduction.Step(SimulationWorld.FixedStepSeconds);
+Require(playerProduction.LooseCount(UnitKind.Infantry) == 12 && playerProduction.LooseCount(UnitKind.Officer) == 1 && playerProduction.LooseCount(UnitKind.Drummer) == 1, "Loose 12+1+1 regiment material was not produced.");
+Require(playerProduction.TryFormRegiment(playerProduction.LooseRegiments), "Twelve musketeers plus officer and drummer did not form a regiment.");
+Require(playerProduction.LooseCount(UnitKind.Infantry) == 0 && playerProduction.LooseCount(UnitKind.Officer) == 0 && playerProduction.LooseCount(UnitKind.Drummer) == 0, "Loose material remained after regiment formation.");
+Require(productionMovement.Regiments.Any(r => r.UnitIndices.Count == 14 && r.UnitIndices.Count(i => productionMovement.Units[i].Alive) == 14), "Formed regiment was not created in the authoritative movement world.");
+Require(productionWorld.PopulationUsed(ArmySide.France) == 14, "Regiment formation changed committed population.");
+Require(!playerProduction.QueueTraining(productionBarracks.Id, UnitKind.Cavalry) && !playerProduction.QueueTraining(productionBarracks.Id, UnitKind.Artillery), "Player Barracks should expose only browser-supported troop training.");
+
 var woodBefore = gameplay.Resources.Where(r => r.Kind == ResourceKind.Wood).Sum(r => r.Amount);
 for (var i = 0; i < 60 * 18; i++) gameplay.Step(SimulationWorld.FixedStepSeconds);
 var woodAfter = gameplay.Resources.Where(r => r.Kind == ResourceKind.Wood).Sum(r => r.Amount);
@@ -117,4 +151,4 @@ Require(gameplay.Combat.ToggleArtillery(new[] { frenchArtillery.Id }), "Artiller
 Require(frenchArtillery.UnitIndices.Where(index => gameplay.Movement.Units[index].Kind == UnitKind.Artillery).All(index => gameplay.Combat.Get(gameplay.Movement.Units[index].Id).ArtilleryMode == ArtilleryMode.GrapeShot), "Artillery did not switch to grapeshot.");
 Require(gameplay.Combat.BayonetCommand(new[] { french.Id }), "Bayonet command did not apply.");
 
-Console.WriteLine($"PASS browser parity core | units={gameplay.Movement.Units.Count} workers={gameplay.Workers.Count} buildings={gameplay.Buildings.Count} pop={gameplay.PopulationUsed(ArmySide.France)}/{gameplay.FranceEconomy.PopulationCap} resources={gameplay.Resources.Count} shots={fight.Combat.TotalShotsFired} deaths={fight.Combat.TotalDeaths} scars={fight.Combat.Rules.Scars.Count} artilleryBuildingDamage={townHp-targetTown.HitPoints:0.0} aiTicks={gameplay.Commander.ProductionTicks} aiState={gameplay.Commander.State}");
+Console.WriteLine($"PASS browser parity core | units={gameplay.Movement.Units.Count} workers={gameplay.Workers.Count} buildings={gameplay.Buildings.Count} pop={gameplay.PopulationUsed(ArmySide.France)}/{gameplay.FranceEconomy.PopulationCap} looseFormation=14 resources={gameplay.Resources.Count} shots={fight.Combat.TotalShotsFired} deaths={fight.Combat.TotalDeaths} scars={fight.Combat.Rules.Scars.Count} artilleryBuildingDamage={townHp-targetTown.HitPoints:0.0} aiTicks={gameplay.Commander.ProductionTicks} aiState={gameplay.Commander.State}");
