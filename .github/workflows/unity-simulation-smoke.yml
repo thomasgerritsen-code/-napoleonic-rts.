@@ -1,0 +1,24 @@
+name: Unity simulation smoke
+
+on:
+  push:
+    paths:
+      - 'unity/**'
+      - '.github/workflows/unity-simulation-smoke.yml'
+  pull_request:
+    paths:
+      - 'unity/**'
+      - '.github/workflows/unity-simulation-smoke.yml'
+
+jobs:
+  simulation-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run native simulation smoke test
+        run: dotnet run --project unity/NapoleonicRTS/Tools/SimulationSmoke/SimulationSmoke.csproj --configuration Release

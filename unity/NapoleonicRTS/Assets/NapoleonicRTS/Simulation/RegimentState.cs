@@ -1,0 +1,21 @@
+using System.Collections.Generic;
+
+namespace NapoleonicRTS.Simulation
+{
+    public enum FormationKind { Line, Column, Square }
+
+    public sealed class RegimentState
+    {
+        public int Id { get; internal set; }
+        public ArmySide Side { get; internal set; }
+        public FormationKind Formation { get; internal set; }
+        public Float2 Anchor { get; internal set; }
+        public Float2 PreviousAnchor { get; internal set; }
+        public Float2 HomeAnchor { get; internal set; }
+        public Float2 Destination { get; internal set; }
+        public float FacingRadians { get; internal set; }
+        public float Speed { get; set; } = 4.2f;
+        public bool Moving { get; internal set; }
+        public List<int> UnitIndices { get; } = new List<int>();
+    }
+}

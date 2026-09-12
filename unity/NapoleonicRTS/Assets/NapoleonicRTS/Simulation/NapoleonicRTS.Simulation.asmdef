@@ -1,0 +1,6 @@
+{
+  "name": "NapoleonicRTS.Simulation",
+  "rootNamespace": "NapoleonicRTS.Simulation",
+  "autoReferenced": true,
+  "noEngineReferences": true
+}
