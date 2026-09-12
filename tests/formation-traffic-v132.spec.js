@@ -34,15 +34,16 @@ test('a moving line keeps actively forming instead of dissolving into loose sold
     const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',start.x,start.y);
     const reg=getRegiment(id);
 
-    // Deliberately disturb several files: the moving battalion should close these gaps
-    // while still advancing instead of waiting motionless for a perfect parade line.
+    window.__RTS_DEBUG__.selectRegiment(id);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(start.x+720,start.y,0);
+
+    // Disturb files after the march slots exist. This verifies that an already-moving
+    // battalion closes a genuine slot error instead of merely receiving fresh targets.
     regimentMembers(reg).filter(u=>u.type==='infantry').slice(0,4).forEach((u,i)=>{
       u.x-=18+i*4;
       u.y+=34+i*5;
     });
 
-    window.__RTS_DEBUG__.selectRegiment(id);
-    window.__RTS_DEBUG__.orderSelectedWithFacing(start.x+720,start.y,0);
     const before=centroid(regimentMembers(reg));
     window.RTS_SIM.step(5.0);
     const after=centroid(regimentMembers(reg));
@@ -84,8 +85,6 @@ test('two friendly lines moving toward each other choose passing lanes instead o
     const initialA=centroid(regimentMembers(a)),initialB=centroid(regimentMembers(b));
     let crossed=false;
 
-    // Use fewer, larger deterministic simulation advances so this remains a fast
-    // regression while still covering the whole head-on encounter.
     for(let i=0;i<90;i++){
       window.RTS_SIM.step(.15);
       if(i%2)continue;
