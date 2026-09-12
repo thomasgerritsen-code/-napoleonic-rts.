@@ -19,7 +19,11 @@ namespace NapoleonicRTS.Runtime
         private readonly Material _projectile;
         private readonly Material _smoke;
         private readonly Material _impact;
-        private readonly Material _objective;
+        private readonly Material _scar;
+        private readonly Material _selected;
+        private readonly Material _objectiveNeutral;
+        private readonly Material _objectiveFrance;
+        private readonly Material _objectiveBritain;
         private readonly Bounds _bounds = new Bounds(Vector3.zero, new Vector3(220f, 160f, 20f));
 
         public ParityEntityRenderer()
@@ -36,13 +40,19 @@ namespace NapoleonicRTS.Runtime
             _projectile = CreateMaterial(shader, new Color(.95f, .86f, .57f, 1f));
             _smoke = CreateMaterial(shader, new Color(.58f, .58f, .55f, .72f));
             _impact = CreateMaterial(shader, new Color(.74f, .58f, .35f, .9f));
-            _objective = CreateMaterial(shader, new Color(.95f, .78f, .18f, .88f));
+            _scar = CreateMaterial(shader, new Color(.17f, .13f, .11f, .55f));
+            _selected = CreateMaterial(shader, new Color(.96f, .78f, .18f, .92f));
+            _objectiveNeutral = CreateMaterial(shader, new Color(.84f, .76f, .46f, .82f));
+            _objectiveFrance = CreateMaterial(shader, new Color(.20f, .42f, .90f, .88f));
+            _objectiveBritain = CreateMaterial(shader, new Color(.86f, .20f, .17f, .88f));
         }
 
-        public void Render(BrowserParityWorld world)
+        public void Render(BrowserParityWorld world, ISet<int> selectedWorkers, int selectedBuildingId)
         {
             if (world == null) return;
+            RenderScars(world.Combat.Rules.Scars);
             RenderResources(world);
+            RenderSelection(world, selectedWorkers, selectedBuildingId);
             RenderWorkers(world);
             RenderBuildings(world);
             RenderProjectiles(world.Combat.Projectiles);
@@ -51,12 +61,28 @@ namespace NapoleonicRTS.Runtime
             RenderObjectives(world.Objective);
         }
 
+        private void RenderScars(List<BattlefieldScarState> scars)
+        {
+            RenderList(scars, _scar, s => true,
+                s => Matrix4x4.TRS(V(s.Position, -.08f), Quaternion.identity, new Vector3(.28f, .14f, 1f)));
+        }
+
         private void RenderResources(BrowserParityWorld world)
         {
             RenderList(world.Resources, _wood, r => !r.Depleted && r.Kind == ResourceKind.Wood,
                 r => Matrix4x4.TRS(V(r.Position, .03f), Quaternion.identity, new Vector3(.44f, .44f, 1f)));
             RenderList(world.Resources, _food, r => !r.Depleted && r.Kind == ResourceKind.Food,
                 r => Matrix4x4.TRS(V(r.Position, .03f), Quaternion.identity, new Vector3(.36f, .28f, 1f)));
+        }
+
+        private void RenderSelection(BrowserParityWorld world, ISet<int> selectedWorkers, int selectedBuildingId)
+        {
+            if (selectedWorkers != null && selectedWorkers.Count > 0)
+                RenderList(world.Workers, _selected, w => w.Alive && selectedWorkers.Contains(w.Id),
+                    w => Matrix4x4.TRS(V(w.Position, .095f), Quaternion.Euler(0f, 0f, 45f), new Vector3(.38f, .38f, 1f)));
+            if (selectedBuildingId != 0)
+                RenderList(world.Buildings, _selected, b => !b.Destroyed && b.Id == selectedBuildingId,
+                    b => Matrix4x4.TRS(V(b.Position, .01f), Quaternion.identity, new Vector3(b.Width + .24f, b.Height + .24f, 1f)));
         }
 
         private void RenderWorkers(BrowserParityWorld world)
@@ -70,9 +96,9 @@ namespace NapoleonicRTS.Runtime
         private void RenderBuildings(BrowserParityWorld world)
         {
             RenderList(world.Buildings, _franceBuilding, b => !b.Destroyed && b.Side == ArmySide.France,
-                b => Matrix4x4.TRS(V(b.Position, .02f), Quaternion.identity, new Vector3(b.Width, b.Height, 1f)));
+                b => Matrix4x4.TRS(V(b.Position, .02f), Quaternion.identity, new Vector3(b.Width * Mathf.Max(.15f, b.Construction), b.Height * Mathf.Max(.15f, b.Construction), 1f)));
             RenderList(world.Buildings, _britainBuilding, b => !b.Destroyed && b.Side == ArmySide.Britain,
-                b => Matrix4x4.TRS(V(b.Position, .02f), Quaternion.identity, new Vector3(b.Width, b.Height, 1f)));
+                b => Matrix4x4.TRS(V(b.Position, .02f), Quaternion.identity, new Vector3(b.Width * Mathf.Max(.15f, b.Construction), b.Height * Mathf.Max(.15f, b.Construction), 1f)));
         }
 
         private void RenderProjectiles(List<ProjectileState> projectiles)
@@ -90,8 +116,12 @@ namespace NapoleonicRTS.Runtime
         private void RenderObjectives(ObjectiveState objective)
         {
             if (objective == null) return;
-            RenderList(objective.Points, _objective, p => true,
+            RenderList(objective.Points, _objectiveNeutral, p => !p.Owner.HasValue,
                 p => Matrix4x4.TRS(V(p.Position, -.02f), Quaternion.Euler(0f, 0f, 45f), new Vector3(.72f, .72f, 1f)));
+            RenderList(objective.Points, _objectiveFrance, p => p.Owner == ArmySide.France,
+                p => Matrix4x4.TRS(V(p.Position, -.02f), Quaternion.Euler(0f, 0f, 45f), new Vector3(.76f, .76f, 1f)));
+            RenderList(objective.Points, _objectiveBritain, p => p.Owner == ArmySide.Britain,
+                p => Matrix4x4.TRS(V(p.Position, -.02f), Quaternion.Euler(0f, 0f, 45f), new Vector3(.76f, .76f, 1f)));
         }
 
         private void RenderList<T>(IList<T> source, Material material, Func<T, bool> include, Func<T, Matrix4x4> matrix)
@@ -136,7 +166,8 @@ namespace NapoleonicRTS.Runtime
         {
             Destroy(_wood); Destroy(_food); Destroy(_franceWorker); Destroy(_britainWorker);
             Destroy(_franceBuilding); Destroy(_britainBuilding); Destroy(_projectile);
-            Destroy(_smoke); Destroy(_impact); Destroy(_objective); Destroy(_quad);
+            Destroy(_smoke); Destroy(_impact); Destroy(_scar); Destroy(_selected);
+            Destroy(_objectiveNeutral); Destroy(_objectiveFrance); Destroy(_objectiveBritain); Destroy(_quad);
         }
 
         private static void Destroy(UnityEngine.Object value)
