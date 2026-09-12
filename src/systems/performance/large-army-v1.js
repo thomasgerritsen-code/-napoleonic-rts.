@@ -8,7 +8,7 @@
   const MAX_2D_DPR = 1.5;
   const LOD_UNIT_THRESHOLD = 360;
   const LOD_ZOOM_THRESHOLD = 0.82;
-  const STATIC_TERRAIN_REFRESH_MS = 250;
+  const STATIC_TERRAIN_REFRESH_MS = 1000;
   const combatGrid = { france: new Map(), britain: new Map() };
   const regimentById = new Map();
   const membersByRegiment = new Map();
