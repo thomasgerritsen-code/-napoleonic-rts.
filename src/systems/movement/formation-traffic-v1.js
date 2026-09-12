@@ -55,13 +55,16 @@
 
   function cohesion(reg){
     const members=regimentMembers(reg).filter(u=>u&&!u.dead&&!u.routing);
-    if(!members.length)return{readiness:1,mean:0,max:0};
-    let ready=0,sum=0,max=0;
+    if(!members.length)return{readiness:1,mean:0,p90:0};
+    const errors=[];
+    let ready=0,sum=0;
     for(const u of members){
       const d=Math.hypot((u.targetX??u.x)-u.x,(u.targetY??u.y)-u.y);
-      sum+=d;max=Math.max(max,d);if(d<=24)ready++;
+      errors.push(d);sum+=d;if(d<=24)ready++;
     }
-    return{readiness:ready/members.length,mean:sum/members.length,max};
+    errors.sort((a,b)=>a-b);
+    const p90=errors[Math.min(errors.length-1,Math.floor((errors.length-1)*.9))]||0;
+    return{readiness:ready/members.length,mean:sum/members.length,p90};
   }
 
   const previousDesiredGroupSpeed=desiredGroupSpeedV064;
@@ -70,12 +73,20 @@
     if(!(base>0)||!reg||reg.destroyed||!march?.v064||groupKindV06(reg)==='artillery')return base;
     const info=bridgeInfo(reg);
     if(info?.state==='waiting'||info?.state==='queued')return base;
+
     const c=cohesion(reg);
+    const orderAge=Math.max(0,elapsed-(reg.formationTrafficOrderedAtV132??march.phaseStartedAt??elapsed));
     let factor=1;
-    if(c.readiness<.78)factor*=Math.max(.18,.36+c.readiness*.72);
-    if(c.mean>28)factor*=Math.max(.34,1-(c.mean-28)/105);
-    if(c.max>92)factor*=.68;
-    if((info?.state==='approach'||info?.state==='crossing')&&c.readiness<.58)factor*=.72;
+
+    // Immediately after a new order the anchor briefly gives the line time to close up.
+    // Once the march is established, never let one lagging file stop a whole battalion.
+    if(orderAge<2.0&&c.readiness<.76)factor=Math.min(factor,Math.max(.62,.72+c.readiness*.30));
+    if(c.mean>42)factor=Math.min(factor,Math.max(.78,1-(c.mean-42)/220));
+    if(c.p90>88)factor=Math.min(factor,.84);
+    if((info?.state==='approach'||info?.state==='crossing')&&c.readiness<.58)factor=Math.min(factor,.78);
+
+    const minimumFactor=info?.state==='approach'||info?.state==='crossing'?.62:.74;
+    factor=Math.max(minimumFactor,factor);
     if(factor<.985)stats.cohesionSlowdowns++;
     return base*factor;
   };
@@ -154,7 +165,7 @@
 
   const previousOrderGroupPath=orderGroupPathV06;
   orderGroupPathV06=function orderGroupPathFormationTrafficV132(reg,x,y,formation=reg?.formation,finalFacing=null){
-    if(reg)reg.formationTrafficV132=null;
+    if(reg){reg.formationTrafficV132=null;reg.formationTrafficOrderedAtV132=elapsed;}
     return previousOrderGroupPath(reg,x,y,formation,finalFacing);
   };
 
