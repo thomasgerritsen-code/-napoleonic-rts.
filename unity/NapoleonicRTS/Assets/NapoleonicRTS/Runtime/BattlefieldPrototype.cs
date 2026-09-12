@@ -15,6 +15,7 @@ namespace NapoleonicRTS.Runtime
         private BrowserParityWorld _gameplay;
         private StrategicMap _map;
         private StrategicRoutePlanner _planner;
+        private BattlefieldEnvironmentRenderer _environmentRenderer;
         private InstancedUnitRenderer _renderer;
         private ParityEntityRenderer _parityRenderer;
         private float _accumulator;
@@ -40,6 +41,7 @@ namespace NapoleonicRTS.Runtime
             QualitySettings.vSyncCount = 0;
             _map = BrowserBattlefieldMap.Create();
             _planner = new StrategicRoutePlanner(_map);
+            _environmentRenderer = new BattlefieldEnvironmentRenderer();
             _renderer = new InstancedUnitRenderer();
             _parityRenderer = new ParityEntityRenderer();
             LoadGameplayScenario();
@@ -91,12 +93,14 @@ namespace NapoleonicRTS.Runtime
 
         private void LateUpdate()
         {
-            _renderer?.Render(_world, _alpha, _selectedRegiments);
+            if (_gameplay != null) _environmentRenderer?.Render(_gameplay);
+            _renderer?.Render(_world, _alpha, _selectedRegiments, _gameplay);
             if (_gameplay != null) _parityRenderer?.Render(_gameplay, _selectedWorkers, _selectedBuildingId);
         }
 
         private void OnDestroy()
         {
+            _environmentRenderer?.Dispose();
             _renderer?.Dispose();
             _parityRenderer?.Dispose();
         }
