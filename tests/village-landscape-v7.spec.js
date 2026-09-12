@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test('Village landscape v7 adds archetype character without changing navigation authority', async ({ page }) => {
+test('Village landscape v7.1 adds archetype character and lived-in detail without changing navigation authority', async ({ page }) => {
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/?test=village-landscape-v7',{waitUntil:'networkidle'});
@@ -24,7 +24,7 @@ test('Village landscape v7 adds archetype character without changing navigation 
     };
   });
 
-  expect(result.landscape.version).toBe('village-landscape-v7');
+  expect(result.landscape.version).toBe('village-landscape-v7.1');
   expect(result.landscape.base).toBe('village-landscape-v6');
   expect(result.landscape.archetypeLandmarks).toBe(true);
   expect(result.landscape.roadsideEdges).toBe(true);
@@ -32,6 +32,12 @@ test('Village landscape v7 adds archetype character without changing navigation 
   expect(result.landscape.paddocks).toBe(true);
   expect(result.landscape.woodlandEdge).toBe(true);
   expect(result.landscape.accessGateHints).toBe(true);
+  expect(result.landscape.commonFootpaths).toBe(true);
+  expect(result.landscape.commonTree).toBe(true);
+  expect(result.landscape.ribbonDitches).toBe(true);
+  expect(result.landscape.paddockFurrows).toBe(true);
+  expect(result.landscape.crossroadsWear).toBe(true);
+  expect(result.landscape.importantGateposts).toBe(true);
   expect(result.landscape.navigationUnchanged).toBe(true);
   expect(result.authority.landscape).toBe('village-landscape-v6');
   expect(result.authority.landscapeCharacter).toBe('village-landscape-v7');
