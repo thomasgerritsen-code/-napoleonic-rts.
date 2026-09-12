@@ -15,8 +15,8 @@ namespace NapoleonicRTS.Simulation
             }
             SpawnTypedRegiment(world, ArmySide.France, BrowserBattlefieldMap.MapToNative(1050f, 1550f), 8, UnitKind.Cavalry, FormationKind.Column, 0f, 1.96f);
             SpawnTypedRegiment(world, ArmySide.Britain, BrowserBattlefieldMap.MapToNative(3250f, 1550f), 8, UnitKind.Cavalry, FormationKind.Column, MathF.PI, 1.96f);
-            SpawnTypedRegiment(world, ArmySide.France, BrowserBattlefieldMap.MapToNative(850f, 430f), 3, UnitKind.Artillery, FormationKind.Line, 0f, .62f);
-            SpawnTypedRegiment(world, ArmySide.Britain, BrowserBattlefieldMap.MapToNative(3450f, 430f), 3, UnitKind.Artillery, FormationKind.Line, MathF.PI, .62f);
+            SpawnArtilleryBattery(world, ArmySide.France, BrowserBattlefieldMap.MapToNative(850f, 430f), 0f);
+            SpawnArtilleryBattery(world, ArmySide.Britain, BrowserBattlefieldMap.MapToNative(3450f, 430f), MathF.PI);
         }
 
         public static BrowserParityWorld CreateGameplayWorld(StrategicMap map)
@@ -25,6 +25,7 @@ namespace NapoleonicRTS.Simulation
             PopulateMovement(movement);
             var parity = new BrowserParityWorld(movement, map, new StrategicRoutePlanner(map));
             SeedEconomy(parity);
+            ObjectiveScenarioService.Select(parity.Objective, "crossroads");
             parity.Combat.SyncUnits();
             for (var i = 0; i < movement.Regiments.Count; i++) parity.Combat.RegisterRegiment(movement.Regiments[i]);
             return parity;
@@ -39,8 +40,6 @@ namespace NapoleonicRTS.Simulation
             world.AddBuilding(ArmySide.France, BuildingKind.House, BrowserBattlefieldMap.MapToNative(700f, 1260f));
             world.AddBuilding(ArmySide.Britain, BuildingKind.House, BrowserBattlefieldMap.MapToNative(3600f, 1260f));
 
-            // Resources must exist before initial worker assignment. This keeps both the human
-            // and AI economy active immediately instead of relying on the AI idle-worker fallback.
             AddResourceCluster(world, ResourceKind.Wood, 520f, 580f);
             AddResourceCluster(world, ResourceKind.Food, 760f, 620f);
             AddResourceCluster(world, ResourceKind.Wood, 3780f, 580f);
@@ -75,6 +74,15 @@ namespace NapoleonicRTS.Simulation
             var reg = world.SpawnRegiment(side, anchor, count, formation, facing);
             reg.Speed = speed;
             for (var i = 0; i < reg.UnitIndices.Count; i++) world.Units[reg.UnitIndices[i]].Kind = kind;
+        }
+
+        private static void SpawnArtilleryBattery(SimulationWorld world, ArmySide side, Float2 anchor, float facing)
+        {
+            var reg = world.SpawnRegiment(side, anchor, 3, FormationKind.Line, facing);
+            reg.Speed = .62f;
+            world.Units[reg.UnitIndices[0]].Kind = UnitKind.Artillery;
+            world.Units[reg.UnitIndices[1]].Kind = UnitKind.Infantry;
+            world.Units[reg.UnitIndices[2]].Kind = UnitKind.Infantry;
         }
 
         private static void AddResourceCluster(BrowserParityWorld world, ResourceKind kind, float browserX, float browserY)
