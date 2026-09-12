@@ -19,8 +19,10 @@ namespace NapoleonicRTS.Simulation
         {
             _world = world ?? throw new ArgumentNullException(nameof(world));
             _random = random ?? throw new ArgumentNullException(nameof(random));
+            Rules = new NativeBattlefieldRules(world);
         }
 
+        public NativeBattlefieldRules Rules { get; }
         public List<ProjectileState> Projectiles { get; } = new List<ProjectileState>();
         public List<ParticleState> Particles { get; } = new List<ParticleState>();
         public IReadOnlyDictionary<int, CombatUnitState> UnitStates => _combat;
@@ -41,6 +43,28 @@ namespace NapoleonicRTS.Simulation
                 }
             }
             for (var i = 0; i < _world.Movement.Regiments.Count; i++) RegisterRegiment(_world.Movement.Regiments[i]);
+            RefreshArtilleryCrewFlags();
+        }
+
+        private void RefreshArtilleryCrewFlags()
+        {
+            foreach (var pair in _combat) pair.Value.ArtilleryCrew = false;
+            for (var r = 0; r < _world.Movement.Regiments.Count; r++)
+            {
+                var reg = _world.Movement.Regiments[r];
+                var hasCannon = false;
+                for (var i = 0; i < reg.UnitIndices.Count; i++)
+                {
+                    var u = _world.Movement.Units[reg.UnitIndices[i]];
+                    if (u.Kind == UnitKind.Artillery) { hasCannon = true; break; }
+                }
+                if (!hasCannon) continue;
+                for (var i = 0; i < reg.UnitIndices.Count; i++)
+                {
+                    var u = _world.Movement.Units[reg.UnitIndices[i]];
+                    if (u.Kind == UnitKind.Infantry && _combat.TryGetValue(u.Id, out var c)) c.ArtilleryCrew = true;
+                }
+            }
         }
 
         public void RegisterRegiment(RegimentState regiment)
@@ -79,6 +103,7 @@ namespace NapoleonicRTS.Simulation
         public void Step(float dt)
         {
             SyncUnits();
+            Rules.Step(dt, this);
             _volleyClock = (_volleyClock + dt) % 3.1f;
             BuildSpatialGrid();
 
@@ -98,22 +123,28 @@ namespace NapoleonicRTS.Simulation
                     continue;
                 }
 
-                var nearby = FindNearestEnemyUnit(unit, 3.6f);
+                var nearby = FindNearestEnemyUnit(unit, 3.6f * Rules.VisionFactor);
                 var regiment = _world.Movement.FindRegiment(unit.RegimentId);
                 var support = regiment == null ? 0f : CommandBonus(regiment) * .75f + HasLivingKind(regiment, UnitKind.Drummer) * .45f;
                 state.Morale = MathF.Min(100f, state.Morale + (nearby != null ? .2f : 1.2f + support) * dt);
                 if (state.Morale < 22f) { RouteUnit(unit, state); continue; }
+                if (state.ArtilleryCrew) continue;
+                if (unit.Kind == UnitKind.Artillery && !CanArtilleryOperate(unit)) continue;
 
                 var profile = CombatProfile.For(unit.Kind);
                 var range = profile.Range;
                 if (unit.Kind == UnitKind.Artillery && state.ArtilleryMode == ArtilleryMode.GrapeShot) range = 2.90f;
                 if (unit.Kind == UnitKind.Infantry && state.AttackMode == AttackMode.Bayonet) range = .32f;
+                range *= Rules.VisionFactor;
+
                 var enemy = FindNearestEnemyUnit(unit, range);
-                if (enemy == null || state.ReloadRemaining > 0f) continue;
+                var building = enemy == null ? FindNearestEnemyBuilding(unit, range) : null;
+                if ((enemy == null && building == null) || state.ReloadRemaining > 0f) continue;
 
                 var volleyUnit = unit.Kind == UnitKind.Infantry || unit.Kind == UnitKind.Officer;
-                if (!volleyUnit || _volleyClock < .18f || state.AttackMode == AttackMode.Bayonet)
-                    Fire(unit, state, enemy);
+                if (volleyUnit && _volleyClock >= .18f && state.AttackMode != AttackMode.Bayonet) continue;
+                if (enemy != null) Fire(unit, state, enemy);
+                else FireAtBuilding(unit, state, building);
             }
 
             UpdateProjectiles(dt);
@@ -128,6 +159,7 @@ namespace NapoleonicRTS.Simulation
                 var p = Particles[i];
                 p.Life -= dt;
                 if (p.Life <= 0f) { Particles.RemoveAt(i); continue; }
+                Rules.ApplyParticleWind(p, dt);
                 p.Position += p.Velocity * dt;
                 p.Velocity *= .97f;
             }
@@ -148,6 +180,7 @@ namespace NapoleonicRTS.Simulation
                     var u = _world.Movement.Units[reg.UnitIndices[i]];
                     if (!u.Alive || (u.Kind != UnitKind.Infantry && u.Kind != UnitKind.Officer)) continue;
                     var state = Get(u.Id);
+                    if (state.ArtilleryCrew) continue;
                     state.AttackMode = AttackMode.Bayonet;
                     state.ChargeTimer = 6f;
                     state.Morale = MathF.Min(100f, state.Morale + 8f);
@@ -209,6 +242,21 @@ namespace NapoleonicRTS.Simulation
             return changed;
         }
 
+        public bool CanArtilleryOperate(UnitState cannon)
+        {
+            if (cannon == null || !cannon.Alive || cannon.Kind != UnitKind.Artillery) return false;
+            var reg = _world.Movement.FindRegiment(cannon.RegimentId);
+            if (reg == null) return false;
+            var crew = 0;
+            for (var i = 0; i < reg.UnitIndices.Count; i++)
+            {
+                var u = _world.Movement.Units[reg.UnitIndices[i]];
+                var c = Get(u.Id);
+                if (u.Alive && u.Kind == UnitKind.Infantry && c != null && c.ArtilleryCrew && !c.Routing) crew++;
+            }
+            return crew >= 2;
+        }
+
         private void Fire(UnitState shooter, CombatUnitState state, UnitState enemy)
         {
             var profile = CombatProfile.For(shooter.Kind);
@@ -236,9 +284,11 @@ namespace NapoleonicRTS.Simulation
                     if (distance > 2.90f || distance < .001f) continue;
                     var direction = delta / distance;
                     var dot = forward.X * direction.X + forward.Y * direction.Y;
-                    if (dot > MathF.Cos(.28f))
+                    if (dot > MathF.Cos(.28f) && Rules.HasLineOfSight(shooter.Position, other.Position))
                         ApplyDamage(other, 24f * MathF.Max(.15f, 1f - distance / 3.8f), 18f, shooter.Id);
                 }
+                var building = FindNearestEnemyBuilding(shooter, 2.90f);
+                if (building != null) DamageBuilding(building, 34f);
                 SpawnSmoke(shooter.Position + forward * .24f, 14);
                 return;
             }
@@ -252,35 +302,65 @@ namespace NapoleonicRTS.Simulation
             SpawnSmoke(shooter.Position + Float2.FromAngle(shooter.FacingRadians) * .18f, shooter.Kind == UnitKind.Artillery ? 10 : 4);
         }
 
+        private void FireAtBuilding(UnitState shooter, CombatUnitState state, BuildingState building)
+        {
+            if (building == null) return;
+            var profile = CombatProfile.For(shooter.Kind);
+            state.ReloadRemaining = profile.Reload * (.9f + (float)_random.NextDouble() * .25f);
+            state.ShotsFired++; TotalShotsFired++;
+            if (shooter.Kind == UnitKind.Cavalry || state.AttackMode == AttackMode.Bayonet || shooter.Kind == UnitKind.Drummer)
+            {
+                DamageBuilding(building, profile.Damage * (state.ChargeTimer > 0f ? 1.5f : .8f));
+                SpawnImpact(building.Position, 4);
+                return;
+            }
+            if (shooter.Kind == UnitKind.Artillery && state.ArtilleryMode == ArtilleryMode.GrapeShot)
+            {
+                DamageBuilding(building, 34f); SpawnSmoke(shooter.Position, 12); return;
+            }
+            Projectiles.Add(new ProjectileState
+            {
+                Id = _nextProjectileId++, Side = shooter.Side, Position = shooter.Position,
+                TargetBuildingId = building.Id, Damage = profile.Damage, Speed = profile.ProjectileSpeed,
+                Artillery = shooter.Kind == UnitKind.Artillery
+            });
+            SpawnSmoke(shooter.Position, shooter.Kind == UnitKind.Artillery ? 10 : 4);
+        }
+
         private void UpdateProjectiles(float dt)
         {
             for (var i = Projectiles.Count - 1; i >= 0; i--)
             {
                 var projectile = Projectiles[i];
                 if (projectile.Dead) { Projectiles.RemoveAt(i); continue; }
-                if (!_unitsById.TryGetValue(projectile.TargetUnitId, out var target) || !target.Alive)
+
+                Float2 targetPosition;
+                UnitState unitTarget = null;
+                BuildingState buildingTarget = null;
+                if (projectile.TargetUnitId != 0)
                 {
-                    Projectiles.RemoveAt(i);
-                    continue;
+                    if (!_unitsById.TryGetValue(projectile.TargetUnitId, out unitTarget) || !unitTarget.Alive) { Projectiles.RemoveAt(i); continue; }
+                    targetPosition = unitTarget.Position;
+                }
+                else
+                {
+                    buildingTarget = _world.FindBuilding(projectile.TargetBuildingId);
+                    if (buildingTarget == null || buildingTarget.Destroyed) { Projectiles.RemoveAt(i); continue; }
+                    targetPosition = buildingTarget.Position;
                 }
 
-                var delta = target.Position - projectile.Position;
+                var delta = targetPosition - projectile.Position;
                 var distance = delta.Length;
                 var hitRadius = projectile.Artillery ? .24f : .12f;
                 var travelThisTick = projectile.Speed * dt;
-
-                // Continuous collision: a fast projectile that reaches or passes the target
-                // during this fixed step resolves its impact immediately instead of requiring
-                // the target to remain inside a tiny hit circle on the following tick.
                 if (distance <= hitRadius + travelThisTick)
                 {
-                    ResolveProjectileImpact(projectile, target);
+                    if (unitTarget != null) ResolveProjectileImpact(projectile, unitTarget);
+                    else ResolveBuildingImpact(projectile, buildingTarget);
                     Projectiles.RemoveAt(i);
                     continue;
                 }
-
-                if (distance > .0001f)
-                    projectile.Position += delta / distance * travelThisTick;
+                if (distance > .0001f) projectile.Position += delta / distance * travelThisTick;
             }
         }
 
@@ -295,8 +375,7 @@ namespace NapoleonicRTS.Simulation
                     var other = _world.Movement.Units[i];
                     if (!other.Alive || other.Side == projectile.Side) continue;
                     var distance = Float2.Distance(other.Position, target.Position);
-                    if (distance < .84f)
-                        ApplyDamage(other, projectile.Damage * MathF.Max(.22f, 1f - distance / 1f), 24f, 0);
+                    if (distance < .84f) ApplyDamage(other, projectile.Damage * MathF.Max(.22f, 1f - distance), 24f, 0);
                 }
             }
             else
@@ -304,6 +383,14 @@ namespace NapoleonicRTS.Simulation
                 ApplyDamage(target, projectile.Damage * RandomRange(.75f, 1.25f), 10f, 0);
                 SpawnImpact(target.Position, 3);
             }
+        }
+
+        private void ResolveBuildingImpact(ProjectileState projectile, BuildingState building)
+        {
+            var multiplier = projectile.Artillery ? 1f : .65f;
+            DamageBuilding(building, projectile.Damage * multiplier);
+            SpawnImpact(building.Position, projectile.Artillery ? 16 : 4);
+            if (projectile.Artillery) SpawnSmoke(building.Position, 12);
         }
 
         public void DamageBuilding(BuildingState building, float damage)
@@ -314,6 +401,7 @@ namespace NapoleonicRTS.Simulation
             {
                 building.HitPoints = 0f;
                 building.Destroyed = true;
+                _world.Status = building.Kind == BuildingKind.TownCenter ? "Town Center vernietigd" : $"{building.Kind} vernietigd";
             }
         }
 
@@ -322,6 +410,7 @@ namespace NapoleonicRTS.Simulation
             if (!victim.Alive) return;
             var state = Get(victim.Id);
             if (state == null) return;
+            damage *= Rules.CoverFactor(victim.Position);
             state.HitPoints -= damage;
             state.Morale = MathF.Max(0f, state.Morale - shock - damage * .08f);
             state.RecentHit = 2f;
@@ -352,6 +441,7 @@ namespace NapoleonicRTS.Simulation
             state.HitPoints = 0f;
             state.Morale = 0f;
             TotalDeaths++;
+            Rules.RecordDeath(unit);
             if (!moraleShock) return;
 
             var regiment = _world.Movement.FindRegiment(unit.RegimentId);
@@ -372,8 +462,7 @@ namespace NapoleonicRTS.Simulation
             state.AttackMode = AttackMode.Fire;
             state.ChargeTimer = 0f;
             var regiment = _world.Movement.FindRegiment(unit.RegimentId);
-            if (regiment != null)
-                _world.Movement.SetDestination(regiment, new Float2(unit.Side == ArmySide.France ? -42f : 42f, regiment.Anchor.Y));
+            if (regiment != null) _world.Movement.SetDestination(regiment, new Float2(unit.Side == ArmySide.France ? -42f : 42f, regiment.Anchor.Y));
         }
 
         private void UpdateRegimentMorale()
@@ -382,26 +471,18 @@ namespace NapoleonicRTS.Simulation
             {
                 var regiment = _world.Movement.Regiments[r];
                 RegisterRegiment(regiment);
-                var sum = 0f;
-                var living = 0;
-                var routed = 0;
+                var sum = 0f; var living = 0; var routed = 0;
                 for (var i = 0; i < regiment.UnitIndices.Count; i++)
                 {
                     var unit = _world.Movement.Units[regiment.UnitIndices[i]];
                     if (!unit.Alive) continue;
                     var combat = Get(unit.Id);
-                    sum += combat.Morale;
-                    living++;
-                    if (combat.Routing) routed++;
+                    sum += combat.Morale; living++; if (combat.Routing) routed++;
                 }
-
                 var state = _regiments[regiment.Id];
                 state.Morale = living == 0 ? 0f : sum / living;
                 state.CommandBonus = CommandBonus(regiment);
-                state.Discipline = state.Morale > 75f ? DisciplineState.Steady :
-                    state.Morale > 50f ? DisciplineState.Shaken :
-                    state.Morale > 25f ? DisciplineState.Wavering : DisciplineState.Routing;
-
+                state.Discipline = state.Morale > 75f ? DisciplineState.Steady : state.Morale > 50f ? DisciplineState.Shaken : state.Morale > 25f ? DisciplineState.Wavering : DisciplineState.Routing;
                 if (routed <= 0) continue;
                 var loss = routed * .025f;
                 for (var i = 0; i < regiment.UnitIndices.Count; i++)
@@ -422,11 +503,7 @@ namespace NapoleonicRTS.Simulation
                 var unit = _world.Movement.Units[i];
                 if (!unit.Alive) continue;
                 var key = GridKey(unit.Position);
-                if (!_grid.TryGetValue(key, out var bucket))
-                {
-                    bucket = new List<int>();
-                    _grid[key] = bucket;
-                }
+                if (!_grid.TryGetValue(key, out var bucket)) { bucket = new List<int>(); _grid[key] = bucket; }
                 bucket.Add(i);
             }
         }
@@ -438,7 +515,6 @@ namespace NapoleonicRTS.Simulation
             var radius = Math.Max(1, (int)MathF.Ceiling(maxRange / GridCell));
             UnitState best = null;
             var bestDistanceSquared = maxRange * maxRange;
-
             for (var y = cy - radius; y <= cy + radius; y++)
             for (var x = cx - radius; x <= cx + radius; x++)
             {
@@ -450,12 +526,23 @@ namespace NapoleonicRTS.Simulation
                     var combat = Get(other.Id);
                     if (combat != null && combat.Routing) continue;
                     var distanceSquared = (other.Position - source.Position).LengthSquared;
-                    if (distanceSquared < bestDistanceSquared)
-                    {
-                        bestDistanceSquared = distanceSquared;
-                        best = other;
-                    }
+                    if (distanceSquared >= bestDistanceSquared || !Rules.HasLineOfSight(source.Position, other.Position)) continue;
+                    bestDistanceSquared = distanceSquared; best = other;
                 }
+            }
+            return best;
+        }
+
+        private BuildingState FindNearestEnemyBuilding(UnitState source, float maxRange)
+        {
+            BuildingState best = null; var bestDistance = maxRange;
+            for (var i = 0; i < _world.Buildings.Count; i++)
+            {
+                var b = _world.Buildings[i];
+                if (b.Destroyed || !b.Complete || b.Side == source.Side) continue;
+                var distance = Float2.Distance(source.Position, b.Position);
+                if (distance >= bestDistance || !Rules.HasLineOfSight(source.Position, b.Position)) continue;
+                bestDistance = distance; best = b;
             }
             return best;
         }
@@ -463,8 +550,7 @@ namespace NapoleonicRTS.Simulation
         public Float2? FindNearestEnemyRegimentAnchor(ArmySide sourceSide, Float2 from)
         {
             var enemySide = sourceSide == ArmySide.France ? ArmySide.Britain : ArmySide.France;
-            Float2? best = null;
-            var bestDistance = float.PositiveInfinity;
+            Float2? best = null; var bestDistance = float.PositiveInfinity;
             for (var i = 0; i < _world.Movement.Regiments.Count; i++)
             {
                 var regiment = _world.Movement.Regiments[i];
@@ -485,20 +571,18 @@ namespace NapoleonicRTS.Simulation
                 var combat = Get(unit.Id);
                 if (combat == null || combat.Routing) continue;
                 var weight = unit.Kind == UnitKind.Artillery ? 3f : unit.Kind == UnitKind.Cavalry ? 1.8f : unit.Kind == UnitKind.Officer ? 1.35f : 1f;
-                total += weight * Math.Clamp(combat.HitPoints / MathF.Max(1f, combat.MaxHitPoints), 0f, 1f) * Math.Clamp(combat.Morale / 100f, 0f, 1f);
+                total += weight * Math.Clamp(combat.HitPoints / MathF.Max(1f, combat.MaxHitPoints), 0f, 1f) * Math.Clamp(combat.Morale / 100f, 0f, 1f) * (.68f + .32f * combat.Stamina / 100f);
             }
             return total;
         }
 
         public float MeanMorale(ArmySide side)
         {
-            var sum = 0f;
-            var count = 0;
+            var sum = 0f; var count = 0;
             foreach (var pair in _combat)
             {
                 if (!_unitsById.TryGetValue(pair.Key, out var unit) || !unit.Alive || unit.Side != side) continue;
-                sum += pair.Value.Morale;
-                count++;
+                sum += pair.Value.Morale; count++;
             }
             return count == 0 ? 100f : sum / count;
         }
@@ -506,8 +590,7 @@ namespace NapoleonicRTS.Simulation
         public int LivingMembers(RegimentState regiment)
         {
             var count = 0;
-            for (var i = 0; i < regiment.UnitIndices.Count; i++)
-                if (_world.Movement.Units[regiment.UnitIndices[i]].Alive) count++;
+            for (var i = 0; i < regiment.UnitIndices.Count; i++) if (_world.Movement.Units[regiment.UnitIndices[i]].Alive) count++;
             return count;
         }
 
@@ -527,26 +610,20 @@ namespace NapoleonicRTS.Simulation
 
         private void SpawnSmoke(Float2 position, int count)
         {
-            for (var i = 0; i < count; i++)
-                Particles.Add(new ParticleState
-                {
-                    Position = position,
-                    Velocity = new Float2(RandomRange(-.24f, .24f), RandomRange(.08f, .28f)),
-                    Life = RandomRange(.7f, 1.5f), MaxLife = 1.5f,
-                    Size = RandomRange(.08f, .24f), Impact = false
-                });
+            for (var i = 0; i < count; i++) Particles.Add(new ParticleState
+            {
+                Position = position, Velocity = new Float2(RandomRange(-.24f, .24f), RandomRange(.08f, .28f)),
+                Life = RandomRange(.7f, 1.5f), MaxLife = 1.5f, Size = RandomRange(.08f, .24f), Impact = false
+            });
         }
 
         private void SpawnImpact(Float2 position, int count)
         {
-            for (var i = 0; i < count; i++)
-                Particles.Add(new ParticleState
-                {
-                    Position = position,
-                    Velocity = new Float2(RandomRange(-.9f, .9f), RandomRange(-.9f, .9f)),
-                    Life = RandomRange(.25f, .6f), MaxLife = .6f,
-                    Size = RandomRange(.04f, .10f), Impact = true
-                });
+            for (var i = 0; i < count; i++) Particles.Add(new ParticleState
+            {
+                Position = position, Velocity = new Float2(RandomRange(-.9f, .9f), RandomRange(-.9f, .9f)),
+                Life = RandomRange(.25f, .6f), MaxLife = .6f, Size = RandomRange(.04f, .10f), Impact = true
+            });
         }
     }
 }
