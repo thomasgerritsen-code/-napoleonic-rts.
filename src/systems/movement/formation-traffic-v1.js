@@ -157,7 +157,7 @@
 
         const softCombat=u.side!==other.side&&!!(regA?.engagementV069||regB?.engagementV069);
         const bothSettled=u.arrivedAtTarget&&other.arrivedAtTarget;
-        const correction=overlap*(softCombat?.10:bothSettled?.12:.24);
+        const correction=overlap*(softCombat ? 0.10 : bothSettled ? 0.12 : 0.24);
         u.x-=nx*correction;u.y-=ny*correction;
         other.x+=nx*correction;other.y+=ny*correction;
         if(typeof navStats!=='undefined')navStats.overlapCorrections++;
