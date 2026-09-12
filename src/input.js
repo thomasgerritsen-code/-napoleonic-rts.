@@ -155,14 +155,17 @@
 
   // ---------- Loop ----------
   // Regression pages advance the simulation explicitly via tick()/RTS_SIM.step().
-  // Keep requestAnimationFrame rendering alive for screenshots/UI assertions, but
-  // never let wall-clock frames add hidden simulation time on top of those steps.
+  // Keep requestAnimationFrame alive, but do not pay for the complete legacy 2D draw
+  // while the WebGL battlefield is the visible renderer.
   function frame(now) {
     const dt = Math.min(0.033, (now - lastTime) / 1000);
     lastTime = now;
     if (!TEST_MANUAL_SIMULATION) update(dt);
-    if (typeof window.renderStableFrameV1 === 'function') window.renderStableFrameV1(() => draw(), now);
-    else draw();
+    const threeDActive = Boolean(window.__BATTLEFIELD_3D_V1__?.enabled?.());
+    if (!threeDActive) {
+      if (typeof window.renderStableFrameV1 === 'function') window.renderStableFrameV1(() => draw(), now);
+      else draw();
+    }
     requestAnimationFrame(frame);
   }
 
