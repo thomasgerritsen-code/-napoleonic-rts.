@@ -27,6 +27,7 @@ function selectFocusedTests(files) {
     selected.add('tests/speed-v071.spec.js');
   };
   const addFormationTraffic = () => selected.add('tests/formation-traffic-v132.spec.js');
+  const add2DPerformance = () => selected.add('tests/2d-performance-v132.spec.js');
   const addVillage = () => selected.add('tests/village-renderer-v2.spec.js');
   const addArchitectureV21 = () => selected.add('tests/architecture-v21.spec.js');
   const addRestoration = () => selected.add('tests/restoration-batch-v1.spec.js');
@@ -46,6 +47,7 @@ function selectFocusedTests(files) {
     if (file === 'src/systems/navigation/bridge-follower-safety-v1.js' || file === 'tests/bridge-follower-safety-v1.spec.js') addBridgeFollowerSafety();
     if (file === 'src/systems/navigation/bridge-formation-flow-v1.js' || file === 'src/systems/movement/formation-traffic-v1.js' || file === 'tests/formation-traffic-v132.spec.js') addFormationTraffic();
     if (file === 'src/systems/navigation/bridge-formation-flow-v1.js') addBridgeFollowerSafety();
+    if (file === 'src/systems/rendering/map-realism.js' || file === 'src/systems/rendering/map-ambient-motion.js' || file === 'src/systems/performance/large-army-v1.js' || file === 'tests/2d-performance-v132.spec.js') add2DPerformance();
     if (file === 'src/assets/musketeer-sprite-v1.js' || file === 'src/systems/rendering/musketeer-sprites-v1.js' || file === 'tests/musketeer-sprites-v1.spec.js') addMusketeerSprites();
     if (file === 'index.html' || file === 'style.css' || file.startsWith('src/systems/rendering/battlefield-3d') || file === 'tests/battlefield-3d-v1.spec.js') addBattlefield3D();
 
