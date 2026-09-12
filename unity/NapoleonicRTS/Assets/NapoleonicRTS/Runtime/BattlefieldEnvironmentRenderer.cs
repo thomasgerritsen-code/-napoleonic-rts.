@@ -72,9 +72,7 @@ namespace NapoleonicRTS.Runtime
             var rules = world.Combat.Rules;
             if (rules.Weather == WeatherKind.Mist)
             {
-                _weatherMatrices[0] = Matrix4x4.TRS(new Vector3(0f, 0f, .42f), Quaternion.identity,
-                    new Vector3(BrowserBattlefieldMap.BrowserWidth / BrowserBattlefieldMap.PixelsPerNativeUnit,
-                        BrowserBattlefieldMap.BrowserHeight / BrowserBattlefieldMap.PixelsPerNativeUnit, 1f));
+                SetFullMapOverlay(.42f);
                 Graphics.RenderMeshInstanced(new RenderParams(_mist) { worldBounds = _bounds }, _quad, 0, _weatherMatrices, 1);
             }
             else if (rules.Weather == WeatherKind.Rain)
@@ -84,11 +82,16 @@ namespace NapoleonicRTS.Runtime
 
             if (rules.TimeOfDay == TimeOfDayKind.Evening)
             {
-                _weatherMatrices[70] = Matrix4x4.TRS(new Vector3(0f, 0f, .43f), Quaternion.identity,
-                    new Vector3(BrowserBattlefieldMap.BrowserWidth / BrowserBattlefieldMap.PixelsPerNativeUnit,
-                        BrowserBattlefieldMap.BrowserHeight / BrowserBattlefieldMap.PixelsPerNativeUnit, 1f));
-                Graphics.RenderMeshInstanced(new RenderParams(_evening) { worldBounds = _bounds }, _quad, 0, _weatherMatrices, 1, 70);
+                SetFullMapOverlay(.43f);
+                Graphics.RenderMeshInstanced(new RenderParams(_evening) { worldBounds = _bounds }, _quad, 0, _weatherMatrices, 1);
             }
+        }
+
+        private void SetFullMapOverlay(float z)
+        {
+            _weatherMatrices[0] = Matrix4x4.TRS(new Vector3(0f, 0f, z), Quaternion.identity,
+                new Vector3(BrowserBattlefieldMap.BrowserWidth / BrowserBattlefieldMap.PixelsPerNativeUnit,
+                    BrowserBattlefieldMap.BrowserHeight / BrowserBattlefieldMap.PixelsPerNativeUnit, 1f));
         }
 
         private void BuildRainMatrices()
