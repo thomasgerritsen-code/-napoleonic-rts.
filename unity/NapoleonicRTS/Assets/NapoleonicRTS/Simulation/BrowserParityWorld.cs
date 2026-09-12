@@ -25,8 +25,8 @@ namespace NapoleonicRTS.Simulation
             Movement = movement ?? throw new ArgumentNullException(nameof(movement));
             Map = map ?? throw new ArgumentNullException(nameof(map));
             Planner = planner ?? throw new ArgumentNullException(nameof(planner));
-            FranceEconomy = new EconomyState(1100f, 1100f, 75);
-            BritainEconomy = new EconomyState(850f, 850f, 75);
+            FranceEconomy = new EconomyState(1100f, 1100f, 45);
+            BritainEconomy = new EconomyState(850f, 850f, 45);
             _reserves[ArmySide.France] = NewReservePool();
             _reserves[ArmySide.Britain] = NewReservePool();
             Objective = CreateObjective();
@@ -294,7 +294,12 @@ namespace NapoleonicRTS.Simulation
                 order.Remaining -= dt;
                 if (order.Remaining > 0f) continue;
                 b.Queue.Dequeue();
-                if (order.Kind == UnitKind.Infantry || order.Kind == UnitKind.Officer || order.Kind == UnitKind.Drummer)
+                if (order.Kind == UnitKind.Worker)
+                {
+                    var worker = AddWorker(b.Side, b.Position + new Float2(b.Side == ArmySide.France ? 1.2f : -1.2f, 0f));
+                    if (b.Side == ArmySide.Britain) AssignWorkerToNearestResource(worker.Id, BritainEconomy.Wood < BritainEconomy.Food ? ResourceKind.Wood : ResourceKind.Food);
+                }
+                else if (order.Kind == UnitKind.Infantry || order.Kind == UnitKind.Officer || order.Kind == UnitKind.Drummer)
                     _reserves[b.Side][order.Kind]++;
                 else
                     SpawnSupportUnit(b.Side, order.Kind, b.Position);
@@ -304,12 +309,22 @@ namespace NapoleonicRTS.Simulation
 
         private void SpawnSupportUnit(ArmySide side, UnitKind kind, Float2 near)
         {
+            if (kind == UnitKind.Artillery)
+            {
+                var reg = Movement.SpawnRegiment(side, near + new Float2(side == ArmySide.France ? 2f : -2f, 0f), 3, FormationKind.Line, side == ArmySide.France ? 0f : MathF.PI);
+                reg.Speed = .62f;
+                Movement.Units[reg.UnitIndices[0]].Kind = UnitKind.Artillery;
+                Movement.Units[reg.UnitIndices[1]].Kind = UnitKind.Infantry;
+                Movement.Units[reg.UnitIndices[2]].Kind = UnitKind.Infantry;
+                Combat.SyncUnits(); Combat.RegisterRegiment(reg);
+                return;
+            }
             var formation = kind == UnitKind.Cavalry ? FormationKind.Column : FormationKind.Line;
             var count = kind == UnitKind.Cavalry ? 4 : 1;
-            var reg = Movement.SpawnRegiment(side, near + new Float2(side == ArmySide.France ? 2f : -2f, 0f), count, formation, side == ArmySide.France ? 0f : MathF.PI);
-            for (var i = 0; i < reg.UnitIndices.Count; i++) Movement.Units[reg.UnitIndices[i]].Kind = kind;
-            reg.Speed = kind == UnitKind.Cavalry ? 5.4f : 2.3f;
-            Combat.SyncUnits(); Combat.RegisterRegiment(reg);
+            var support = Movement.SpawnRegiment(side, near + new Float2(side == ArmySide.France ? 2f : -2f, 0f), count, formation, side == ArmySide.France ? 0f : MathF.PI);
+            for (var i = 0; i < support.UnitIndices.Count; i++) Movement.Units[support.UnitIndices[i]].Kind = kind;
+            support.Speed = kind == UnitKind.Cavalry ? 1.96f : 1.14f;
+            Combat.SyncUnits(); Combat.RegisterRegiment(support);
         }
 
         private void UpdateObjective(float dt)
@@ -364,6 +379,12 @@ namespace NapoleonicRTS.Simulation
                 var u = Movement.Units[i]; if (!u.Alive || u.Side != side) continue;
                 count += PopulationCost(u.Kind);
             }
+            foreach (var pair in _reserves[side]) count += pair.Value * PopulationCost(pair.Key);
+            for (var i = 0; i < Buildings.Count; i++)
+            {
+                var b = Buildings[i]; if (b.Destroyed || b.Side != side) continue;
+                foreach (var order in b.Queue) count += PopulationCost(order.Kind);
+            }
             return count;
         }
 
@@ -373,10 +394,9 @@ namespace NapoleonicRTS.Simulation
             for (var i = 0; i < Buildings.Count; i++)
             {
                 var b = Buildings[i]; if (b.Destroyed || !b.Complete || b.Side != side) continue;
-                if (b.Kind == BuildingKind.TownCenter) cap = Math.Max(cap, 45);
-                else if (b.Kind == BuildingKind.House) cap += 15;
+                if (b.Kind == BuildingKind.House) cap += 15;
             }
-            Economy(side).PopulationCap = Math.Max(cap, PopulationUsed(side) + 8);
+            Economy(side).PopulationCap = cap;
         }
 
         public BuildingState FindBuilding(int id)
@@ -419,7 +439,7 @@ namespace NapoleonicRTS.Simulation
 
         private static bool CanTrain(BuildingKind building, UnitKind kind)
         {
-            if (building == BuildingKind.TownCenter) return kind == UnitKind.Drummer;
+            if (building == BuildingKind.TownCenter) return kind == UnitKind.Worker;
             if (building != BuildingKind.Barracks) return false;
             return kind == UnitKind.Infantry || kind == UnitKind.Officer || kind == UnitKind.Drummer || kind == UnitKind.Cavalry || kind == UnitKind.Artillery;
         }
@@ -428,6 +448,7 @@ namespace NapoleonicRTS.Simulation
         {
             switch (kind)
             {
+                case UnitKind.Worker: food = 50f; wood = 0f; seconds = 7f; break;
                 case UnitKind.Officer: food = 160f; wood = 60f; seconds = 10f; break;
                 case UnitKind.Drummer: food = 90f; wood = 20f; seconds = 7f; break;
                 case UnitKind.Cavalry: food = 180f; wood = 30f; seconds = 12f; break;
@@ -449,7 +470,7 @@ namespace NapoleonicRTS.Simulation
         private static ObjectiveState CreateObjective()
         {
             var o = new ObjectiveState();
-            o.Points.Add(new ObjectivePointState { Id = "center", Label = "Centraal kruispunt", Position = BrowserBattlefieldMap.MapToNative(1600, 900) });
+            ObjectiveScenarioService.Select(o, "crossroads");
             return o;
         }
     }
