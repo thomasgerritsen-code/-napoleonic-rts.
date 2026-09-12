@@ -13,6 +13,7 @@ namespace NapoleonicRTS.Runtime
         private readonly List<int> _workerBuffer = new List<int>();
         private SimulationWorld _world;
         private BrowserParityWorld _gameplay;
+        private PlayerLooseProductionSystem _playerProduction;
         private StrategicMap _map;
         private StrategicRoutePlanner _planner;
         private BattlefieldEnvironmentRenderer _environmentRenderer;
@@ -50,6 +51,7 @@ namespace NapoleonicRTS.Runtime
         public void LoadGameplayScenario()
         {
             _gameplay = BrowserParityScenario.CreateGameplayWorld(_map);
+            _playerProduction = new PlayerLooseProductionSystem(_gameplay);
             _world = _gameplay.Movement;
             ClearSelection();
             _placementKind = null;
@@ -61,6 +63,7 @@ namespace NapoleonicRTS.Runtime
         public void LoadStressScenario()
         {
             _gameplay = null;
+            _playerProduction = null;
             _world = new SimulationWorld();
             ScaleScenario.Populate(_world, 100, 50);
             ClearSelection();
@@ -79,6 +82,7 @@ namespace NapoleonicRTS.Runtime
             {
                 if (_gameplay != null)
                 {
+                    _playerProduction?.Step(SimulationWorld.FixedStepSeconds);
                     WorkerOrderService.StepMoveTasks(_gameplay, SimulationWorld.FixedStepSeconds);
                     _gameplay.Step(SimulationWorld.FixedStepSeconds);
                 }
@@ -243,25 +247,26 @@ namespace NapoleonicRTS.Runtime
 
         private void QuickTrain(UnitKind kind)
         {
-            if (_gameplay == null) return;
-            if (_selectedBuildingId != 0 && _gameplay.QueueTraining(ArmySide.France, _selectedBuildingId, kind))
+            if (_gameplay == null || _playerProduction == null) return;
+            if (_selectedBuildingId == 0)
             {
-                _gameplay.Status = $"{kind} in trainingswachtrij";
+                _gameplay.Status = "Selecteer eerst het juiste productiegebouw";
                 return;
             }
+            if (_playerProduction.QueueTraining(_selectedBuildingId, kind)) return;
+            _gameplay.Status = "Productie niet mogelijk: controleer gebouw, grondstoffen, queue en popcap";
+        }
 
-            for (var i = 0; i < _gameplay.Buildings.Count; i++)
+        private void FormSelectedLooseRegiment()
+        {
+            if (_gameplay == null || _playerProduction == null) return;
+            CopySelectionToCommandBuffer();
+            if (_playerProduction.TryFormRegiment(_commandBuffer))
             {
-                var candidate = _gameplay.Buildings[i];
-                if (candidate.Destroyed || !candidate.Complete || candidate.Side != ArmySide.France) continue;
-                if (kind == UnitKind.Worker && candidate.Kind != BuildingKind.TownCenter) continue;
-                if (kind != UnitKind.Worker && candidate.Kind != BuildingKind.Barracks) continue;
-                if (!_gameplay.QueueTraining(ArmySide.France, candidate.Id, kind)) continue;
-                _selectedBuildingId = candidate.Id;
-                _gameplay.Status = $"{kind} in trainingswachtrij";
+                _selectedRegiments.Clear();
                 return;
             }
-            _gameplay.Status = "Training niet mogelijk: controleer grondstoffen, queue en popcap";
+            _gameplay.Status = "Selecteer 12 losse musketiers + 1 officier + 1 drummer";
         }
 
         private void CycleObjective()
@@ -307,10 +312,38 @@ namespace NapoleonicRTS.Runtime
             if (_selectedBuildingId != 0)
             {
                 var b = _gameplay.FindBuilding(_selectedBuildingId);
-                if (b != null) return $"{b.Kind} · HP {b.HitPoints:0}/{b.MaxHitPoints:0} · Queue {b.Queue.Count}";
+                if (b != null)
+                {
+                    var playerQueue = _playerProduction?.QueueCount(b.Id) ?? 0;
+                    var progress = playerQueue > 0 ? $" · Productie {(_playerProduction.QueueProgress(b.Id) * 100f):0}%" : "";
+                    return $"{b.Kind} · HP {b.HitPoints:0}/{b.MaxHitPoints:0} · Queue {playerQueue}{progress}";
+                }
             }
             if (_selectedWorkers.Count > 0) return $"Workers geselecteerd: {_selectedWorkers.Count}";
+            if (_selectedRegiments.Count > 0 && _playerProduction != null)
+            {
+                var loose = 0;
+                foreach (var id in _selectedRegiments) if (_playerProduction.IsLooseRegiment(id)) loose++;
+                if (loose > 0) return $"Losse troepen: {loose} · regimenten: {_selectedRegiments.Count - loose}";
+            }
             return $"Regiments geselecteerd: {_selectedRegiments.Count}";
+        }
+
+        private void DrawProductionActions()
+        {
+            if (_selectedBuildingId == 0 || _gameplay == null) return;
+            var building = _gameplay.FindBuilding(_selectedBuildingId);
+            if (building == null || building.Destroyed || !building.Complete) return;
+            if (building.Kind == BuildingKind.TownCenter)
+            {
+                if (GUI.Button(new Rect(24, 328, 108, 26), "Boer · 50 food")) QuickTrain(UnitKind.Worker);
+            }
+            else if (building.Kind == BuildingKind.Barracks)
+            {
+                if (GUI.Button(new Rect(24, 328, 108, 26), "Musketier")) QuickTrain(UnitKind.Infantry);
+                if (GUI.Button(new Rect(140, 328, 108, 26), "Officier")) QuickTrain(UnitKind.Officer);
+                if (GUI.Button(new Rect(256, 328, 108, 26), "Drummer")) QuickTrain(UnitKind.Drummer);
+            }
         }
 
         private void OnGUI()
@@ -352,18 +385,14 @@ namespace NapoleonicRTS.Runtime
             if (GUI.Button(new Rect(140, 294, 108, 26), "Cavalry [C]")) CavalryCharge();
             if (GUI.Button(new Rect(256, 294, 108, 26), "Round/Grape [G]")) ToggleArtillery();
 
-            if (GUI.Button(new Rect(24, 328, 82, 26), "Worker")) QuickTrain(UnitKind.Worker);
-            if (GUI.Button(new Rect(112, 328, 82, 26), "Infantry")) QuickTrain(UnitKind.Infantry);
-            if (GUI.Button(new Rect(200, 328, 82, 26), "Officer")) QuickTrain(UnitKind.Officer);
-            if (GUI.Button(new Rect(288, 328, 76, 26), "Drummer")) QuickTrain(UnitKind.Drummer);
+            DrawProductionActions();
 
             if (GUI.Button(new Rect(24, 362, 108, 26), "Place House")) BeginPlacement(BuildingKind.House);
             if (GUI.Button(new Rect(140, 362, 108, 26), "Place Barracks")) BeginPlacement(BuildingKind.Barracks);
-            if (GUI.Button(new Rect(256, 362, 108, 26), "Form reserve")) _gameplay.TryFormReserveRegiment(ArmySide.France);
+            if (GUI.Button(new Rect(256, 362, 108, 26), "Maak regiment")) FormSelectedLooseRegiment();
 
-            if (GUI.Button(new Rect(24, 396, 108, 26), "Cavalry")) QuickTrain(UnitKind.Cavalry);
-            if (GUI.Button(new Rect(140, 396, 108, 26), "Artillery")) QuickTrain(UnitKind.Artillery);
-            if (GUI.Button(new Rect(256, 396, 108, 26), "Next objective")) CycleObjective();
+            if (GUI.Button(new Rect(24, 396, 165, 26), "Next objective")) CycleObjective();
+            GUI.Label(new Rect(199, 396, 165, 26), _playerProduction == null ? "" : $"Los: I{_playerProduction.LooseCount(UnitKind.Infantry)} O{_playerProduction.LooseCount(UnitKind.Officer)} D{_playerProduction.LooseCount(UnitKind.Drummer)}");
 
             if (GUI.Button(new Rect(24, 436, 165, 28), "Reset battle")) LoadGameplayScenario();
             if (GUI.Button(new Rect(199, 436, 165, 28), "Stress 10k")) LoadStressScenario();
