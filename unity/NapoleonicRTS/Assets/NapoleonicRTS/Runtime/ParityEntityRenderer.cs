@@ -21,6 +21,7 @@ namespace NapoleonicRTS.Runtime
         private readonly Material _impact;
         private readonly Material _scar;
         private readonly Material _selected;
+        private readonly Material _lastKnown;
         private readonly Material _objectiveNeutral;
         private readonly Material _objectiveFrance;
         private readonly Material _objectiveBritain;
@@ -42,6 +43,7 @@ namespace NapoleonicRTS.Runtime
             _impact = CreateMaterial(shader, new Color(.74f, .58f, .35f, .9f));
             _scar = CreateMaterial(shader, new Color(.17f, .13f, .11f, .55f));
             _selected = CreateMaterial(shader, new Color(.96f, .78f, .18f, .92f));
+            _lastKnown = CreateMaterial(shader, new Color(.58f, .20f, .18f, .28f));
             _objectiveNeutral = CreateMaterial(shader, new Color(.84f, .76f, .46f, .82f));
             _objectiveFrance = CreateMaterial(shader, new Color(.20f, .42f, .90f, .88f));
             _objectiveBritain = CreateMaterial(shader, new Color(.86f, .20f, .17f, .88f));
@@ -52,6 +54,7 @@ namespace NapoleonicRTS.Runtime
             if (world == null) return;
             RenderScars(world.Combat.Rules.Scars);
             RenderResources(world);
+            RenderLastKnown(world);
             RenderSelection(world, selectedWorkers, selectedBuildingId);
             RenderWorkers(world);
             RenderBuildings(world);
@@ -75,6 +78,14 @@ namespace NapoleonicRTS.Runtime
                 r => Matrix4x4.TRS(V(r.Position, .03f), Quaternion.identity, new Vector3(.36f, .28f, 1f)));
         }
 
+        private void RenderLastKnown(BrowserParityWorld world)
+        {
+            var sightings = world.Combat.Rules.ScoutReport();
+            RenderList(sightings, _lastKnown,
+                s => world.Elapsed - s.SeenAt >= .55f && world.Elapsed - s.SeenAt <= 45f && !SightingCurrentlyVisible(world, s),
+                s => Matrix4x4.TRS(V(s.Position, .06f), Quaternion.Euler(0f, 0f, 45f), new Vector3(s.Building ? .72f : .34f, s.Building ? .72f : .34f, 1f)));
+        }
+
         private void RenderSelection(BrowserParityWorld world, ISet<int> selectedWorkers, int selectedBuildingId)
         {
             if (selectedWorkers != null && selectedWorkers.Count > 0)
@@ -89,7 +100,7 @@ namespace NapoleonicRTS.Runtime
         {
             RenderList(world.Workers, _franceWorker, w => w.Alive && w.Side == ArmySide.France,
                 w => Matrix4x4.TRS(V(w.Position, .11f), Quaternion.identity, new Vector3(.25f, .25f, 1f)));
-            RenderList(world.Workers, _britainWorker, w => w.Alive && w.Side == ArmySide.Britain,
+            RenderList(world.Workers, _britainWorker, w => w.Alive && w.Side == ArmySide.Britain && CanSeePoint(world, w.Position),
                 w => Matrix4x4.TRS(V(w.Position, .11f), Quaternion.identity, new Vector3(.25f, .25f, 1f)));
         }
 
@@ -97,8 +108,41 @@ namespace NapoleonicRTS.Runtime
         {
             RenderList(world.Buildings, _franceBuilding, b => !b.Destroyed && b.Side == ArmySide.France,
                 b => Matrix4x4.TRS(V(b.Position, .02f), Quaternion.identity, new Vector3(b.Width * Mathf.Max(.15f, b.Construction), b.Height * Mathf.Max(.15f, b.Construction), 1f)));
-            RenderList(world.Buildings, _britainBuilding, b => !b.Destroyed && b.Side == ArmySide.Britain,
+            RenderList(world.Buildings, _britainBuilding, b => !b.Destroyed && b.Side == ArmySide.Britain && CanSeePoint(world, b.Position),
                 b => Matrix4x4.TRS(V(b.Position, .02f), Quaternion.identity, new Vector3(b.Width * Mathf.Max(.15f, b.Construction), b.Height * Mathf.Max(.15f, b.Construction), 1f)));
+        }
+
+        private bool SightingCurrentlyVisible(BrowserParityWorld world, SightingState sighting)
+        {
+            if (sighting.Building)
+            {
+                var building = world.FindBuilding(sighting.Id);
+                return building != null && !building.Destroyed && CanSeePoint(world, building.Position);
+            }
+            for (var i = 0; i < world.Movement.Units.Count; i++)
+            {
+                var unit = world.Movement.Units[i];
+                if (unit.Id == sighting.Id) return unit.Alive && world.Combat.Rules.CanSee(ArmySide.France, unit);
+            }
+            return false;
+        }
+
+        private bool CanSeePoint(BrowserParityWorld world, Float2 target)
+        {
+            var rules = world.Combat.Rules;
+            for (var i = 0; i < world.Movement.Units.Count; i++)
+            {
+                var source = world.Movement.Units[i];
+                if (!source.Alive || source.Side != ArmySide.France) continue;
+                if (Float2.Distance(source.Position, target) <= rules.VisionRange(source) && rules.HasLineOfSight(source.Position, target)) return true;
+            }
+            for (var i = 0; i < world.Buildings.Count; i++)
+            {
+                var building = world.Buildings[i];
+                if (building.Destroyed || !building.Complete || building.Side != ArmySide.France) continue;
+                if (Float2.Distance(building.Position, target) <= 5f && rules.HasLineOfSight(building.Position, target)) return true;
+            }
+            return false;
         }
 
         private void RenderProjectiles(List<ProjectileState> projectiles)
@@ -166,7 +210,7 @@ namespace NapoleonicRTS.Runtime
         {
             Destroy(_wood); Destroy(_food); Destroy(_franceWorker); Destroy(_britainWorker);
             Destroy(_franceBuilding); Destroy(_britainBuilding); Destroy(_projectile);
-            Destroy(_smoke); Destroy(_impact); Destroy(_scar); Destroy(_selected);
+            Destroy(_smoke); Destroy(_impact); Destroy(_scar); Destroy(_selected); Destroy(_lastKnown);
             Destroy(_objectiveNeutral); Destroy(_objectiveFrance); Destroy(_objectiveBritain); Destroy(_quad);
         }
 
