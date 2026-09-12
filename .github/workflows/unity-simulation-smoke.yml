@@ -20,6 +20,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Compile Unity runtime C# surface
+        run: dotnet run --project unity/NapoleonicRTS/Tools/RuntimeCompileSmoke/RuntimeCompileSmoke.csproj --configuration Release
       - name: Run native simulation smoke test
         run: dotnet run --project unity/NapoleonicRTS/Tools/SimulationSmoke/SimulationSmoke.csproj --configuration Release
       - name: Run browser-parity gameplay smoke test
