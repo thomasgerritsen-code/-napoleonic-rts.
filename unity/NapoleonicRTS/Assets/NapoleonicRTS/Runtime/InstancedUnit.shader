@@ -3,9 +3,10 @@ Shader "NapoleonicRTS/InstancedUnit"
     Properties { _Color ("Color", Color) = (1,1,1,1) }
     SubShader
     {
-        Tags { "RenderType"="Opaque" "Queue"="Geometry" }
+        Tags { "RenderType"="Transparent" "Queue"="Transparent" }
         Pass
         {
+            Blend SrcAlpha OneMinusSrcAlpha
             Cull Off
             ZWrite Off
             ZTest LEqual
