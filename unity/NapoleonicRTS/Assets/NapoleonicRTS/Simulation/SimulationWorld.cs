@@ -6,6 +6,7 @@ namespace NapoleonicRTS.Simulation
     public sealed class SimulationWorld
     {
         public const float FixedStepSeconds = 1f / 60f;
+        private const float RegimentTurnRateRadians = 0.82f;
         private int _nextUnitId = 1;
         private int _nextRegimentId = 1;
 
@@ -83,7 +84,8 @@ namespace NapoleonicRTS.Simulation
             foreach (var regiment in Regiments)
             {
                 regiment.PreviousAnchor = regiment.Anchor;
-                AdvanceRegiment(regiment, dt);
+                var cohesionFactor = CohesionSpeedFactor(regiment);
+                AdvanceRegiment(regiment, dt, cohesionFactor);
                 for (var i = 0; i < regiment.UnitIndices.Count; i++)
                 {
                     var unit = Units[regiment.UnitIndices[i]];
@@ -92,17 +94,43 @@ namespace NapoleonicRTS.Simulation
                     unit.FacingRadians = regiment.FacingRadians;
                     var target = TransformSlot(regiment.Anchor, regiment.FacingRadians, unit.SlotOffset);
                     var error = Float2.Distance(unit.Position, target);
-                    var followerSpeed = MathF.Max(regiment.Speed * 1.45f, regiment.Speed + error * 2.2f);
-                    followerSpeed = MathF.Min(followerSpeed, regiment.Speed * 3.25f);
+                    var followerSpeed = MathF.Max(regiment.Speed * 1.55f, regiment.Speed + error * 2.65f);
+                    followerSpeed = MathF.Min(followerSpeed, regiment.Speed * 4.15f);
                     unit.Position = Float2.MoveTowards(unit.Position, target, followerSpeed * dt);
                 }
             }
         }
 
-        private static void AdvanceRegiment(RegimentState regiment, float dt)
+        private float CohesionSpeedFactor(RegimentState regiment)
+        {
+            if (regiment.UnitIndices.Count == 0) return 1f;
+            var sum = 0f;
+            var max = 0f;
+            var living = 0;
+            for (var i = 0; i < regiment.UnitIndices.Count; i++)
+            {
+                var unit = Units[regiment.UnitIndices[i]];
+                if (!unit.Alive) continue;
+                var target = TransformSlot(regiment.Anchor, regiment.FacingRadians, unit.SlotOffset);
+                var error = Float2.Distance(unit.Position, target);
+                sum += error;
+                if (error > max) max = error;
+                living++;
+            }
+            if (living == 0) return 1f;
+            var mean = sum / living;
+            var factor = 1f;
+            if (mean > 1.15f) factor = MathF.Min(factor, MathF.Max(0.70f, 1f - (mean - 1.15f) / 6f));
+            if (max > 3.2f) factor = MathF.Min(factor, 0.82f);
+            return MathF.Max(0.66f, factor);
+        }
+
+        private static void AdvanceRegiment(RegimentState regiment, float dt, float cohesionFactor)
         {
             if (!regiment.Moving) return;
-            while (true)
+            var remainingStep = regiment.Speed * cohesionFactor * dt;
+            var guard = 0;
+            while (remainingStep > 0f && guard++ < 4)
             {
                 var target = regiment.Route.Count > 0 && regiment.RouteIndex < regiment.Route.Count ? regiment.Route[regiment.RouteIndex] : regiment.Destination;
                 var delta = target - regiment.Anchor;
@@ -114,19 +142,33 @@ namespace NapoleonicRTS.Simulation
                     regiment.Moving = false;
                     return;
                 }
+
                 var direction = delta / distance;
-                regiment.FacingRadians = MathF.Atan2(direction.Y, direction.X);
-                var step = regiment.Speed * dt;
-                if (step >= distance)
-                {
-                    regiment.Anchor = target;
-                    if (regiment.Route.Count > 0 && regiment.RouteIndex + 1 < regiment.Route.Count) { regiment.RouteIndex++; continue; }
-                    regiment.Moving = false;
-                    return;
-                }
-                regiment.Anchor += direction * step;
-                return;
+                var desiredFacing = MathF.Atan2(direction.Y, direction.X);
+                regiment.FacingRadians = RotateTowardsAngle(regiment.FacingRadians, desiredFacing, RegimentTurnRateRadians * dt);
+                var move = MathF.Min(remainingStep, distance);
+                regiment.Anchor += direction * move;
+                remainingStep -= move;
+                if (move + 1e-5f < distance) return;
+
+                regiment.Anchor = target;
+                if (regiment.Route.Count > 0 && regiment.RouteIndex + 1 < regiment.Route.Count) regiment.RouteIndex++;
+                else { regiment.Moving = false; return; }
             }
+        }
+
+        private static float RotateTowardsAngle(float current, float target, float maxDelta)
+        {
+            var delta = NormalizeAngle(target - current);
+            if (MathF.Abs(delta) <= maxDelta) return target;
+            return NormalizeAngle(current + MathF.Sign(delta) * maxDelta);
+        }
+
+        private static float NormalizeAngle(float angle)
+        {
+            while (angle > MathF.PI) angle -= MathF.PI * 2f;
+            while (angle < -MathF.PI) angle += MathF.PI * 2f;
+            return angle;
         }
 
         public static Float2 TransformSlot(Float2 anchor, float facingRadians, Float2 slot)
