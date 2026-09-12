@@ -14,6 +14,7 @@
   const getRegimentBeforePerformanceV12 = getRegiment;
   const regimentMembersBeforePerformanceV12 = regimentMembers;
   const renderStats = { fullUnits:0, lodUnits:0, culledUnits:0, dprResizes:0 };
+  let livingUnitCount = 0;
 
   const cellKey = (x, y) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
 
@@ -22,6 +23,7 @@
     combatGrid.britain.clear();
     regimentById.clear();
     membersByRegiment.clear();
+    livingUnitCount = 0;
 
     for (const reg of regiments) {
       if (!reg.destroyed) regimentById.set(reg.id, reg);
@@ -29,6 +31,7 @@
 
     for (const unit of units) {
       if (unit.dead) continue;
+      livingUnitCount++;
       if (unit.regimentId) {
         let members = membersByRegiment.get(unit.regimentId);
         if (!members) membersByRegiment.set(unit.regimentId, members = []);
@@ -110,13 +113,7 @@
   }
 
   function useUnitLod(unit) {
-    if (selectedUnits.has(unit)) return false;
-    if (camera.zoom >= LOD_ZOOM_THRESHOLD) return false;
-    let living = 0;
-    for (const candidate of units) {
-      if (!candidate.dead && ++living > LOD_UNIT_THRESHOLD) return true;
-    }
-    return false;
+    return !selectedUnits.has(unit) && livingUnitCount > LOD_UNIT_THRESHOLD && camera.zoom < LOD_ZOOM_THRESHOLD;
   }
 
   function drawUnitLod(unit) {
@@ -186,13 +183,10 @@
     renderStats.dprResizes++;
   }
 
-  // Core registers its resize handler earlier. Registering this one later means the
-  // performance cap is the final canvas size after a browser resize.
   addEventListener('resize', resize2DCanvasForPerformance);
   resize2DCanvasForPerformance();
 
   // 3D stays available for explicit experiments/tests, but normal play now starts in 2D.
-  // This keeps the current development cycle focused on the mature renderer and movement.
   addEventListener('load', () => {
     const params = new URLSearchParams(location.search);
     const explicit3D = params.get('view') === '3d' || params.get('test') === '3d';
@@ -215,6 +209,7 @@
     unitLod: true,
     unitLodThreshold: LOD_UNIT_THRESHOLD,
     unitLodZoomThreshold: LOD_ZOOM_THRESHOLD,
+    livingUnitCount: () => livingUnitCount,
     renderStats: () => ({ ...renderStats })
   });
   global.__LARGE_ARMY_PERFORMANCE_V1__ = api;
