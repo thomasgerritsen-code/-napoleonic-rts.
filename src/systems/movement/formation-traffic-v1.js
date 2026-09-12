@@ -85,7 +85,7 @@
     if(c.p90>88)factor=Math.min(factor,.84);
     if((info?.state==='approach'||info?.state==='crossing')&&c.readiness<.58)factor=Math.min(factor,.78);
 
-    const minimumFactor=info?.state==='approach'||info?.state==='crossing'?.62:.74;
+    const minimumFactor=(info?.state==='approach'||info?.state==='crossing') ? .62 : .74;
     factor=Math.max(minimumFactor,factor);
     if(factor<.985)stats.cohesionSlowdowns++;
     return base*factor;
