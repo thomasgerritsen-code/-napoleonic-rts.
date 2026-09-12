@@ -37,8 +37,12 @@ namespace NapoleonicRTS.Simulation
             var bTc = world.AddBuilding(ArmySide.Britain, BuildingKind.TownCenter, BrowserBattlefieldMap.MapToNative(3650f, 900f));
             world.AddBuilding(ArmySide.France, BuildingKind.Barracks, BrowserBattlefieldMap.MapToNative(820f, 1160f));
             world.AddBuilding(ArmySide.Britain, BuildingKind.Barracks, BrowserBattlefieldMap.MapToNative(3480f, 1160f));
-            world.AddBuilding(ArmySide.France, BuildingKind.House, BrowserBattlefieldMap.MapToNative(700f, 1260f));
-            world.AddBuilding(ArmySide.Britain, BuildingKind.House, BrowserBattlefieldMap.MapToNative(3600f, 1260f));
+
+            // The native parity scenario starts with a larger ready-made army than the old browser
+            // tutorial start. Five houses per side give a real 120 population cap rather than the
+            // temporary auto-expanding cap used during the first Unity prototype.
+            AddStartingHouses(world, ArmySide.France, false);
+            AddStartingHouses(world, ArmySide.Britain, true);
 
             AddResourceCluster(world, ResourceKind.Wood, 520f, 580f);
             AddResourceCluster(world, ResourceKind.Food, 760f, 620f);
@@ -58,6 +62,17 @@ namespace NapoleonicRTS.Simulation
 
             world.RecalculatePopulationCap(ArmySide.France);
             world.RecalculatePopulationCap(ArmySide.Britain);
+        }
+
+        private static void AddStartingHouses(BrowserParityWorld world, ArmySide side, bool mirror)
+        {
+            var xs = new[] { 700f, 560f, 650f, 850f, 930f };
+            var ys = new[] { 1260f, 1180f, 1370f, 1370f, 1240f };
+            for (var i = 0; i < xs.Length; i++)
+            {
+                var x = mirror ? 4300f - xs[i] : xs[i];
+                world.AddBuilding(side, BuildingKind.House, BrowserBattlefieldMap.MapToNative(x, ys[i]));
+            }
         }
 
         private static void SpawnInfantryRegiment(SimulationWorld world, ArmySide side, Float2 anchor, float facing)
