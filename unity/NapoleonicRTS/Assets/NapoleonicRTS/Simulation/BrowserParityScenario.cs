@@ -39,6 +39,15 @@ namespace NapoleonicRTS.Simulation
             world.AddBuilding(ArmySide.France, BuildingKind.House, BrowserBattlefieldMap.MapToNative(700f, 1260f));
             world.AddBuilding(ArmySide.Britain, BuildingKind.House, BrowserBattlefieldMap.MapToNative(3600f, 1260f));
 
+            // Resources must exist before initial worker assignment. This keeps both the human
+            // and AI economy active immediately instead of relying on the AI idle-worker fallback.
+            AddResourceCluster(world, ResourceKind.Wood, 520f, 580f);
+            AddResourceCluster(world, ResourceKind.Food, 760f, 620f);
+            AddResourceCluster(world, ResourceKind.Wood, 3780f, 580f);
+            AddResourceCluster(world, ResourceKind.Food, 3540f, 620f);
+            AddResourceCluster(world, ResourceKind.Wood, 2050f, 370f);
+            AddResourceCluster(world, ResourceKind.Food, 2200f, 1750f);
+
             for (var i = 0; i < 8; i++)
             {
                 var fy = (i - 3.5f) * .55f;
@@ -47,13 +56,6 @@ namespace NapoleonicRTS.Simulation
                 world.AssignWorkerToNearestResource(fw.Id, i % 2 == 0 ? ResourceKind.Food : ResourceKind.Wood);
                 world.AssignWorkerToNearestResource(bw.Id, i % 2 == 0 ? ResourceKind.Food : ResourceKind.Wood);
             }
-
-            AddResourceCluster(world, ResourceKind.Wood, 520f, 580f);
-            AddResourceCluster(world, ResourceKind.Food, 760f, 620f);
-            AddResourceCluster(world, ResourceKind.Wood, 3780f, 580f);
-            AddResourceCluster(world, ResourceKind.Food, 3540f, 620f);
-            AddResourceCluster(world, ResourceKind.Wood, 2050f, 370f);
-            AddResourceCluster(world, ResourceKind.Food, 2200f, 1750f);
 
             world.RecalculatePopulationCap(ArmySide.France);
             world.RecalculatePopulationCap(ArmySide.Britain);
