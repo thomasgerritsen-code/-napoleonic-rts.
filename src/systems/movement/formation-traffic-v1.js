@@ -78,8 +78,6 @@
     const orderAge=Math.max(0,elapsed-(reg.formationTrafficOrderedAtV132??march.phaseStartedAt??elapsed));
     let factor=1;
 
-    // Immediately after a new order the anchor briefly gives the line time to close up.
-    // Once the march is established, never let one lagging file stop a whole battalion.
     if(orderAge<2.0&&c.readiness<.76)factor=Math.min(factor,Math.max(.62,.72+c.readiness*.30));
     if(c.mean>42)factor=Math.min(factor,Math.max(.78,1-(c.mean-42)/220));
     if(c.p90>88)factor=Math.min(factor,.84);
@@ -118,7 +116,10 @@
         if(d<.001){const angle=((u.id*37+other.id*53)%360)*Math.PI/180;dx=Math.cos(angle);dy=Math.sin(angle);d=1;}
         const sameGroup=!!(u.regimentId&&u.regimentId===other.regimentId);
         const sameReg=sameGroup?getRegiment(u.regimentId):null;
-        if(sameReg&&!sameReg.destroyed&&!u.routing&&!other.routing)continue;
+        if(sameReg&&!sameReg.destroyed&&!u.routing&&!other.routing){
+          if(typeof V071_STATS!=='undefined')V071_STATS.internalCollisionSkips++;
+          continue;
+        }
         const regA=regFor(u),regB=regFor(other);
         const friendly=u.side===other.side;
         const nx=dx/d,ny=dy/d,overlap=minD-d;
