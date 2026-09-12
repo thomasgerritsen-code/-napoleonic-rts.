@@ -1,7 +1,7 @@
 namespace NapoleonicRTS.Simulation
 {
     public enum ArmySide { France, Britain }
-    public enum UnitKind { Infantry, Officer, Drummer, Cavalry, Artillery }
+    public enum UnitKind { Worker, Infantry, Officer, Drummer, Cavalry, Artillery }
 
     public sealed class UnitState
     {
