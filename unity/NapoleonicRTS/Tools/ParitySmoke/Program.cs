@@ -11,8 +11,11 @@ var map = BrowserBattlefieldMap.Create();
 var gameplay = BrowserParityScenario.CreateGameplayWorld(map);
 Require(gameplay.Movement.Units.Count == 182, $"Expected 182 combat units, got {gameplay.Movement.Units.Count}.");
 Require(gameplay.Workers.Count == 16, $"Expected 16 workers, got {gameplay.Workers.Count}.");
-Require(gameplay.Buildings.Count == 6, $"Expected 6 buildings, got {gameplay.Buildings.Count}.");
+Require(gameplay.Buildings.Count == 14, $"Expected 14 starting buildings, got {gameplay.Buildings.Count}.");
 Require(gameplay.Resources.Count == 36, $"Expected 36 resources, got {gameplay.Resources.Count}.");
+Require(gameplay.FranceEconomy.PopulationCap == 120 && gameplay.BritainEconomy.PopulationCap == 120, "Starting houses should provide a real 120 population cap per side.");
+Require(gameplay.PopulationUsed(ArmySide.France) <= gameplay.FranceEconomy.PopulationCap, "French starting army exceeds population cap.");
+Require(gameplay.PopulationUsed(ArmySide.Britain) <= gameplay.BritainEconomy.PopulationCap, "British starting army exceeds population cap.");
 Require(gameplay.Movement.Units.Count(u => u.Kind == UnitKind.Officer) == 8, "Officer parity missing.");
 Require(gameplay.Movement.Units.Count(u => u.Kind == UnitKind.Drummer) == 8, "Drummer parity missing.");
 Require(gameplay.Movement.Units.Count(u => u.Kind == UnitKind.Cavalry) == 16, "Cavalry parity missing.");
@@ -23,6 +26,28 @@ ObjectiveScenarioService.Select(gameplay.Objective, "threePoints");
 Require(gameplay.Objective.Points.Count == 3 && gameplay.Objective.TargetScore == 180, "Three-point objective preset failed.");
 ObjectiveScenarioService.Select(gameplay.Objective, "crossroads");
 Require(gameplay.Objective.Points.Count == 1 && gameplay.Objective.TargetScore == 120, "Crossroads objective preset failed.");
+
+// Worker production must use the Town Center queue rather than instant spawning.
+var frenchTown = gameplay.FindBuilding(ArmySide.France, BuildingKind.TownCenter);
+var workerCountBeforeTraining = gameplay.Workers.Count(w => w.Alive && w.Side == ArmySide.France);
+var foodBeforeTraining = gameplay.FranceEconomy.Food;
+Require(gameplay.QueueTraining(ArmySide.France, frenchTown.Id, UnitKind.Worker), "Worker training could not be queued at the Town Center.");
+Require(Math.Abs(gameplay.FranceEconomy.Food - (foodBeforeTraining - 50f)) < .001f, "Worker training should cost 50 food.");
+for (var i = 0; i < 60 * 6; i++) gameplay.Step(SimulationWorld.FixedStepSeconds);
+Require(gameplay.Workers.Count(w => w.Alive && w.Side == ArmySide.France) == workerCountBeforeTraining, "Worker spawned before the 7 second training time.");
+for (var i = 0; i < 90; i++) gameplay.Step(SimulationWorld.FixedStepSeconds);
+Require(gameplay.Workers.Count(w => w.Alive && w.Side == ArmySide.France) == workerCountBeforeTraining + 1, "Queued worker did not spawn after training.");
+
+// Context orders support both map movement and resource interaction.
+var orderWorker = gameplay.Workers.First(w => w.Alive && w.Side == ArmySide.France);
+var workerStart = orderWorker.Position;
+var groundTarget = frenchTown.Position + new Float2(0f, -5f);
+Require(WorkerOrderService.IssueContextOrder(gameplay, new[] { orderWorker.Id }, groundTarget) == 1 && orderWorker.Task == WorkerTask.Move, "Ground context order did not create a worker move task.");
+for (var i = 0; i < 60; i++) WorkerOrderService.StepMoveTasks(gameplay, SimulationWorld.FixedStepSeconds);
+Require(Float2.Distance(orderWorker.Position, workerStart) > .5f, "Worker move task did not advance the worker.");
+var clickedResource = gameplay.Resources.First(r => !r.Depleted);
+WorkerOrderService.IssueContextOrder(gameplay, new[] { orderWorker.Id }, clickedResource.Position);
+Require(orderWorker.Task == WorkerTask.Gather && orderWorker.ResourceId == clickedResource.Id, "Resource context order did not bind the clicked resource.");
 
 var woodBefore = gameplay.Resources.Where(r => r.Kind == ResourceKind.Wood).Sum(r => r.Amount);
 for (var i = 0; i < 60 * 18; i++) gameplay.Step(SimulationWorld.FixedStepSeconds);
@@ -92,4 +117,4 @@ Require(gameplay.Combat.ToggleArtillery(new[] { frenchArtillery.Id }), "Artiller
 Require(frenchArtillery.UnitIndices.Where(index => gameplay.Movement.Units[index].Kind == UnitKind.Artillery).All(index => gameplay.Combat.Get(gameplay.Movement.Units[index].Id).ArtilleryMode == ArtilleryMode.GrapeShot), "Artillery did not switch to grapeshot.");
 Require(gameplay.Combat.BayonetCommand(new[] { french.Id }), "Bayonet command did not apply.");
 
-Console.WriteLine($"PASS browser parity core | units={gameplay.Movement.Units.Count} workers={gameplay.Workers.Count} buildings={gameplay.Buildings.Count} resources={gameplay.Resources.Count} shots={fight.Combat.TotalShotsFired} deaths={fight.Combat.TotalDeaths} scars={fight.Combat.Rules.Scars.Count} artilleryBuildingDamage={townHp-targetTown.HitPoints:0.0} aiTicks={gameplay.Commander.ProductionTicks} aiState={gameplay.Commander.State}");
+Console.WriteLine($"PASS browser parity core | units={gameplay.Movement.Units.Count} workers={gameplay.Workers.Count} buildings={gameplay.Buildings.Count} pop={gameplay.PopulationUsed(ArmySide.France)}/{gameplay.FranceEconomy.PopulationCap} resources={gameplay.Resources.Count} shots={fight.Combat.TotalShotsFired} deaths={fight.Combat.TotalDeaths} scars={fight.Combat.Rules.Scars.Count} artilleryBuildingDamage={townHp-targetTown.HitPoints:0.0} aiTicks={gameplay.Commander.ProductionTicks} aiState={gameplay.Commander.State}");
