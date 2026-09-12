@@ -7,6 +7,7 @@ namespace NapoleonicRTS.Runtime
     public sealed class BattlefieldPrototype : MonoBehaviour
     {
         private readonly HashSet<int> _selectedRegiments = new HashSet<int>();
+        private readonly HashSet<int> _selectedWorkers = new HashSet<int>();
         private readonly List<int> _selectionBuffer = new List<int>();
         private readonly List<int> _commandBuffer = new List<int>();
         private readonly List<int> _workerBuffer = new List<int>();
@@ -19,6 +20,8 @@ namespace NapoleonicRTS.Runtime
         private float _accumulator;
         private float _alpha;
         private int _lastSteps;
+        private int _selectedBuildingId;
+        private BuildingKind? _placementKind;
         private string _scenarioName = "browser parity battle";
         private bool _stressMode;
 
@@ -26,6 +29,9 @@ namespace NapoleonicRTS.Runtime
         public BrowserParityWorld Gameplay => _gameplay;
         public StrategicMap Map => _map;
         public ISet<int> SelectedRegiments => _selectedRegiments;
+        public ISet<int> SelectedWorkers => _selectedWorkers;
+        public int SelectedBuildingId => _selectedBuildingId;
+        public bool PlacementActive => _placementKind.HasValue;
         public bool StressMode => _stressMode;
 
         private void Awake()
@@ -43,7 +49,8 @@ namespace NapoleonicRTS.Runtime
         {
             _gameplay = BrowserParityScenario.CreateGameplayWorld(_map);
             _world = _gameplay.Movement;
-            _selectedRegiments.Clear();
+            ClearSelection();
+            _placementKind = null;
             _accumulator = 0f;
             _stressMode = false;
             _scenarioName = "browser parity battle";
@@ -54,7 +61,8 @@ namespace NapoleonicRTS.Runtime
             _gameplay = null;
             _world = new SimulationWorld();
             ScaleScenario.Populate(_world, 100, 50);
-            _selectedRegiments.Clear();
+            ClearSelection();
+            _placementKind = null;
             _accumulator = 0f;
             _stressMode = true;
             _scenarioName = "10k render/sim stress";
@@ -67,7 +75,11 @@ namespace NapoleonicRTS.Runtime
             var steps = 0;
             while (_accumulator >= SimulationWorld.FixedStepSeconds && steps < 8)
             {
-                if (_gameplay != null) _gameplay.Step(SimulationWorld.FixedStepSeconds);
+                if (_gameplay != null)
+                {
+                    WorkerOrderService.StepMoveTasks(_gameplay, SimulationWorld.FixedStepSeconds);
+                    _gameplay.Step(SimulationWorld.FixedStepSeconds);
+                }
                 else _world.Step(SimulationWorld.FixedStepSeconds);
                 _accumulator -= SimulationWorld.FixedStepSeconds;
                 steps++;
@@ -80,7 +92,7 @@ namespace NapoleonicRTS.Runtime
         private void LateUpdate()
         {
             _renderer?.Render(_world, _alpha, _selectedRegiments);
-            if (_gameplay != null) _parityRenderer?.Render(_gameplay);
+            if (_gameplay != null) _parityRenderer?.Render(_gameplay, _selectedWorkers, _selectedBuildingId);
         }
 
         private void OnDestroy()
@@ -89,19 +101,88 @@ namespace NapoleonicRTS.Runtime
             _parityRenderer?.Dispose();
         }
 
+        public void SelectAt(Float2 point, bool additive)
+        {
+            if (_gameplay == null)
+            {
+                SelectFranceInRect(point - new Float2(1.4f, 1.4f), point + new Float2(1.4f, 1.4f), additive);
+                return;
+            }
+
+            if (_placementKind.HasValue)
+            {
+                if (_selectedWorkers.Count == 0)
+                {
+                    _gameplay.Status = "Selecteer eerst een of meer arbeiders";
+                    _placementKind = null;
+                    return;
+                }
+                _workerBuffer.Clear();
+                foreach (var id in _selectedWorkers) _workerBuffer.Add(id);
+                _workerBuffer.Sort();
+                var kind = _placementKind.Value;
+                if (_gameplay.BeginConstruction(ArmySide.France, kind, point, _workerBuffer))
+                {
+                    _gameplay.Status = kind == BuildingKind.House ? "House in aanbouw" : "Barracks in aanbouw";
+                    _placementKind = null;
+                }
+                else _gameplay.Status = "Kan hier niet bouwen";
+                return;
+            }
+
+            WorkerState nearestWorker = null;
+            var workerDistance = .58f;
+            for (var i = 0; i < _gameplay.Workers.Count; i++)
+            {
+                var worker = _gameplay.Workers[i];
+                if (!worker.Alive || worker.Side != ArmySide.France) continue;
+                var distance = Float2.Distance(point, worker.Position);
+                if (distance >= workerDistance) continue;
+                workerDistance = distance;
+                nearestWorker = worker;
+            }
+            if (nearestWorker != null)
+            {
+                if (!additive) ClearSelection();
+                _selectedWorkers.Add(nearestWorker.Id);
+                _selectedBuildingId = 0;
+                _gameplay.Status = $"Arbeider {nearestWorker.Id} geselecteerd";
+                return;
+            }
+
+            for (var i = _gameplay.Buildings.Count - 1; i >= 0; i--)
+            {
+                var building = _gameplay.Buildings[i];
+                if (building.Destroyed || building.Side != ArmySide.France) continue;
+                if (Mathf.Abs(point.X - building.Position.X) > building.Width * .62f + .18f ||
+                    Mathf.Abs(point.Y - building.Position.Y) > building.Height * .62f + .18f) continue;
+                if (!additive) ClearSelection();
+                _selectedBuildingId = building.Id;
+                _gameplay.Status = $"{building.Kind} geselecteerd";
+                return;
+            }
+
+            SelectFranceInRect(point - new Float2(1.4f, 1.4f), point + new Float2(1.4f, 1.4f), additive);
+        }
+
         public void SelectFranceInRect(Float2 a, Float2 b, bool additive)
         {
             SelectionQuery.RegimentsInRect(_world, ArmySide.France, a, b, _selectionBuffer);
-            if (!additive) _selectedRegiments.Clear();
+            if (!additive) ClearSelection();
             for (var i = 0; i < _selectionBuffer.Count; i++) _selectedRegiments.Add(_selectionBuffer[i]);
+            if (_selectionBuffer.Count > 0) _selectedBuildingId = 0;
         }
 
         public void MoveSelection(Float2 target)
         {
             CopySelectionToCommandBuffer();
-            if (_commandBuffer.Count == 0) return;
-            if (_gameplay != null) _gameplay.QueueMoveCommand(_commandBuffer, target);
-            else RegimentCommandService.MoveRegiments(_world, _commandBuffer, target, 5.5f, null);
+            if (_commandBuffer.Count > 0)
+            {
+                if (_gameplay != null) _gameplay.QueueMoveCommand(_commandBuffer, target);
+                else RegimentCommandService.MoveRegiments(_world, _commandBuffer, target, 5.5f, null);
+            }
+            if (_gameplay != null && _selectedWorkers.Count > 0)
+                WorkerOrderService.IssueContextOrder(_gameplay, _selectedWorkers, target);
         }
 
         public void SetSelectionFormation(FormationKind formation)
@@ -137,48 +218,56 @@ namespace NapoleonicRTS.Runtime
             _gameplay.Combat.ToggleArtillery(_commandBuffer);
         }
 
+        public void BeginPlacement(BuildingKind kind)
+        {
+            if (_gameplay == null || kind == BuildingKind.TownCenter) return;
+            if (_selectedWorkers.Count == 0)
+            {
+                _gameplay.Status = "Selecteer eerst een arbeider";
+                return;
+            }
+            _placementKind = kind;
+            _gameplay.Status = kind == BuildingKind.House ? "Plaats House op de kaart" : "Plaats Barracks op de kaart";
+        }
+
+        public void CancelPlacement()
+        {
+            if (!_placementKind.HasValue) return;
+            _placementKind = null;
+            if (_gameplay != null) _gameplay.Status = "Bouwen geannuleerd";
+        }
+
         private void QuickTrain(UnitKind kind)
         {
             if (_gameplay == null) return;
-            BuildingState building = null;
+            if (_selectedBuildingId != 0 && _gameplay.QueueTraining(ArmySide.France, _selectedBuildingId, kind))
+            {
+                _gameplay.Status = $"{kind} in trainingswachtrij";
+                return;
+            }
+
             for (var i = 0; i < _gameplay.Buildings.Count; i++)
             {
                 var candidate = _gameplay.Buildings[i];
                 if (candidate.Destroyed || !candidate.Complete || candidate.Side != ArmySide.France) continue;
-                if (kind == UnitKind.Worker && candidate.Kind == BuildingKind.TownCenter) { building = candidate; break; }
-                if (kind != UnitKind.Worker && candidate.Kind == BuildingKind.Barracks) { building = candidate; break; }
-            }
-            if (building == null) return;
-            if (kind == UnitKind.Worker)
-            {
-                var e = _gameplay.FranceEconomy;
-                if (e.Food < 50f || _gameplay.PopulationUsed(ArmySide.France) >= e.PopulationCap) return;
-                e.Food -= 50f;
-                _gameplay.AddWorker(ArmySide.France, building.Position + new Float2(1.2f, 0f));
-                _gameplay.Status = "Arbeider getraind";
+                if (kind == UnitKind.Worker && candidate.Kind != BuildingKind.TownCenter) continue;
+                if (kind != UnitKind.Worker && candidate.Kind != BuildingKind.Barracks) continue;
+                if (!_gameplay.QueueTraining(ArmySide.France, candidate.Id, kind)) continue;
+                _selectedBuildingId = candidate.Id;
+                _gameplay.Status = $"{kind} in trainingswachtrij";
                 return;
             }
-            if (_gameplay.QueueTraining(ArmySide.France, building.Id, kind))
-                _gameplay.Status = $"{kind} in trainingswachtrij";
+            _gameplay.Status = "Training niet mogelijk: controleer grondstoffen, queue en popcap";
         }
 
-        private void QuickBuild(BuildingKind kind)
+        private void CycleObjective()
         {
             if (_gameplay == null) return;
-            _workerBuffer.Clear();
-            for (var i = 0; i < _gameplay.Workers.Count && _workerBuffer.Count < 2; i++)
-            {
-                var worker = _gameplay.Workers[i];
-                if (worker.Alive && worker.Side == ArmySide.France && worker.Task != WorkerTask.Build)
-                    _workerBuffer.Add(worker.Id);
-            }
-            var tc = _gameplay.FindBuilding(ArmySide.France, BuildingKind.TownCenter);
-            if (tc == null || _workerBuffer.Count == 0) return;
-            var count = 0;
-            for (var i = 0; i < _gameplay.Buildings.Count; i++) if (!_gameplay.Buildings[i].Destroyed && _gameplay.Buildings[i].Side == ArmySide.France && _gameplay.Buildings[i].Kind == kind) count++;
-            var position = tc.Position + new Float2(2.8f + count * 1.4f, kind == BuildingKind.Barracks ? 3.2f : -3.0f);
-            if (_gameplay.BeginConstruction(ArmySide.France, kind, position, _workerBuffer))
-                _gameplay.Status = kind == BuildingKind.House ? "House in aanbouw" : "Barracks in aanbouw";
+            var presets = ObjectiveScenarioService.Presets;
+            var current = 0;
+            for (var i = 0; i < presets.Count; i++) if (presets[i] == _gameplay.Objective.Scenario) { current = i; break; }
+            ObjectiveScenarioService.Select(_gameplay.Objective, presets[(current + 1) % presets.Count]);
+            _gameplay.Status = $"Scenario: {_gameplay.Objective.Name}";
         }
 
         private void CopySelectionToCommandBuffer()
@@ -186,6 +275,13 @@ namespace NapoleonicRTS.Runtime
             _commandBuffer.Clear();
             foreach (var id in _selectedRegiments) _commandBuffer.Add(id);
             _commandBuffer.Sort();
+        }
+
+        private void ClearSelection()
+        {
+            _selectedRegiments.Clear();
+            _selectedWorkers.Clear();
+            _selectedBuildingId = 0;
         }
 
         private float SelectedMorale()
@@ -201,17 +297,29 @@ namespace NapoleonicRTS.Runtime
             return n == 0 ? 100f : sum / n;
         }
 
+        private string SelectionLabel()
+        {
+            if (_gameplay == null) return $"Regiments {_selectedRegiments.Count}";
+            if (_selectedBuildingId != 0)
+            {
+                var b = _gameplay.FindBuilding(_selectedBuildingId);
+                if (b != null) return $"{b.Kind} · HP {b.HitPoints:0}/{b.MaxHitPoints:0} · Queue {b.Queue.Count}";
+            }
+            if (_selectedWorkers.Count > 0) return $"Workers geselecteerd: {_selectedWorkers.Count}";
+            return $"Regiments geselecteerd: {_selectedRegiments.Count}";
+        }
+
         private void OnGUI()
         {
             if (_world == null) return;
             var maxCompression = 0f;
             for (var i = 0; i < _world.Regiments.Count; i++) if (_world.Regiments[i].BridgeCompression > maxCompression) maxCompression = _world.Regiments[i].BridgeCompression;
 
-            GUI.Box(new Rect(12, 12, 392, _gameplay != null ? 466 : 256), "Napoleonic RTS — Unity Native");
-            GUI.Label(new Rect(24, 42, 360, 22), $"Scenario: {_scenarioName}");
-            GUI.Label(new Rect(24, 62, 360, 22), $"Units: {_world.Units.Count}  Regiments: {_world.Regiments.Count}  Selected: {_selectedRegiments.Count}");
-            GUI.Label(new Rect(24, 82, 360, 22), $"Fixed sim 60 Hz · Tick {_world.Tick} · Steps/frame {_lastSteps} · FPS {(1f / Mathf.Max(.0001f, Time.unscaledDeltaTime)):0}");
-            GUI.Label(new Rect(24, 102, 360, 22), $"Bridge compression: {maxCompression * 100f:0}% · GPU-instanced rendering");
+            GUI.Box(new Rect(12, 12, 408, _gameplay != null ? 548 : 256), "Napoleonic RTS — Unity Native");
+            GUI.Label(new Rect(24, 42, 376, 22), $"Scenario: {_scenarioName}");
+            GUI.Label(new Rect(24, 62, 376, 22), $"Units: {_world.Units.Count}  Regiments: {_world.Regiments.Count}  {SelectionLabel()}");
+            GUI.Label(new Rect(24, 82, 376, 22), $"Fixed sim 60 Hz · Tick {_world.Tick} · Steps/frame {_lastSteps} · FPS {(1f / Mathf.Max(.0001f, Time.unscaledDeltaTime)):0}");
+            GUI.Label(new Rect(24, 102, 376, 22), $"Bridge compression: {maxCompression * 100f:0}% · GPU-instanced rendering");
 
             if (_gameplay == null)
             {
@@ -222,34 +330,43 @@ namespace NapoleonicRTS.Runtime
             }
 
             var e = _gameplay.FranceEconomy;
-            GUI.Label(new Rect(24, 130, 360, 22), $"🇫🇷 Food {e.Food:0} · Wood {e.Wood:0} · Pop {_gameplay.PopulationUsed(ArmySide.France)}/{e.PopulationCap} · Workers {_gameplay.Workers.FindAll(w => w.Alive && w.Side == ArmySide.France).Count}");
-            GUI.Label(new Rect(24, 150, 360, 22), $"Selected morale {SelectedMorale():0}% · Shots {_gameplay.Combat.TotalShotsFired} · Losses {_gameplay.Combat.TotalDeaths}");
-            GUI.Label(new Rect(24, 170, 360, 22), $"Objective: 🇫🇷 {_gameplay.Objective.FranceScore}/{_gameplay.Objective.TargetScore} · 🇬🇧 {_gameplay.Objective.BritainScore}/{_gameplay.Objective.TargetScore}");
-            GUI.Label(new Rect(24, 190, 360, 22), $"AI: {_gameplay.Commander.State} · {_gameplay.Commander.Plan}");
-            GUI.Label(new Rect(24, 210, 360, 22), $"Status: {_gameplay.Status} · Pending orders {_gameplay.PendingOrderCount}");
+            var rules = _gameplay.Combat.Rules;
+            var workers = 0;
+            for (var i = 0; i < _gameplay.Workers.Count; i++) if (_gameplay.Workers[i].Alive && _gameplay.Workers[i].Side == ArmySide.France) workers++;
+            GUI.Label(new Rect(24, 130, 376, 22), $"🇫🇷 Food {e.Food:0} · Wood {e.Wood:0} · Pop {_gameplay.PopulationUsed(ArmySide.France)}/{e.PopulationCap} · Workers {workers}");
+            GUI.Label(new Rect(24, 150, 376, 22), $"Morale {SelectedMorale():0}% · Shots {_gameplay.Combat.TotalShotsFired} · Losses {_gameplay.Combat.TotalDeaths}");
+            GUI.Label(new Rect(24, 170, 376, 22), $"Objective {_gameplay.Objective.Name}: 🇫🇷 {_gameplay.Objective.FranceScore}/{_gameplay.Objective.TargetScore} · 🇬🇧 {_gameplay.Objective.BritainScore}/{_gameplay.Objective.TargetScore}");
+            GUI.Label(new Rect(24, 190, 376, 22), $"Weather {rules.Weather} · {rules.TimeOfDay} · Sightings {rules.ScoutReport().Count}");
+            GUI.Label(new Rect(24, 210, 376, 22), $"AI: {_gameplay.Commander.State} · {_gameplay.Commander.Plan}");
+            GUI.Label(new Rect(24, 230, 376, 22), $"Status: {_gameplay.Status} · Pending orders {_gameplay.PendingOrderCount}");
 
-            if (GUI.Button(new Rect(24, 240, 108, 26), "Line [1]")) SetSelectionFormation(FormationKind.Line);
-            if (GUI.Button(new Rect(140, 240, 108, 26), "Column [2]")) SetSelectionFormation(FormationKind.Column);
-            if (GUI.Button(new Rect(256, 240, 108, 26), "Square [3]")) SetSelectionFormation(FormationKind.Square);
+            if (GUI.Button(new Rect(24, 260, 108, 26), "Line [1]")) SetSelectionFormation(FormationKind.Line);
+            if (GUI.Button(new Rect(140, 260, 108, 26), "Column [2]")) SetSelectionFormation(FormationKind.Column);
+            if (GUI.Button(new Rect(256, 260, 108, 26), "Square [3]")) SetSelectionFormation(FormationKind.Square);
 
-            if (GUI.Button(new Rect(24, 274, 108, 26), "Bayonet [B]")) BayonetCommand();
-            if (GUI.Button(new Rect(140, 274, 108, 26), "Cavalry [C]")) CavalryCharge();
-            if (GUI.Button(new Rect(256, 274, 108, 26), "Round/Grape [G]")) ToggleArtillery();
+            if (GUI.Button(new Rect(24, 294, 108, 26), "Bayonet [B]")) BayonetCommand();
+            if (GUI.Button(new Rect(140, 294, 108, 26), "Cavalry [C]")) CavalryCharge();
+            if (GUI.Button(new Rect(256, 294, 108, 26), "Round/Grape [G]")) ToggleArtillery();
 
-            if (GUI.Button(new Rect(24, 308, 82, 26), "Worker")) QuickTrain(UnitKind.Worker);
-            if (GUI.Button(new Rect(112, 308, 82, 26), "Infantry")) QuickTrain(UnitKind.Infantry);
-            if (GUI.Button(new Rect(200, 308, 82, 26), "Officer")) QuickTrain(UnitKind.Officer);
-            if (GUI.Button(new Rect(288, 308, 76, 26), "Drummer")) QuickTrain(UnitKind.Drummer);
+            if (GUI.Button(new Rect(24, 328, 82, 26), "Worker")) QuickTrain(UnitKind.Worker);
+            if (GUI.Button(new Rect(112, 328, 82, 26), "Infantry")) QuickTrain(UnitKind.Infantry);
+            if (GUI.Button(new Rect(200, 328, 82, 26), "Officer")) QuickTrain(UnitKind.Officer);
+            if (GUI.Button(new Rect(288, 328, 76, 26), "Drummer")) QuickTrain(UnitKind.Drummer);
 
-            if (GUI.Button(new Rect(24, 342, 108, 26), "Build House")) QuickBuild(BuildingKind.House);
-            if (GUI.Button(new Rect(140, 342, 108, 26), "Build Barracks")) QuickBuild(BuildingKind.Barracks);
-            if (GUI.Button(new Rect(256, 342, 108, 26), "Form reserve")) _gameplay.TryFormReserveRegiment(ArmySide.France);
+            if (GUI.Button(new Rect(24, 362, 108, 26), "Place House")) BeginPlacement(BuildingKind.House);
+            if (GUI.Button(new Rect(140, 362, 108, 26), "Place Barracks")) BeginPlacement(BuildingKind.Barracks);
+            if (GUI.Button(new Rect(256, 362, 108, 26), "Form reserve")) _gameplay.TryFormReserveRegiment(ArmySide.France);
 
-            if (GUI.Button(new Rect(24, 382, 165, 28), "Reset battle")) LoadGameplayScenario();
-            if (GUI.Button(new Rect(199, 382, 165, 28), "Stress 10k")) LoadStressScenario();
+            if (GUI.Button(new Rect(24, 396, 108, 26), "Cavalry")) QuickTrain(UnitKind.Cavalry);
+            if (GUI.Button(new Rect(140, 396, 108, 26), "Artillery")) QuickTrain(UnitKind.Artillery);
+            if (GUI.Button(new Rect(256, 396, 108, 26), "Next objective")) CycleObjective();
 
+            if (GUI.Button(new Rect(24, 436, 165, 28), "Reset battle")) LoadGameplayScenario();
+            if (GUI.Button(new Rect(199, 436, 165, 28), "Stress 10k")) LoadStressScenario();
+
+            GUI.Label(new Rect(24, 474, 370, 42), _placementKind.HasValue ? $"PLAATSING: {_placementKind.Value} — klik kaart, Esc annuleert" : "Klik/drag: units · klik worker/gebouw · rechtsklik: contextorder");
             if (_gameplay.Victory != VictorySide.None)
-                GUI.Label(new Rect(24, 420, 350, 28), _gameplay.Victory == VictorySide.France ? "FRANSE OVERWINNING" : "BRITSE OVERWINNING");
+                GUI.Label(new Rect(24, 516, 350, 28), _gameplay.Victory == VictorySide.France ? "FRANSE OVERWINNING" : "BRITSE OVERWINNING");
         }
     }
 }
