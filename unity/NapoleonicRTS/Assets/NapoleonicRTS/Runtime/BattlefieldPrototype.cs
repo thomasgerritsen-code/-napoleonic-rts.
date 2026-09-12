@@ -17,6 +17,7 @@ namespace NapoleonicRTS.Runtime
         private float _alpha;
         private bool _home;
         private int _lastSteps;
+        private string _scenarioName = "1k route prototype";
 
         public SimulationWorld World => _world;
         public StrategicMap Map => _map;
@@ -27,10 +28,27 @@ namespace NapoleonicRTS.Runtime
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
             _map = BrowserBattlefieldMap.Create();
-            _world = new SimulationWorld(_map);
             _planner = new StrategicRoutePlanner(_map);
-            PrototypeScenario.Populate(_world);
             _renderer = new InstancedUnitRenderer();
+            LoadBaselineScenario();
+        }
+
+        private void LoadBaselineScenario()
+        {
+            _world = new SimulationWorld(_map);
+            PrototypeScenario.Populate(_world);
+            _selectedRegiments.Clear();
+            _accumulator = 0f;
+            _scenarioName = "1k route prototype";
+        }
+
+        private void LoadStressScenario()
+        {
+            _world = new SimulationWorld();
+            ScaleScenario.Populate(_world, 100, 50);
+            _selectedRegiments.Clear();
+            _accumulator = 0f;
+            _scenarioName = "10k render/sim stress";
         }
 
         private void Update()
@@ -61,7 +79,7 @@ namespace NapoleonicRTS.Runtime
         public void MoveSelection(Float2 target)
         {
             CopySelectionToCommandBuffer();
-            RegimentCommandService.MoveRegiments(_world, _commandBuffer, target, 5.5f, _planner);
+            RegimentCommandService.MoveRegiments(_world, _commandBuffer, target, 5.5f, _scenarioName.StartsWith("10k") ? null : _planner);
         }
 
         public void SetSelectionFormation(FormationKind formation)
@@ -82,17 +100,20 @@ namespace NapoleonicRTS.Runtime
         {
             var maxCompression = 0f;
             if (_world != null) for (var i = 0; i < _world.Regiments.Count; i++) if (_world.Regiments[i].BridgeCompression > maxCompression) maxCompression = _world.Regiments[i].BridgeCompression;
-            GUI.Box(new Rect(12, 12, 328, 234), "Napoleonic RTS — Native Prototype");
-            GUI.Label(new Rect(24, 42, 300, 22), $"Units: {_world?.Units.Count ?? 0}  Regiments: {_world?.Regiments.Count ?? 0}");
-            GUI.Label(new Rect(24, 62, 300, 22), $"Selected regiments: {_selectedRegiments.Count}");
-            GUI.Label(new Rect(24, 82, 300, 22), $"Road graph: {_planner?.NodeCount ?? 0} nodes · 4 legal river crossings");
-            GUI.Label(new Rect(24, 102, 300, 22), $"Bridge compression: {maxCompression * 100f:0}%");
-            GUI.Label(new Rect(24, 122, 300, 22), $"Fixed sim: 60 Hz  Tick: {_world?.Tick ?? 0}  Steps/frame: {_lastSteps}");
-            GUI.Label(new Rect(24, 142, 300, 22), $"GPU instances · FPS: {(1f / Mathf.Max(0.0001f, Time.unscaledDeltaTime)):0}");
-            if (GUI.Button(new Rect(24, 170, 82, 26), "Line")) SetSelectionFormation(FormationKind.Line);
-            if (GUI.Button(new Rect(112, 170, 82, 26), "Column")) SetSelectionFormation(FormationKind.Column);
-            if (GUI.Button(new Rect(200, 170, 82, 26), "Square")) SetSelectionFormation(FormationKind.Square);
-            if (GUI.Button(new Rect(24, 204, 258, 26), _home ? "March to centre" : "Return home"))
+            GUI.Box(new Rect(12, 12, 348, 274), "Napoleonic RTS — Native Prototype");
+            GUI.Label(new Rect(24, 42, 320, 22), $"Scenario: {_scenarioName}");
+            GUI.Label(new Rect(24, 62, 320, 22), $"Units: {_world?.Units.Count ?? 0}  Regiments: {_world?.Regiments.Count ?? 0}");
+            GUI.Label(new Rect(24, 82, 320, 22), $"Selected regiments: {_selectedRegiments.Count}");
+            GUI.Label(new Rect(24, 102, 320, 22), $"Road graph: {_planner?.NodeCount ?? 0} nodes · 4 legal river crossings");
+            GUI.Label(new Rect(24, 122, 320, 22), $"Bridge compression: {maxCompression * 100f:0}%");
+            GUI.Label(new Rect(24, 142, 320, 22), $"Fixed sim: 60 Hz  Tick: {_world?.Tick ?? 0}  Steps/frame: {_lastSteps}");
+            GUI.Label(new Rect(24, 162, 320, 22), $"GPU instances · FPS: {(1f / Mathf.Max(0.0001f, Time.unscaledDeltaTime)):0}");
+            if (GUI.Button(new Rect(24, 190, 82, 26), "Line")) SetSelectionFormation(FormationKind.Line);
+            if (GUI.Button(new Rect(112, 190, 82, 26), "Column")) SetSelectionFormation(FormationKind.Column);
+            if (GUI.Button(new Rect(200, 190, 82, 26), "Square")) SetSelectionFormation(FormationKind.Square);
+            if (GUI.Button(new Rect(24, 224, 124, 26), "Load 1k map")) LoadBaselineScenario();
+            if (GUI.Button(new Rect(158, 224, 124, 26), "Stress 10k")) LoadStressScenario();
+            if (GUI.Button(new Rect(24, 254, 258, 26), _home ? "March to centre" : "Return home"))
             {
                 _home = !_home;
                 PrototypeScenario.OrderMarch(_world, _home);
