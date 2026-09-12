@@ -42,6 +42,10 @@ fightMovement.Units[f.UnitIndices[^1]].Kind = UnitKind.Drummer;
 fightMovement.Units[b.UnitIndices[^2]].Kind = UnitKind.Officer;
 fightMovement.Units[b.UnitIndices[^1]].Kind = UnitKind.Drummer;
 var fight = new BrowserParityWorld(fightMovement, map, new StrategicRoutePlanner(map));
+// The browser victory rule depends on both Town Centers existing. Keep them far away so
+// this fixture tests only combat rather than ending after the first simulation step.
+fight.AddBuilding(ArmySide.France, BuildingKind.TownCenter, new Float2(-35f, -18f));
+fight.AddBuilding(ArmySide.Britain, BuildingKind.TownCenter, new Float2(35f, 18f));
 fight.Combat.SyncUnits();
 for (var i = 0; i < 60 * 24; i++) fight.Step(SimulationWorld.FixedStepSeconds);
 Require(fight.Combat.TotalShotsFired > 0, "Musket volley system never fired.");
