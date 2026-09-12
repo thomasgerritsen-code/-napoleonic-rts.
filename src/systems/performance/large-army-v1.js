@@ -1,15 +1,19 @@
 'use strict';
-// ---------- v1.2 large-army performance authority ----------
+// ---------- v1.3.2 large-army + 2D render performance authority ----------
 (function installLargeArmyPerformance(global) {
   const nrts = global.NRTS;
   if (!nrts) throw new Error('NRTS foundation runtime must load before large-army performance authority.');
 
   const CELL = 160;
+  const MAX_2D_DPR = 1.5;
+  const LOD_UNIT_THRESHOLD = 360;
+  const LOD_ZOOM_THRESHOLD = 0.82;
   const combatGrid = { france: new Map(), britain: new Map() };
   const regimentById = new Map();
   const membersByRegiment = new Map();
   const getRegimentBeforePerformanceV12 = getRegiment;
   const regimentMembersBeforePerformanceV12 = regimentMembers;
+  const renderStats = { fullUnits:0, lodUnits:0, culledUnits:0, dprResizes:0 };
 
   const cellKey = (x, y) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
 
@@ -40,8 +44,6 @@
     }
   }
 
-  // Replace repeated O(regiments * units) scans with one cache rebuild per simulation frame,
-  // while falling back to the original authority for regiments created between ticks.
   getRegiment = function getRegimentCached(id) {
     const reg = regimentById.get(id);
     if (reg && !reg.destroyed) return reg;
@@ -52,12 +54,9 @@
     if (!reg || reg.destroyed) return [];
     const members = membersByRegiment.get(reg.id);
     if (!members) return regimentMembersBeforePerformanceV12(reg);
-    // Deaths can happen after the frame cache is built; filter only this small regiment array,
-    // never the full global unit list.
     return members.filter(unit => !unit.dead);
   };
 
-  // Replace the two full enemy-array scans performed by every combat unit each tick.
   nearestEnemyEntity = function nearestEnemyEntitySpatial(unit, maxRange) {
     const enemySide = opposite(unit.side);
     const grid = combatGrid[enemySide];
@@ -85,7 +84,6 @@
       }
     }
 
-    // Building counts stay tiny, so keep this exact scan for gameplay parity.
     for (const b of buildings) {
       if (b.dead || b.side !== enemySide || !b.complete) continue;
       const dx = b.x - unit.x;
@@ -111,10 +109,56 @@
     return x >= camera.x - halfW && x <= camera.x + halfW && y >= camera.y - halfH && y <= camera.y + halfH;
   }
 
-  // Rendering outside the viewport was still paying the full character/cavalry canvas cost.
+  function useUnitLod(unit) {
+    if (selectedUnits.has(unit)) return false;
+    if (camera.zoom >= LOD_ZOOM_THRESHOLD) return false;
+    let living = 0;
+    for (const candidate of units) {
+      if (!candidate.dead && ++living > LOD_UNIT_THRESHOLD) return true;
+    }
+    return false;
+  }
+
+  function drawUnitLod(unit) {
+    const radius = TYPES[unit.type]?.radius || 6;
+    const sideColor = unit.side === 'france' ? COLORS.france : COLORS.britain;
+    ctx.save();
+    ctx.translate(unit.x, unit.y);
+    ctx.rotate(unit.facing || 0);
+    if (unit.type === 'cavalry') {
+      ctx.fillStyle = '#493a2e';
+      ctx.beginPath();ctx.ellipse(0,0,10,4.5,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle = sideColor;ctx.beginPath();ctx.arc(1,0,3.2,0,Math.PI*2);ctx.fill();
+    } else if (unit.type === 'artillery') {
+      ctx.strokeStyle = '#3e3328';ctx.lineWidth = 3;
+      ctx.beginPath();ctx.moveTo(-9,3);ctx.lineTo(11,-2);ctx.stroke();
+      ctx.fillStyle = '#282522';ctx.beginPath();ctx.arc(-5,5,3,0,Math.PI*2);ctx.arc(5,4,3,0,Math.PI*2);ctx.fill();
+    } else {
+      ctx.fillStyle = unit.routing ? '#777' : sideColor;
+      ctx.beginPath();ctx.arc(0,0,Math.max(4,radius*.82),0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle = unit.side === 'france' ? COLORS.franceLight : COLORS.britainLight;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(radius+4,0);ctx.stroke();
+      if (unit.type === 'officer') {
+        ctx.fillStyle = COLORS.selected;ctx.beginPath();ctx.arc(0,0,2,0,Math.PI*2);ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   const drawUnitBeforePerformanceV12 = drawUnit;
-  drawUnit = function drawUnitCameraCulledV12(unit) {
-    if (!unit.dead && isOnCamera(unit.x, unit.y, 70)) drawUnitBeforePerformanceV12(unit);
+  drawUnit = function drawUnitCameraCulledV132(unit) {
+    if (unit.dead || !isOnCamera(unit.x, unit.y, 70)) {
+      renderStats.culledUnits++;
+      return;
+    }
+    if (useUnitLod(unit)) {
+      renderStats.lodUnits++;
+      drawUnitLod(unit);
+    } else {
+      renderStats.fullUnits++;
+      drawUnitBeforePerformanceV12(unit);
+    }
   };
 
   const drawResourceBeforePerformanceV12 = drawResource;
@@ -129,21 +173,56 @@
     }
   };
 
+  function resize2DCanvasForPerformance() {
+    const desiredDpr = Math.min(devicePixelRatio || 1, MAX_2D_DPR);
+    const desiredWidth = Math.max(1, Math.floor(innerWidth * desiredDpr));
+    const desiredHeight = Math.max(1, Math.floor(innerHeight * desiredDpr));
+    if (canvas.width === desiredWidth && canvas.height === desiredHeight) return;
+    canvas.width = desiredWidth;
+    canvas.height = desiredHeight;
+    canvas.style.width = `${innerWidth}px`;
+    canvas.style.height = `${innerHeight}px`;
+    ctx.setTransform(desiredDpr, 0, 0, desiredDpr, 0, 0);
+    renderStats.dprResizes++;
+  }
+
+  // Core registers its resize handler earlier. Registering this one later means the
+  // performance cap is the final canvas size after a browser resize.
+  addEventListener('resize', resize2DCanvasForPerformance);
+  resize2DCanvasForPerformance();
+
+  // 3D stays available for explicit experiments/tests, but normal play now starts in 2D.
+  // This keeps the current development cycle focused on the mature renderer and movement.
+  addEventListener('load', () => {
+    const params = new URLSearchParams(location.search);
+    const explicit3D = params.get('view') === '3d' || params.get('test') === '3d';
+    if (!explicit3D && global.__BATTLEFIELD_3D_V1__?.enabled?.()) {
+      global.__BATTLEFIELD_3D_V1__.setEnabled(false);
+      statusEl.textContent = '2D-weergave actief · geoptimaliseerd voor vloeiende grote veldslagen.';
+    }
+  }, { once:true });
+
   const api = Object.freeze({
-    version: 'large-army-v1',
+    version: 'large-army-v1.3.2',
     combatCellSize: CELL,
     prepareFrameIndexes,
     cameraCulling: true,
     cachedRegimentMembership: true,
     spatialCombatQueries: true,
-    immediateLookupFallbacks: true
+    immediateLookupFallbacks: true,
+    twoDDefault: true,
+    maxCanvasDpr: MAX_2D_DPR,
+    unitLod: true,
+    unitLodThreshold: LOD_UNIT_THRESHOLD,
+    unitLodZoomThreshold: LOD_ZOOM_THRESHOLD,
+    renderStats: () => ({ ...renderStats })
   });
   global.__LARGE_ARMY_PERFORMANCE_V1__ = api;
   if (!nrts.subsystems.has('large-army-performance')) {
     nrts.subsystems.register('large-army-performance', api, {
-      phase: 'v1.2',
+      phase: 'v1.3.2',
       legacyBridge: false,
-      responsibility: 'large-army combat query caching and camera render culling'
+      responsibility: 'large-army combat query caching, viewport culling, 2D canvas scaling and density-aware unit rendering'
     });
   }
 })(window);
