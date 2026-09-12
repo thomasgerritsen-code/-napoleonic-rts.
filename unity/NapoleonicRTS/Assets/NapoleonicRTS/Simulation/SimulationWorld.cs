@@ -10,6 +10,7 @@ namespace NapoleonicRTS.Simulation
         private const float BridgeCompressionStart = 1.80f;
         private const float BridgeCompressionFull = 0.48f;
         private const float BridgeReleaseDistance = 1.80f;
+        private const float BridgeMemberReleaseMargin = 0.22f;
         private readonly StrategicMap _map;
         private int _nextUnitId = 1;
         private int _nextRegimentId = 1;
@@ -83,9 +84,9 @@ namespace NapoleonicRTS.Simulation
         {
             var regiment = FindRegiment(unit.RegimentId);
             if (regiment == null) return unit.Position;
-            var index = regiment.UnitIndices.IndexOf(Units.IndexOf(unit));
-            if (index < 0) return unit.Position;
-            return EffectiveSlotTarget(regiment, unit, index);
+            for (var i = 0; i < regiment.UnitIndices.Count; i++)
+                if (ReferenceEquals(Units[regiment.UnitIndices[i]], unit)) return EffectiveSlotTarget(regiment, unit, i);
+            return unit.Position;
         }
 
         public RegimentState FindRegiment(int id)
@@ -182,8 +183,7 @@ namespace NapoleonicRTS.Simulation
             var crossing = FindCrossing(regiment.RouteCrossingIds[regiment.RouteCrossingIndex]);
             if (crossing == null) return;
             regiment.ActiveCrossingId = crossing.Id;
-            var localAlong = LocalAlong(crossing, regiment.Anchor);
-            regiment.CrossingInitialSide = localAlong >= 0f ? 1 : -1;
+            regiment.CrossingInitialSide = LocalAlong(crossing, regiment.Anchor) >= 0f ? 1 : -1;
         }
 
         private void UpdateBridgeFlow(RegimentState regiment)
@@ -202,7 +202,7 @@ namespace NapoleonicRTS.Simulation
             {
                 var release = -signedAlong - half;
                 compression = 1f - Smooth01(release / BridgeReleaseDistance);
-                if (release >= BridgeReleaseDistance)
+                if (release >= BridgeReleaseDistance && AllMembersSafelyCleared(regiment, crossing))
                 {
                     regiment.RouteCrossingIndex++;
                     ClearBridgeState(regiment);
@@ -212,6 +212,20 @@ namespace NapoleonicRTS.Simulation
             }
             regiment.BridgeCompression = Math.Clamp(compression, 0f, 1f);
             if (regiment.BridgeCompression > regiment.PeakBridgeCompression) regiment.PeakBridgeCompression = regiment.BridgeCompression;
+        }
+
+        private bool AllMembersSafelyCleared(RegimentState regiment, CrossingDefinition crossing)
+        {
+            var direction = -regiment.CrossingInitialSide;
+            var clearAlong = crossing.Length * 0.5f + BridgeMemberReleaseMargin;
+            for (var i = 0; i < regiment.UnitIndices.Count; i++)
+            {
+                var unit = Units[regiment.UnitIndices[i]];
+                if (!unit.Alive) continue;
+                if (_map.IsWater(unit.Position)) return false;
+                if (LocalAlong(crossing, unit.Position) * direction <= clearAlong) return false;
+            }
+            return true;
         }
 
         private Float2 EffectiveSlotTarget(RegimentState regiment, UnitState unit, int memberIndex)
@@ -253,16 +267,45 @@ namespace NapoleonicRTS.Simulation
 
         private Float2 SafeFollowerTarget(RegimentState regiment, UnitState unit, Float2 desired)
         {
-            if (_map == null || _map.SegmentWaterCrossing(unit.Position, desired)?.Blocked != true) return desired;
+            if (_map == null || string.IsNullOrEmpty(regiment.ActiveCrossingId)) return desired;
             var crossing = FindCrossing(regiment.ActiveCrossingId);
-            if (crossing == null) return unit.Position;
-            var forward = Float2.FromAngle(crossing.AngleRadians);
-            var half = crossing.Length * 0.5f;
-            var signedUnitAlong = LocalAlong(crossing, unit.Position) * regiment.CrossingInitialSide;
-            if (signedUnitAlong > half)
-                return crossing.Centre + forward * (regiment.CrossingInitialSide * (half + 0.18f));
-            return crossing.Centre - forward * (regiment.CrossingInitialSide * (half + 0.18f));
+            if (crossing == null) return desired;
+
+            var currentAlong = LocalAlong(crossing, unit.Position);
+            var currentPerp = LocalPerpendicular(crossing, unit.Position);
+            var desiredBlocked = _map.SegmentWaterCrossing(unit.Position, desired)?.Blocked == true;
+            var markerHalfWidth = unit.Kind == UnitKind.Cavalry ? 0.52f : 0.43f;
+            var safeHalf = MathF.Max(0.10f, crossing.Width * 0.5f - markerHalfWidth - 0.10f);
+            var nearCrossing = MathF.Abs(currentAlong) <= crossing.Length * 0.5f + BridgeCompressionStart;
+            var outsideLane = nearCrossing && MathF.Abs(currentPerp) > safeHalf;
+            if (!desiredBlocked && !outsideLane) return desired;
+
+            var centeredPerp = Math.Clamp(currentPerp, -safeHalf * 0.35f, safeHalf * 0.35f);
+            if (outsideLane)
+            {
+                var lateral = CrossingPoint(crossing, currentAlong, centeredPerp);
+                if (IsLegalFollowerSegment(unit.Position, lateral) && Float2.Distance(unit.Position, lateral) > 0.03f) return lateral;
+                lateral = CrossingPoint(crossing, currentAlong, 0f);
+                if (IsLegalFollowerSegment(unit.Position, lateral) && Float2.Distance(unit.Position, lateral) > 0.03f) return lateral;
+            }
+
+            var direction = -regiment.CrossingInitialSide;
+            var maxAlong = crossing.Length * 0.5f + BridgeReleaseDistance;
+            var steps = new[] { 0.56f, 0.40f, 0.24f, 0.12f, 0.06f };
+            for (var i = 0; i < steps.Length; i++)
+            {
+                var along = Math.Clamp(currentAlong + direction * steps[i], -maxAlong, maxAlong);
+                var candidate = CrossingPoint(crossing, along, centeredPerp);
+                if (IsLegalFollowerSegment(unit.Position, candidate) && Float2.Distance(unit.Position, candidate) > 0.02f) return candidate;
+                candidate = CrossingPoint(crossing, along, 0f);
+                if (IsLegalFollowerSegment(unit.Position, candidate) && Float2.Distance(unit.Position, candidate) > 0.02f) return candidate;
+            }
+
+            var centered = CrossingPoint(crossing, Math.Clamp(currentAlong, -maxAlong, maxAlong), 0f);
+            return IsLegalFollowerSegment(unit.Position, centered) ? centered : unit.Position;
         }
+
+        private bool IsLegalFollowerSegment(Float2 from, Float2 to) => _map.SegmentWaterCrossing(from, to)?.Blocked != true;
 
         private CrossingDefinition FindCrossing(string id)
         {
@@ -276,6 +319,21 @@ namespace NapoleonicRTS.Simulation
             var delta = point - crossing.Centre;
             var forward = Float2.FromAngle(crossing.AngleRadians);
             return delta.X * forward.X + delta.Y * forward.Y;
+        }
+
+        private static float LocalPerpendicular(CrossingDefinition crossing, Float2 point)
+        {
+            var delta = point - crossing.Centre;
+            var forward = Float2.FromAngle(crossing.AngleRadians);
+            var right = new Float2(-forward.Y, forward.X);
+            return delta.X * right.X + delta.Y * right.Y;
+        }
+
+        private static Float2 CrossingPoint(CrossingDefinition crossing, float along, float perpendicular)
+        {
+            var forward = Float2.FromAngle(crossing.AngleRadians);
+            var right = new Float2(-forward.Y, forward.X);
+            return crossing.Centre + forward * along + right * perpendicular;
         }
 
         private static float Smooth01(float t)
