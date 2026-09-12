@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test('3D battlefield renderer consumes live simulation without replacing gameplay', async ({ page }) => {
+test('3D battlefield renderer consumes lightweight live simulation without replacing gameplay', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -19,6 +19,9 @@ test('3D battlefield renderer consumes live simulation without replacing gamepla
     return {
       bridgeRegistered: window.NRTS.subsystems.has('battlefield-3d-bridge-v1'),
       rendererName: window.__BATTLEFIELD_3D_V1__.renderer,
+      snapshotMode: window.NRTS_3D_SOURCE.snapshotMode,
+      snapshotHasAudit: Object.prototype.hasOwnProperty.call(snapshot, 'audit'),
+      snapshotHasGroups: Object.prototype.hasOwnProperty.call(snapshot, 'groups'),
       world,
       snapshotUnits: snapshot.units.length,
       snapshotBuildings: snapshot.buildings.length,
@@ -33,6 +36,9 @@ test('3D battlefield renderer consumes live simulation without replacing gamepla
 
   expect(state.bridgeRegistered).toBe(true);
   expect(state.rendererName).toBe('three.js');
+  expect(state.snapshotMode).toBe('lightweight-live-render-state');
+  expect(state.snapshotHasAudit).toBe(false);
+  expect(state.snapshotHasGroups).toBe(false);
   expect(state.world.world.width).toBeGreaterThan(3200);
   expect(state.world.world.height).toBeGreaterThan(1850);
   expect(state.world.roads.length).toBeGreaterThan(2);
@@ -45,6 +51,11 @@ test('3D battlefield renderer consumes live simulation without replacing gamepla
   expect(state.canvasWidth).toBeGreaterThan(0);
   expect(state.canvasHeight).toBeGreaterThan(0);
   expect(state.buttonText).toContain('3D');
+
+  const drawMsBefore = await page.evaluate(() => window.RTS_SIM.getMetrics().drawMs);
+  await page.waitForTimeout(250);
+  const drawMsAfter = await page.evaluate(() => window.RTS_SIM.getMetrics().drawMs);
+  expect(drawMsAfter).toBe(drawMsBefore);
 
   const toggle = await page.evaluate(() => {
     window.__BATTLEFIELD_3D_V1__.setEnabled(false);
