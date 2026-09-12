@@ -11,7 +11,8 @@
     ctx.save();
     for(const village of villages){
       if(typeof drawJunctionApronV069==='function') drawJunctionApronV069(village);
-      if(typeof global.drawVillageLandscapeV6==='function') global.drawVillageLandscapeV6(village);
+      if(typeof global.drawVillageLandscapeV7==='function') global.drawVillageLandscapeV7(village);
+      else if(typeof global.drawVillageLandscapeV6==='function') global.drawVillageLandscapeV6(village);
       else if(typeof global.drawVillageCommonsV5==='function') global.drawVillageCommonsV5(village);
     }
     for(const village of villages){
@@ -30,9 +31,11 @@
     sourceRenderer:'village-renderer-v2',
     yardBlend:global.__VILLAGE_YARD_BLEND_V5__?.version||null,
     landscape:global.__VILLAGE_LANDSCAPE_V6__?.version||null,
+    landscapeCharacter:global.__VILLAGE_LANDSCAPE_V7__?.version||null,
     hierarchical:Boolean(global.__VILLAGE_LAYOUT_V6__),
     collisionSafe:true,
     naturalVillageFabric:Boolean(global.__VILLAGE_LANDSCAPE_V6__),
+    archetypeCharacter:Boolean(global.__VILLAGE_LANDSCAPE_V7__),
     visibleFacades:false
   });
 
