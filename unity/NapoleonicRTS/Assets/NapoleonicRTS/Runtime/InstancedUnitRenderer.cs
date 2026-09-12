@@ -64,8 +64,10 @@ namespace NapoleonicRTS.Runtime
                 var kindIndex = (int)unit.Kind;
                 if (kindIndex <= 0 || kindIndex >= _batches.Length) continue;
                 var p = Float2.Lerp(unit.PreviousPosition, unit.Position, alpha);
-                var rotation = Quaternion.Euler(0f, 0f, unit.FacingRadians * Mathf.Rad2Deg);
+                p = ArtilleryCrewVisualPosition(world, unit, p, alpha, gameplay);
                 var scale = ScaleFor(unit.Kind, selectedOnly);
+                ApplyMarchVisual(world, unit, gameplay, ref p, ref scale);
+                var rotation = Quaternion.Euler(0f, 0f, unit.FacingRadians * Mathf.Rad2Deg);
                 var count = _counts[kindIndex];
                 _batches[kindIndex][count] = Matrix4x4.TRS(new Vector3(p.X, p.Y, selectedOnly ? .18f : .12f), rotation, scale);
                 count++;
@@ -80,6 +82,62 @@ namespace NapoleonicRTS.Runtime
                 var count = _counts[kindIndex];
                 if (count <= 0) continue;
                 Graphics.RenderMeshInstanced(renderParams, MeshFor((UnitKind)kindIndex), 0, _batches[kindIndex], count);
+            }
+        }
+
+        private static Float2 ArtilleryCrewVisualPosition(SimulationWorld world, UnitState unit, Float2 fallback, float alpha, BrowserParityWorld gameplay)
+        {
+            if (gameplay == null) return fallback;
+            var combat = gameplay.Combat.Get(unit.Id);
+            if (combat == null || !combat.ArtilleryCrew) return fallback;
+            var regiment = world.FindRegiment(unit.RegimentId);
+            if (regiment == null) return fallback;
+
+            UnitState cannon = null;
+            var crewOrdinal = 0;
+            var seenCrew = 0;
+            for (var i = 0; i < regiment.UnitIndices.Count; i++)
+            {
+                var member = world.Units[regiment.UnitIndices[i]];
+                if (member.Kind == UnitKind.Artillery) cannon = member;
+                var memberCombat = gameplay.Combat.Get(member.Id);
+                if (memberCombat == null || !memberCombat.ArtilleryCrew) continue;
+                if (member.Id == unit.Id) crewOrdinal = seenCrew;
+                seenCrew++;
+            }
+            if (cannon == null) return fallback;
+
+            var cannonPosition = Float2.Lerp(cannon.PreviousPosition, cannon.Position, alpha);
+            var moving = regiment.Moving || Float2.Distance(cannon.PreviousPosition, cannon.Position) > .002f;
+            var forward = Float2.FromAngle(cannon.FacingRadians);
+            var right = new Float2(-forward.Y, forward.X);
+            var forwardOffset = moving ? -.56f : -.18f;
+            var lateralOffset = (crewOrdinal == 0 ? -1f : 1f) * (moving ? .28f : .48f);
+            return cannonPosition + forward * forwardOffset + right * lateralOffset;
+        }
+
+        private static void ApplyMarchVisual(SimulationWorld world, UnitState unit, BrowserParityWorld gameplay, ref Float2 position, ref Vector3 scale)
+        {
+            var moved = Float2.Distance(unit.PreviousPosition, unit.Position);
+            if (moved <= .001f || unit.Kind == UnitKind.Artillery) return;
+            var combat = gameplay?.Combat.Get(unit.Id);
+            if (combat != null && combat.ArtilleryCrew) return;
+
+            var roadMarch = gameplay != null && gameplay.Combat.Rules.TerrainAt(position) == TacticalTerrainKind.Road;
+            var time = world.Tick * SimulationWorld.FixedStepSeconds;
+            var cadence = unit.Kind == UnitKind.Cavalry ? 9.4f : unit.Kind == UnitKind.Drummer ? 7.8f : 6.8f;
+            var identityPhase = roadMarch ? unit.RegimentId * .31f : unit.Id * 1.173f;
+            var phase = time * cadence + identityPhase;
+            var amplitude = unit.Kind == UnitKind.Cavalry ? .075f : .038f;
+            var facing = Float2.FromAngle(unit.FacingRadians);
+            var right = new Float2(-facing.Y, facing.X);
+            position += right * (Mathf.Sin(phase) * amplitude);
+            scale.y *= 1f + Mathf.Cos(phase * 2f) * (unit.Kind == UnitKind.Cavalry ? .055f : .035f);
+
+            if (combat != null && combat.ChargeTimer > 0f)
+            {
+                position += facing * .035f;
+                scale.x *= 1.07f;
             }
         }
 
