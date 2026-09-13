@@ -5,6 +5,8 @@
   const MARKER_HALO_PX = 6;
   const LABEL_GAP_PX = 8;
   const FOOTPRINT_PAD = 12;
+  const MAX_RENDERED_TARGETS = 24;
+  const COMPACT_LABEL_THRESHOLD = 8;
 
   function livingSelectedRegiments() {
     if (typeof selectedRegiments !== 'function') return [];
@@ -83,6 +85,13 @@
     return Number.isFinite(zoom) && zoom > 0.05 ? zoom : 1;
   }
 
+  function renderedTargets(targets) {
+    return targets
+      .filter(target => target.distance >= MIN_VISIBLE_DISTANCE)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, MAX_RENDERED_TARGETS);
+  }
+
   function drawFormationFootprint(target, zoom) {
     if (!target.footprint) return;
     const { width, depth } = target.footprint;
@@ -97,8 +106,7 @@
     ctx.restore();
   }
 
-  function drawTarget(target) {
-    if (target.distance < MIN_VISIBLE_DISTANCE) return;
+  function drawTarget(target, compactLabel = false) {
     const zoom = safeZoom();
     const pulse = 1 + Math.sin((typeof elapsed === 'number' ? elapsed : 0) * 5) * 0.08;
     const radius = (MARKER_RADIUS_PX * pulse) / zoom;
@@ -138,20 +146,24 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = '#f4d86d';
-    const footprintLabel = target.footprint ? ` · ${Math.round(target.footprint.width)}×${Math.round(target.footprint.depth)}m` : '';
-    ctx.fillText(`${target.label} · ${Math.round(target.distance)}m${footprintLabel}`, target.x, target.y - radius - (LABEL_GAP_PX / zoom));
+    const footprintLabel = !compactLabel && target.footprint ? ` · ${Math.round(target.footprint.width)}×${Math.round(target.footprint.depth)}m` : '';
+    const label = compactLabel ? `${target.kind === 'regiment' ? `R${target.id}` : target.label} · ${Math.round(target.distance)}m` : `${target.label} · ${Math.round(target.distance)}m${footprintLabel}`;
+    ctx.fillText(label, target.x, target.y - radius - (LABEL_GAP_PX / zoom));
     ctx.restore();
   }
 
   function drawOrderFeedback() {
     const targets = getTargets();
     if (!targets.length || typeof ctx === 'undefined' || typeof camera === 'undefined') return;
+    const visibleTargets = renderedTargets(targets);
+    if (!visibleTargets.length) return;
     const zoom = safeZoom();
+    const compactLabels = visibleTargets.length > COMPACT_LABEL_THRESHOLD;
     ctx.save();
     ctx.translate(innerWidth / 2, innerHeight / 2);
     ctx.scale(zoom, zoom);
     ctx.translate(-camera.x, -camera.y);
-    targets.forEach(drawTarget);
+    visibleTargets.forEach(target => drawTarget(target, compactLabels));
     ctx.restore();
   }
 
@@ -163,5 +175,10 @@
     };
   }
 
-  root.RTS_ORDER_FEEDBACK = Object.freeze({ getTargets, drawOrderFeedback, minVisibleDistance: MIN_VISIBLE_DISTANCE });
+  root.RTS_ORDER_FEEDBACK = Object.freeze({
+    getTargets,
+    drawOrderFeedback,
+    minVisibleDistance: MIN_VISIBLE_DISTANCE,
+    maxRenderedTargets: MAX_RENDERED_TARGETS
+  });
 })(window);
