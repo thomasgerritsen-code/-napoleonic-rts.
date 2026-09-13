@@ -13,6 +13,7 @@
   const CONTACT_DEPLOY_RANGE=245;
   const acceptedThisTick=[];
 
+  function now(){try{return Number(elapsed)||0;}catch{return 0;}}
   function members(reg){
     try{return global.regimentMembers(reg).filter(u=>u&&!u.dead&&!u.routing);}catch{return[];}
   }
@@ -61,7 +62,7 @@
     if(!last)return false;
     return Math.hypot(last.x-x,last.y-y)<=SAME_TARGET_EPS&&last.formation===formation&&angleDelta(last.facing,facing)<.14;
   }
-  function deconflict(reg,x,y,formation){
+  function deconflict(reg,x,y){
     if(crossingActive(reg))return{x,y};
     let nx=x,ny=y;
     for(const slot of acceptedThisTick){
@@ -91,12 +92,12 @@
         if(changed){stats.crossingProtected++;stats.suppressed++;return false;}
       }
       const chosenFormation=tacticalFormation(reg,formation);
-      const p=deconflict(reg,x,y,chosenFormation);
-      const age=Math.max(0,(global.elapsed||0)-(last?.at??-Infinity));
+      const p=deconflict(reg,x,y);
+      const age=Math.max(0,now()-(last?.at??-Infinity));
       if(age<ORDER_TTL&&sameOrder(last,p.x,p.y,chosenFormation,finalFacing)){
         stats.suppressed++;acceptedThisTick.push({regId:reg.id,x:last.x,y:last.y});return false;
       }
-      reg.aiOrderDisciplineV1322={x:p.x,y:p.y,formation:chosenFormation,facing:finalFacing,at:global.elapsed||0};
+      reg.aiOrderDisciplineV1322={x:p.x,y:p.y,formation:chosenFormation,facing:finalFacing,at:now()};
       acceptedThisTick.push({regId:reg.id,x:p.x,y:p.y});
       return previousOrderGroupPath(reg,p.x,p.y,chosenFormation,finalFacing);
     };
