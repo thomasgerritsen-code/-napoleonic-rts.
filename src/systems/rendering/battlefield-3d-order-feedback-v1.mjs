@@ -1,0 +1,134 @@
+import * as THREE from 'three';
+
+const hook = window.__NRTS_THREE_SCENE_HOOK_V1__;
+const feedback = window.RTS_ORDER_FEEDBACK;
+const battlefield = window.__BATTLEFIELD_3D_V1__;
+
+if (!hook || !feedback || !battlefield) {
+  console.warn('3D order feedback skipped: required renderer bridge is not ready.');
+} else {
+  const MAX_TARGETS = 8;
+  const MIN_DISTANCE = Number(feedback.minVisibleDistance) || 28;
+  const root = new THREE.Group();
+  root.name = 'order-feedback-3d';
+  root.renderOrder = 20;
+
+  const lineMaterial = new THREE.LineDashedMaterial({
+    color: 0xf4d86d,
+    transparent: true,
+    opacity: 0.7,
+    dashSize: 18,
+    gapSize: 12,
+    depthTest: false,
+    depthWrite: false
+  });
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color: 0xf4d86d,
+    transparent: true,
+    opacity: 0.92,
+    side: THREE.DoubleSide,
+    depthTest: false,
+    depthWrite: false
+  });
+  const beaconMaterial = new THREE.MeshBasicMaterial({
+    color: 0xf4d86d,
+    transparent: true,
+    opacity: 0.34,
+    depthTest: false,
+    depthWrite: false
+  });
+  const ringGeometry = new THREE.RingGeometry(12, 16, 32);
+  ringGeometry.rotateX(-Math.PI / 2);
+  const beaconGeometry = new THREE.CylinderGeometry(1.2, 2.4, 26, 8);
+
+  let attachedScene = null;
+  let frame = 0;
+  let visibleTargets = 0;
+
+  function terrainHeight(x, z) {
+    // Keep feedback slightly above terrain without importing renderer internals.
+    const ray = new THREE.Raycaster(new THREE.Vector3(x, 2000, z), new THREE.Vector3(0, -1, 0));
+    const scene = hook.scene?.();
+    if (!scene) return 2;
+    const terrain = scene.getObjectByName('battlefield-terrain');
+    if (!terrain) return 2;
+    const hit = ray.intersectObject(terrain, false)[0];
+    return hit ? hit.point.y + 2.5 : 2;
+  }
+
+  function disposeTransient() {
+    for (const child of [...root.children]) {
+      root.remove(child);
+      if (child.geometry && child.geometry !== ringGeometry && child.geometry !== beaconGeometry) child.geometry.dispose();
+    }
+  }
+
+  function buildTarget(target, index) {
+    if (!target || target.distance < MIN_DISTANCE) return;
+    const fromY = terrainHeight(target.fromX, target.fromY) + 2;
+    const targetY = terrainHeight(target.x, target.y) + 2;
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(target.fromX, fromY, target.fromY),
+      new THREE.Vector3(target.x, targetY, target.y)
+    ]);
+    const line = new THREE.Line(geometry, lineMaterial);
+    line.computeLineDistances();
+    line.renderOrder = 20;
+    line.userData.orderTargetId = target.id ?? `loose-${index}`;
+    root.add(line);
+
+    const marker = new THREE.Mesh(ringGeometry, ringMaterial.clone());
+    marker.position.set(target.x, targetY + 0.8, target.y);
+    marker.renderOrder = 21;
+    marker.userData.baseScale = target.kind === 'loose' ? 0.9 : 1;
+    marker.userData.phase = index * 0.8;
+    root.add(marker);
+
+    const beacon = new THREE.Mesh(beaconGeometry, beaconMaterial.clone());
+    beacon.position.set(target.x, targetY + 13, target.y);
+    beacon.renderOrder = 19;
+    root.add(beacon);
+  }
+
+  function rebuild() {
+    disposeTransient();
+    const targets = feedback.getTargets().filter(target => target.distance >= MIN_DISTANCE).slice(0, MAX_TARGETS);
+    targets.forEach(buildTarget);
+    visibleTargets = targets.length;
+  }
+
+  function animateMarkers(time) {
+    for (const child of root.children) {
+      if (!child.userData?.baseScale) continue;
+      const pulse = child.userData.baseScale * (1 + Math.sin(time * 4 + child.userData.phase) * 0.12);
+      child.scale.setScalar(pulse);
+      if (child.material) child.material.opacity = 0.78 + Math.sin(time * 4 + child.userData.phase) * 0.12;
+    }
+  }
+
+  function tick(timeMs) {
+    requestAnimationFrame(tick);
+    frame++;
+    const scene = hook.scene?.();
+    if (scene && scene !== attachedScene) {
+      attachedScene = scene;
+      attachedScene.add(root);
+    }
+    if (!attachedScene || !battlefield.enabled()) {
+      root.visible = false;
+      return;
+    }
+    root.visible = true;
+    if (frame % 3 === 1) rebuild();
+    animateMarkers(timeMs / 1000);
+  }
+
+  requestAnimationFrame(tick);
+
+  window.__BATTLEFIELD_3D_ORDER_FEEDBACK_V1__ = Object.freeze({
+    version: 'battlefield-3d-order-feedback-v1',
+    maxTargets: MAX_TARGETS,
+    visibleTargets: () => visibleTargets,
+    group: () => root
+  });
+}
