@@ -12,7 +12,9 @@ if (!source || !sceneHook) {
   const MAX_INSTANCES = 1400;
   const UPDATE_INTERVAL_MS = 50;
   const FAR_UPDATE_INTERVAL_MS = 100;
+  const ULTRA_FAR_UPDATE_INTERVAL_MS = 200;
   const FAR_LOD_CAMERA_Y = 900;
+  const ULTRA_FAR_LOD_CAMERA_Y = 1450;
   const detailGroup = new THREE.Group();
   detailGroup.name = 'napoleonic-unit-details-v1';
 
@@ -28,6 +30,7 @@ if (!source || !sceneHook) {
   const diagnostics = {
     updates: 0,
     skippedInactive: 0,
+    skippedUltraFar: 0,
     lodTransitions: 0,
     transformBuilds: 0,
     lodMode: 'near',
@@ -126,24 +129,26 @@ if (!source || !sceneHook) {
     return !renderApi?.enabled || renderApi.enabled();
   }
 
-  function farLodActive() {
+  function currentLodMode() {
     const camera = sceneHook.camera?.();
-    return Boolean(camera && camera.position.y >= FAR_LOD_CAMERA_Y);
+    const cameraY = camera?.position?.y ?? 0;
+    if (cameraY >= ULTRA_FAR_LOD_CAMERA_Y) return 'ultra-far';
+    if (cameraY >= FAR_LOD_CAMERA_Y) return 'far';
+    return 'near';
   }
 
-  function applyLodVisibility(farLod) {
-    const nextMode = farLod ? 'far' : 'near';
-    if (diagnostics.lodMode !== nextMode) {
-      diagnostics.lodMode = nextMode;
+  function applyLodVisibility(lodMode) {
+    if (diagnostics.lodMode !== lodMode) {
+      diagnostics.lodMode = lodMode;
       diagnostics.lodTransitions++;
     }
-    for (const mesh of fineDetailMeshes) mesh.visible = !farLod;
+    const fineVisible = lodMode === 'near';
+    for (const mesh of fineDetailMeshes) mesh.visible = fineVisible;
   }
 
-  function updateDetails() {
+  function updateDetails(lodMode) {
     const snapshot = source.snapshot();
-    const farLod = farLodActive();
-    applyLodVisibility(farLod);
+    const farLod = lodMode === 'far';
     selectedUnitIds.clear();
     for (const id of snapshot.selection?.unitIds || []) selectedUnitIds.add(id);
     let infantry = 0;
@@ -231,10 +236,15 @@ if (!source || !sceneHook) {
     scene.add(detailGroup);
     function tick() {
       const active = active3dRendering();
-      detailGroup.visible = active;
-      if (active) updateDetails();
-      else diagnostics.skippedInactive++;
-      setTimeout(tick, active && farLodActive() ? FAR_UPDATE_INTERVAL_MS : UPDATE_INTERVAL_MS);
+      const lodMode = active ? currentLodMode() : diagnostics.lodMode;
+      if (active) applyLodVisibility(lodMode);
+      const ultraFar = active && lodMode === 'ultra-far';
+      detailGroup.visible = active && !ultraFar;
+      if (!active) diagnostics.skippedInactive++;
+      else if (ultraFar) diagnostics.skippedUltraFar++;
+      else updateDetails(lodMode);
+      const delay = ultraFar ? ULTRA_FAR_UPDATE_INTERVAL_MS : lodMode === 'far' ? FAR_UPDATE_INTERVAL_MS : UPDATE_INTERVAL_MS;
+      setTimeout(tick, delay);
     }
     tick();
   }
@@ -243,14 +253,16 @@ if (!source || !sceneHook) {
     version: 'battlefield-3d-unit-detail-v1',
     updateIntervalMs: UPDATE_INTERVAL_MS,
     farUpdateIntervalMs: FAR_UPDATE_INTERVAL_MS,
+    ultraFarUpdateIntervalMs: ULTRA_FAR_UPDATE_INTERVAL_MS,
     farLodCameraY: FAR_LOD_CAMERA_Y,
+    ultraFarLodCameraY: ULTRA_FAR_LOD_CAMERA_Y,
     maxInstances: MAX_INSTANCES,
     layerCount: Object.keys(meshes).length,
     visualRoles: ['infantry', 'officer', 'cavalry', 'artillery'],
     silhouetteFeatures: ['infantry-pack', 'horse-body-head-tail', 'gun-carriage-trail', 'artillery-crew'],
     performanceModel: 'shared-instanced-low-poly-detail',
     transformReuse: 'one-world-matrix-per-unit-update',
-    scheduler: 'adaptive-active-3d-lod',
+    scheduler: 'adaptive-active-3d-tiered-lod',
     diagnostics: () => ({ ...diagnostics, active: active3dRendering() })
   });
 
