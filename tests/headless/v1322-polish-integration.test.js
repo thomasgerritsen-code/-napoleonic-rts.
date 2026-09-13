@@ -15,7 +15,7 @@ test('v1.3.22 identity and browser cache keys stay aligned', () => {
   assert.match(index, /Napoleonic RTS v1\.3\.22/);
   assert.match(index, /class="version">v1\.3\.22</);
   assert.match(index, /src\/foundation\/version\.js\?build=1322a/);
-  assert.match(index, /src\/hud\.js\?build=1322a/);
+  assert.match(index, /src\/hud\.js\?build=1322b/);
 });
 
 test('selected regiments expose post-crossing regroup progress and cohesion', () => {
