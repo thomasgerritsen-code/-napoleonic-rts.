@@ -39,18 +39,23 @@ test('3D unit detail work pauses in 2D mode and resumes in 3D', async ({ page })
   await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics().updates > 0);
 
-  const beforePause = await page.evaluate(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics());
   await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(false));
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics().active === false);
+
+  // Allow any scheduler tick that was already in flight at the mode switch to finish,
+  // then verify the expensive update counter remains frozen while 2D stays active.
+  await page.waitForTimeout(120);
+  const settledPause = await page.evaluate(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics());
   await page.waitForTimeout(160);
   const paused = await page.evaluate(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics());
 
   expect(paused.active).toBe(false);
-  expect(paused.updates).toBe(beforePause.updates);
-  expect(paused.skippedInactive).toBeGreaterThan(beforePause.skippedInactive);
+  expect(paused.updates).toBe(settledPause.updates);
+  expect(paused.skippedInactive).toBeGreaterThan(settledPause.skippedInactive);
 
   await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
-  await page.waitForFunction(previous => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics().updates > previous, beforePause.updates);
+  await page.waitForFunction(previous => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics().updates > previous, settledPause.updates);
   const resumed = await page.evaluate(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics());
   expect(resumed.active).toBe(true);
-  expect(resumed.updates).toBeGreaterThan(beforePause.updates);
+  expect(resumed.updates).toBeGreaterThan(settledPause.updates);
 });
