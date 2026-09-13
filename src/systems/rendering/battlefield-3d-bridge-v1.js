@@ -1,5 +1,5 @@
 'use strict';
-// ---------- v1.3.6: lightweight renderer-neutral bridge for the 3D battlefield ----------
+// ---------- v1.3.7: lightweight renderer-neutral bridge for the 3D battlefield ----------
 (function installBattlefield3DBridge(global) {
   const nrts = global.NRTS;
   if (!nrts) throw new Error('NRTS runtime must load before the 3D renderer bridge.');
@@ -64,10 +64,6 @@
     };
   }
 
-  // The v1.3.0 bridge used RTS_SIM.snapshot() here. That routine intentionally performs
-  // a complete audit and serializes every regiment plus its members, which is useful for
-  // diagnostics but far too expensive for a renderer requesting state ~30 times/second.
-  // The 3D renderer only needs live units/buildings/selection, so keep this path shallow.
   function getRenderState() {
     const liveUnits = typeof units === 'undefined' ? [] : units.filter(unit => !unit.dead);
     const liveBuildings = typeof buildings === 'undefined' ? [] : buildings.filter(building => !building.dead);
@@ -86,9 +82,10 @@
   }
 
   const api = Object.freeze({
-    version: 'battlefield-3d-bridge-v1.3.6',
+    version: 'battlefield-3d-bridge-v1.3.7',
     snapshotMode: 'lightweight-live-render-state',
     villageMetadata: 'archetype-zone-cluster-role',
+    villageIdentityCompanion: true,
     snapshot: getRenderState,
     staticWorld: getStaticWorld,
     resources: cloneResources,
@@ -111,13 +108,13 @@
     responsibility: 'expose lightweight live simulation state plus archetype-aware village metadata to the WebGL battlefield renderer'
   });
 
-  // Load the non-invasive experience layer only after the renderer has published its API.
   let attempts = 0;
   const experienceTimer = global.setInterval(() => {
     attempts++;
     if (global.__BATTLEFIELD_3D_V1__) {
       global.clearInterval(experienceTimer);
       import('./battlefield-3d-experience-v1.mjs?build=136a').catch(error => console.warn('3D experience layer failed to load', error));
+      import('./battlefield-3d-village-identity-v1.mjs?build=137a').catch(error => console.warn('3D village identity layer failed to load', error));
     } else if (attempts > 120) {
       global.clearInterval(experienceTimer);
     }
