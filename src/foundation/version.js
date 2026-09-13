@@ -1,6 +1,6 @@
 'use strict';
 (function initRtsVersion(root) {
-  const VERSION = '1.3.16';
+  const VERSION = '1.3.17';
   const app = document.getElementById('app');
   if (app) app.style.visibility = 'hidden';
 
