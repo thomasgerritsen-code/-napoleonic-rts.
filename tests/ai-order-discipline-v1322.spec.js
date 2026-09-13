@@ -1,0 +1,73 @@
+const { test, expect } = require('@playwright/test');
+
+test('AI order discipline suppresses repeated strategic orders instead of restarting regiment movement', async ({ page }) => {
+  const errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/?test=v071',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment&&window.__AI_ORDER_DISCIPLINE_V1322__));
+  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
+
+  const result=await page.evaluate(()=>{
+    gameOver=false;v05PeaceMode=false;
+    for(const u of units){if(u.side==='france'&&u.type!=='worker'){u.x=120;u.y=120;u.targetX=120;u.targetY=120;u.morale=35;}}
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,760);
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,1040);
+    for(const u of units){if(u.side==='britain'&&u.type!=='worker'){u.morale=100;u.hp=u.maxHp;}}
+    eval('elapsed=80');
+    window.__AI_COMMANDER_V1__.forceState('ADVANCE');
+    aiMilitaryOrder();
+    const first=window.__AI_ORDER_DISCIPLINE_V1322__.stats();
+    eval('elapsed+=1');
+    window.__AI_COMMANDER_V1__.forceState('ADVANCE');
+    aiMilitaryOrder();
+    const second=window.__AI_ORDER_DISCIPLINE_V1322__.stats();
+    v05PeaceMode=true;
+    return{first,second,config:window.__AI_ORDER_DISCIPLINE_V1322__.config};
+  });
+
+  expect(result.first.ordersSeen).toBeGreaterThan(0);
+  expect(result.second.ordersSeen).toBeGreaterThan(result.first.ordersSeen);
+  expect(result.second.suppressed).toBeGreaterThan(result.first.suppressed);
+  expect(result.config.orderTtl).toBeGreaterThan(4);
+  expect(errors).toEqual([]);
+});
+
+test('AI columns deploy into a fighting formation before close contact', async ({ page }) => {
+  await page.goto('/?test=v071',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment&&window.__AI_ORDER_DISCIPLINE_V1322__));
+  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
+
+  const result=await page.evaluate(()=>{
+    gameOver=false;v05PeaceMode=false;
+    const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2200,900);
+    const reg=getRegiment(id);
+    for(const u of units){if(u.side==='france'&&u.type!=='worker'){u.x=120;u.y=120;u.targetX=120;u.targetY=120;}}
+    const enemy=units.find(u=>u.side==='france'&&u.type!=='worker'&&!u.dead);
+    const c=centroid(regimentMembers(reg));
+    enemy.x=c.x+150;enemy.y=c.y;enemy.targetX=enemy.x;enemy.targetY=enemy.y;
+    for(const u of regimentMembers(reg)){u.morale=100;u.hp=u.maxHp;}
+    eval('elapsed=90');
+    window.__AI_COMMANDER_V1__.forceState('ADVANCE');
+    aiMilitaryOrder();
+    const order={...(reg.aiOrderDisciplineV1322||{})};
+    const stats=window.__AI_ORDER_DISCIPLINE_V1322__.stats();
+    v05PeaceMode=true;
+    return{order,stats};
+  });
+
+  expect(result.order.formation).toBe('line');
+  expect(result.stats.threatFormationChanges).toBeGreaterThan(0);
+});
+
+test('AI order discipline is registered after movement authority and exposes bridge-safe spacing policy', async ({ page }) => {
+  await page.goto('/?test=v071',{waitUntil:'networkidle'});
+  const result=await page.evaluate(()=>({
+    loaded:Boolean(window.__AI_ORDER_DISCIPLINE_V1322__),
+    subsystem:window.NRTS?.diagnostics?.snapshot()?.subsystems?.find(s=>s.name==='ai-order-discipline')||null,
+    config:window.__AI_ORDER_DISCIPLINE_V1322__?.config||null
+  }));
+  expect(result.loaded).toBe(true);
+  expect(result.subsystem?.meta?.phase).toBe('v1.3.22');
+  expect(result.config.destinationSeparation).toBeGreaterThanOrEqual(90);
+  expect(result.config.contactDeployRange).toBeGreaterThan(200);
+});
