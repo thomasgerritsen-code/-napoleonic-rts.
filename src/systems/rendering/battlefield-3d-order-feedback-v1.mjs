@@ -8,6 +8,7 @@ if (!hook || !feedback || !battlefield) {
   console.warn('3D order feedback skipped: required renderer bridge is not ready.');
 } else {
   const MAX_TARGETS = 8;
+  const REBUILD_INTERVAL_FRAMES = 12;
   const MIN_DISTANCE = Number(feedback.minVisibleDistance) || 28;
   const root = new THREE.Group();
   root.name = 'order-feedback-3d';
@@ -55,19 +56,23 @@ if (!hook || !feedback || !battlefield) {
   const ringGeometry = new THREE.RingGeometry(12, 16, 32);
   ringGeometry.rotateX(-Math.PI / 2);
   const beaconGeometry = new THREE.CylinderGeometry(1.2, 2.4, 26, 8);
+  const terrainRaycaster = new THREE.Raycaster();
+  const terrainRayOrigin = new THREE.Vector3();
+  const terrainRayDirection = new THREE.Vector3(0, -1, 0);
 
   let attachedScene = null;
+  let terrainObject = null;
   let frame = 0;
   let visibleTargets = 0;
 
   function terrainHeight(x, z) {
-    // Keep feedback slightly above terrain without importing renderer internals.
-    const ray = new THREE.Raycaster(new THREE.Vector3(x, 2000, z), new THREE.Vector3(0, -1, 0));
     const scene = hook.scene?.();
     if (!scene) return 2;
-    const terrain = scene.getObjectByName('battlefield-terrain');
-    if (!terrain) return 2;
-    const hit = ray.intersectObject(terrain, false)[0];
+    if (!terrainObject) terrainObject = scene.getObjectByName('battlefield-terrain') || null;
+    if (!terrainObject) return 2;
+    terrainRayOrigin.set(x, 2000, z);
+    terrainRaycaster.set(terrainRayOrigin, terrainRayDirection);
+    const hit = terrainRaycaster.intersectObject(terrainObject, false)[0];
     return hit ? hit.point.y + 2.5 : 2;
   }
 
@@ -127,9 +132,16 @@ if (!hook || !feedback || !battlefield) {
     root.add(beacon);
   }
 
+  function prioritizedTargets() {
+    return feedback.getTargets()
+      .filter(target => target.distance >= MIN_DISTANCE)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, MAX_TARGETS);
+  }
+
   function rebuild() {
     disposeTransient();
-    const targets = feedback.getTargets().filter(target => target.distance >= MIN_DISTANCE).slice(0, MAX_TARGETS);
+    const targets = prioritizedTargets();
     targets.forEach(buildTarget);
     visibleTargets = targets.length;
   }
@@ -149,6 +161,7 @@ if (!hook || !feedback || !battlefield) {
     const scene = hook.scene?.();
     if (scene && scene !== attachedScene) {
       attachedScene = scene;
+      terrainObject = null;
       attachedScene.add(root);
     }
     if (!attachedScene || !battlefield.enabled()) {
@@ -156,7 +169,7 @@ if (!hook || !feedback || !battlefield) {
       return;
     }
     root.visible = true;
-    if (frame % 3 === 1) rebuild();
+    if (frame % REBUILD_INTERVAL_FRAMES === 1) rebuild();
     animateMarkers(timeMs / 1000);
   }
 
@@ -165,6 +178,7 @@ if (!hook || !feedback || !battlefield) {
   window.__BATTLEFIELD_3D_ORDER_FEEDBACK_V1__ = Object.freeze({
     version: 'battlefield-3d-order-feedback-v1',
     maxTargets: MAX_TARGETS,
+    rebuildIntervalFrames: REBUILD_INTERVAL_FRAMES,
     visibleTargets: () => visibleTargets,
     group: () => root
   });
