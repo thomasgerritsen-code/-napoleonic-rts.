@@ -16,10 +16,11 @@ test('3D order feedback loads after the base 3D renderer', () => {
   assert.ok(feedbackIndex > rendererIndex, '3D order feedback must load after the base renderer');
 });
 
-test('scene hook exposes read-only active scene and camera access', () => {
+test('scene hook exposes read-only active scene/camera access and preserves scenery compatibility', () => {
   assert.match(hook, /WebGLRenderer\.prototype\.render/);
   assert.match(hook, /scene:\s*\(\)\s*=>\s*activeScene/);
   assert.match(hook, /camera:\s*\(\)\s*=>\s*activeCamera/);
+  assert.match(hook, /window\.__NRTS_THREE_SCENE__\s*=\s*scene/);
 });
 
 test('3D feedback reads existing order targets and never writes movement targets', () => {
