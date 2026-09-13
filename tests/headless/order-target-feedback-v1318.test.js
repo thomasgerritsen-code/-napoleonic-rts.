@@ -30,6 +30,17 @@ test('order markers remain screen-readable and safe across zoom levels', () => {
   assert.match(feedback, /ctx\.scale\(zoom, zoom\)/);
 });
 
+test('large multi-selections cap rendered feedback and simplify labels for frame stability', () => {
+  assert.match(feedback, /MAX_RENDERED_TARGETS = 24/);
+  assert.match(feedback, /COMPACT_LABEL_THRESHOLD = 8/);
+  assert.match(feedback, /function renderedTargets\(targets\)/);
+  assert.match(feedback, /\.sort\(\(a, b\) => a\.distance - b\.distance\)/);
+  assert.match(feedback, /\.slice\(0, MAX_RENDERED_TARGETS\)/);
+  assert.match(feedback, /visibleTargets\.length > COMPACT_LABEL_THRESHOLD/);
+  assert.match(feedback, /drawTarget\(target, compactLabels\)/);
+  assert.match(feedback, /maxRenderedTargets: MAX_RENDERED_TARGETS/);
+});
+
 test('order feedback loads after the base 2D renderer and release identity is consistent', () => {
   const baseIndex = index.indexOf('src/simulation-render.js');
   const feedbackIndex = index.indexOf('src/systems/rendering/order-target-feedback-v1.js');
