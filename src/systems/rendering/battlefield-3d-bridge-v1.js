@@ -1,5 +1,5 @@
 'use strict';
-// ---------- v1.3.1: lightweight renderer-neutral bridge for the 3D battlefield ----------
+// ---------- v1.3.6: lightweight renderer-neutral bridge for the 3D battlefield ----------
 (function installBattlefield3DBridge(global) {
   const nrts = global.NRTS;
   if (!nrts) throw new Error('NRTS runtime must load before the 3D renderer bridge.');
@@ -16,14 +16,19 @@
   }
 
   function cloneVillages() {
-    if (typeof VILLAGE_SCENERY_V069 === 'undefined') return [];
-    return VILLAGE_SCENERY_V069.map(village => ({
+    const source = global.VILLAGE_SCENERY_V6 || (typeof VILLAGE_SCENERY_V069 === 'undefined' ? [] : VILLAGE_SCENERY_V069);
+    return source.map(village => ({
       name: village.name,
       x: village.x,
       y: village.y,
+      archetype: village.archetype || 'crossroads',
+      junctionRoadCount: village.junctionRoadCount || 0,
       houses: village.houses.map(house => ({
         id: house.id,
         kind: house.kind,
+        zone: house.zone || 'residential',
+        clusterRole: house.clusterRole || 'standalone',
+        archetype: house.archetype || village.archetype || 'crossroads',
         x: house.x,
         y: house.y,
         w: house.w,
@@ -81,8 +86,9 @@
   }
 
   const api = Object.freeze({
-    version: 'battlefield-3d-bridge-v1.3.1',
+    version: 'battlefield-3d-bridge-v1.3.6',
     snapshotMode: 'lightweight-live-render-state',
+    villageMetadata: 'archetype-zone-cluster-role',
     snapshot: getRenderState,
     staticWorld: getStaticWorld,
     resources: cloneResources,
@@ -102,6 +108,18 @@
   nrts.subsystems.register('battlefield-3d-bridge-v1', api, {
     phase: 'rendering-v3',
     legacyBridge: false,
-    responsibility: 'expose lightweight live simulation state and static world data to the WebGL battlefield renderer'
+    responsibility: 'expose lightweight live simulation state plus archetype-aware village metadata to the WebGL battlefield renderer'
   });
+
+  // Load the non-invasive experience layer only after the renderer has published its API.
+  let attempts = 0;
+  const experienceTimer = global.setInterval(() => {
+    attempts++;
+    if (global.__BATTLEFIELD_3D_V1__) {
+      global.clearInterval(experienceTimer);
+      import('./battlefield-3d-experience-v1.mjs?build=136a').catch(error => console.warn('3D experience layer failed to load', error));
+    } else if (attempts > 120) {
+      global.clearInterval(experienceTimer);
+    }
+  }, 50);
 })(window);
