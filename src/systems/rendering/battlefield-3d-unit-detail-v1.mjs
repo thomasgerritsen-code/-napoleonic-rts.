@@ -29,6 +29,7 @@ if (!source || !sceneHook) {
     updates: 0,
     skippedInactive: 0,
     lodTransitions: 0,
+    transformBuilds: 0,
     lodMode: 'near',
     lastUpdateAt: 0
   };
@@ -99,30 +100,19 @@ if (!source || !sceneHook) {
     artilleryCrewHead: instancedMesh(translatedSphere(1.65, -7.0, 12.6, -2.5), 0xd3aa82, 0.95)
   };
 
-  const fineDetailMeshes = [
-    meshes.infantryHead,
-    meshes.infantryShako,
-    meshes.infantryMusket,
-    meshes.infantryPack,
-    meshes.officerHead,
-    meshes.officerBicorne,
-    meshes.cavalryHead,
-    meshes.cavalryShako,
-    meshes.cavalryHorseHead,
-    meshes.cavalryHorseTail,
-    meshes.artilleryCrewHead
-  ];
+  const fineDetailMeshes = [meshes.infantryHead, meshes.infantryShako, meshes.infantryMusket, meshes.infantryPack, meshes.officerHead, meshes.officerBicorne, meshes.cavalryHead, meshes.cavalryShako, meshes.cavalryHorseHead, meshes.cavalryHorseTail, meshes.artilleryCrewHead];
 
-  function setInstance(mesh, index, unit, selected, colorize = false) {
-    const y = hillHeightAt(unit.x, unit.y);
-    tempPosition.set(unit.x, y, unit.y);
+  function prepareUnitMatrix(unit) {
+    tempPosition.set(unit.x, hillHeightAt(unit.x, unit.y), unit.y);
     tempEuler.set(0, -(unit.facing || 0), 0);
     tempQuaternion.setFromEuler(tempEuler);
     tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
+    diagnostics.transformBuilds++;
+  }
+
+  function setInstance(mesh, index, unit, selected, colorize = false) {
     mesh.setMatrixAt(index, tempMatrix);
-    if (colorize) {
-      mesh.setColorAt(index, selected ? selectedColor : unit.side === 'france' ? frenchColor : britishColor);
-    }
+    if (colorize) mesh.setColorAt(index, selected ? selectedColor : unit.side === 'france' ? frenchColor : britishColor);
   }
 
   function finish(mesh, count) {
@@ -166,6 +156,7 @@ if (!source || !sceneHook) {
       const isSelected = selectedUnitIds.has(unit.id);
       if (unit.type === 'artillery') {
         if (artillery >= MAX_INSTANCES) continue;
+        prepareUnitMatrix(unit);
         setInstance(meshes.artilleryBarrel, artillery, unit, false);
         setInstance(meshes.artilleryCarriage, artillery, unit, false);
         setInstance(meshes.artilleryTrail, artillery, unit, false);
@@ -178,6 +169,7 @@ if (!source || !sceneHook) {
       }
       if (unit.type === 'cavalry') {
         if (cavalry >= MAX_INSTANCES) continue;
+        prepareUnitMatrix(unit);
         setInstance(meshes.cavalryRider, cavalry, unit, isSelected, true);
         if (!farLod) {
           setInstance(meshes.cavalryHead, cavalry, unit, false);
@@ -192,6 +184,7 @@ if (!source || !sceneHook) {
       }
       if (unit.type === 'officer') {
         if (officers >= MAX_INSTANCES) continue;
+        prepareUnitMatrix(unit);
         setInstance(meshes.officerTorso, officers, unit, isSelected, true);
         if (!farLod) {
           setInstance(meshes.officerHead, officers, unit, false);
@@ -202,6 +195,7 @@ if (!source || !sceneHook) {
       }
       if (unit.type === 'worker') continue;
       if (infantry >= MAX_INSTANCES) continue;
+      prepareUnitMatrix(unit);
       setInstance(meshes.infantryTorso, infantry, unit, isSelected, true);
       if (!farLod) {
         setInstance(meshes.infantryHead, infantry, unit, false);
@@ -213,24 +207,11 @@ if (!source || !sceneHook) {
     }
 
     finish(meshes.infantryTorso, infantry);
-    if (!farLod) {
-      finish(meshes.infantryHead, infantry);
-      finish(meshes.infantryShako, infantry);
-      finish(meshes.infantryMusket, infantry);
-      finish(meshes.infantryPack, infantry);
-    }
+    if (!farLod) { finish(meshes.infantryHead, infantry); finish(meshes.infantryShako, infantry); finish(meshes.infantryMusket, infantry); finish(meshes.infantryPack, infantry); }
     finish(meshes.officerTorso, officers);
-    if (!farLod) {
-      finish(meshes.officerHead, officers);
-      finish(meshes.officerBicorne, officers);
-    }
+    if (!farLod) { finish(meshes.officerHead, officers); finish(meshes.officerBicorne, officers); }
     finish(meshes.cavalryRider, cavalry);
-    if (!farLod) {
-      finish(meshes.cavalryHead, cavalry);
-      finish(meshes.cavalryShako, cavalry);
-      finish(meshes.cavalryHorseHead, cavalry);
-      finish(meshes.cavalryHorseTail, cavalry);
-    }
+    if (!farLod) { finish(meshes.cavalryHead, cavalry); finish(meshes.cavalryShako, cavalry); finish(meshes.cavalryHorseHead, cavalry); finish(meshes.cavalryHorseTail, cavalry); }
     finish(meshes.cavalryHorseBody, cavalry);
     finish(meshes.cavalryHorseNeck, cavalry);
     finish(meshes.artilleryBarrel, artillery);
@@ -246,10 +227,7 @@ if (!source || !sceneHook) {
 
   function attachWhenReady() {
     const scene = sceneHook.scene();
-    if (!scene) {
-      requestAnimationFrame(attachWhenReady);
-      return;
-    }
+    if (!scene) { requestAnimationFrame(attachWhenReady); return; }
     scene.add(detailGroup);
     function tick() {
       const active = active3dRendering();
@@ -271,6 +249,7 @@ if (!source || !sceneHook) {
     visualRoles: ['infantry', 'officer', 'cavalry', 'artillery'],
     silhouetteFeatures: ['infantry-pack', 'horse-body-head-tail', 'gun-carriage-trail', 'artillery-crew'],
     performanceModel: 'shared-instanced-low-poly-detail',
+    transformReuse: 'one-world-matrix-per-unit-update',
     scheduler: 'adaptive-active-3d-lod',
     diagnostics: () => ({ ...diagnostics, active: active3dRendering() })
   });
