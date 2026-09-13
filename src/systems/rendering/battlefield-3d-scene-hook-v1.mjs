@@ -7,13 +7,20 @@ if (!window.__NRTS_THREE_SCENE_HOOK_V1__) {
   const originalAdd = THREE.Scene.prototype.add;
   const originalRender = THREE.WebGLRenderer.prototype.render;
 
+  function rememberScene(scene) {
+    if (!scene?.isScene) return;
+    activeScene = scene;
+    // Compatibility contract used by the existing village/scenery companion modules.
+    window.__NRTS_THREE_SCENE__ = scene;
+  }
+
   THREE.Scene.prototype.add = function patchedSceneAdd(...objects) {
-    if (!activeScene) activeScene = this;
+    rememberScene(this);
     return originalAdd.apply(this, objects);
   };
 
   THREE.WebGLRenderer.prototype.render = function patchedRendererRender(scene, camera) {
-    if (scene?.isScene) activeScene = scene;
+    rememberScene(scene);
     if (camera?.isCamera) activeCamera = camera;
     return originalRender.call(this, scene, camera);
   };
