@@ -47,14 +47,14 @@
     const infantry=list.filter(u=>u.type==='infantry'||u.type==='officer'||u.type==='drummer').length;
     return infantry/list.length>.72;
   }
-  function tacticalFormation(reg,formation){
+  function tacticalFormation(reg,formation,countChange=true){
     if(crossingActive(reg))return formation;
     const threat=nearestEnemy(reg);if(!threat)return formation;
     if(mostlyInfantry(reg)&&threat.unit?.type==='cavalry'&&threat.distance<CAVALRY_SQUARE_RANGE&&formation!=='square'){
-      stats.threatFormationChanges++;return'square';
+      if(countChange)stats.threatFormationChanges++;return'square';
     }
     if(formation==='column'&&threat.distance<CONTACT_DEPLOY_RANGE){
-      stats.threatFormationChanges++;return'line';
+      if(countChange)stats.threatFormationChanges++;return'line';
     }
     return formation;
   }
@@ -108,6 +108,7 @@
   const api=Object.freeze({
     version:'ai-order-discipline-v1322',
     stats:()=>({...stats}),
+    previewFormation:(reg,formation)=>tacticalFormation(reg,formation,false),
     config:Object.freeze({orderTtl:ORDER_TTL,targetEpsilon:SAME_TARGET_EPS,destinationSeparation:DESTINATION_SEPARATION,cavalrySquareRange:CAVALRY_SQUARE_RANGE,contactDeployRange:CONTACT_DEPLOY_RANGE})
   });
   global.__AI_ORDER_DISCIPLINE_V1322__=api;
