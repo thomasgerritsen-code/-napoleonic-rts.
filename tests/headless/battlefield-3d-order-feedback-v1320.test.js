@@ -34,9 +34,8 @@ test('3D feedback reads existing order targets and never writes movement targets
   assert.doesNotMatch(feedback3d, /dispatch\(/);
 });
 
-test('release identity is consistently v1.3.20', () => {
-  assert.equal(pkg.version, '1.3.20');
-  assert.match(version, /VERSION = '1\.3\.20'/);
-  assert.match(index, /Napoleonic RTS v1\.3\.20/);
-  assert.match(index, /class="version">v1\.3\.20/);
+test('release identity follows the package version', () => {
+  assert.ok(index.includes(`Napoleonic RTS v${pkg.version}`));
+  assert.ok(index.includes(`<span class="version">v${pkg.version}</span>`));
+  assert.ok(version.includes(`const VERSION = '${pkg.version}'`));
 });

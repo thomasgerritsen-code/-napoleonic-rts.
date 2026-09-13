@@ -4,10 +4,25 @@
   const MARKER_RADIUS_PX = 12;
   const MARKER_HALO_PX = 6;
   const LABEL_GAP_PX = 8;
+  const FOOTPRINT_PAD = 12;
 
   function livingSelectedRegiments() {
     if (typeof selectedRegiments !== 'function') return [];
     return selectedRegiments().filter(reg => reg && !reg.destroyed);
+  }
+
+  function regimentFootprint(reg) {
+    if (typeof regimentRoleOffsets !== 'function') return null;
+    const offsets = [...regimentRoleOffsets(reg, reg.formation).values()];
+    if (!offsets.length) return null;
+    const xs = offsets.map(offset => offset.ox);
+    const ys = offsets.map(offset => offset.oy);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    return {
+      width: Math.max(36, maxX - minX + FOOTPRINT_PAD * 2),
+      depth: Math.max(28, maxY - minY + FOOTPRINT_PAD * 2)
+    };
   }
 
   function regimentOrderTargets() {
@@ -17,15 +32,18 @@
       const from = centroid(members);
       const dx = reg.targetX - from.x;
       const dy = reg.targetY - from.y;
+      const footprint = regimentFootprint(reg);
       return {
         kind: 'regiment',
         id: reg.id,
         label: `R${reg.id} · ${typeof formationLabel === 'function' ? formationLabel(reg.formation) : reg.formation}`,
+        formation: reg.formation,
         fromX: from.x,
         fromY: from.y,
         x: reg.targetX,
         y: reg.targetY,
-        distance: Math.hypot(dx, dy)
+        distance: Math.hypot(dx, dy),
+        footprint
       };
     }).filter(Boolean);
   }
@@ -48,7 +66,8 @@
       fromY: from.y,
       x,
       y,
-      distance: Math.hypot(x - from.x, y - from.y)
+      distance: Math.hypot(x - from.x, y - from.y),
+      footprint: null
     };
   }
 
@@ -62,6 +81,20 @@
   function safeZoom() {
     const zoom = Number(camera?.zoom);
     return Number.isFinite(zoom) && zoom > 0.05 ? zoom : 1;
+  }
+
+  function drawFormationFootprint(target, zoom) {
+    if (!target.footprint) return;
+    const { width, depth } = target.footprint;
+    ctx.save();
+    ctx.fillStyle = 'rgba(244,216,109,.07)';
+    ctx.strokeStyle = 'rgba(244,216,109,.7)';
+    ctx.lineWidth = 1.4 / zoom;
+    ctx.setLineDash([6 / zoom, 5 / zoom]);
+    ctx.fillRect(target.x - width / 2, target.y - depth / 2, width, depth);
+    ctx.strokeRect(target.x - width / 2, target.y - depth / 2, width, depth);
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   function drawTarget(target) {
@@ -81,6 +114,8 @@
     ctx.lineTo(target.x, target.y);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    drawFormationFootprint(target, zoom);
 
     ctx.fillStyle = 'rgba(20,20,15,.72)';
     ctx.beginPath();
@@ -103,7 +138,8 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = '#f4d86d';
-    ctx.fillText(`${target.label} · ${Math.round(target.distance)}m`, target.x, target.y - radius - (LABEL_GAP_PX / zoom));
+    const footprintLabel = target.footprint ? ` · ${Math.round(target.footprint.width)}×${Math.round(target.footprint.depth)}m` : '';
+    ctx.fillText(`${target.label} · ${Math.round(target.distance)}m${footprintLabel}`, target.x, target.y - radius - (LABEL_GAP_PX / zoom));
     ctx.restore();
   }
 
