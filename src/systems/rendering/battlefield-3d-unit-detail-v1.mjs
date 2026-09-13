@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const source = window.NRTS_3D_SOURCE;
 const sceneHook = window.__NRTS_THREE_SCENE_HOOK_V1__;
+const renderApi = window.__BATTLEFIELD_3D_V1__;
 
 if (!source || !sceneHook) {
   console.warn('3D unit detail layer skipped: renderer bridge or scene hook unavailable.');
@@ -21,6 +22,12 @@ if (!source || !sceneHook) {
   const frenchColor = new THREE.Color(0x2855a5);
   const britishColor = new THREE.Color(0xa63b35);
   const selectedColor = new THREE.Color(0xf4d86d);
+  const selectedUnitIds = new Set();
+  const diagnostics = {
+    updates: 0,
+    skippedInactive: 0,
+    lastUpdateAt: 0
+  };
 
   function hillHeightAt(x, z) {
     let height = Math.sin(x * 0.0041) * 2.4 + Math.sin(z * 0.0057 + 1.1) * 2.0;
@@ -98,9 +105,15 @@ if (!source || !sceneHook) {
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
 
+  function active3dRendering() {
+    if (document.hidden) return false;
+    return !renderApi?.enabled || renderApi.enabled();
+  }
+
   function updateDetails() {
     const snapshot = source.snapshot();
-    const selected = new Set(snapshot.selection?.unitIds || []);
+    selectedUnitIds.clear();
+    for (const id of snapshot.selection?.unitIds || []) selectedUnitIds.add(id);
     let infantry = 0;
     let officers = 0;
     let cavalry = 0;
@@ -108,7 +121,7 @@ if (!source || !sceneHook) {
 
     for (const unit of snapshot.units || []) {
       if (unit.dead) continue;
-      const isSelected = selected.has(unit.id);
+      const isSelected = selectedUnitIds.has(unit.id);
       if (unit.type === 'artillery') {
         if (artillery >= MAX_INSTANCES) continue;
         setInstance(meshes.artilleryBarrel, artillery, unit, false);
@@ -157,6 +170,8 @@ if (!source || !sceneHook) {
     finish(meshes.artilleryBarrel, artillery);
     finish(meshes.artilleryWheelL, artillery);
     finish(meshes.artilleryWheelR, artillery);
+    diagnostics.updates++;
+    diagnostics.lastUpdateAt = performance.now();
   }
 
   function attachWhenReady() {
@@ -166,15 +181,14 @@ if (!source || !sceneHook) {
       return;
     }
     scene.add(detailGroup);
-    let lastUpdate = 0;
-    function tick(now) {
-      if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
-        updateDetails();
-        lastUpdate = now;
-      }
-      requestAnimationFrame(tick);
+    function tick() {
+      const active = active3dRendering();
+      detailGroup.visible = active;
+      if (active) updateDetails();
+      else diagnostics.skippedInactive++;
+      setTimeout(tick, UPDATE_INTERVAL_MS);
     }
-    requestAnimationFrame(tick);
+    tick();
   }
 
   window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__ = Object.freeze({
@@ -183,7 +197,9 @@ if (!source || !sceneHook) {
     maxInstances: MAX_INSTANCES,
     layerCount: Object.keys(meshes).length,
     visualRoles: ['infantry', 'officer', 'cavalry', 'artillery'],
-    performanceModel: 'shared-instanced-low-poly-detail'
+    performanceModel: 'shared-instanced-low-poly-detail',
+    scheduler: 'fixed-interval-active-3d-only',
+    diagnostics: () => ({ ...diagnostics, active: active3dRendering() })
   });
 
   attachWhenReady();
