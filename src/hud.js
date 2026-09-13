@@ -1,5 +1,10 @@
 'use strict';
 // ---------- HUD/actions ----------
+  function setHudText(el, text) {
+    const next = String(text);
+    if (el.textContent !== next) el.textContent = next;
+  }
+
   function getActionSignature() {
     const buildingPart = selectedBuilding ? `${selectedBuilding.id}:${selectedBuilding.type}:${selectedBuilding.complete}` : '-';
     const selected = [...selectedUnits].filter(u => !u.dead);
@@ -56,14 +61,19 @@
   }
 
   function updateActionVisuals() {
+    const regs = selectedRegiments();
+    const selectedMode = regs.length === 1 ? regs[0].formation : currentFormation;
     actionsEl.querySelectorAll('[data-formation]').forEach(btn => {
-      const regs = selectedRegiments();
-      const selectedMode = regs.length === 1 ? regs[0].formation : currentFormation;
       const active = btn.dataset.formation === selectedMode;
       btn.classList.toggle('active', active);
-      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      if (btn.getAttribute('aria-pressed') !== (active ? 'true' : 'false')) {
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      }
     });
-    actionsEl.querySelectorAll('[data-action^="build-"]').forEach(btn => btn.classList.toggle('active', btn.dataset.action === `build-${buildMode}`));
+    actionsEl.querySelectorAll('[data-action^="build-"]').forEach(btn => {
+      const active = btn.dataset.action === `build-${buildMode}`;
+      btn.classList.toggle('active', active);
+    });
   }
 
   function regimentOrderState(reg) {
@@ -92,8 +102,7 @@
     return `${formation} · ${reform ? `${reform} · ` : ''}marcheert · ${Math.max(1, Math.round(order.distance))} m te gaan`;
   }
 
-  function selectionRegimentSummary() {
-    const regs = selectedRegiments();
+  function selectionRegimentSummary(regs = selectedRegiments()) {
     if (regs.length === 1) {
       const reg = regs[0], members = regimentMembers(reg);
       const officerAlive = members.some(u => u.id === reg.officerId);
@@ -112,8 +121,8 @@
   }
 
   function setSelectionDetails(text) {
-    selectionDetailsEl.textContent = text;
-    selectionDetailsEl.title = text;
+    setHudText(selectionDetailsEl, text);
+    if (selectionDetailsEl.title !== text) selectionDetailsEl.title = text;
   }
 
   function updateHud(forceActions = false) {
@@ -121,42 +130,48 @@
     if (selectedBuilding?.dead) selectedBuilding = null;
     recalcPopCap('france'); recalcPopCap('britain');
 
-    foodEl.textContent = Math.floor(economies.france.food);
-    woodEl.textContent = Math.floor(economies.france.wood);
-    populationEl.textContent = `${populationUsed('france')}/${economies.france.popCap}`;
-    frenchCountEl.textContent = livingUnits('france').length;
-    britishCountEl.textContent = livingUnits('britain').length;
-    frenchRegimentsEl.textContent = activeRegiments('france').length;
+    const frenchLiving = livingUnits('france');
+    const britishLiving = livingUnits('britain');
+    const frenchRegs = activeRegiments('france');
+    const britishRegs = activeRegiments('britain');
+    const selectedRegs = selectedRegiments();
 
-    aiEconomyEl.textContent = `Economie: 🍞 ${Math.floor(economies.britain.food)} · 🪵 ${Math.floor(economies.britain.wood)} · 👥 ${populationUsed('britain')}/${economies.britain.popCap}`;
-    aiBuildingsEl.textContent = `Gebouwen: ${livingBuildings('britain').filter(b => b.complete).length} compleet`;
-    aiRegimentsEl.textContent = `Regimenten: ${activeRegiments('britain').length}`;
-    aiPlanEl.textContent = `Plan: ${aiPlan}`;
+    setHudText(foodEl, Math.floor(economies.france.food));
+    setHudText(woodEl, Math.floor(economies.france.wood));
+    setHudText(populationEl, `${populationUsed('france')}/${economies.france.popCap}`);
+    setHudText(frenchCountEl, frenchLiving.length);
+    setHudText(britishCountEl, britishLiving.length);
+    setHudText(frenchRegimentsEl, frenchRegs.length);
+
+    setHudText(aiEconomyEl, `Economie: 🍞 ${Math.floor(economies.britain.food)} · 🪵 ${Math.floor(economies.britain.wood)} · 👥 ${populationUsed('britain')}/${economies.britain.popCap}`);
+    setHudText(aiBuildingsEl, `Gebouwen: ${livingBuildings('britain').filter(b => b.complete).length} compleet`);
+    setHudText(aiRegimentsEl, `Regimenten: ${britishRegs.length}`);
+    setHudText(aiPlanEl, `Plan: ${aiPlan}`);
 
     if (selectedBuilding) {
       const b = selectedBuilding;
-      selectionTitleEl.textContent = BUILDINGS[b.type].label;
+      setHudText(selectionTitleEl, BUILDINGS[b.type].label);
       if (!b.complete) setSelectionDetails(`In aanbouw · ${Math.floor(b.construction * 100)}%`);
       else if (b.queue.length) setSelectionDetails(`Productie: ${b.queue[0].label} · ${Math.floor(b.production * 100)}% · queue ${b.queue.length}`);
       else setSelectionDetails(`${Math.max(0, Math.floor(b.hp))}/${b.maxHp} HP`);
     } else if (selectedUnits.size) {
       const group = [...selectedUnits];
-      const regSummary = selectionRegimentSummary();
+      const regSummary = selectionRegimentSummary(selectedRegs);
       if (regSummary) {
-        selectionTitleEl.textContent = selectedRegiments().length === 1 ? selectedRegiments()[0].name : `${selectedRegiments().length} regimenten`;
+        setHudText(selectionTitleEl, selectedRegs.length === 1 ? selectedRegs[0].name : `${selectedRegs.length} regimenten`);
         setSelectionDetails(regSummary);
       } else {
         const workers = group.filter(u => u.type === 'worker').length;
         const inf = group.filter(u => u.type === 'infantry').length;
         const off = group.filter(u => u.type === 'officer').length;
         const drum = group.filter(u => u.type === 'drummer').length;
-        selectionTitleEl.textContent = group.length === 1 ? TYPES[group[0].type].label : `${group.length} eenheden`;
+        setHudText(selectionTitleEl, group.length === 1 ? TYPES[group[0].type].label : `${group.length} eenheden`);
         setSelectionDetails(workers
           ? `${workers} boeren · rechtsklik op grondstof om te verzamelen`
           : `Losse troepen · musketiers ${inf} · officier ${off} · drummer ${drum}`);
       }
     } else {
-      selectionTitleEl.textContent = 'Niets geselecteerd';
+      setHudText(selectionTitleEl, 'Niets geselecteerd');
       setSelectionDetails('Voor regiment: 12 musketiers + 1 officier + 1 drummer selecteren.');
     }
 
