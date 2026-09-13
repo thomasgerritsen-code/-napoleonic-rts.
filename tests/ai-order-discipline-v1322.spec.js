@@ -59,6 +59,10 @@ test('AI columns deploy into a fighting formation before close contact', async (
 
 test('AI order discipline is registered after movement authority and exposes bridge-safe spacing policy', async ({ page }) => {
   await page.goto('/?test=v071',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(
+    window.__AI_ORDER_DISCIPLINE_V1322__ &&
+    window.NRTS?.diagnostics?.snapshot()?.subsystems?.some(s=>s.name==='ai-order-discipline')
+  ));
   const result=await page.evaluate(()=>({
     loaded:Boolean(window.__AI_ORDER_DISCIPLINE_V1322__),
     subsystem:window.NRTS?.diagnostics?.snapshot()?.subsystems?.find(s=>s.name==='ai-order-discipline')||null,
