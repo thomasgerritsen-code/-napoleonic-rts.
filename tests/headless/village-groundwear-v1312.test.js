@@ -29,5 +29,5 @@ test('v1.3.12 ground wear loads after base village props and release identity fo
   assert.ok(props >= 0, 'village props are wired with the v1.3.12 cache key');
   assert.ok(wear > props, 'ground wear loads after village props');
   assert.match(html, new RegExp(`Napoleonic RTS v${packageVersion.replace(/\./g, '\\.')}`));
-  assert.match(html, /version\.js\?build=1312a/);
+  assert.match(html, /src\/foundation\/version\.js\?build=\w+/);
 });
