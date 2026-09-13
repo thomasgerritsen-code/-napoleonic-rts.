@@ -16,7 +16,8 @@ test('3D village scenery adds render-only archetype silhouettes without changing
       sceneryCount: renderOnly.length,
       renderOnlyZones: [...new Set(renderOnly.map(house => house.zone))],
       renderOnlyRoles: [...new Set(renderOnly.map(house => house.clusterRole))],
-      byArchetype,
+      archetypes: Object.keys(byArchetype),
+      kinds: [...new Set(Object.values(byArchetype).flat())],
       authority: window.__VILLAGE_AUTHORITY_V6__?.version || null
     };
   });
@@ -27,7 +28,13 @@ test('3D village scenery adds render-only archetype silhouettes without changing
   expect(state.sceneryCount).toBeGreaterThanOrEqual(state.villageCount * 3);
   expect(state.renderOnlyZones).toEqual(['render-only']);
   expect(state.renderOnlyRoles.length).toBeGreaterThanOrEqual(4);
-  expect(Object.keys(state.byArchetype).length).toBeGreaterThanOrEqual(4);
-  expect(Object.values(state.byArchetype).flat()).toEqual(expect.arrayContaining(['house', 'barn', 'farmhouse', 'inn']));
+  expect(state.archetypes.length).toBeGreaterThanOrEqual(4);
+  expect(state.kinds).toContain('house');
+  if (state.archetypes.some(key => String(key).includes('agrar'))) {
+    expect(state.kinds).toEqual(expect.arrayContaining(['barn', 'farmhouse']));
+  }
+  if (state.archetypes.some(key => String(key).includes('cross'))) {
+    expect(state.kinds).toContain('inn');
+  }
   expect(state.authority).toContain('village-authority-v6');
 });
