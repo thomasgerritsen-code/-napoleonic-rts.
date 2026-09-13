@@ -35,8 +35,7 @@ test('order feedback loads after the base 2D renderer and release identity is co
   const feedbackIndex = index.indexOf('src/systems/rendering/order-target-feedback-v1.js?build=1319a');
   assert.ok(baseIndex >= 0, 'base renderer script should exist');
   assert.ok(feedbackIndex > baseIndex, 'feedback wrapper should load after the base renderer');
-  assert.match(index, /Napoleonic RTS v1\.3\.19/);
-  assert.match(index, /<span class="version">v1\.3\.19<\/span>/);
-  assert.match(version, /const VERSION = '1\.3\.19'/);
-  assert.equal(pkg.version, '1.3.19');
+  assert.ok(index.includes(`Napoleonic RTS v${pkg.version}`));
+  assert.ok(index.includes(`<span class="version">v${pkg.version}</span>`));
+  assert.ok(version.includes(`const VERSION = '${pkg.version}'`));
 });
