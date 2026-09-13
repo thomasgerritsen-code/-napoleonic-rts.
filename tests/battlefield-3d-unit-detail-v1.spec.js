@@ -11,11 +11,14 @@ test('3D battlefield loads lightweight Napoleonic unit detail silhouettes', asyn
     return {
       version: api.version,
       updateIntervalMs: api.updateIntervalMs,
+      farUpdateIntervalMs: api.farUpdateIntervalMs,
+      farLodCameraY: api.farLodCameraY,
       maxInstances: api.maxInstances,
       layerCount: api.layerCount,
       visualRoles: api.visualRoles,
       performanceModel: api.performanceModel,
       scheduler: api.scheduler,
+      diagnostics: api.diagnostics(),
       attached: Boolean(group),
       childCount: group?.children?.length || 0
     };
@@ -23,11 +26,14 @@ test('3D battlefield loads lightweight Napoleonic unit detail silhouettes', asyn
 
   expect(state.version).toBe('battlefield-3d-unit-detail-v1');
   expect(state.updateIntervalMs).toBeGreaterThanOrEqual(40);
+  expect(state.farUpdateIntervalMs).toBeGreaterThan(state.updateIntervalMs);
+  expect(state.farLodCameraY).toBeGreaterThan(700);
   expect(state.maxInstances).toBeGreaterThanOrEqual(1000);
   expect(state.layerCount).toBeGreaterThanOrEqual(12);
   expect(state.visualRoles).toEqual(expect.arrayContaining(['infantry', 'officer', 'cavalry', 'artillery']));
   expect(state.performanceModel).toBe('shared-instanced-low-poly-detail');
-  expect(state.scheduler).toBe('fixed-interval-active-3d-only');
+  expect(state.scheduler).toBe('adaptive-active-3d-lod');
+  expect(['near', 'far']).toContain(state.diagnostics.lodMode);
   expect(state.attached).toBe(true);
   expect(state.childCount).toBe(state.layerCount);
 });
