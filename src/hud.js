@@ -64,15 +64,37 @@
     actionsEl.querySelectorAll('[data-action^="build-"]').forEach(btn => btn.classList.toggle('active', btn.dataset.action === `build-${buildMode}`));
   }
 
+  function regimentOrderState(reg) {
+    const members = regimentMembers(reg).filter(u => !u.dead && !u.routing);
+    if (!members.length) return { moving: false, distance: 0 };
+    const c = centroid(members);
+    const dx = (reg.targetX ?? c.x) - c.x;
+    const dy = (reg.targetY ?? c.y) - c.y;
+    const distance = Math.hypot(dx, dy);
+    return { moving: distance > 42, distance };
+  }
+
+  function regimentOrderLabel(reg) {
+    const order = regimentOrderState(reg);
+    const formation = formationLabel(reg.formation || 'line');
+    if (!order.moving) return `${formation} · positie ingenomen`;
+    return `${formation} · marcheert · ${Math.max(1, Math.round(order.distance))} m te gaan`;
+  }
+
   function selectionRegimentSummary() {
     const regs = selectedRegiments();
     if (regs.length === 1) {
       const reg = regs[0], members = regimentMembers(reg);
       const officerAlive = members.some(u => u.id === reg.officerId);
       const drummerAlive = members.some(u => u.id === reg.drummerId);
-      return `${reg.name} · ${members.filter(u => u.type === 'infantry').length} musketiers · O:${officerAlive ? '✓' : '✗'} D:${drummerAlive ? '✓' : '✗'} · morale ${Math.round(reg.morale)}%`;
+      return `${reg.name} · ${members.filter(u => u.type === 'infantry').length} musketiers · O:${officerAlive ? '✓' : '✗'} D:${drummerAlive ? '✓' : '✗'} · morale ${Math.round(reg.morale)}% · ${regimentOrderLabel(reg)}`;
     }
-    if (regs.length > 1) return `${regs.length} regimenten geselecteerd`;
+    if (regs.length > 1) {
+      const moving = regs.filter(reg => regimentOrderState(reg).moving).length;
+      const formations = [...new Set(regs.map(reg => formationLabel(reg.formation || 'line')))];
+      const formationText = formations.length === 1 ? formations[0] : 'gemengde formaties';
+      return `${regs.length} regimenten geselecteerd · ${formationText} · ${moving ? `${moving} marcheert` : 'positie ingenomen'}`;
+    }
     return null;
   }
 
