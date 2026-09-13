@@ -10,6 +10,7 @@ const read = relative => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 const source = read('src/systems/input/playability-controls-v1.js');
 const html = read('index.html');
 const version = read('src/foundation/version.js');
+const packageVersion = JSON.parse(read('package.json')).version;
 
 test('v1.3.14 exposes the playability control improvements and UI hotkey guard', () => {
   assert.match(source, /shiftBoxAdditiveSelection: true/);
@@ -25,7 +26,7 @@ test('v1.3.14 exposes the playability control improvements and UI hotkey guard',
   assert.match(source, /button, input, select, textarea, a\[href\]/);
 });
 
-test('v1.3.14 playability controls load immediately after base input and publish release identity', () => {
+test('playability controls load immediately after base input and publish current release identity', () => {
   const input = html.indexOf('src/input.js?build=131a');
   const controls = html.indexOf('src/systems/input/playability-controls-v1.js?build=1314a');
   assert.ok(input >= 0, 'base input remains wired');
@@ -34,5 +35,6 @@ test('v1.3.14 playability controls load immediately after base input and publish
   assert.match(html, /1\/2\/3: linie \/ colonne \/ carré/);
   assert.match(html, /Tab \/ Shift\+Tab: volgend \/ vorig regiment/);
   assert.match(html, /F: camera naar selectie/);
-  assert.match(version, /const VERSION = '1\.3\.14'/);
+  assert.ok(version.includes(`const VERSION = '${packageVersion}'`), 'runtime version follows package version');
+  assert.ok(html.includes(`Napoleonic RTS v${packageVersion}`), 'visible release identity follows package version');
 });
