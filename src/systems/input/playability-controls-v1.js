@@ -5,7 +5,8 @@
     shiftBoxAdditiveSelection: true,
     formationHotkeys: true,
     focusSelectionHotkey: true,
-    regimentCycleHotkey: true
+    regimentCycleHotkey: true,
+    interactiveUiHotkeyGuard: true
   });
 
   const baseSelectBox = selectBox;
@@ -66,8 +67,13 @@
     return true;
   }
 
+  function isInteractiveUiTarget(target) {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest('button, input, select, textarea, a[href], [contenteditable="true"], [role="button"]'));
+  }
+
   addEventListener('keydown', e => {
-    if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey || isInteractiveUiTarget(e.target)) return;
     const k = e.key.toLowerCase();
     const formationByKey = { '1': 'line', '2': 'column', '3': 'square' };
     if (formationByKey[k]) {
@@ -89,6 +95,7 @@
   root.__PLAYABILITY_CONTROLS_V1__ = Object.freeze({
     contract: CONTRACT,
     focusCurrentSelection,
-    cyclePlayerRegiment
+    cyclePlayerRegiment,
+    isInteractiveUiTarget
   });
 })(window);
