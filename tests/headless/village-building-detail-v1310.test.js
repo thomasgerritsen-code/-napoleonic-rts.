@@ -14,7 +14,8 @@ const html = read('index.html');
 test('v1.3.10 village detail remains render-only and preserves simulation identity', () => {
   assert.match(moduleSource, /contract: 'render-only-building-detail-v1'/);
   assert.match(moduleSource, /renderOnly: true/);
-  assert.match(moduleSource, /userData\.sceneryId/);
+  assert.match(moduleSource, /const sceneryId = object\?\.userData\?\.sceneryId/);
+  assert.match(moduleSource, /rebuildHouse\(object, housesById\.get\(sceneryId\)\)/);
   assert.doesNotMatch(moduleSource, /NRTS_GAME\s*\./);
   assert.doesNotMatch(moduleSource, /collision|pathfinding|routePlanner/i);
 });
