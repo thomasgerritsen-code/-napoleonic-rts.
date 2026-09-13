@@ -1,6 +1,9 @@
 'use strict';
 (function initOrderTargetFeedback(root) {
   const MIN_VISIBLE_DISTANCE = 28;
+  const MARKER_RADIUS_PX = 12;
+  const MARKER_HALO_PX = 6;
+  const LABEL_GAP_PX = 8;
 
   function livingSelectedRegiments() {
     if (typeof selectedRegiments !== 'function') return [];
@@ -56,15 +59,23 @@
     return targets;
   }
 
+  function safeZoom() {
+    const zoom = Number(camera?.zoom);
+    return Number.isFinite(zoom) && zoom > 0.05 ? zoom : 1;
+  }
+
   function drawTarget(target) {
     if (target.distance < MIN_VISIBLE_DISTANCE) return;
+    const zoom = safeZoom();
     const pulse = 1 + Math.sin((typeof elapsed === 'number' ? elapsed : 0) * 5) * 0.08;
-    const radius = 12 * pulse;
+    const radius = (MARKER_RADIUS_PX * pulse) / zoom;
+    const halo = MARKER_HALO_PX / zoom;
+    const cross = 7 / zoom;
 
     ctx.save();
     ctx.strokeStyle = 'rgba(244,216,109,.62)';
-    ctx.lineWidth = 1.5 / camera.zoom;
-    ctx.setLineDash([10 / camera.zoom, 7 / camera.zoom]);
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.setLineDash([10 / zoom, 7 / zoom]);
     ctx.beginPath();
     ctx.moveTo(target.fromX, target.fromY);
     ctx.lineTo(target.x, target.y);
@@ -73,35 +84,36 @@
 
     ctx.fillStyle = 'rgba(20,20,15,.72)';
     ctx.beginPath();
-    ctx.arc(target.x, target.y, radius + 6 / camera.zoom, 0, Math.PI * 2);
+    ctx.arc(target.x, target.y, radius + halo, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = COLORS.selected;
-    ctx.lineWidth = 2.2 / camera.zoom;
+    ctx.lineWidth = 2.2 / zoom;
     ctx.beginPath();
     ctx.arc(target.x, target.y, radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(target.x - 7 / camera.zoom, target.y);
-    ctx.lineTo(target.x + 7 / camera.zoom, target.y);
-    ctx.moveTo(target.x, target.y - 7 / camera.zoom);
-    ctx.lineTo(target.x, target.y + 7 / camera.zoom);
+    ctx.moveTo(target.x - cross, target.y);
+    ctx.lineTo(target.x + cross, target.y);
+    ctx.moveTo(target.x, target.y - cross);
+    ctx.lineTo(target.x, target.y + cross);
     ctx.stroke();
 
-    ctx.font = `${11 / camera.zoom}px sans-serif`;
+    ctx.font = `${11 / zoom}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = '#f4d86d';
-    ctx.fillText(`${target.label} · ${Math.round(target.distance)}m`, target.x, target.y - (radius + 8 / camera.zoom));
+    ctx.fillText(`${target.label} · ${Math.round(target.distance)}m`, target.x, target.y - radius - (LABEL_GAP_PX / zoom));
     ctx.restore();
   }
 
   function drawOrderFeedback() {
     const targets = getTargets();
     if (!targets.length || typeof ctx === 'undefined' || typeof camera === 'undefined') return;
+    const zoom = safeZoom();
     ctx.save();
     ctx.translate(innerWidth / 2, innerHeight / 2);
-    ctx.scale(camera.zoom, camera.zoom);
+    ctx.scale(zoom, zoom);
     ctx.translate(-camera.x, -camera.y);
     targets.forEach(drawTarget);
     ctx.restore();
