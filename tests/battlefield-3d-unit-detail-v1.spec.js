@@ -18,6 +18,7 @@ test('3D battlefield loads lightweight Napoleonic unit detail silhouettes', asyn
       visualRoles: api.visualRoles,
       silhouetteFeatures: api.silhouetteFeatures,
       performanceModel: api.performanceModel,
+      transformReuse: api.transformReuse,
       scheduler: api.scheduler,
       diagnostics: api.diagnostics(),
       attached: Boolean(group),
@@ -39,8 +40,10 @@ test('3D battlefield loads lightweight Napoleonic unit detail silhouettes', asyn
     'artillery-crew'
   ]));
   expect(state.performanceModel).toBe('shared-instanced-low-poly-detail');
+  expect(state.transformReuse).toBe('one-world-matrix-per-unit-update');
   expect(state.scheduler).toBe('adaptive-active-3d-lod');
   expect(['near', 'far']).toContain(state.diagnostics.lodMode);
+  expect(state.diagnostics.transformBuilds).toBeGreaterThan(0);
   expect(state.attached).toBe(true);
   expect(state.childCount).toBe(state.layerCount);
 });
@@ -55,8 +58,6 @@ test('3D unit detail work pauses in 2D mode and resumes in 3D', async ({ page })
   await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(false));
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics().active === false);
 
-  // Allow any scheduler tick that was already in flight at the mode switch to finish,
-  // then verify the expensive update counter remains frozen while 2D stays active.
   await page.waitForTimeout(120);
   const settledPause = await page.evaluate(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics());
   await page.waitForTimeout(160);
@@ -64,6 +65,7 @@ test('3D unit detail work pauses in 2D mode and resumes in 3D', async ({ page })
 
   expect(paused.active).toBe(false);
   expect(paused.updates).toBe(settledPause.updates);
+  expect(paused.transformBuilds).toBe(settledPause.transformBuilds);
   expect(paused.skippedInactive).toBeGreaterThan(settledPause.skippedInactive);
 
   await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
@@ -71,4 +73,5 @@ test('3D unit detail work pauses in 2D mode and resumes in 3D', async ({ page })
   const resumed = await page.evaluate(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics());
   expect(resumed.active).toBe(true);
   expect(resumed.updates).toBeGreaterThan(settledPause.updates);
+  expect(resumed.transformBuilds).toBeGreaterThan(settledPause.transformBuilds);
 });
