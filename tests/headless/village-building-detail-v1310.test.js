@@ -10,6 +10,7 @@ const read = relative => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 
 const moduleSource = read('src/systems/rendering/battlefield-3d-village-buildings-v1.mjs');
 const html = read('index.html');
+const packageVersion = JSON.parse(read('package.json')).version;
 
 test('v1.3.10 village detail remains render-only and preserves simulation identity', () => {
   assert.match(moduleSource, /contract: 'render-only-building-detail-v1'/);
@@ -36,5 +37,5 @@ test('v1.3.10 building detail loads after the base 3D renderer', () => {
   const detail = html.indexOf('battlefield-3d-village-buildings-v1.mjs?build=1310a');
   assert.ok(base >= 0, 'base 3D renderer is wired');
   assert.ok(detail > base, 'detail module loads after the base renderer');
-  assert.match(html, /Napoleonic RTS v1\.3\.10/);
+  assert.match(html, new RegExp(`Napoleonic RTS v${packageVersion.replace(/\./g, '\\.')}`));
 });
