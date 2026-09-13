@@ -110,8 +110,15 @@ test('AI Commander tracks urgent base threats and keeps a reserve during a three
     for(const u of units){if(u.side==='britain'&&u.type!=='worker'){u.morale=100;u.hp=u.maxHp;}}
 
     const tc=livingBuildings('britain').find(b=>b.type==='towncenter'&&b.complete);
-    const french=units.find(u=>u.side==='france'&&u.type!=='worker');
-    french.x=tc.x-220; french.y=tc.y; french.targetX=french.x; french.targetY=french.y;
+    const frenchRegimentId=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',tc.x-220,tc.y);
+    const frenchRegiment=getRegiment(frenchRegimentId);
+    const frenchMembers=regimentMembers(frenchRegiment);
+    frenchMembers.forEach((u,i)=>{
+      u.x=tc.x-220-(i%4)*4;
+      u.y=tc.y+(Math.floor(i/4)-1)*8;
+      u.targetX=u.x;
+      u.targetY=u.y;
+    });
     const threat=window.__AI_COMMANDER_V1__.nearestThreat();
 
     eval('elapsed=90');
@@ -119,13 +126,19 @@ test('AI Commander tracks urgent base threats and keeps a reserve during a three
     window.__AI_COMMANDER_V1__.tick();
     const defended=window.__AI_COMMANDER_V1__.state();
 
-    for(const u of units){if(u.side==='france'&&u.type!=='worker'){u.x=120;u.y=120;u.targetX=120;u.targetY=120;u.morale=30;}}
+    for(const u of units){
+      if(u.side==='france'&&u.type!=='worker'){
+        u.x=120;u.y=120;u.targetX=120;u.targetY=120;
+        u.morale=30;
+      }
+    }
+    frenchMembers.forEach(u=>{u.morale=20;u.hp=Math.max(1,u.maxHp*.45);});
     window.__AI_COMMANDER_V1__.forceState('ATTACK');
     window.__AI_COMMANDER_V1__.tick();
     const attacked=window.__AI_COMMANDER_V1__.state();
     const target=window.__AI_COMMANDER_V1__.strategicTarget();
     v05PeaceMode=true;
-    return {threat,defended,attacked,target,british};
+    return {threat,defended,attacked,target,british,frenchRegimentId};
   });
 
   expect(result.threat.distance).toBeLessThan(300);
@@ -135,5 +148,7 @@ test('AI Commander tracks urgent base threats and keeps a reserve during a three
   expect(result.attacked.reserveRegimentId).toBeTruthy();
   expect(result.british).toContain(result.attacked.reserveRegimentId);
   expect(result.target.kind).toBe('regiment');
+  expect(result.target.id).toBe(result.frenchRegimentId);
   expect(typeof result.target.condition).toBe('number');
+  expect(result.target.condition).toBeLessThan(0.6);
 });
