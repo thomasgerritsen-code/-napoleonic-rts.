@@ -30,7 +30,12 @@ test('stuck recovery does not restart a battalion while it is forming its march 
     TYPES.drummer.speed = 0;
 
     orderGroupPathV06(reg, start.x + 900, start.y + 260, 'line', 0);
-    const initialPhase = reg.marchV063?.phase;
+    // This regression targets stuck-recovery ownership, not route-planner phase selection.
+    // Force the public march state into the protected transition so the assertion stays
+    // deterministic if the planner legitimately chooses a field-moving route here.
+    reg.marchV063 = reg.marchV063 || {};
+    reg.marchV063.phase = 'forming-column';
+    const initialPhase = reg.marchV063.phase;
     for (let i = 0; i < 58; i++) window.RTS_SIM.step(.05);
 
     TYPES.infantry.speed = oldInf;
