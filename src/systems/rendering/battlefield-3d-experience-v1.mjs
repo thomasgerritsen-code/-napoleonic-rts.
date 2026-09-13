@@ -76,7 +76,7 @@ if (!api || !canvas || !modeButton) {
 
   document.documentElement.dataset.renderMode = api.enabled() ? '3d' : '2d';
 
-  import('./battlefield-3d-unit-detail-v1.mjs?build=graphics5').catch(error => {
+  import('./battlefield-3d-unit-detail-v1.mjs?build=graphics6').catch(error => {
     console.warn('3D unit detail layer failed to load', error);
   });
 }
