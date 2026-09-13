@@ -21,19 +21,16 @@ if (!api || !canvas || !modeButton) {
     }
   }
 
-  // 1) Preserve the player's chosen render mode between reloads.
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === '2d') setMode(false, { persist: false, status: false });
     else if (stored === '3d') setMode(true, { persist: false, status: false });
   } catch (_) {}
 
-  // Keep persistence in sync when the existing renderer button is used.
   modeButton.addEventListener('click', () => {
     queueMicrotask(() => setMode(api.enabled(), { persist: true, status: false }));
   });
 
-  // 2) Keyboard render-mode toggle for fast tactical switching.
   window.addEventListener('keydown', event => {
     if (!(event.altKey && event.code === 'Digit3')) return;
     if (event.repeat) return;
@@ -42,7 +39,6 @@ if (!api || !canvas || !modeButton) {
   });
   modeButton.title = `${modeButton.title} · Alt+3 wisselt direct`;
 
-  // 3) Graceful 2D fallback when WebGL context is lost.
   canvas.addEventListener('webglcontextlost', event => {
     event.preventDefault();
     fallbackReason = 'WebGL-context verloren; veilig teruggeschakeld naar 2D.';
@@ -53,7 +49,6 @@ if (!api || !canvas || !modeButton) {
     window.NRTS_3D_SOURCE?.setStatus?.('WebGL-context hersteld. 3D kan opnieuw worden ingeschakeld.');
   });
 
-  // 4) Automatically reduce GPU pressure when the tab is not visible.
   let resume3d = false;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
@@ -68,7 +63,6 @@ if (!api || !canvas || !modeButton) {
     }
   });
 
-  // 5) Lightweight live diagnostics available to tests/debug tooling.
   window.__BATTLEFIELD_3D_EXPERIENCE_V1__ = Object.freeze({
     version: 'battlefield-3d-experience-v1',
     shortcut: 'Alt+3',
@@ -82,7 +76,7 @@ if (!api || !canvas || !modeButton) {
 
   document.documentElement.dataset.renderMode = api.enabled() ? '3d' : '2d';
 
-  import('./battlefield-3d-unit-detail-v1.mjs?build=graphics4').catch(error => {
+  import('./battlefield-3d-unit-detail-v1.mjs?build=graphics5').catch(error => {
     console.warn('3D unit detail layer failed to load', error);
   });
 }
