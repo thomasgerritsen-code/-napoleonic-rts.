@@ -14,6 +14,7 @@ test('3D bridge exposes archetype metadata and resilient experience controls', a
     return {
       bridgeVersion: window.__BATTLEFIELD_3D_BRIDGE_V1__.version,
       villageMetadata: window.__BATTLEFIELD_3D_BRIDGE_V1__.villageMetadata,
+      villageIdentityCompanion: window.__BATTLEFIELD_3D_BRIDGE_V1__.villageIdentityCompanion,
       archetypes,
       houseMetadata,
       experienceVersion: exp.version,
@@ -25,8 +26,9 @@ test('3D bridge exposes archetype metadata and resilient experience controls', a
     };
   });
 
-  expect(state.bridgeVersion).toBe('battlefield-3d-bridge-v1.3.6');
+  expect(state.bridgeVersion).toBe('battlefield-3d-bridge-v1.3.7');
   expect(state.villageMetadata).toBe('archetype-zone-cluster-role');
+  expect(state.villageIdentityCompanion).toBe(true);
   expect(state.archetypes.length).toBeGreaterThanOrEqual(4);
   expect(state.houseMetadata).toBe(true);
   expect(state.experienceVersion).toBe('battlefield-3d-experience-v1');
