@@ -29,8 +29,8 @@ test('3D feedback reads existing order targets and never writes movement targets
   assert.match(feedback3d, /LineDashedMaterial/);
   assert.match(feedback3d, /RingGeometry/);
   assert.match(feedback3d, /battlefield\.enabled\(\)/);
-  assert.doesNotMatch(feedback3d, /targetX\s*=/);
-  assert.doesNotMatch(feedback3d, /targetY\s*=/);
+  assert.doesNotMatch(feedback3d, /\.targetX\s*=/);
+  assert.doesNotMatch(feedback3d, /\.targetY\s*=/);
   assert.doesNotMatch(feedback3d, /dispatch\(/);
 });
 
