@@ -11,6 +11,8 @@ if (!source || !sceneHook) {
   const hills = staticWorld.hills || [];
   const MAX_INSTANCES = 1400;
   const UPDATE_INTERVAL_MS = 50;
+  const FAR_UPDATE_INTERVAL_MS = 100;
+  const FAR_LOD_CAMERA_Y = 900;
   const detailGroup = new THREE.Group();
   detailGroup.name = 'napoleonic-unit-details-v1';
 
@@ -26,6 +28,8 @@ if (!source || !sceneHook) {
   const diagnostics = {
     updates: 0,
     skippedInactive: 0,
+    lodTransitions: 0,
+    lodMode: 'near',
     lastUpdateAt: 0
   };
 
@@ -87,6 +91,16 @@ if (!source || !sceneHook) {
     artilleryWheelR: instancedMesh((() => { const g = new THREE.CylinderGeometry(3.7, 3.7, 0.9, 12); g.rotateZ(Math.PI / 2); g.translate(5.4, 3.1, 0); return g; })(), 0x5a402b, 0.96)
   };
 
+  const fineDetailMeshes = [
+    meshes.infantryHead,
+    meshes.infantryShako,
+    meshes.infantryMusket,
+    meshes.officerHead,
+    meshes.officerBicorne,
+    meshes.cavalryHead,
+    meshes.cavalryShako
+  ];
+
   function setInstance(mesh, index, unit, selected, colorize = false) {
     const y = hillHeightAt(unit.x, unit.y);
     tempPosition.set(unit.x, y, unit.y);
@@ -110,8 +124,24 @@ if (!source || !sceneHook) {
     return !renderApi?.enabled || renderApi.enabled();
   }
 
+  function farLodActive() {
+    const camera = sceneHook.camera?.();
+    return Boolean(camera && camera.position.y >= FAR_LOD_CAMERA_Y);
+  }
+
+  function applyLodVisibility(farLod) {
+    const nextMode = farLod ? 'far' : 'near';
+    if (diagnostics.lodMode !== nextMode) {
+      diagnostics.lodMode = nextMode;
+      diagnostics.lodTransitions++;
+    }
+    for (const mesh of fineDetailMeshes) mesh.visible = !farLod;
+  }
+
   function updateDetails() {
     const snapshot = source.snapshot();
+    const farLod = farLodActive();
+    applyLodVisibility(farLod);
     selectedUnitIds.clear();
     for (const id of snapshot.selection?.unitIds || []) selectedUnitIds.add(id);
     let infantry = 0;
@@ -133,8 +163,10 @@ if (!source || !sceneHook) {
       if (unit.type === 'cavalry') {
         if (cavalry >= MAX_INSTANCES) continue;
         setInstance(meshes.cavalryRider, cavalry, unit, isSelected, true);
-        setInstance(meshes.cavalryHead, cavalry, unit, false);
-        setInstance(meshes.cavalryShako, cavalry, unit, false);
+        if (!farLod) {
+          setInstance(meshes.cavalryHead, cavalry, unit, false);
+          setInstance(meshes.cavalryShako, cavalry, unit, false);
+        }
         setInstance(meshes.cavalryHorseNeck, cavalry, unit, false);
         cavalry++;
         continue;
@@ -142,30 +174,40 @@ if (!source || !sceneHook) {
       if (unit.type === 'officer') {
         if (officers >= MAX_INSTANCES) continue;
         setInstance(meshes.officerTorso, officers, unit, isSelected, true);
-        setInstance(meshes.officerHead, officers, unit, false);
-        setInstance(meshes.officerBicorne, officers, unit, false);
+        if (!farLod) {
+          setInstance(meshes.officerHead, officers, unit, false);
+          setInstance(meshes.officerBicorne, officers, unit, false);
+        }
         officers++;
         continue;
       }
       if (unit.type === 'worker') continue;
       if (infantry >= MAX_INSTANCES) continue;
       setInstance(meshes.infantryTorso, infantry, unit, isSelected, true);
-      setInstance(meshes.infantryHead, infantry, unit, false);
-      setInstance(meshes.infantryShako, infantry, unit, false);
-      setInstance(meshes.infantryMusket, infantry, unit, false);
+      if (!farLod) {
+        setInstance(meshes.infantryHead, infantry, unit, false);
+        setInstance(meshes.infantryShako, infantry, unit, false);
+        setInstance(meshes.infantryMusket, infantry, unit, false);
+      }
       infantry++;
     }
 
     finish(meshes.infantryTorso, infantry);
-    finish(meshes.infantryHead, infantry);
-    finish(meshes.infantryShako, infantry);
-    finish(meshes.infantryMusket, infantry);
+    if (!farLod) {
+      finish(meshes.infantryHead, infantry);
+      finish(meshes.infantryShako, infantry);
+      finish(meshes.infantryMusket, infantry);
+    }
     finish(meshes.officerTorso, officers);
-    finish(meshes.officerHead, officers);
-    finish(meshes.officerBicorne, officers);
+    if (!farLod) {
+      finish(meshes.officerHead, officers);
+      finish(meshes.officerBicorne, officers);
+    }
     finish(meshes.cavalryRider, cavalry);
-    finish(meshes.cavalryHead, cavalry);
-    finish(meshes.cavalryShako, cavalry);
+    if (!farLod) {
+      finish(meshes.cavalryHead, cavalry);
+      finish(meshes.cavalryShako, cavalry);
+    }
     finish(meshes.cavalryHorseNeck, cavalry);
     finish(meshes.artilleryBarrel, artillery);
     finish(meshes.artilleryWheelL, artillery);
@@ -186,7 +228,7 @@ if (!source || !sceneHook) {
       detailGroup.visible = active;
       if (active) updateDetails();
       else diagnostics.skippedInactive++;
-      setTimeout(tick, UPDATE_INTERVAL_MS);
+      setTimeout(tick, active && farLodActive() ? FAR_UPDATE_INTERVAL_MS : UPDATE_INTERVAL_MS);
     }
     tick();
   }
@@ -194,11 +236,13 @@ if (!source || !sceneHook) {
   window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__ = Object.freeze({
     version: 'battlefield-3d-unit-detail-v1',
     updateIntervalMs: UPDATE_INTERVAL_MS,
+    farUpdateIntervalMs: FAR_UPDATE_INTERVAL_MS,
+    farLodCameraY: FAR_LOD_CAMERA_Y,
     maxInstances: MAX_INSTANCES,
     layerCount: Object.keys(meshes).length,
     visualRoles: ['infantry', 'officer', 'cavalry', 'artillery'],
     performanceModel: 'shared-instanced-low-poly-detail',
-    scheduler: 'fixed-interval-active-3d-only',
+    scheduler: 'adaptive-active-3d-lod',
     diagnostics: () => ({ ...diagnostics, active: active3dRendering() })
   });
 
