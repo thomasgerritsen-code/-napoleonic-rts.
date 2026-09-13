@@ -68,9 +68,7 @@ if (!hook || !feedback || !battlefield) {
   function terrainHeight(x, z) {
     const scene = hook.scene?.();
     if (!scene) return 2;
-    if (!terrainObject || terrainObject.parent !== scene) {
-      terrainObject = scene.getObjectByName('battlefield-terrain') || null;
-    }
+    if (!terrainObject) terrainObject = scene.getObjectByName('battlefield-terrain') || null;
     if (!terrainObject) return 2;
     terrainRayOrigin.set(x, 2000, z);
     terrainRaycaster.set(terrainRayOrigin, terrainRayDirection);
