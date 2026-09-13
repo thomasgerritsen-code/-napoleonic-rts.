@@ -1,4 +1,14 @@
 'use strict';
+const HUD_REFRESH_INTERVAL = 0.10;
+let hudRefreshAccumulator = 0;
+
+function isWorldVisible(x, y, padding = 0) {
+  const halfW = innerWidth / (2 * camera.zoom);
+  const halfH = innerHeight / (2 * camera.zoom);
+  return x >= camera.x - halfW - padding && x <= camera.x + halfW + padding &&
+    y >= camera.y - halfH - padding && y <= camera.y + halfH + padding;
+}
+
 // ---------- Victory ----------
   function checkVictory() {
     if (gameOver) return;
@@ -44,7 +54,12 @@
     if (keys.has('a') || keys.has('arrowleft')) camera.x -= speed * dt;
     if (keys.has('d') || keys.has('arrowright')) camera.x += speed * dt;
     clampCamera();
-    updateHud();
+
+    hudRefreshAccumulator += dt;
+    if (hudRefreshAccumulator >= HUD_REFRESH_INTERVAL) {
+      hudRefreshAccumulator %= HUD_REFRESH_INTERVAL;
+      updateHud();
+    }
   }
 
   // ---------- Drawing ----------
@@ -57,7 +72,7 @@
   }
 
   function drawResource(r) {
-    if (r.dead) return;
+    if (r.dead || !isWorldVisible(r.x, r.y, 28)) return;
     const ratio = r.amount / r.maxAmount;
     if (r.type === 'wood') {
       ctx.fillStyle = '#553b28'; ctx.fillRect(r.x - 3, r.y + 3, 6, 13);
@@ -73,7 +88,7 @@
   }
 
   function drawBuilding(b) {
-    if (b.dead) return;
+    if (b.dead || !isWorldVisible(b.x, b.y, Math.max(b.w, b.h) * 0.65 + 18)) return;
     const side = b.side === 'france' ? COLORS.france : COLORS.britain;
     ctx.save(); ctx.translate(b.x, b.y); ctx.globalAlpha = b.complete ? 1 : 0.65;
     ctx.fillStyle = '#594936'; ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
@@ -101,7 +116,7 @@
   }
 
   function drawUnit(u) {
-    if (u.dead) return;
+    if (u.dead || !isWorldVisible(u.x, u.y, 30)) return;
     const t = TYPES[u.type];
     const base = u.side === 'france' ? COLORS.france : COLORS.britain;
     const light = u.side === 'france' ? COLORS.franceLight : COLORS.britainLight;
@@ -154,6 +169,7 @@
       const members = regimentMembers(reg);
       if (!members.length) continue;
       const c = centroid(members);
+      if (!isWorldVisible(c.x, c.y, 70)) continue;
       ctx.fillStyle = 'rgba(20,20,15,.72)';
       ctx.fillRect(c.x - 48, c.y - 40, 96, 16);
       ctx.fillStyle = COLORS.regiment;
@@ -165,12 +181,14 @@
   }
 
   function drawProjectile(p) {
+    if (!isWorldVisible(p.x, p.y, 8)) return;
     ctx.fillStyle = p.artillery ? '#202020' : '#f0dfaa';
     ctx.beginPath(); ctx.arc(p.x, p.y, p.artillery ? 3.2 : 1.8, 0, Math.PI * 2); ctx.fill();
   }
 
   function drawParticles() {
     for (const p of particles) {
+      if (!isWorldVisible(p.x, p.y, p.size + 4)) continue;
       ctx.globalAlpha = Math.max(0, p.life / p.maxLife); ctx.fillStyle = COLORS.smoke;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
     }
