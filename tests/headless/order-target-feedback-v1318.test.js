@@ -8,7 +8,6 @@ const feedback = fs.readFileSync(path.join(root, 'src', 'systems', 'rendering', 
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const version = fs.readFileSync(path.join(root, 'src', 'foundation', 'version.js'), 'utf8');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const escapedPackageVersion = pkg.version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('selected movement orders expose battlefield target markers without changing movement authority', () => {
   assert.match(feedback, /function regimentOrderTargets\(\)/);
@@ -36,7 +35,7 @@ test('order feedback loads after the base 2D renderer and release identity is co
   const feedbackIndex = index.indexOf('src/systems/rendering/order-target-feedback-v1.js?build=1319a');
   assert.ok(baseIndex >= 0, 'base renderer script should exist');
   assert.ok(feedbackIndex > baseIndex, 'feedback wrapper should load after the base renderer');
-  assert.match(index, new RegExp(`Napoleonic RTS v${escapedPackageVersion}`));
-  assert.match(index, new RegExp(`<span class="version">v${escapedPackageVersion}<\\/span>`));
-  assert.match(version, new RegExp(`const VERSION = '${escapedPackageVersion}'`));
+  assert.ok(index.includes(`Napoleonic RTS v${pkg.version}`));
+  assert.ok(index.includes(`<span class="version">v${pkg.version}</span>`));
+  assert.ok(version.includes(`const VERSION = '${pkg.version}'`));
 });
