@@ -32,7 +32,7 @@ test('order markers remain screen-readable and safe across zoom levels', () => {
 
 test('order feedback loads after the base 2D renderer and release identity is consistent', () => {
   const baseIndex = index.indexOf('src/simulation-render.js');
-  const feedbackIndex = index.indexOf('src/systems/rendering/order-target-feedback-v1.js?build=1319a');
+  const feedbackIndex = index.indexOf('src/systems/rendering/order-target-feedback-v1.js');
   assert.ok(baseIndex >= 0, 'base renderer script should exist');
   assert.ok(feedbackIndex > baseIndex, 'feedback wrapper should load after the base renderer');
   assert.ok(index.includes(`Napoleonic RTS v${pkg.version}`));
