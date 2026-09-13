@@ -76,11 +76,20 @@
     return { moving: distance > 42, distance };
   }
 
+  function regimentReformLabel(reg) {
+    const reform = reg?.postCrossingReformV1322;
+    if (!reform) return null;
+    const progress = Math.max(0, Math.min(100, Math.round((Number(reform.progress) || 0) * 100)));
+    const cohesion = Math.max(0, Math.min(100, Math.round((Number(reform.readiness) || 0) * 100)));
+    return `hergroepeert ${progress}% · cohesie ${cohesion}%`;
+  }
+
   function regimentOrderLabel(reg) {
     const order = regimentOrderState(reg);
     const formation = formationLabel(reg.formation || 'line');
-    if (!order.moving) return `${formation} · positie ingenomen`;
-    return `${formation} · marcheert · ${Math.max(1, Math.round(order.distance))} m te gaan`;
+    const reform = regimentReformLabel(reg);
+    if (!order.moving) return `${formation} · ${reform || 'positie ingenomen'}`;
+    return `${formation} · ${reform ? `${reform} · ` : ''}marcheert · ${Math.max(1, Math.round(order.distance))} m te gaan`;
   }
 
   function selectionRegimentSummary() {
@@ -93,9 +102,11 @@
     }
     if (regs.length > 1) {
       const moving = regs.filter(reg => regimentOrderState(reg).moving).length;
+      const reforming = regs.filter(reg => reg?.postCrossingReformV1322).length;
       const formations = [...new Set(regs.map(reg => formationLabel(reg.formation || 'line')))];
       const formationText = formations.length === 1 ? formations[0] : 'gemengde formaties';
-      return `${regs.length} regimenten geselecteerd · ${formationText} · ${moving ? `${moving} marcheert` : 'positie ingenomen'}`;
+      const reformText = reforming ? ` · ${reforming} hergroepeert` : '';
+      return `${regs.length} regimenten geselecteerd · ${formationText}${reformText} · ${moving ? `${moving} marcheert` : 'positie ingenomen'}`;
     }
     return null;
   }

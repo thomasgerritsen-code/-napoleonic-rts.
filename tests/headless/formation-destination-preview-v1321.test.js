@@ -6,8 +6,6 @@ const fs = require('node:fs');
 const index = fs.readFileSync('index.html', 'utf8');
 const feedback2d = fs.readFileSync('src/systems/rendering/order-target-feedback-v1.js', 'utf8');
 const feedback3d = fs.readFileSync('src/systems/rendering/battlefield-3d-order-feedback-v1.mjs', 'utf8');
-const version = fs.readFileSync('src/foundation/version.js', 'utf8');
-const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 
 test('regiment order targets expose a footprint derived from production formation offsets', () => {
   assert.match(feedback2d, /regimentRoleOffsets\(reg, reg\.formation\)/);
@@ -34,11 +32,7 @@ test('3D battlefield mirrors the same landing zone without movement authority', 
   assert.doesNotMatch(feedback3d, /\.targetY\s*=/);
 });
 
-test('release identity and cache keys are consistently v1.3.21', () => {
-  assert.equal(pkg.version, '1.3.21');
-  assert.match(version, /VERSION = '1\.3\.21'/);
-  assert.match(index, /Napoleonic RTS v1\.3\.21/);
-  assert.match(index, /class="version">v1\.3\.21/);
+test('formation destination preview keeps its own 2D and 3D cache keys', () => {
   assert.match(index, /order-target-feedback-v1\.js\?build=1321a/);
   assert.match(index, /battlefield-3d-order-feedback-v1\.mjs\?build=1321a/);
 });

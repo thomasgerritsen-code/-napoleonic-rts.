@@ -53,6 +53,7 @@
     if(reason==='new-order')stats.orderOverrides++;
     else stats.completed++;
     if(reg?.postCrossingReformV1322)reg.postCrossingReformV1322=null;
+    if(reg?.id!=null)states.delete(reg.id);
   }
   function explicitOrderAfterBegin(reg,state){
     const stamp=Number(reg?.formationTrafficOrderedAtV132)||0;
