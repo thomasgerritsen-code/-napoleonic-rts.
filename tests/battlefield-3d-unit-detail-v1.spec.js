@@ -2,7 +2,10 @@ const { test, expect } = require('@playwright/test');
 
 test('3D battlefield loads lightweight Napoleonic unit detail silhouettes', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__ && window.__NRTS_THREE_SCENE_HOOK_V1__?.scene?.());
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__ && window.__NRTS_THREE_SCENE_HOOK_V1__?.scene?.() && window.__BATTLEFIELD_3D_V1__);
+
+  await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics().transformBuilds > 0);
 
   const state = await page.evaluate(() => {
     const api = window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__;
