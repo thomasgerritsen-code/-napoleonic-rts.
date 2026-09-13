@@ -59,7 +59,9 @@
     actionsEl.querySelectorAll('[data-formation]').forEach(btn => {
       const regs = selectedRegiments();
       const selectedMode = regs.length === 1 ? regs[0].formation : currentFormation;
-      btn.classList.toggle('active', btn.dataset.formation === selectedMode);
+      const active = btn.dataset.formation === selectedMode;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
     actionsEl.querySelectorAll('[data-action^="build-"]').forEach(btn => btn.classList.toggle('active', btn.dataset.action === `build-${buildMode}`));
   }
@@ -98,6 +100,11 @@
     return null;
   }
 
+  function setSelectionDetails(text) {
+    selectionDetailsEl.textContent = text;
+    selectionDetailsEl.title = text;
+  }
+
   function updateHud(forceActions = false) {
     for (const u of [...selectedUnits]) if (u.dead) selectedUnits.delete(u);
     if (selectedBuilding?.dead) selectedBuilding = null;
@@ -118,28 +125,28 @@
     if (selectedBuilding) {
       const b = selectedBuilding;
       selectionTitleEl.textContent = BUILDINGS[b.type].label;
-      if (!b.complete) selectionDetailsEl.textContent = `In aanbouw · ${Math.floor(b.construction * 100)}%`;
-      else if (b.queue.length) selectionDetailsEl.textContent = `Productie: ${b.queue[0].label} · ${Math.floor(b.production * 100)}% · queue ${b.queue.length}`;
-      else selectionDetailsEl.textContent = `${Math.max(0, Math.floor(b.hp))}/${b.maxHp} HP`;
+      if (!b.complete) setSelectionDetails(`In aanbouw · ${Math.floor(b.construction * 100)}%`);
+      else if (b.queue.length) setSelectionDetails(`Productie: ${b.queue[0].label} · ${Math.floor(b.production * 100)}% · queue ${b.queue.length}`);
+      else setSelectionDetails(`${Math.max(0, Math.floor(b.hp))}/${b.maxHp} HP`);
     } else if (selectedUnits.size) {
       const group = [...selectedUnits];
       const regSummary = selectionRegimentSummary();
       if (regSummary) {
         selectionTitleEl.textContent = selectedRegiments().length === 1 ? selectedRegiments()[0].name : `${selectedRegiments().length} regimenten`;
-        selectionDetailsEl.textContent = regSummary;
+        setSelectionDetails(regSummary);
       } else {
         const workers = group.filter(u => u.type === 'worker').length;
         const inf = group.filter(u => u.type === 'infantry').length;
         const off = group.filter(u => u.type === 'officer').length;
         const drum = group.filter(u => u.type === 'drummer').length;
         selectionTitleEl.textContent = group.length === 1 ? TYPES[group[0].type].label : `${group.length} eenheden`;
-        selectionDetailsEl.textContent = workers
+        setSelectionDetails(workers
           ? `${workers} boeren · rechtsklik op grondstof om te verzamelen`
-          : `Losse troepen · musketiers ${inf} · officier ${off} · drummer ${drum}`;
+          : `Losse troepen · musketiers ${inf} · officier ${off} · drummer ${drum}`);
       }
     } else {
       selectionTitleEl.textContent = 'Niets geselecteerd';
-      selectionDetailsEl.textContent = 'Voor regiment: 12 musketiers + 1 officier + 1 drummer selecteren.';
+      setSelectionDetails('Voor regiment: 12 musketiers + 1 officier + 1 drummer selecteren.');
     }
 
     renderDynamicActions(forceActions);
