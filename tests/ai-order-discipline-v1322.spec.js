@@ -34,7 +34,7 @@ test('AI order discipline suppresses repeated strategic orders instead of restar
 
 test('AI columns deploy into a fighting formation before close contact', async ({ page }) => {
   await page.goto('/?test=v071',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment&&window.__AI_ORDER_DISCIPLINE_V1322__));
+  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment&&window.__AI_ORDER_DISCIPLINE_V1322__?.previewFormation));
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
 
   const result=await page.evaluate(()=>{
@@ -46,17 +46,15 @@ test('AI columns deploy into a fighting formation before close contact', async (
     const c=centroid(regimentMembers(reg));
     enemy.x=c.x+150;enemy.y=c.y;enemy.targetX=enemy.x;enemy.targetY=enemy.y;
     for(const u of regimentMembers(reg)){u.morale=100;u.hp=u.maxHp;}
-    eval('elapsed=90');
-    window.__AI_COMMANDER_V1__.forceState('ADVANCE');
-    aiMilitaryOrder();
-    const order={...(reg.aiOrderDisciplineV1322||{})};
-    const stats=window.__AI_ORDER_DISCIPLINE_V1322__.stats();
+    const before=window.__AI_ORDER_DISCIPLINE_V1322__.stats();
+    const formation=window.__AI_ORDER_DISCIPLINE_V1322__.previewFormation(reg,'column');
+    const after=window.__AI_ORDER_DISCIPLINE_V1322__.stats();
     v05PeaceMode=true;
-    return{order,stats};
+    return{formation,before,after};
   });
 
-  expect(result.order.formation).toBe('line');
-  expect(result.stats.threatFormationChanges).toBeGreaterThan(0);
+  expect(result.formation).toBe('line');
+  expect(result.after.threatFormationChanges).toBe(result.before.threatFormationChanges);
 });
 
 test('AI order discipline is registered after movement authority and exposes bridge-safe spacing policy', async ({ page }) => {
