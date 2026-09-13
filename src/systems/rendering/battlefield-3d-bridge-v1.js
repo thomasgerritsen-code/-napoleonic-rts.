@@ -1,5 +1,5 @@
 'use strict';
-// ---------- v1.3.8: lightweight renderer-neutral bridge for the 3D battlefield ----------
+// ---------- v1.3.22: lightweight renderer-neutral bridge for the 3D battlefield ----------
 (function installBattlefield3DBridge(global) {
   const nrts = global.NRTS;
   if (!nrts) throw new Error('NRTS runtime must load before the 3D renderer bridge.');
@@ -113,14 +113,19 @@
 
   function cloneResources() {
     if (typeof resources === 'undefined') return [];
-    return resources.filter(resource => !resource.dead).map(resource => ({
-      id: resource.id,
-      type: resource.type,
-      x: resource.x,
-      y: resource.y,
-      amount: resource.amount,
-      radius: resource.radius
-    }));
+    const liveResources = [];
+    for (const resource of resources) {
+      if (resource.dead) continue;
+      liveResources.push({
+        id: resource.id,
+        type: resource.type,
+        x: resource.x,
+        y: resource.y,
+        amount: resource.amount,
+        radius: resource.radius
+      });
+    }
+    return liveResources;
   }
 
   function getStaticWorld() {
@@ -134,11 +139,26 @@
   }
 
   function getRenderState() {
-    const liveUnits = typeof units === 'undefined' ? [] : units.filter(unit => !unit.dead);
-    const liveBuildings = typeof buildings === 'undefined' ? [] : buildings.filter(building => !building.dead);
-    const selectionIds = typeof selectedUnits === 'undefined'
-      ? []
-      : [...selectedUnits].filter(unit => !unit.dead).map(unit => unit.id);
+    const liveUnits = [];
+    const liveBuildings = [];
+    const selectionIds = [];
+
+    if (typeof units !== 'undefined') {
+      for (const unit of units) {
+        if (!unit.dead) liveUnits.push(unit);
+      }
+    }
+    if (typeof buildings !== 'undefined') {
+      for (const building of buildings) {
+        if (!building.dead) liveBuildings.push(building);
+      }
+    }
+    if (typeof selectedUnits !== 'undefined') {
+      for (const unit of selectedUnits) {
+        if (!unit.dead) selectionIds.push(unit.id);
+      }
+    }
+
     return {
       elapsed: typeof elapsed === 'number' ? elapsed : 0,
       units: liveUnits,
@@ -151,8 +171,9 @@
   }
 
   const api = Object.freeze({
-    version: 'battlefield-3d-bridge-v1.3.8',
+    version: 'battlefield-3d-bridge-v1.3.22',
     snapshotMode: 'lightweight-live-render-state',
+    snapshotAllocationMode: 'single-pass-live-collections',
     villageMetadata: 'archetype-zone-cluster-role-render-only',
     villageIdentityCompanion: true,
     villageScenery: 'archetype-render-only-silhouette-v1',
@@ -175,7 +196,7 @@
   nrts.subsystems.register('battlefield-3d-bridge-v1', api, {
     phase: 'rendering-v3',
     legacyBridge: false,
-    responsibility: 'expose lightweight live simulation state plus archetype-aware village metadata and render-only scenery to the WebGL battlefield renderer'
+    responsibility: 'expose allocation-conscious lightweight live simulation state plus archetype-aware village metadata and render-only scenery to the WebGL battlefield renderer'
   });
 
   let attempts = 0;
