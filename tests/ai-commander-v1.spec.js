@@ -8,18 +8,9 @@ test('AI Commander progresses through mass, advance, attack and flank while prod
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
 
   const result=await page.evaluate(()=>{
-    // The normal battle can finish while the page is settling in CI. This regression owns its
-    // command-state fixture, so make that fixture explicitly active before exercising the AI.
     gameOver=false;
     messageEl.classList.add('hidden');
-
-    // v0.5 peace mode wraps aiMilitaryOrder and intentionally drops every military order.
-    // The browser remains frozen while this synchronous evaluate runs, so temporarily bypass
-    // that wrapper for these explicit Commander ticks only.
     v05PeaceMode=false;
-
-    // This regression exercises the command-state lifecycle, not threat detection. Keep the
-    // strategic safety inputs deterministic while leaving the production system untouched.
     for(const u of units){
       if(u.side==='france' && u.type!=='worker'){
         u.x=120; u.y=120; u.targetX=120; u.targetY=120;
@@ -28,8 +19,6 @@ test('AI Commander progresses through mass, advance, attack and flank while prod
     window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,720);
     window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,900);
     window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,1080);
-    // Ensure the lifecycle test starts from a force ratio that is deliberately above the
-    // retreat threshold; retreat behavior has its own dedicated regression below.
     for(const u of units){
       if(u.side==='britain' && u.type!=='worker'){u.morale=100;u.hp=u.maxHp;}
       if(u.side==='france' && u.type!=='worker'){u.morale=35;}
@@ -72,6 +61,7 @@ test('AI Commander progresses through mass, advance, attack and flank while prod
   expect(result.diag?.meta?.legacyBridge).toBe(false);
   expect(result.state.wave).toBeGreaterThanOrEqual(1);
   expect(result.state.target).toBeTruthy();
+  expect(result.state.reserveRegimentId).toBeTruthy();
   expect(result.britishGroups).toBeGreaterThanOrEqual(2);
   expect(result.productionStillExists).toBe(true);
   expect(errors).toEqual([]);
@@ -82,7 +72,6 @@ test('AI Commander retreats on collapsed morale instead of blindly attacking', a
   await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment && window.__AI_COMMANDER_V1__));
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
   const state=await page.evaluate(()=>{
-    // Keep this fixture independent from the lifecycle of the background battle.
     gameOver=false;
     messageEl.classList.add('hidden');
     v05PeaceMode=false;
@@ -91,7 +80,6 @@ test('AI Commander retreats on collapsed morale instead of blindly attacking', a
     const reg=getRegiment(id);
     for(const u of regimentMembers(reg))u.morale=22;
     reg.morale=22;
-    // Keep this regression focused on morale collapse rather than base-threat priority.
     for(const u of units){if(u.side==='france'&&u.type!=='worker'){u.x=120;u.y=120;u.targetX=120;u.targetY=120;}}
     eval('elapsed=70');
     window.__AI_COMMANDER_V1__.forceState('ATTACK');
@@ -102,4 +90,50 @@ test('AI Commander retreats on collapsed morale instead of blindly attacking', a
   });
   expect(state.state).toBe('RETREAT');
   expect(state.retreatUntil).toBeGreaterThan(70);
+  expect(state.reserveRegimentId).toBeNull();
+});
+
+test('AI Commander tracks urgent base threats and keeps a reserve during a three-regiment attack', async ({ page }) => {
+  await page.goto('/?test=v071',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment && window.__AI_COMMANDER_V1__));
+  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
+
+  const result=await page.evaluate(()=>{
+    gameOver=false;
+    messageEl.classList.add('hidden');
+    v05PeaceMode=false;
+
+    const british=[];
+    british.push(window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,720));
+    british.push(window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,900));
+    british.push(window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,1080));
+    for(const u of units){if(u.side==='britain'&&u.type!=='worker'){u.morale=100;u.hp=u.maxHp;}}
+
+    const tc=livingBuildings('britain').find(b=>b.type==='towncenter'&&b.complete);
+    const french=units.find(u=>u.side==='france'&&u.type!=='worker');
+    french.x=tc.x-220; french.y=tc.y; french.targetX=french.x; french.targetY=french.y;
+    const threat=window.__AI_COMMANDER_V1__.nearestThreat();
+
+    eval('elapsed=90');
+    window.__AI_COMMANDER_V1__.forceState('ATTACK');
+    window.__AI_COMMANDER_V1__.tick();
+    const defended=window.__AI_COMMANDER_V1__.state();
+
+    for(const u of units){if(u.side==='france'&&u.type!=='worker'){u.x=120;u.y=120;u.targetX=120;u.targetY=120;u.morale=30;}}
+    window.__AI_COMMANDER_V1__.forceState('ATTACK');
+    window.__AI_COMMANDER_V1__.tick();
+    const attacked=window.__AI_COMMANDER_V1__.state();
+    const target=window.__AI_COMMANDER_V1__.strategicTarget();
+    v05PeaceMode=true;
+    return {threat,defended,attacked,target,british};
+  });
+
+  expect(result.threat.distance).toBeLessThan(300);
+  expect(result.defended.state).toBe('DEFEND');
+  expect(result.defended.threatDistance).toBeLessThan(300);
+  expect(result.attacked.state).toBe('ATTACK');
+  expect(result.attacked.reserveRegimentId).toBeTruthy();
+  expect(result.british).toContain(result.attacked.reserveRegimentId);
+  expect(result.target.kind).toBe('regiment');
+  expect(typeof result.target.condition).toBe('number');
 });
