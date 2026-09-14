@@ -15,7 +15,9 @@ test('3D battlefield loads lightweight Napoleonic unit detail silhouettes', asyn
       version: api.version,
       updateIntervalMs: api.updateIntervalMs,
       farUpdateIntervalMs: api.farUpdateIntervalMs,
+      ultraFarUpdateIntervalMs: api.ultraFarUpdateIntervalMs,
       farLodCameraY: api.farLodCameraY,
+      ultraFarLodCameraY: api.ultraFarLodCameraY,
       maxInstances: api.maxInstances,
       layerCount: api.layerCount,
       visualRoles: api.visualRoles,
@@ -32,7 +34,10 @@ test('3D battlefield loads lightweight Napoleonic unit detail silhouettes', asyn
   expect(state.version).toBe('battlefield-3d-unit-detail-v1');
   expect(state.updateIntervalMs).toBeGreaterThanOrEqual(40);
   expect(state.farUpdateIntervalMs).toBeGreaterThan(state.updateIntervalMs);
+  expect(state.ultraFarUpdateIntervalMs).toBeGreaterThan(state.farUpdateIntervalMs);
   expect(state.farLodCameraY).toBeGreaterThan(700);
+  expect(state.ultraFarLodCameraY).toBeGreaterThan(state.farLodCameraY);
+  expect(state.ultraFarLodCameraY).toBeLessThanOrEqual(1230);
   expect(state.maxInstances).toBeGreaterThanOrEqual(1000);
   expect(state.layerCount).toBeGreaterThanOrEqual(20);
   expect(state.visualRoles).toEqual(expect.arrayContaining(['infantry', 'officer', 'cavalry', 'artillery']));
@@ -44,8 +49,8 @@ test('3D battlefield loads lightweight Napoleonic unit detail silhouettes', asyn
   ]));
   expect(state.performanceModel).toBe('shared-instanced-low-poly-detail');
   expect(state.transformReuse).toBe('one-world-matrix-per-unit-update');
-  expect(state.scheduler).toBe('adaptive-active-3d-lod');
-  expect(['near', 'far']).toContain(state.diagnostics.lodMode);
+  expect(state.scheduler).toBe('adaptive-active-3d-tiered-lod');
+  expect(['near', 'far', 'ultra-far']).toContain(state.diagnostics.lodMode);
   expect(state.diagnostics.transformBuilds).toBeGreaterThan(0);
   expect(state.attached).toBe(true);
   expect(state.childCount).toBe(state.layerCount);
@@ -77,4 +82,53 @@ test('3D unit detail work pauses in 2D mode and resumes in 3D', async ({ page })
   expect(resumed.active).toBe(true);
   expect(resumed.updates).toBeGreaterThan(settledPause.updates);
   expect(resumed.transformBuilds).toBeGreaterThan(settledPause.transformBuilds);
+});
+
+test('ultra-far tactical zoom suspends the optional 3D detail layer', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__ && window.__BATTLEFIELD_3D_V1__ && window.__NRTS_THREE_SCENE_HOOK_V1__?.scene?.());
+  await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics().transformBuilds > 0);
+
+  const canvas = page.locator('#battlefield3d');
+  for (let i = 0; i < 8; i++) await canvas.dispatchEvent('wheel', { deltaY: 120 });
+
+  await page.waitForFunction(() => {
+    const api = window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__;
+    const diagnostics = api.diagnostics();
+    return diagnostics.cameraY >= api.ultraFarLodCameraY && diagnostics.lodMode === 'ultra-far' && diagnostics.skippedUltraFar > 0;
+  });
+
+  await page.waitForTimeout(240);
+  const settled = await page.evaluate(() => {
+    const api = window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__;
+    const group = window.__NRTS_THREE_SCENE_HOOK_V1__.scene().getObjectByName('napoleonic-unit-details-v1');
+    return { diagnostics: api.diagnostics(), visible: group.visible };
+  });
+  await page.waitForTimeout(260);
+  const suspended = await page.evaluate(() => {
+    const api = window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__;
+    const group = window.__NRTS_THREE_SCENE_HOOK_V1__.scene().getObjectByName('napoleonic-unit-details-v1');
+    return { diagnostics: api.diagnostics(), visible: group.visible };
+  });
+
+  expect(suspended.visible).toBe(false);
+  expect(suspended.diagnostics.lodMode).toBe('ultra-far');
+  expect(suspended.diagnostics.updates).toBe(settled.diagnostics.updates);
+  expect(suspended.diagnostics.transformBuilds).toBe(settled.diagnostics.transformBuilds);
+  expect(suspended.diagnostics.skippedUltraFar).toBeGreaterThan(settled.diagnostics.skippedUltraFar);
+
+  for (let i = 0; i < 8; i++) await canvas.dispatchEvent('wheel', { deltaY: -120 });
+  await page.waitForFunction(previous => {
+    const diagnostics = window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics();
+    return diagnostics.lodMode === 'near' && diagnostics.transformBuilds > previous;
+  }, suspended.diagnostics.transformBuilds);
+
+  const resumed = await page.evaluate(() => {
+    const group = window.__NRTS_THREE_SCENE_HOOK_V1__.scene().getObjectByName('napoleonic-unit-details-v1');
+    return { diagnostics: window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics(), visible: group.visible };
+  });
+  expect(resumed.visible).toBe(true);
+  expect(resumed.diagnostics.lodMode).toBe('near');
+  expect(resumed.diagnostics.transformBuilds).toBeGreaterThan(suspended.diagnostics.transformBuilds);
 });
