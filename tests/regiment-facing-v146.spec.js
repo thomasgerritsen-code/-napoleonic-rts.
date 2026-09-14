@@ -89,13 +89,15 @@ test('regiment movement keeps destination slots inside world bounds', async ({ p
       minX: Math.min(...members.map(u => u.targetX)),
       minY: Math.min(...members.map(u => u.targetY)),
       maxX: Math.max(...members.map(u => u.targetX)),
-      maxY: Math.max(...members.map(u => u.targetY))
+      maxY: Math.max(...members.map(u => u.targetY)),
+      worldWidth: WORLD.width,
+      worldHeight: WORLD.height
     };
   });
 
   expect(result.minX).toBeGreaterThanOrEqual(20);
   expect(result.minY).toBeGreaterThanOrEqual(20);
-  expect(result.maxX).toBeLessThanOrEqual(3180);
-  expect(result.maxY).toBeLessThanOrEqual(1780);
+  expect(result.maxX).toBeLessThanOrEqual(result.worldWidth - 20);
+  expect(result.maxY).toBeLessThanOrEqual(result.worldHeight - 20);
   expect(errors).toEqual([]);
 });
