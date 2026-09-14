@@ -53,7 +53,14 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
 .selection-panel { display: flex; flex-direction: column; min-width: 0; }
 .selection-panel .label { text-transform: uppercase; letter-spacing: .09em; opacity: .55; font-size: .63rem; }
 .selection-panel strong { font-size: .95rem; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#selectionDetails { font-size: .72rem; opacity: .76; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#selectionDetails {
+  font-size: .72rem; opacity: .76; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color .12s ease, opacity .12s ease;
+}
+#selectionDetails[data-tactical-state="steady"] { color: #dcebd6; opacity: .88; }
+#selectionDetails[data-tactical-state="moving"] { color: #dce8f6; opacity: .90; }
+#selectionDetails[data-tactical-state="reforming"] { color: #f0dda0; opacity: .94; }
+#selectionDetails[data-tactical-state="pressured"] { color: #ffc0b7; opacity: 1; font-weight: 650; }
 .actions { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .actions button { min-width: 78px; min-height: 49px; padding: 6px 8px; font-size: .75rem; }
 .army-counts { display: flex; justify-content: flex-end; gap: 9px; font-size: .82rem; flex-wrap: wrap; }
@@ -68,6 +75,9 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
   font-weight: 800; letter-spacing: .05em; text-shadow: 0 4px 20px #000; pointer-events: none;
 }
 .hidden { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  #selectionDetails { transition: none; }
+}
 @media (max-width: 860px) {
   .topbar { grid-template-columns: 1fr auto auto; gap: 7px 8px; }
   .resources { grid-column: 1 / -1; grid-row: 2; overflow-x: auto; }
