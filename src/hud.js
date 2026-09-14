@@ -95,6 +95,8 @@
       if (u.routing) routing++;
     }
     return {
+      hp,
+      maxHp,
       strength: maxHp ? Math.max(0, Math.min(100, Math.round((hp / maxHp) * 100))) : 0,
       morale: Math.max(0, Math.min(100, Math.round(Number(reg?.morale) || 0))),
       routing,
@@ -103,18 +105,27 @@
   }
 
   function selectionTacticalState(regs = selectedRegiments()) {
-    if (!regs.length) return { state: 'neutral', strength: 0, morale: 0, routing: 0 };
+    if (!regs.length) return { state: 'neutral', strength: 0, morale: 0, routing: 0, reforming: 0, moving: 0, pressureReasons: [] };
     const metrics = regs.map(regimentTacticalMetrics);
-    const strength = Math.round(metrics.reduce((sum, m) => sum + m.strength, 0) / metrics.length);
-    const morale = Math.round(metrics.reduce((sum, m) => sum + m.morale, 0) / metrics.length);
+    const totalHp = metrics.reduce((sum, m) => sum + m.hp, 0);
+    const totalMaxHp = metrics.reduce((sum, m) => sum + m.maxHp, 0);
+    const totalMembers = metrics.reduce((sum, m) => sum + m.members, 0);
+    const strength = totalMaxHp ? Math.round((totalHp / totalMaxHp) * 100) : 0;
+    const morale = totalMembers
+      ? Math.round(metrics.reduce((sum, m) => sum + (m.morale * m.members), 0) / totalMembers)
+      : Math.round(metrics.reduce((sum, m) => sum + m.morale, 0) / metrics.length);
     const routing = metrics.reduce((sum, m) => sum + m.routing, 0);
     const reforming = regs.filter(reg => reg?.postCrossingReformV1322).length;
     const moving = regs.filter(reg => regimentOrderState(reg).moving).length;
+    const pressureReasons = [];
+    if (strength < 55) pressureReasons.push('lage sterkte');
+    if (morale < 45) pressureReasons.push('lage morale');
+    if (routing) pressureReasons.push(`${routing} op de vlucht`);
     let state = 'steady';
-    if (routing || morale < 45 || strength < 55) state = 'pressured';
+    if (pressureReasons.length) state = 'pressured';
     else if (reforming) state = 'reforming';
     else if (moving) state = 'moving';
-    return { state, strength, morale, routing, reforming, moving };
+    return { state, strength, morale, routing, reforming, moving, pressureReasons };
   }
 
   function regimentReformLabel(reg) {
@@ -133,14 +144,18 @@
     return `${formation} · ${reform ? `${reform} · ` : ''}marcheert · ${Math.max(1, Math.round(order.distance))} m te gaan`;
   }
 
-  function selectionRegimentSummaryV144(regs = selectedRegiments()) {
-    const tactical = selectionTacticalState(regs);
+  function pressureSummary(tactical) {
+    return tactical.state === 'pressured' && tactical.pressureReasons.length
+      ? ` · onder druk (${tactical.pressureReasons.join(', ')})`
+      : '';
+  }
+
+  function selectionRegimentSummaryV144(regs = selectedRegiments(), tactical = selectionTacticalState(regs)) {
     if (regs.length === 1) {
-      const reg = regs[0], members = regimentMembers(reg);
+      const reg = regs[0], members = regimentMembers(reg).filter(u => !u.dead);
       const officerAlive = members.some(u => u.id === reg.officerId);
       const drummerAlive = members.some(u => u.id === reg.drummerId);
-      const warning = tactical.state === 'pressured' ? ' · onder druk' : '';
-      return `${reg.name} · ${members.filter(u => u.type === 'infantry').length} musketiers · O:${officerAlive ? '✓' : '✗'} D:${drummerAlive ? '✓' : '✗'} · sterkte ${tactical.strength}% · morale ${Math.round(reg.morale)}%${warning} · ${regimentOrderLabel(reg)}`;
+      return `${reg.name} · ${members.filter(u => u.type === 'infantry').length} musketiers · O:${officerAlive ? '✓' : '✗'} D:${drummerAlive ? '✓' : '✗'} · sterkte ${tactical.strength}% · morale ${tactical.morale}%${pressureSummary(tactical)} · ${regimentOrderLabel(reg)}`;
     }
     if (regs.length > 1) {
       const moving = tactical.moving;
@@ -148,8 +163,7 @@
       const formations = [...new Set(regs.map(reg => formationLabel(reg.formation || 'line')))];
       const formationText = formations.length === 1 ? formations[0] : 'gemengde formaties';
       const reformText = reforming ? ` · ${reforming} hergroepeert` : '';
-      const pressureText = tactical.state === 'pressured' ? ' · onder druk' : '';
-      return `${regs.length} regimenten geselecteerd · ${formationText} · sterkte ${tactical.strength}% · morale ${tactical.morale}%${pressureText}${reformText} · ${moving ? `${moving} marcheert` : 'positie ingenomen'}`;
+      return `${regs.length} regimenten geselecteerd · ${formationText} · sterkte ${tactical.strength}% · morale ${tactical.morale}%${pressureSummary(tactical)}${reformText} · ${moving ? `${moving} marcheert` : 'positie ingenomen'}`;
     }
     return null;
   }
@@ -193,9 +207,9 @@
       else setSelectionDetails(`${Math.max(0, Math.floor(b.hp))}/${b.maxHp} HP`);
     } else if (selectedUnits.size) {
       const group = [...selectedUnits];
-      const regSummary = selectionRegimentSummaryV144(selectedRegs);
+      const tactical = selectedRegs.length ? selectionTacticalState(selectedRegs) : null;
+      const regSummary = tactical ? selectionRegimentSummaryV144(selectedRegs, tactical) : null;
       if (regSummary) {
-        const tactical = selectionTacticalState(selectedRegs);
         setHudText(selectionTitleEl, selectedRegs.length === 1 ? selectedRegs[0].name : `${selectedRegs.length} regimenten`);
         setSelectionDetails(regSummary, tactical.state);
       } else {
