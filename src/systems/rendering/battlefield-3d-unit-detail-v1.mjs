@@ -14,7 +14,7 @@ if (!source || !sceneHook) {
   const FAR_UPDATE_INTERVAL_MS = 100;
   const ULTRA_FAR_UPDATE_INTERVAL_MS = 200;
   const FAR_LOD_CAMERA_Y = 900;
-  const ULTRA_FAR_LOD_CAMERA_Y = 1450;
+  const ULTRA_FAR_LOD_CAMERA_Y = 1120;
   const detailGroup = new THREE.Group();
   detailGroup.name = 'napoleonic-unit-details-v1';
 
@@ -129,9 +129,15 @@ if (!source || !sceneHook) {
     return !renderApi?.enabled || renderApi.enabled();
   }
 
+  function currentCameraY() {
+    const cameraY = sceneHook.camera?.()?.position?.y;
+    if (Number.isFinite(cameraY)) return cameraY;
+    const cameraDistance = renderApi?.diagnostics?.().cameraDistance;
+    return Number.isFinite(cameraDistance) ? cameraDistance * 0.82 : 0;
+  }
+
   function currentLodMode() {
-    const camera = sceneHook.camera?.();
-    const cameraY = camera?.position?.y ?? 0;
+    const cameraY = currentCameraY();
     if (cameraY >= ULTRA_FAR_LOD_CAMERA_Y) return 'ultra-far';
     if (cameraY >= FAR_LOD_CAMERA_Y) return 'far';
     return 'near';
@@ -263,7 +269,7 @@ if (!source || !sceneHook) {
     performanceModel: 'shared-instanced-low-poly-detail',
     transformReuse: 'one-world-matrix-per-unit-update',
     scheduler: 'adaptive-active-3d-tiered-lod',
-    diagnostics: () => ({ ...diagnostics, active: active3dRendering() })
+    diagnostics: () => ({ ...diagnostics, active: active3dRendering(), cameraY: currentCameraY() })
   });
 
   attachWhenReady();
