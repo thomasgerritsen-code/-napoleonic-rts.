@@ -2,3 +2,17 @@ node_modules/
 playwright-report/
 test-results/
 blob-report/
+
+# Unity native prototype generated state
+unity/NapoleonicRTS/[Ll]ibrary/
+unity/NapoleonicRTS/[Tt]emp/
+unity/NapoleonicRTS/[Oo]bj/
+unity/NapoleonicRTS/[Bb]uild/
+unity/NapoleonicRTS/[Bb]uilds/
+unity/NapoleonicRTS/[Ll]ogs/
+unity/NapoleonicRTS/UserSettings/
+unity/NapoleonicRTS/MemoryCaptures/
+unity/NapoleonicRTS/.vs/
+unity/NapoleonicRTS/.idea/
+unity/NapoleonicRTS/*.sln
+unity/NapoleonicRTS/*.csproj

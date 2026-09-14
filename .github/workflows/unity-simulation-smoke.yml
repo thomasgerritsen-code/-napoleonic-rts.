@@ -1,0 +1,30 @@
+name: Unity simulation smoke
+
+on:
+  push:
+    paths:
+      - 'unity/**'
+      - '.github/workflows/unity-simulation-smoke.yml'
+  pull_request:
+    paths:
+      - 'unity/**'
+      - '.github/workflows/unity-simulation-smoke.yml'
+
+jobs:
+  simulation-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Compile Unity runtime C# surface
+        run: dotnet run --project unity/NapoleonicRTS/Tools/RuntimeCompileSmoke/RuntimeCompileSmoke.csproj --configuration Release
+      - name: Run native simulation smoke test
+        run: dotnet run --project unity/NapoleonicRTS/Tools/SimulationSmoke/SimulationSmoke.csproj --configuration Release
+      - name: Run browser-parity gameplay smoke test
+        run: dotnet run --project unity/NapoleonicRTS/Tools/ParitySmoke/ParitySmoke.csproj --configuration Release
+      - name: Run 10,000-unit native scale benchmark
+        run: dotnet run --project unity/NapoleonicRTS/Tools/SimulationScale/SimulationScale.csproj --configuration Release

@@ -1,0 +1,6 @@
+{
+  "name": "NapoleonicRTS.Runtime",
+  "rootNamespace": "NapoleonicRTS.Runtime",
+  "references": ["NapoleonicRTS.Simulation"],
+  "autoReferenced": true
+}

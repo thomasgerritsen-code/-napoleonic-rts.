@@ -1,0 +1,7 @@
+{
+  "name": "NapoleonicRTS.Editor",
+  "rootNamespace": "NapoleonicRTS.Editor",
+  "references": ["NapoleonicRTS.Runtime", "NapoleonicRTS.Simulation"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}
