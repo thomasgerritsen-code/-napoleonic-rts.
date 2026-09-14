@@ -40,6 +40,7 @@
   function point(c,along,perp=0){return typeof crossingPointV068==='function'?crossingPointV068(c,along,perp):crossingPointArchitectureV2(c,along,perp);}
   function passageHalfWidth(c){return Math.max(8,c.width*.5-5);}
   function forwardProgress(c,info,x,y){const q=local(c,x,y),direction=info?.initialSide>0?-1:1;return q.along*direction;}
+  function groupProgressPoint(reg,center){const march=reg?.marchV063;return march?.v064&&Number.isFinite(march.anchorX)&&Number.isFinite(march.anchorY)?{x:march.anchorX,y:march.anchorY}:center;}
   function safeRecoveryTarget(c,initialSide,x,y,entered=false){const q=local(c,x,y),direction=initialSide>0?-1:1,lateralLimit=passageHalfWidth(c),centered=Math.max(-lateralLimit*.45,Math.min(lateralLimit*.45,q.perp));const approachEdge=c.length*.5+20,portal=Math.max(20,c.length*.5-14);let along=q.along;if(Math.abs(q.perp)>lateralLimit){along+=direction*22;return point(c,along,0);}const progress=q.along*direction;if(!entered&&progress<-portal+3)along=direction*-portal;else if(progress<portal-3)along+=direction*34;else along=Math.max(-approachEdge,Math.min(approachEdge,along+direction*42));return point(c,along,centered);}
   function targetIsSafe(u,target){return!!target&&Number.isFinite(target.x)&&Number.isFinite(target.y)&&!waterAtV067(target.x,target.y)&&!segmentCrossesBlockedWaterV067(u.x,u.y,target.x,target.y);}
   function assignUnitRecovery(u,c,info,reason,unitOwned=false){const target=safeRecoveryTarget(c,info.initialSide,u.x,u.y,!!info.entered);if(!targetIsSafe(u,target)){const q=local(c,u.x,u.y),centered=point(c,q.along,0);if(!targetIsSafe(u,centered)){stats.unsafeRecoveryRejected++;return false;}u.riverCrossingRecoveryV1={x:centered.x,y:centered.y,crossingId:c.id,until:elapsed+recoveryDuration,reason};}else u.riverCrossingRecoveryV1={x:target.x,y:target.y,crossingId:c.id,until:elapsed+recoveryDuration,reason};u.localAvoidanceV2=null;u.arrivedAtTarget=false;stats.unitRecoveries++;if(unitOwned)stats.unitContextRecoveries++;if(reason==='blocked-target')stats.blockedTargetRecoveries++;if(c.type==='ford')stats.fordRecoveries++;else stats.bridgeRecoveries++;return true;}
@@ -47,16 +48,16 @@
   function sampleRegiment(reg,dt){
     if(!reg||reg.destroyed)return;const members=livingMembers(reg);if(!members.length)return;const center=centroid(members),groupContext=activeCrossing(reg);
     if(groupContext){
-      const{c,info}=groupContext,progress=forwardProgress(c,info,center.x,center.y);let gs=groupState.get(reg.id);
-      if(!gs||gs.crossingId!==c.id){gs={crossingId:c.id,x:center.x,y:center.y,stall:0,lastRecovery:-999,maxProgress:progress,lastProgressAt:elapsed};groupState.set(reg.id,gs);}
+      const{c,info}=groupContext,progressPoint=groupProgressPoint(reg,center),progress=forwardProgress(c,info,progressPoint.x,progressPoint.y);let gs=groupState.get(reg.id);
+      if(!gs||gs.crossingId!==c.id){gs={crossingId:c.id,x:progressPoint.x,y:progressPoint.y,stall:0,lastRecovery:-999,maxProgress:progress,lastProgressAt:elapsed};groupState.set(reg.id,gs);}
       else{
-        const moved=Math.hypot(center.x-gs.x,center.y-gs.y);gs.x=center.x;gs.y=center.y;
+        const moved=Math.hypot(progressPoint.x-gs.x,progressPoint.y-gs.y);gs.x=progressPoint.x;gs.y=progressPoint.y;
         if(progress>gs.maxProgress+axisProgressEpsilon){gs.maxProgress=progress;gs.lastProgressAt=elapsed;gs.stall=0;}
-        else{if(progress>gs.maxProgress)gs.maxProgress=progress;gs.stall=elapsed-gs.lastProgressAt;}
+        else gs.stall=elapsed-gs.lastProgressAt;
         stats.maxGroupStallSeconds=Math.max(stats.maxGroupStallSeconds,gs.stall);stats.maxAxisNoProgressSeconds=Math.max(stats.maxAxisNoProgressSeconds,gs.stall);
         const movingDemand=info.state!=='clearing'&&reg.marchV063?.v064&&((reg.path?.length||0)>0||!reg.marchV063?.arrived);
         const lateralJitterWithoutProgress=moved>movementEpsilon&&gs.stall>=groupStallSeconds;
-        if(movingDemand&&gs.stall>=groupStallSeconds&&elapsed-gs.lastRecovery>.65){if(recoverGroupAnchor(reg,c,info,'axis-stall')){gs.lastRecovery=elapsed;gs.lastProgressAt=elapsed;gs.maxProgress=forwardProgress(c,info,reg.marchV063.anchorX,reg.marchV063.anchorY);}gs.stall=0;}
+        if(movingDemand&&gs.stall>=groupStallSeconds&&elapsed-gs.lastRecovery>.65){if(recoverGroupAnchor(reg,c,info,'axis-stall')){const recoveredPoint=groupProgressPoint(reg,center);gs.lastRecovery=elapsed;gs.lastProgressAt=elapsed;gs.maxProgress=forwardProgress(c,info,recoveredPoint.x,recoveredPoint.y);gs.x=recoveredPoint.x;gs.y=recoveredPoint.y;}gs.stall=0;}
         else if(!movingDemand&&!lateralJitterWithoutProgress)gs.stall=0;
       }
     }else groupState.delete(reg.id);
@@ -72,6 +73,6 @@
   const previousMoveToward=moveToward;
   moveToward=function moveTowardWithRiverCrossingRecoveryV1(u,tx,ty,dt,speed=TYPES[u.type].speed){const r=u?.riverCrossingRecoveryV1;if(r&&elapsed<=r.until){const d=Math.hypot(u.x-r.x,u.y-r.y);if(d>5){u.arrivedAtTarget=false;return previousMoveToward(u,r.x,r.y,dt,speed);}u.riverCrossingRecoveryV1=null;}else if(r)u.riverCrossingRecoveryV1=null;return previousMoveToward(u,tx,ty,dt,speed);};
   const previousUpdate=update;update=function updateWithRiverCrossingRecoveryV1(dt){if(dt>0&&!gameOver)for(const reg of regiments)sampleRegiment(reg,dt);previousUpdate(dt);};
-  const api=Object.freeze({version:'river-crossing-recovery-v1.4',localOnly:true,preservesSelectedCrossing:true,unitRecovery:true,laggingUnitContext:true,blockedSegmentContext:true,movementDemandGuard:true,groupAnchorRecovery:true,axisProgressRecovery:true,stats:()=>({...stats,trackedUnits:unitState.size,trackedGroups:groupState.size})});global.__RIVER_CROSSING_RECOVERY_V1__=api;
-  if(global.NRTS.subsystems.has('river-crossing-recovery'))global.NRTS.services?.provide?.('river-crossing-recovery','src/systems/navigation/river-crossing-recovery-v1.js',api,{generation:27,legacyBridge:false});else global.NRTS.subsystems.register('river-crossing-recovery',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'recover stalled battalions and lagging followers locally around rivers, bridges and fords using forward-axis progress so lateral bridge-mouth jitter cannot mask a deadlock'});
+  const api=Object.freeze({version:'river-crossing-recovery-v1.5',localOnly:true,preservesSelectedCrossing:true,unitRecovery:true,laggingUnitContext:true,blockedSegmentContext:true,movementDemandGuard:true,groupAnchorRecovery:true,axisProgressRecovery:true,stats:()=>({...stats,trackedUnits:unitState.size,trackedGroups:groupState.size})});global.__RIVER_CROSSING_RECOVERY_V1__=api;
+  if(global.NRTS.subsystems.has('river-crossing-recovery'))global.NRTS.services?.provide?.('river-crossing-recovery','src/systems/navigation/river-crossing-recovery-v1.js',api,{generation:27,legacyBridge:false});else global.NRTS.subsystems.register('river-crossing-recovery',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'recover stalled battalions and lagging followers locally around rivers, bridges and fords using cumulative forward-axis anchor progress so lateral bridge-mouth jitter cannot mask a deadlock'});
 })(window);
