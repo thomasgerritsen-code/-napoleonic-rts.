@@ -69,6 +69,12 @@
     if(!last)return false;
     return Math.hypot(last.x-x,last.y-y)<=SAME_TARGET_EPS&&last.formation===formation&&angleDelta(last.facing,facing)<.14;
   }
+  function sameStrategicOrder(last,x,y,formation,facing){
+    if(!last)return false;
+    const previousX=Number.isFinite(last.requestedX)?last.requestedX:last.x;
+    const previousY=Number.isFinite(last.requestedY)?last.requestedY:last.y;
+    return Math.hypot(previousX-x,previousY-y)<=SAME_TARGET_EPS&&last.formation===formation&&angleDelta(last.facing,facing)<.14;
+  }
   function formationSeparation(reg,formation){
     const count=members(reg).length;
     const bonus=Math.min(MAX_DYNAMIC_SPACING_BONUS,Math.max(0,count-12)*1.35);
@@ -131,17 +137,26 @@
       const state=global.__AI_COMMANDER_V1__?.state?.().state;
       const last=reg.aiOrderDisciplineV1322;
       if(crossingActive(reg)&&last&&state!=='RETREAT'){
-        const changed=Math.hypot(last.x-x,last.y-y)>80;
+        const previousX=Number.isFinite(last.requestedX)?last.requestedX:last.x;
+        const previousY=Number.isFinite(last.requestedY)?last.requestedY:last.y;
+        const changed=Math.hypot(previousX-x,previousY-y)>80;
         if(changed){stats.crossingProtected++;stats.suppressed++;return false;}
       }
       const chosenFormation=tacticalFormation(reg,formation);
       const separation=formationSeparation(reg,chosenFormation);
-      const p=deconflict(reg,x,y,chosenFormation);
       const age=Math.max(0,now()-(last?.at??-Infinity));
-      if(age<ORDER_TTL&&sameOrder(last,p.x,p.y,chosenFormation,finalFacing)){
-        stats.suppressed++;acceptedThisTick.push({regId:reg.id,x:last.x,y:last.y,separation});return false;
+      if(age<ORDER_TTL&&sameStrategicOrder(last,x,y,chosenFormation,finalFacing)){
+        stats.suppressed++;
+        acceptedThisTick.push({regId:reg.id,x:last.x,y:last.y,separation:last.separation||separation});
+        return false;
       }
-      reg.aiOrderDisciplineV1322={x:p.x,y:p.y,formation:chosenFormation,facing:finalFacing,at:now(),separation};
+      const p=deconflict(reg,x,y,chosenFormation);
+      if(age<ORDER_TTL&&sameOrder(last,p.x,p.y,chosenFormation,finalFacing)){
+        stats.suppressed++;
+        acceptedThisTick.push({regId:reg.id,x:last.x,y:last.y,separation:last.separation||separation});
+        return false;
+      }
+      reg.aiOrderDisciplineV1322={x:p.x,y:p.y,requestedX:x,requestedY:y,formation:chosenFormation,facing:finalFacing,at:now(),separation};
       acceptedThisTick.push({regId:reg.id,x:p.x,y:p.y,separation});
       return previousOrderGroupPath(reg,p.x,p.y,chosenFormation,finalFacing);
     };
