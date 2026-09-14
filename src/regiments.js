@@ -66,7 +66,7 @@
     };
     members.forEach(u => { u.regimentId = reg.id; u.morale = Math.max(u.morale, 90); });
     regiments.push(reg);
-    arrangeRegiment(reg, reg.targetX, reg.targetY, 'line', reg.facing);
+    arrangeFacingRegimentV146(reg, reg.targetX, reg.targetY, 'line', reg.facing);
     return reg;
   }
 
@@ -126,7 +126,7 @@
     return result;
   }
 
-  function arrangeRegiment(reg, x, y, mode = reg.formation || 'line', facing = reg.facing ?? -Math.PI / 2) {
+  function arrangeFacingRegimentV146(reg, x, y, mode = reg.formation || 'line', facing = reg.facing ?? -Math.PI / 2) {
     if (!reg || reg.destroyed) return;
     reg.formation = mode;
     reg.facing = normalizeFacing(facing);
@@ -139,6 +139,12 @@
       u.targetX = Math.max(20, Math.min(WORLD.width - 20, x + o.ox));
       u.targetY = Math.max(20, Math.min(WORLD.height - 20, y + o.oy));
     }
+  }
+
+  // Keep the established global API for legacy callers, while all v146 movement paths
+  // use the version-bound helper above so later legacy scripts cannot replace its behavior.
+  function arrangeRegiment(reg, x, y, mode = reg.formation || 'line', facing = reg.facing ?? -Math.PI / 2) {
+    return arrangeFacingRegimentV146(reg, x, y, mode, facing);
   }
 
   function selectedRegiments() {
@@ -175,7 +181,7 @@
     if (regs.length) {
       for (const reg of regs) {
         const c = centroid(regimentMembers(reg));
-        arrangeRegiment(reg, c.x, c.y, mode, reg.facing);
+        arrangeFacingRegimentV146(reg, c.x, c.y, mode, reg.facing);
       }
       statusEl.textContent = `${formationLabel(mode)} toegepast op ${regs.length} regiment${regs.length > 1 ? 'en' : ''}.`;
     } else {
@@ -212,7 +218,7 @@
       const spacing = Math.max(...regs.map(regimentMoveSpacing));
       regs.forEach((reg, i) => {
         const lateral = (i - (regs.length - 1) / 2) * spacing;
-        arrangeRegiment(reg, x + perpX * lateral, y + perpY * lateral, reg.formation, facing);
+        arrangeFacingRegimentV146(reg, x + perpX * lateral, y + perpY * lateral, reg.formation, facing);
       });
     }
 
