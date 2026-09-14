@@ -23,7 +23,7 @@ test('AI command cohesion suppresses duplicate regiment intent and registers dia
   expect(result.stats.issued).toBeGreaterThanOrEqual(1);
   expect(result.stats.suppressed).toBeGreaterThanOrEqual(1);
   expect(result.stats.cachedOrders).toBeGreaterThanOrEqual(1);
-  expect(result.diag?.meta?.phase).toBe('gameplay-v140');
+  expect(result.diag?.meta?.phase).toBe('gameplay-v141');
   expect(errors).toEqual([]);
 });
 
@@ -105,4 +105,29 @@ test('AI chooses the less congested flank from actual enemy deployment', async (
   expect(result.pressure?.samples).toBeGreaterThanOrEqual(2);
   expect(result.pressure.right).toBeGreaterThan(result.pressure.left);
   expect(result.flankSide).toBe(-1);
+});
+
+test('AI cohesion prunes stale cached orders without a background interval', async ({ page }) => {
+  await page.goto('/?test=v071',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment && window.__AI_COHESION_V140__));
+  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
+
+  const result=await page.evaluate(()=>{
+    gameOver=false;
+    const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2300,880);
+    const reg=getRegiment(id);
+    window.__AI_COHESION_V140__.resetOrderCache();
+    eval('elapsed=200');
+    aiOrderReg(reg,{x:2050,y:880},'line',0);
+    const before=window.__AI_COHESION_V140__.stats();
+    eval('elapsed=260');
+    window.__AI_COHESION_V140__.cleanupOrderCache(true);
+    const after=window.__AI_COHESION_V140__.stats();
+    return {before,after};
+  });
+
+  expect(result.before.cachedOrders).toBeGreaterThanOrEqual(1);
+  expect(result.after.cachedOrders).toBe(0);
+  expect(result.after.cleanupRuns).toBeGreaterThan(result.before.cleanupRuns);
+  expect(result.after.staleOrdersPruned).toBeGreaterThan(result.before.staleOrdersPruned);
 });
