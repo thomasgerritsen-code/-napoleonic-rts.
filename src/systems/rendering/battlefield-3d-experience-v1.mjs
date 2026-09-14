@@ -7,13 +7,24 @@ if (!api || !canvas || !modeButton) {
   console.warn('3D experience layer skipped: renderer API not ready.');
 } else {
   const STORAGE_KEY = 'nrts-render-mode';
-  const VISUAL_BUILD = 'graphics15';
+  const VISUAL_BUILD = 'graphics16';
+  const FRAME_SAMPLE_ALPHA = 0.12;
+  const FRAME_PRESSURE_ENTER_MS = 23;
+  const FRAME_PRESSURE_EXIT_MS = 19;
+  const FRAME_PRESSURE_HOLD_MS = 900;
   let fallbackReason = '';
   let visualLayersImportStarted = false;
   let visualLayersReady = 0;
   let visualLayersFailed = 0;
   let deferredBatches = 0;
   let deferredWaits = 0;
+  let framePressureWaits = 0;
+  let framePressureTransitions = 0;
+  let framePressure = false;
+  let framePressureUntil = 0;
+  let averageFrameMs = 16.7;
+  let lastFrameAt = 0;
+  let frameMonitorRaf = 0;
 
   const essentialVisualLayers = [
     ['./battlefield-3d-unit-detail-v1.mjs', '3D unit detail layer'],
@@ -27,6 +38,49 @@ if (!api || !canvas || !modeButton) {
     ['./battlefield-3d-regimental-identity-v1.mjs', '3D regimental identity layer']
   ];
 
+  function setFramePressure(next, now = performance.now()) {
+    if (framePressure === next) return;
+    framePressure = next;
+    framePressureTransitions++;
+    if (next) framePressureUntil = Math.max(framePressureUntil, now + FRAME_PRESSURE_HOLD_MS);
+    document.documentElement.dataset.graphicsPressure = next ? 'reduced' : 'normal';
+  }
+
+  function sampleFrame(now) {
+    frameMonitorRaf = 0;
+    if (!api.enabled() || document.hidden) {
+      lastFrameAt = 0;
+      return;
+    }
+    if (lastFrameAt > 0) {
+      const delta = Math.min(100, Math.max(0, now - lastFrameAt));
+      averageFrameMs += (delta - averageFrameMs) * FRAME_SAMPLE_ALPHA;
+      if (averageFrameMs >= FRAME_PRESSURE_ENTER_MS) {
+        framePressureUntil = now + FRAME_PRESSURE_HOLD_MS;
+        setFramePressure(true, now);
+      } else if (framePressure && now >= framePressureUntil && averageFrameMs <= FRAME_PRESSURE_EXIT_MS) {
+        setFramePressure(false, now);
+      }
+    }
+    lastFrameAt = now;
+    frameMonitorRaf = requestAnimationFrame(sampleFrame);
+  }
+
+  function startFrameMonitor() {
+    if (frameMonitorRaf || !api.enabled() || document.hidden) return;
+    lastFrameAt = 0;
+    frameMonitorRaf = requestAnimationFrame(sampleFrame);
+  }
+
+  function stopFrameMonitor() {
+    if (frameMonitorRaf) cancelAnimationFrame(frameMonitorRaf);
+    frameMonitorRaf = 0;
+    lastFrameAt = 0;
+    averageFrameMs = 16.7;
+    framePressureUntil = 0;
+    setFramePressure(false);
+  }
+
   function importVisualLayer(path, label) {
     return import(`${path}?build=${VISUAL_BUILD}`).then(() => {
       visualLayersReady++;
@@ -36,13 +90,17 @@ if (!api || !canvas || !modeButton) {
     });
   }
 
-  function scheduleDeferred(callback) {
+  function scheduleDeferred(callback, extraDelay = 0) {
     deferredBatches++;
+    const run = () => {
+      if (extraDelay > 0) setTimeout(callback, extraDelay);
+      else callback();
+    };
     if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(callback, { timeout: 220 });
+      window.requestIdleCallback(run, { timeout: framePressure ? 420 : 220 });
       return;
     }
-    requestAnimationFrame(() => setTimeout(callback, 0));
+    requestAnimationFrame(() => setTimeout(run, framePressure ? 48 : 0));
   }
 
   function importCosmeticLayers(index = 0) {
@@ -52,9 +110,14 @@ if (!api || !canvas || !modeButton) {
       setTimeout(() => importCosmeticLayers(index), 180);
       return;
     }
+    if (framePressure) {
+      framePressureWaits++;
+      setTimeout(() => importCosmeticLayers(index), 240);
+      return;
+    }
     const [path, label] = cosmeticVisualLayers[index];
     importVisualLayer(path, label).finally(() => {
-      scheduleDeferred(() => importCosmeticLayers(index + 1));
+      scheduleDeferred(() => importCosmeticLayers(index + 1), 18);
     });
   }
 
@@ -70,8 +133,9 @@ if (!api || !canvas || !modeButton) {
       return;
     }
     visualLayersImportStarted = true;
+    startFrameMonitor();
     Promise.all(essentialVisualLayers.map(([path, label]) => importVisualLayer(path, label)))
-      .finally(() => scheduleDeferred(() => importCosmeticLayers(0)));
+      .finally(() => scheduleDeferred(() => importCosmeticLayers(0), 18));
   }
 
   function setMode(enabled, { persist = true, status = true } = {}) {
@@ -84,7 +148,12 @@ if (!api || !canvas || !modeButton) {
       const label = enabled ? '3D-weergave actief.' : '2D-weergave actief.';
       window.NRTS_3D_SOURCE?.setStatus?.(fallbackReason ? `${label} ${fallbackReason}` : label);
     }
-    if (enabled) importVisualLayersWhenReady();
+    if (enabled) {
+      startFrameMonitor();
+      importVisualLayersWhenReady();
+    } else {
+      stopFrameMonitor();
+    }
   }
 
   try {
@@ -119,6 +188,7 @@ if (!api || !canvas || !modeButton) {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       resume3d = api.enabled();
+      stopFrameMonitor();
       if (resume3d) api.setEnabled(false);
       return;
     }
@@ -126,6 +196,7 @@ if (!api || !canvas || !modeButton) {
       api.setEnabled(true);
       document.documentElement.dataset.renderMode = '3d';
       resume3d = false;
+      startFrameMonitor();
       importVisualLayersWhenReady();
     }
   });
@@ -138,6 +209,7 @@ if (!api || !canvas || !modeButton) {
     hiddenTabSuspension: true,
     visualBuild: VISUAL_BUILD,
     stagedVisualLoading: true,
+    adaptiveFrameBudget: true,
     mode: () => api.enabled() ? '3d' : '2d',
     fallbackReason: () => fallbackReason,
     diagnostics: () => ({
@@ -147,10 +219,17 @@ if (!api || !canvas || !modeButton) {
       visualLayersFailed,
       visualLayerCount: essentialVisualLayers.length + cosmeticVisualLayers.length,
       deferredBatches,
-      deferredWaits
+      deferredWaits,
+      framePressure,
+      framePressureWaits,
+      framePressureTransitions,
+      averageFrameMs: Math.round(averageFrameMs * 10) / 10,
+      frameMonitorActive: Boolean(frameMonitorRaf)
     })
   });
 
   document.documentElement.dataset.renderMode = api.enabled() ? '3d' : '2d';
+  document.documentElement.dataset.graphicsPressure = 'normal';
+  if (api.enabled()) startFrameMonitor();
   importVisualLayersWhenReady();
 }
