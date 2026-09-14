@@ -84,17 +84,20 @@ if (!api || !canvas || !modeButton) {
       return;
     }
     visualLayersImportStarted = true;
-    import('./battlefield-3d-unit-detail-v1.mjs?build=graphics11').catch(error => {
+    import('./battlefield-3d-unit-detail-v1.mjs?build=graphics12').catch(error => {
       console.warn('3D unit detail layer failed to load', error);
     });
-    import('./battlefield-3d-selection-feedback-v1.mjs?build=graphics11').catch(error => {
+    import('./battlefield-3d-selection-feedback-v1.mjs?build=graphics12').catch(error => {
       console.warn('3D selection feedback layer failed to load', error);
     });
-    import('./battlefield-3d-combat-feedback-v1.mjs?build=graphics11').catch(error => {
+    import('./battlefield-3d-combat-feedback-v1.mjs?build=graphics12').catch(error => {
       console.warn('3D combat feedback layer failed to load', error);
     });
-    import('./battlefield-3d-salvo-polish-v1.mjs?build=graphics11').catch(error => {
+    import('./battlefield-3d-salvo-polish-v1.mjs?build=graphics12').catch(error => {
       console.warn('3D salvo polish layer failed to load', error);
+    });
+    import('./battlefield-3d-volley-readability-v1.mjs?build=graphics12').catch(error => {
+      console.warn('3D volley readability layer failed to load', error);
     });
   }
   importVisualLayersWhenReady();
