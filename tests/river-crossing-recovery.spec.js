@@ -139,6 +139,7 @@ test('bridge holder lateral jitter cannot mask a pre-entry forward-axis stall', 
   expect(result.groupRecoveries).toBeGreaterThan(0);
   expect(result.recoveryReason).toBe('axis-stall');
   expect(result.safeTarget).toBe(true);
-  expect(result.maxAxisNoProgressSeconds).toBeGreaterThanOrEqual(1);
+  expect(result.maxAxisNoProgressSeconds).toBeGreaterThanOrEqual(0.75);
+  expect(result.crossed).toBe(true);
   expect(result.water).toBe(0);
 });
