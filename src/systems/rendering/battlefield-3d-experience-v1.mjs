@@ -7,7 +7,71 @@ if (!api || !canvas || !modeButton) {
   console.warn('3D experience layer skipped: renderer API not ready.');
 } else {
   const STORAGE_KEY = 'nrts-render-mode';
+  const VISUAL_BUILD = 'graphics14';
   let fallbackReason = '';
+  let visualLayersImportStarted = false;
+  let visualLayersReady = 0;
+  let visualLayersFailed = 0;
+  let deferredBatches = 0;
+  let deferredWaits = 0;
+
+  const essentialVisualLayers = [
+    ['./battlefield-3d-unit-detail-v1.mjs', '3D unit detail layer'],
+    ['./battlefield-3d-selection-feedback-v1.mjs', '3D selection feedback layer']
+  ];
+  const cosmeticVisualLayers = [
+    ['./battlefield-3d-combat-feedback-v1.mjs', '3D combat feedback layer'],
+    ['./battlefield-3d-salvo-polish-v1.mjs', '3D salvo polish layer'],
+    ['./battlefield-3d-volley-readability-v1.mjs', '3D volley readability layer'],
+    ['./battlefield-3d-regiment-polish-v1.mjs', '3D regiment polish layer']
+  ];
+
+  function importVisualLayer(path, label) {
+    return import(`${path}?build=${VISUAL_BUILD}`).then(() => {
+      visualLayersReady++;
+    }).catch(error => {
+      visualLayersFailed++;
+      console.warn(`${label} failed to load`, error);
+    });
+  }
+
+  function scheduleDeferred(callback) {
+    deferredBatches++;
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(callback, { timeout: 220 });
+      return;
+    }
+    requestAnimationFrame(() => setTimeout(callback, 0));
+  }
+
+  function importCosmeticLayers(index = 0) {
+    if (index >= cosmeticVisualLayers.length) return;
+    if (!api.enabled() || document.hidden) {
+      deferredWaits++;
+      setTimeout(() => importCosmeticLayers(index), 180);
+      return;
+    }
+    const [path, label] = cosmeticVisualLayers[index];
+    importVisualLayer(path, label).finally(() => {
+      scheduleDeferred(() => importCosmeticLayers(index + 1));
+    });
+  }
+
+  function importVisualLayersWhenReady() {
+    if (visualLayersImportStarted) return;
+    if (!window.NRTS_3D_SOURCE || !window.__NRTS_THREE_SCENE_HOOK_V1__) {
+      requestAnimationFrame(importVisualLayersWhenReady);
+      return;
+    }
+    if (!api.enabled() || document.hidden) {
+      deferredWaits++;
+      setTimeout(importVisualLayersWhenReady, 180);
+      return;
+    }
+    visualLayersImportStarted = true;
+    Promise.all(essentialVisualLayers.map(([path, label]) => importVisualLayer(path, label)))
+      .finally(() => scheduleDeferred(() => importCosmeticLayers(0)));
+  }
 
   function setMode(enabled, { persist = true, status = true } = {}) {
     api.setEnabled(Boolean(enabled));
@@ -19,6 +83,7 @@ if (!api || !canvas || !modeButton) {
       const label = enabled ? '3D-weergave actief.' : '2D-weergave actief.';
       window.NRTS_3D_SOURCE?.setStatus?.(fallbackReason ? `${label} ${fallbackReason}` : label);
     }
+    if (enabled) importVisualLayersWhenReady();
   }
 
   try {
@@ -60,6 +125,7 @@ if (!api || !canvas || !modeButton) {
       api.setEnabled(true);
       document.documentElement.dataset.renderMode = '3d';
       resume3d = false;
+      importVisualLayersWhenReady();
     }
   });
 
@@ -69,39 +135,21 @@ if (!api || !canvas || !modeButton) {
     persistentMode: true,
     webglFallback: true,
     hiddenTabSuspension: true,
+    visualBuild: VISUAL_BUILD,
+    stagedVisualLoading: true,
     mode: () => api.enabled() ? '3d' : '2d',
     fallbackReason: () => fallbackReason,
-    diagnostics: () => api.diagnostics()
+    diagnostics: () => ({
+      ...api.diagnostics(),
+      visualLayersImportStarted,
+      visualLayersReady,
+      visualLayersFailed,
+      visualLayerCount: essentialVisualLayers.length + cosmeticVisualLayers.length,
+      deferredBatches,
+      deferredWaits
+    })
   });
 
   document.documentElement.dataset.renderMode = api.enabled() ? '3d' : '2d';
-
-  let visualLayersImportStarted = false;
-  function importVisualLayersWhenReady() {
-    if (visualLayersImportStarted) return;
-    if (!window.NRTS_3D_SOURCE || !window.__NRTS_THREE_SCENE_HOOK_V1__) {
-      requestAnimationFrame(importVisualLayersWhenReady);
-      return;
-    }
-    visualLayersImportStarted = true;
-    import('./battlefield-3d-unit-detail-v1.mjs?build=graphics13').catch(error => {
-      console.warn('3D unit detail layer failed to load', error);
-    });
-    import('./battlefield-3d-selection-feedback-v1.mjs?build=graphics13').catch(error => {
-      console.warn('3D selection feedback layer failed to load', error);
-    });
-    import('./battlefield-3d-combat-feedback-v1.mjs?build=graphics13').catch(error => {
-      console.warn('3D combat feedback layer failed to load', error);
-    });
-    import('./battlefield-3d-salvo-polish-v1.mjs?build=graphics13').catch(error => {
-      console.warn('3D salvo polish layer failed to load', error);
-    });
-    import('./battlefield-3d-volley-readability-v1.mjs?build=graphics13').catch(error => {
-      console.warn('3D volley readability layer failed to load', error);
-    });
-    import('./battlefield-3d-regiment-polish-v1.mjs?build=graphics13').catch(error => {
-      console.warn('3D regiment polish layer failed to load', error);
-    });
-  }
   importVisualLayersWhenReady();
 }
