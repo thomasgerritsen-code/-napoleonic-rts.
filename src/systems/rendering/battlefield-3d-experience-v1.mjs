@@ -12,6 +12,8 @@ if (!api || !canvas || !modeButton) {
   const FRAME_PRESSURE_ENTER_MS = 23;
   const FRAME_PRESSURE_EXIT_MS = 19;
   const FRAME_PRESSURE_HOLD_MS = 900;
+  const MAX_PRESSURE_DEFERS_PER_LAYER = 1;
+  const PRESSURE_RETRY_MS = 120;
   let fallbackReason = '';
   let visualLayersImportStarted = false;
   let visualLayersReady = 0;
@@ -99,10 +101,10 @@ if (!api || !canvas || !modeButton) {
       else callback();
     };
     if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(run, { timeout: framePressure ? 420 : 220 });
+      window.requestIdleCallback(run, { timeout: framePressure ? 300 : 220 });
       return;
     }
-    requestAnimationFrame(() => setTimeout(run, framePressure ? 48 : 0));
+    requestAnimationFrame(() => setTimeout(run, framePressure ? 32 : 0));
   }
 
   function importCosmeticLayers(index = 0) {
@@ -112,10 +114,10 @@ if (!api || !canvas || !modeButton) {
       setTimeout(() => importCosmeticLayers(index), 180);
       return;
     }
-    if (framePressure && consecutiveFramePressureWaits < 3) {
+    if (framePressure && consecutiveFramePressureWaits < MAX_PRESSURE_DEFERS_PER_LAYER) {
       framePressureWaits++;
       consecutiveFramePressureWaits++;
-      setTimeout(() => importCosmeticLayers(index), 240);
+      setTimeout(() => importCosmeticLayers(index), PRESSURE_RETRY_MS);
       return;
     }
     if (framePressure) forcedCosmeticLoads++;
