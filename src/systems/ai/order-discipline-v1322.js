@@ -115,11 +115,11 @@
   nrts.subsystems.register('ai-order-discipline',api,{phase:'v1.3.22',legacyBridge:false,responsibility:'stabilize AI orders, preserve active crossings, deploy before contact, react to close cavalry, and keep regiment destinations from stacking'});
 })(window);
 
-// Load the v1.4.0 commander-cohesion layer only after the established order-discipline
+// Load the commander-cohesion layer only after the established order-discipline
 // wrapper is installed, keeping the existing authority chain deterministic.
 (() => {
   const script=document.createElement('script');
-  script.src='src/systems/ai/command-cohesion-v140.js?build=140a';
+  script.src='src/systems/ai/command-cohesion-v140.js?build=141a';
   script.defer=true;
   document.head.appendChild(script);
 })();
