@@ -17,6 +17,29 @@
     };
   }
 
+  function normalizeFacing(angle) {
+    if (!Number.isFinite(angle)) return -Math.PI / 2;
+    let result = angle;
+    while (result > Math.PI) result -= Math.PI * 2;
+    while (result <= -Math.PI) result += Math.PI * 2;
+    return result;
+  }
+
+  function rotateFormationOffset(ox, oy, facing) {
+    // Local formation coordinates use -Y as the front. Rotating by facing + 90deg
+    // makes that front axis point exactly along the regiment's world-space facing.
+    const theta = normalizeFacing(facing) + Math.PI / 2;
+    const c = Math.cos(theta), s = Math.sin(theta);
+    return { ox: ox * c - oy * s, oy: ox * s + oy * c };
+  }
+
+  function regimentMoveSpacing(reg) {
+    const mode = reg?.formation || 'line';
+    if (mode === 'line') return 340;
+    if (mode === 'square') return 190;
+    return 150;
+  }
+
   function createRegiment(side, candidateUnits, name = null) {
     const free = candidateUnits.filter(u => !u.dead && u.side === side && !u.routing && !u.regimentId);
     const infantry = free.filter(u => u.type === 'infantry').slice(0, 36);
@@ -33,6 +56,7 @@
       officerId: officer.id,
       drummerId: drummer.id,
       formation: 'line',
+      facing: -Math.PI / 2,
       morale: 100,
       destroyed: false,
       targetX: centroid(members).x,
@@ -42,7 +66,7 @@
     };
     members.forEach(u => { u.regimentId = reg.id; u.morale = Math.max(u.morale, 90); });
     regiments.push(reg);
-    arrangeRegiment(reg, reg.targetX, reg.targetY, 'line');
+    arrangeFacingRegimentV146(reg, reg.targetX, reg.targetY, 'line', reg.facing);
     return reg;
   }
 
@@ -102,17 +126,25 @@
     return result;
   }
 
-  function arrangeRegiment(reg, x, y, mode = reg.formation || 'line') {
+  function arrangeFacingRegimentV146(reg, x, y, mode = reg.formation || 'line', facing = reg.facing ?? -Math.PI / 2) {
     if (!reg || reg.destroyed) return;
     reg.formation = mode;
+    reg.facing = normalizeFacing(facing);
     reg.targetX = x; reg.targetY = y;
     const offsets = regimentRoleOffsets(reg, mode);
     for (const u of regimentMembers(reg)) {
-      const o = offsets.get(u.id) || { ox: 0, oy: 0 };
+      const local = offsets.get(u.id) || { ox: 0, oy: 0 };
+      const o = rotateFormationOffset(local.ox, local.oy, reg.facing);
       u.task = null; u.resourceTarget = null;
       u.targetX = Math.max(20, Math.min(WORLD.width - 20, x + o.ox));
       u.targetY = Math.max(20, Math.min(WORLD.height - 20, y + o.oy));
     }
+  }
+
+  // Keep the established global API for legacy callers, while all v146 movement paths
+  // use the version-bound helper above so later legacy scripts cannot replace its behavior.
+  function arrangeRegiment(reg, x, y, mode = reg.formation || 'line', facing = reg.facing ?? -Math.PI / 2) {
+    return arrangeFacingRegimentV146(reg, x, y, mode, facing);
   }
 
   function selectedRegiments() {
@@ -149,7 +181,7 @@
     if (regs.length) {
       for (const reg of regs) {
         const c = centroid(regimentMembers(reg));
-        arrangeRegiment(reg, c.x, c.y, mode);
+        arrangeFacingRegimentV146(reg, c.x, c.y, mode, reg.facing);
       }
       statusEl.textContent = `${formationLabel(mode)} toegepast op ${regs.length} regiment${regs.length > 1 ? 'en' : ''}.`;
     } else {
@@ -179,8 +211,15 @@
     regs.forEach(r => regimentMembers(r).forEach(u => regimentMemberIds.add(u.id)));
 
     if (regs.length) {
-      const spacing = 110;
-      regs.forEach((reg, i) => arrangeRegiment(reg, x, y + (i - (regs.length - 1) / 2) * spacing, reg.formation));
+      const groupCenter = centroid(regs.flatMap(regimentMembers));
+      const dx = x - groupCenter.x, dy = y - groupCenter.y;
+      const facing = Math.hypot(dx, dy) > 2 ? Math.atan2(dy, dx) : (regs[0].facing ?? -Math.PI / 2);
+      const perpX = -Math.sin(facing), perpY = Math.cos(facing);
+      const spacing = Math.max(...regs.map(regimentMoveSpacing));
+      regs.forEach((reg, i) => {
+        const lateral = (i - (regs.length - 1) / 2) * spacing;
+        arrangeFacingRegimentV146(reg, x + perpX * lateral, y + perpY * lateral, reg.formation, facing);
+      });
     }
 
     const loose = [...selectedUnits].filter(u => !u.dead && !u.routing && !regimentMemberIds.has(u.id));
@@ -188,7 +227,7 @@
 
     if (regs.length || loose.length) {
       statusEl.textContent = regs.length
-        ? `${regs.length} regiment${regs.length > 1 ? 'en' : ''} marcheert in formatie.`
+        ? `${regs.length} regiment${regs.length > 1 ? 'en' : ''} marcheert richting doel in ${formationLabel(regs[0].formation).toLowerCase()}.`
         : `${loose.length} losse eenheden verplaatsen.`;
     }
   }
