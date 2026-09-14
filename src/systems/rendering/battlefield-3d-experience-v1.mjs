@@ -76,17 +76,20 @@ if (!api || !canvas || !modeButton) {
 
   document.documentElement.dataset.renderMode = api.enabled() ? '3d' : '2d';
 
-  let unitDetailImportStarted = false;
-  function importUnitDetailsWhenReady() {
-    if (unitDetailImportStarted) return;
+  let visualLayersImportStarted = false;
+  function importVisualLayersWhenReady() {
+    if (visualLayersImportStarted) return;
     if (!window.NRTS_3D_SOURCE || !window.__NRTS_THREE_SCENE_HOOK_V1__) {
-      requestAnimationFrame(importUnitDetailsWhenReady);
+      requestAnimationFrame(importVisualLayersWhenReady);
       return;
     }
-    unitDetailImportStarted = true;
-    import('./battlefield-3d-unit-detail-v1.mjs?build=graphics7').catch(error => {
+    visualLayersImportStarted = true;
+    import('./battlefield-3d-unit-detail-v1.mjs?build=graphics8').catch(error => {
       console.warn('3D unit detail layer failed to load', error);
     });
+    import('./battlefield-3d-selection-feedback-v1.mjs?build=graphics8').catch(error => {
+      console.warn('3D selection feedback layer failed to load', error);
+    });
   }
-  importUnitDetailsWhenReady();
+  importVisualLayersWhenReady();
 }
