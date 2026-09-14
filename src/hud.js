@@ -86,6 +86,37 @@
     return { moving: distance > 42, distance };
   }
 
+  function regimentTacticalMetrics(reg) {
+    const members = regimentMembers(reg).filter(u => !u.dead);
+    let hp = 0, maxHp = 0, routing = 0;
+    for (const u of members) {
+      hp += Math.max(0, Number(u.hp) || 0);
+      maxHp += Math.max(1, Number(u.maxHp) || 1);
+      if (u.routing) routing++;
+    }
+    return {
+      strength: maxHp ? Math.max(0, Math.min(100, Math.round((hp / maxHp) * 100))) : 0,
+      morale: Math.max(0, Math.min(100, Math.round(Number(reg?.morale) || 0))),
+      routing,
+      members: members.length
+    };
+  }
+
+  function selectionTacticalState(regs = selectedRegiments()) {
+    if (!regs.length) return { state: 'neutral', strength: 0, morale: 0, routing: 0 };
+    const metrics = regs.map(regimentTacticalMetrics);
+    const strength = Math.round(metrics.reduce((sum, m) => sum + m.strength, 0) / metrics.length);
+    const morale = Math.round(metrics.reduce((sum, m) => sum + m.morale, 0) / metrics.length);
+    const routing = metrics.reduce((sum, m) => sum + m.routing, 0);
+    const reforming = regs.filter(reg => reg?.postCrossingReformV1322).length;
+    const moving = regs.filter(reg => regimentOrderState(reg).moving).length;
+    let state = 'steady';
+    if (routing || morale < 45 || strength < 55) state = 'pressured';
+    else if (reforming) state = 'reforming';
+    else if (moving) state = 'moving';
+    return { state, strength, morale, routing, reforming, moving };
+  }
+
   function regimentReformLabel(reg) {
     const reform = reg?.postCrossingReformV1322;
     if (!reform) return null;
@@ -103,26 +134,32 @@
   }
 
   function selectionRegimentSummary(regs = selectedRegiments()) {
+    const tactical = selectionTacticalState(regs);
     if (regs.length === 1) {
       const reg = regs[0], members = regimentMembers(reg);
       const officerAlive = members.some(u => u.id === reg.officerId);
       const drummerAlive = members.some(u => u.id === reg.drummerId);
-      return `${reg.name} · ${members.filter(u => u.type === 'infantry').length} musketiers · O:${officerAlive ? '✓' : '✗'} D:${drummerAlive ? '✓' : '✗'} · morale ${Math.round(reg.morale)}% · ${regimentOrderLabel(reg)}`;
+      const warning = tactical.state === 'pressured' ? ' · onder druk' : '';
+      return `${reg.name} · ${members.filter(u => u.type === 'infantry').length} musketiers · O:${officerAlive ? '✓' : '✗'} D:${drummerAlive ? '✓' : '✗'} · sterkte ${tactical.strength}% · morale ${Math.round(reg.morale)}%${warning} · ${regimentOrderLabel(reg)}`;
     }
     if (regs.length > 1) {
-      const moving = regs.filter(reg => regimentOrderState(reg).moving).length;
-      const reforming = regs.filter(reg => reg?.postCrossingReformV1322).length;
+      const moving = tactical.moving;
+      const reforming = tactical.reforming;
       const formations = [...new Set(regs.map(reg => formationLabel(reg.formation || 'line')))];
       const formationText = formations.length === 1 ? formations[0] : 'gemengde formaties';
       const reformText = reforming ? ` · ${reforming} hergroepeert` : '';
-      return `${regs.length} regimenten geselecteerd · ${formationText}${reformText} · ${moving ? `${moving} marcheert` : 'positie ingenomen'}`;
+      const pressureText = tactical.state === 'pressured' ? ' · onder druk' : '';
+      return `${regs.length} regimenten geselecteerd · ${formationText} · sterkte ${tactical.strength}% · morale ${tactical.morale}%${pressureText}${reformText} · ${moving ? `${moving} marcheert` : 'positie ingenomen'}`;
     }
     return null;
   }
 
-  function setSelectionDetails(text) {
+  function setSelectionDetails(text, tacticalState = 'neutral') {
     setHudText(selectionDetailsEl, text);
     if (selectionDetailsEl.title !== text) selectionDetailsEl.title = text;
+    if (selectionDetailsEl.dataset.tacticalState !== tacticalState) selectionDetailsEl.dataset.tacticalState = tacticalState;
+    if (selectionDetailsEl.getAttribute('aria-live') !== 'polite') selectionDetailsEl.setAttribute('aria-live', 'polite');
+    if (selectionDetailsEl.getAttribute('aria-atomic') !== 'true') selectionDetailsEl.setAttribute('aria-atomic', 'true');
   }
 
   function updateHud(forceActions = false) {
@@ -158,8 +195,9 @@
       const group = [...selectedUnits];
       const regSummary = selectionRegimentSummary(selectedRegs);
       if (regSummary) {
+        const tactical = selectionTacticalState(selectedRegs);
         setHudText(selectionTitleEl, selectedRegs.length === 1 ? selectedRegs[0].name : `${selectedRegs.length} regimenten`);
-        setSelectionDetails(regSummary);
+        setSelectionDetails(regSummary, tactical.state);
       } else {
         const workers = group.filter(u => u.type === 'worker').length;
         const inf = group.filter(u => u.type === 'infantry').length;
