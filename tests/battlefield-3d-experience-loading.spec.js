@@ -12,7 +12,7 @@ test('cosmetic 3D layers stay deferred in 2D and start when 3D is enabled', asyn
   });
   expect(before.mode).toBe('2d');
   expect(before.staged).toBe(true);
-  expect(before.build).toBe('graphics14');
+  expect(before.build).toBe('graphics15');
   expect(before.diagnostics.visualLayersImportStarted).toBe(false);
   expect(before.diagnostics.visualLayersReady).toBe(0);
   expect(before.diagnostics.deferredWaits).toBeGreaterThan(0);
@@ -23,17 +23,17 @@ test('cosmetic 3D layers stay deferred in 2D and start when 3D is enabled', asyn
 
   const after = await page.evaluate(() => window.__BATTLEFIELD_3D_EXPERIENCE_V1__.diagnostics());
   expect(after.visualLayersFailed).toBe(0);
-  expect(after.visualLayerCount).toBe(6);
+  expect(after.visualLayerCount).toBe(7);
 });
 
 test('cosmetic visual layers are staggered after essential 3D layers', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('nrts-render-mode', '3d'));
   await page.goto('/');
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_EXPERIENCE_V1__?.diagnostics().visualLayersImportStarted);
-  await page.waitForFunction(() => window.__BATTLEFIELD_3D_EXPERIENCE_V1__.diagnostics().visualLayersReady === 6, null, { timeout: 10000 });
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_EXPERIENCE_V1__.diagnostics().visualLayersReady === 7, null, { timeout: 10000 });
 
   const state = await page.evaluate(() => window.__BATTLEFIELD_3D_EXPERIENCE_V1__.diagnostics());
   expect(state.visualLayersFailed).toBe(0);
-  expect(state.visualLayersReady).toBe(6);
-  expect(state.deferredBatches).toBeGreaterThanOrEqual(4);
+  expect(state.visualLayersReady).toBe(7);
+  expect(state.deferredBatches).toBeGreaterThanOrEqual(5);
 });
