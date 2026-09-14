@@ -119,6 +119,18 @@ if (!source || !sceneHook) {
     return Number.isFinite(cameraDistance) ? cameraDistance * 0.82 : 0;
   }
 
+  function currentCameraCenter() {
+    const simCamera = source.camera?.();
+    if (Number.isFinite(simCamera?.x) && Number.isFinite(simCamera?.y)) {
+      return { x: simCamera.x, z: simCamera.y, source: 'simulation-camera' };
+    }
+    const camera = currentCamera();
+    if (Number.isFinite(camera?.position?.x) && Number.isFinite(camera?.position?.z)) {
+      return { x: camera.position.x, z: camera.position.z, source: 'three-camera' };
+    }
+    return null;
+  }
+
   function currentLodMode() {
     const cameraY = currentCameraY();
     if (cameraY >= ULTRA_FAR_LOD_CAMERA_Y) return 'ultra-far';
@@ -127,11 +139,11 @@ if (!source || !sceneHook) {
   }
 
   function withinEffectRange(x, z, lodMode) {
-    const camera = currentCamera();
-    if (!camera?.position) return true;
+    const center = currentCameraCenter();
+    if (!center) return true;
     const radius = lodMode === 'far' ? FAR_EFFECT_RADIUS : NEAR_EFFECT_RADIUS;
-    const dx = x - camera.position.x;
-    const dz = z - camera.position.z;
+    const dx = x - center.x;
+    const dz = z - center.z;
     return dx * dx + dz * dz <= radius * radius;
   }
 
@@ -356,7 +368,17 @@ if (!source || !sceneHook) {
     farEffectRadius: FAR_EFFECT_RADIUS,
     effects: ['directional-musket-muzzle-flash', 'musket-smoke', 'directional-artillery-muzzle-flash', 'layered-artillery-smoke'],
     performanceModel: 'fixed-pool-instanced-effects-with-distance-culling-and-lod',
-    diagnostics: () => ({ ...diagnostics, active: active3dRendering(), cameraY: currentCameraY() })
+    diagnostics: () => {
+      const center = currentCameraCenter();
+      return {
+        ...diagnostics,
+        active: active3dRendering(),
+        cameraY: currentCameraY(),
+        cameraCenterX: center?.x ?? null,
+        cameraCenterZ: center?.z ?? null,
+        cameraCenterSource: center?.source || 'unavailable'
+      };
+    }
   });
 
   attachWhenReady();
