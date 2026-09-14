@@ -37,6 +37,7 @@ test('3D battlefield loads lightweight Napoleonic unit detail silhouettes', asyn
   expect(state.ultraFarUpdateIntervalMs).toBeGreaterThan(state.farUpdateIntervalMs);
   expect(state.farLodCameraY).toBeGreaterThan(700);
   expect(state.ultraFarLodCameraY).toBeGreaterThan(state.farLodCameraY);
+  expect(state.ultraFarLodCameraY).toBeLessThanOrEqual(1230);
   expect(state.maxInstances).toBeGreaterThanOrEqual(1000);
   expect(state.layerCount).toBeGreaterThanOrEqual(20);
   expect(state.visualRoles).toEqual(expect.arrayContaining(['infantry', 'officer', 'cavalry', 'artillery']));
@@ -85,18 +86,17 @@ test('3D unit detail work pauses in 2D mode and resumes in 3D', async ({ page })
 
 test('ultra-far tactical zoom suspends the optional 3D detail layer', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__);
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__ && window.__BATTLEFIELD_3D_V1__ && window.__NRTS_THREE_SCENE_HOOK_V1__?.scene?.());
   await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
-  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__ && window.__NRTS_THREE_SCENE_HOOK_V1__?.camera?.());
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics().transformBuilds > 0);
 
-  await page.evaluate(() => {
-    const api = window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__;
-    window.__NRTS_THREE_SCENE_HOOK_V1__.camera().position.y = api.ultraFarLodCameraY + 100;
-  });
+  const canvas = page.locator('#battlefield3d');
+  for (let i = 0; i < 8; i++) await canvas.dispatchEvent('wheel', { deltaY: 120 });
+
   await page.waitForFunction(() => {
-    const diagnostics = window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics();
-    return diagnostics.lodMode === 'ultra-far' && diagnostics.skippedUltraFar > 0;
+    const api = window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__;
+    const diagnostics = api.diagnostics();
+    return diagnostics.cameraY >= api.ultraFarLodCameraY && diagnostics.lodMode === 'ultra-far' && diagnostics.skippedUltraFar > 0;
   });
 
   await page.waitForTimeout(240);
@@ -118,9 +118,7 @@ test('ultra-far tactical zoom suspends the optional 3D detail layer', async ({ p
   expect(suspended.diagnostics.transformBuilds).toBe(settled.diagnostics.transformBuilds);
   expect(suspended.diagnostics.skippedUltraFar).toBeGreaterThan(settled.diagnostics.skippedUltraFar);
 
-  await page.evaluate(() => {
-    window.__NRTS_THREE_SCENE_HOOK_V1__.camera().position.y = 400;
-  });
+  for (let i = 0; i < 8; i++) await canvas.dispatchEvent('wheel', { deltaY: -120 });
   await page.waitForFunction(previous => {
     const diagnostics = window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics();
     return diagnostics.lodMode === 'near' && diagnostics.transformBuilds > previous;
