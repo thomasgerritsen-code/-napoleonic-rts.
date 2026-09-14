@@ -16,6 +16,8 @@ if (!source || !sceneHook) {
   const ULTRA_FAR_UPDATE_INTERVAL_MS = 200;
   const FAR_LOD_CAMERA_Y = 900;
   const ULTRA_FAR_LOD_CAMERA_Y = 1120;
+  const NEAR_EFFECT_RADIUS = 1050;
+  const FAR_EFFECT_RADIUS = 1325;
   const MUSKET_SMOKE_LIFE = 1.45;
   const ARTILLERY_SMOKE_LIFE = 2.35;
   const FLASH_LIFE = 0.11;
@@ -58,12 +60,15 @@ if (!source || !sceneHook) {
   const lastShotByUnit = new Map();
   let smokeCursor = 0;
   let flashCursor = 0;
+  let previousSmokeCount = 0;
+  let previousFlashCount = 0;
 
   const tempMatrix = new THREE.Matrix4();
   const tempPosition = new THREE.Vector3();
   const tempQuaternion = new THREE.Quaternion();
   const tempScale = new THREE.Vector3();
   const identityQuaternion = new THREE.Quaternion();
+  const upAxis = new THREE.Vector3(0, 1, 0);
   const smokeColor = new THREE.Color();
   const musketSmokeColor = new THREE.Color(0xbfc1bb);
   const artillerySmokeColor = new THREE.Color(0xa9aaa3);
@@ -77,6 +82,8 @@ if (!source || !sceneHook) {
     droppedTrackedShots: 0,
     skippedInactive: 0,
     skippedUltraFar: 0,
+    culledByDistance: 0,
+    reducedFarSmoke: 0,
     smokeVisible: 0,
     flashVisible: 0,
     lodMode: 'near',
@@ -101,8 +108,12 @@ if (!source || !sceneHook) {
     return !renderApi?.enabled || renderApi.enabled();
   }
 
+  function currentCamera() {
+    return sceneHook.camera?.() || null;
+  }
+
   function currentCameraY() {
-    const cameraY = sceneHook.camera?.()?.position?.y;
+    const cameraY = currentCamera()?.position?.y;
     if (Number.isFinite(cameraY)) return cameraY;
     const cameraDistance = renderApi?.diagnostics?.().cameraDistance;
     return Number.isFinite(cameraDistance) ? cameraDistance * 0.82 : 0;
@@ -113,6 +124,15 @@ if (!source || !sceneHook) {
     if (cameraY >= ULTRA_FAR_LOD_CAMERA_Y) return 'ultra-far';
     if (cameraY >= FAR_LOD_CAMERA_Y) return 'far';
     return 'near';
+  }
+
+  function withinEffectRange(x, z, lodMode) {
+    const camera = currentCamera();
+    if (!camera?.position) return true;
+    const radius = lodMode === 'far' ? FAR_EFFECT_RADIUS : NEAR_EFFECT_RADIUS;
+    const dx = x - camera.position.x;
+    const dz = z - camera.position.z;
+    return dx * dx + dz * dz <= radius * radius;
   }
 
   function allocate(pool, cursorKey) {
@@ -141,14 +161,17 @@ if (!source || !sceneHook) {
     const puff = allocate(smokePool, 'smoke');
     const spread = artillery ? 4.8 : 2.2;
     const angle = point.facing + (seed - 0.5) * 0.32;
+    const windPhase = point.x * 0.0017 + point.z * 0.0011;
+    const windX = Math.cos(windPhase) * 0.75;
+    const windZ = Math.sin(windPhase) * 0.55;
     puff.active = true;
     puff.born = now;
     puff.life = artillery ? ARTILLERY_SMOKE_LIFE : MUSKET_SMOKE_LIFE;
     puff.x = point.x + Math.cos(angle) * spread * seed;
     puff.y = point.y + seed * 1.2;
     puff.z = point.z + Math.sin(angle) * spread * seed;
-    puff.driftX = Math.cos(angle) * (artillery ? 4.0 : 2.1) + 0.8;
-    puff.driftZ = Math.sin(angle) * (artillery ? 4.0 : 2.1) + 0.25;
+    puff.driftX = Math.cos(angle) * (artillery ? 4.0 : 2.1) + windX;
+    puff.driftZ = Math.sin(angle) * (artillery ? 4.0 : 2.1) + windZ;
     puff.rise = artillery ? 8.0 + seed * 3.0 : 5.2 + seed * 2.0;
     puff.startScale = artillery ? 3.6 + seed * 1.8 : 2.0 + seed * 1.1;
     puff.growth = artillery ? 8.8 + seed * 4.0 : 5.2 + seed * 2.2;
@@ -163,6 +186,7 @@ if (!source || !sceneHook) {
     burst.x = point.x;
     burst.y = point.y;
     burst.z = point.z;
+    burst.facing = point.facing;
     burst.scale = artillery ? 5.8 : 3.2;
     burst.artillery = artillery;
   }
@@ -189,16 +213,22 @@ if (!source || !sceneHook) {
 
       const artillery = event.kind === 'artillery-fire';
       const point = muzzlePoint(unit, artillery);
+      if (!withinEffectRange(point.x, point.z, lodMode)) {
+        diagnostics.culledByDistance++;
+        continue;
+      }
       emitFlash(point, now, artillery);
 
       if (artillery) {
         emitSmoke(point, now, true, 0.15);
-        emitSmoke(point, now, true, 0.48);
-        emitSmoke(point, now, true, 0.82);
+        emitSmoke(point, now, true, 0.52);
+        if (lodMode === 'near') emitSmoke(point, now, true, 0.86);
+        else diagnostics.reducedFarSmoke++;
         diagnostics.emittedArtillery++;
       } else {
         emitSmoke(point, now, false, 0.25);
         if (lodMode === 'near') emitSmoke(point, now, false, 0.72);
+        else diagnostics.reducedFarSmoke++;
         diagnostics.emittedMusket++;
       }
     }
@@ -230,8 +260,11 @@ if (!source || !sceneHook) {
       count++;
     }
     smoke.count = count;
-    smoke.instanceMatrix.needsUpdate = true;
-    if (smoke.instanceColor) smoke.instanceColor.needsUpdate = true;
+    if (count > 0 || previousSmokeCount > 0) {
+      smoke.instanceMatrix.needsUpdate = true;
+      if (smoke.instanceColor) smoke.instanceColor.needsUpdate = true;
+    }
+    previousSmokeCount = count;
     diagnostics.smokeVisible = count;
   }
 
@@ -248,15 +281,19 @@ if (!source || !sceneHook) {
       const t = age / burst.life;
       const scale = burst.scale * (1 - t) * (lodMode === 'far' ? 0.82 : 1);
       tempPosition.set(burst.x, burst.y, burst.z);
-      tempScale.set(scale * 1.45, scale, scale * 1.45);
-      tempMatrix.compose(tempPosition, tempQuaternion.copy(identityQuaternion), tempScale);
+      tempScale.set(scale * 2.15, scale * 0.72, scale * 0.72);
+      tempQuaternion.setFromAxisAngle(upAxis, -burst.facing);
+      tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
       flash.setMatrixAt(count, tempMatrix);
       flash.setColorAt(count, burst.artillery ? artilleryFlashColor : musketFlashColor);
       count++;
     }
     flash.count = count;
-    flash.instanceMatrix.needsUpdate = true;
-    if (flash.instanceColor) flash.instanceColor.needsUpdate = true;
+    if (count > 0 || previousFlashCount > 0) {
+      flash.instanceMatrix.needsUpdate = true;
+      if (flash.instanceColor) flash.instanceColor.needsUpdate = true;
+    }
+    previousFlashCount = count;
     diagnostics.flashVisible = count;
   }
 
@@ -273,6 +310,10 @@ if (!source || !sceneHook) {
   function clearVisibleInstances() {
     smoke.count = 0;
     flash.count = 0;
+    if (previousSmokeCount > 0) smoke.instanceMatrix.needsUpdate = true;
+    if (previousFlashCount > 0) flash.instanceMatrix.needsUpdate = true;
+    previousSmokeCount = 0;
+    previousFlashCount = 0;
     diagnostics.smokeVisible = 0;
     diagnostics.flashVisible = 0;
   }
@@ -311,8 +352,10 @@ if (!source || !sceneHook) {
     maxFlash: MAX_FLASH,
     farLodCameraY: FAR_LOD_CAMERA_Y,
     ultraFarLodCameraY: ULTRA_FAR_LOD_CAMERA_Y,
-    effects: ['musket-muzzle-flash', 'musket-smoke', 'artillery-muzzle-flash', 'layered-artillery-smoke'],
-    performanceModel: 'fixed-pool-instanced-effects-with-distance-lod',
+    nearEffectRadius: NEAR_EFFECT_RADIUS,
+    farEffectRadius: FAR_EFFECT_RADIUS,
+    effects: ['directional-musket-muzzle-flash', 'musket-smoke', 'directional-artillery-muzzle-flash', 'layered-artillery-smoke'],
+    performanceModel: 'fixed-pool-instanced-effects-with-distance-culling-and-lod',
     diagnostics: () => ({ ...diagnostics, active: active3dRendering(), cameraY: currentCameraY() })
   });
 
