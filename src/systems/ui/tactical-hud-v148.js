@@ -9,6 +9,26 @@
   const baseMetrics = global.regimentTacticalMetrics;
   const baseReformLabel = global.regimentReformLabel;
 
+  function movementCohesion(orderStates, regimentCount) {
+    const movingStates = orderStates.filter(order => order.moving);
+    const moving = movingStates.length;
+    const arrived = Math.max(0, regimentCount - moving);
+    const distances = movingStates.map(order => Math.max(0, Number(order.distance) || 0));
+    const averageDistance = moving
+      ? Math.round(distances.reduce((sum, distance) => sum + distance, 0) / moving)
+      : 0;
+    const distanceSpread = distances.length > 1
+      ? Math.round(Math.max(...distances) - Math.min(...distances))
+      : 0;
+    return {
+      moving,
+      arrived,
+      averageDistance,
+      distanceSpread,
+      cohesionState: distances.length > 1 && distanceSpread >= 120 ? 'stretched' : 'steady'
+    };
+  }
+
   function regimentSnapshot(reg) {
     const members = regimentMembers(reg).filter(u => !u.dead);
     return {
@@ -44,17 +64,7 @@
       : Math.round(metrics.reduce((sum, m) => sum + m.morale, 0) / metrics.length);
     const routing = metrics.reduce((sum, m) => sum + m.routing, 0);
     const reforming = regs.filter(reg => reg?.postCrossingReformV1322).length;
-    const movingStates = orderStates.filter(order => order.moving);
-    const moving = movingStates.length;
-    const arrived = regs.length - moving;
-    const averageDistance = moving
-      ? Math.round(movingStates.reduce((sum, order) => sum + order.distance, 0) / moving)
-      : 0;
-    const movingDistances = movingStates.map(order => Math.max(0, Number(order.distance) || 0));
-    const distanceSpread = movingDistances.length > 1
-      ? Math.round(Math.max(...movingDistances) - Math.min(...movingDistances))
-      : 0;
-    const cohesionState = movingDistances.length > 1 && distanceSpread >= 120 ? 'stretched' : 'steady';
+    const movement = movementCohesion(orderStates, regs.length);
     const officerLosses = snapshots.filter(s => !s.officerAlive).length;
     const drummerLosses = snapshots.filter(s => !s.drummerAlive).length;
 
@@ -67,12 +77,11 @@
     let state = 'steady';
     if (pressureReasons.length) state = 'pressured';
     else if (reforming) state = 'reforming';
-    else if (moving) state = 'moving';
+    else if (movement.moving) state = 'moving';
 
     return {
-      state, strength, morale, routing, reforming, moving, arrived, averageDistance,
-      distanceSpread, cohesionState, pressureReasons, orderStates, snapshots,
-      officerLosses, drummerLosses
+      state, strength, morale, routing, reforming, ...movement,
+      pressureReasons, orderStates, snapshots, officerLosses, drummerLosses
     };
   }
 
@@ -125,6 +134,7 @@
   global.selectionRegimentSummaryV147 = selectionRegimentSummaryV148;
   global.selectionRegimentSummaryV148 = selectionRegimentSummaryV148;
   global.__TACTICAL_HUD_V148__ = Object.freeze({
+    movementCohesion,
     selectionTacticalState: selectionTacticalStateV148,
     regimentOrderLabel: regimentOrderLabelV148,
     selectionRegimentSummary: selectionRegimentSummaryV148
