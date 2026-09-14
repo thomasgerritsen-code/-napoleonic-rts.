@@ -133,7 +133,7 @@
     return `${formation} · ${reform ? `${reform} · ` : ''}marcheert · ${Math.max(1, Math.round(order.distance))} m te gaan`;
   }
 
-  function selectionRegimentSummary(regs = selectedRegiments()) {
+  function selectionRegimentSummaryV144(regs = selectedRegiments()) {
     const tactical = selectionTacticalState(regs);
     if (regs.length === 1) {
       const reg = regs[0], members = regimentMembers(reg);
@@ -193,7 +193,7 @@
       else setSelectionDetails(`${Math.max(0, Math.floor(b.hp))}/${b.maxHp} HP`);
     } else if (selectedUnits.size) {
       const group = [...selectedUnits];
-      const regSummary = selectionRegimentSummary(selectedRegs);
+      const regSummary = selectionRegimentSummaryV144(selectedRegs);
       if (regSummary) {
         const tactical = selectionTacticalState(selectedRegs);
         setHudText(selectionTitleEl, selectedRegs.length === 1 ? selectedRegs[0].name : `${selectedRegs.length} regimenten`);
