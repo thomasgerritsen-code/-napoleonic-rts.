@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-14",
+  "sourceOfTruth": "main",
+  "currentFocus": "2D visual foundation and measurable large-battle stability",
+  "baselines": {
+    "ci": "Test and deploy to GitHub Pages green on f665096c2a9d0632449ab9d9c93fb309d2c19213",
+    "visualFoundation": {
+      "status": "introduced in feat/visual-foundation-v2",
+      "deterministic": true,
+      "viewportCulled": true,
+      "perFrameRandomGeneration": false
+    }
+  },
+  "performanceBudgets": {
+    "status": "needs reliable golden-battle measurements before numeric gates are frozen"
+  },
+  "technicalDebt": [
+    "legacy script-load chain remains long and should be consolidated only when tests protect load order",
+    "numeric p95 frametime budget is not yet recorded from a deterministic golden battle"
+  ],
+  "provenApproaches": [
+    "precompute deterministic static render detail instead of regenerating it every frame",
+    "viewport-cull decorative rendering",
+    "stabilize and merge green open work before starting overlapping changes"
+  ],
+  "avoid": [
+    "new gameplay authority in presentation modules",
+    "per-frame random terrain generation",
+    "visual improvements that introduce canvas remounts or full DOM rebuilds"
+  ],
+  "candidates": [
+    {
+      "priority": 1,
+      "name": "Golden Battle deterministic benchmark",
+      "reason": "creates comparable p95 frametime, cohesion, AI and flicker baselines for every later change"
+    },
+    {
+      "priority": 2,
+      "name": "Regiment visual hierarchy and LOD",
+      "reason": "largest next readability and scale improvement after terrain foundation"
+    },
+    {
+      "priority": 3,
+      "name": "Pooled black-powder salvo effects",
+      "reason": "high atmosphere gain if implemented at regiment/salvo level without allocation spikes"
+    }
+  ]
+}
