@@ -42,6 +42,9 @@ test('3D combat feedback loads with hard pooled caps and distance LOD', async ({
   expect(state.attached).toBe(true);
   expect(state.childCount).toBe(2);
   expect(state.diagnostics.active).toBe(true);
+  expect(state.diagnostics.cameraCenterSource).toBe('simulation-camera');
+  expect(Number.isFinite(state.diagnostics.cameraCenterX)).toBe(true);
+  expect(Number.isFinite(state.diagnostics.cameraCenterZ)).toBe(true);
 });
 
 test('3D combat feedback reacts to live fire markers without changing simulation authority', async ({ page }) => {
@@ -75,16 +78,19 @@ test('3D combat feedback distance-culls fire markers outside the visual budget',
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__);
   await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__?.diagnostics().updates > 0);
-  await page.waitForFunction(() => Boolean(window.__NRTS_THREE_SCENE_HOOK_V1__?.camera?.()?.position));
+  await page.waitForFunction(() => {
+    const d = window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__?.diagnostics?.();
+    return d?.cameraCenterSource === 'simulation-camera' && Number.isFinite(d.cameraCenterX) && Number.isFinite(d.cameraCenterZ);
+  });
 
   const before = await page.evaluate(() => window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__.diagnostics());
   const marked = await page.evaluate(() => {
     const snapshot = window.NRTS_3D_SOURCE.snapshot();
     const unit = snapshot.units.find(item => item.type === 'infantry' && !item.dead);
-    const camera = window.__NRTS_THREE_SCENE_HOOK_V1__.camera();
-    if (!unit || !camera?.position) return false;
-    unit.x = camera.position.x + 5000;
-    unit.y = camera.position.z + 5000;
+    const camera = window.NRTS_3D_SOURCE.camera();
+    if (!unit || !Number.isFinite(camera?.x) || !Number.isFinite(camera?.y)) return false;
+    unit.x = camera.x + 5000;
+    unit.y = camera.y + 5000;
     unit.combatVisualV1 = { kind: 'musket-fire', started: snapshot.elapsed + 0.001, duration: 1.0 };
     return true;
   });
