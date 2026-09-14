@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "updatedAt": "2026-09-14",
   "sourceOfTruth": "main",
-  "currentFocus": "regiment-scale 2D readability, stable zoom LOD and Golden Battle calibration",
+  "currentFocus": "bridge/chokepoint deadlock elimination first; mobile touch-control vertical slice next; preserve stable 2D readability and Golden Battle gates",
   "baselines": {
-    "ci": "main 8ae5c1751d40126a79fc64537ccd73e4f30fd6eb includes the deterministic Golden Battle regression gate",
+    "ci": "main c7d4eee35f394a2380cfa6a746bf4321608ff4d1 includes regiment-scale 2D visual hierarchy and the deterministic Golden Battle gate",
     "visualFoundation": {
       "status": "merged on c275bc0400c81149d0b2f73c11864abbaaf51f03",
       "deterministic": true,
@@ -23,12 +23,21 @@
       ]
     },
     "regimentVisualHierarchy": {
-      "status": "candidate implementation on feat/regiment-visual-hierarchy-lod-v1",
+      "status": "merged on c7d4eee35f394a2380cfa6a746bf4321608ff4d1",
       "lodThresholds": {"massBelow": 0.55, "silhouetteBelow": 0.9},
       "presentationOnly": true,
       "viewportCulled": true,
       "lowZoomMoraleBars": false,
       "lowZoomRegimentRings": false
+    },
+    "bridgeRecovery": {
+      "observedFailure": "regiments can visibly move or oscillate laterally near a bridge mouth without making forward crossing progress",
+      "rootCauseCandidate": "group stall detection used Euclidean centroid movement, allowing lateral jitter to reset the stall timer indefinitely",
+      "candidateFix": "track signed forward-axis high-water progress and recover after bounded no-progress time without teleportation"
+    },
+    "mobile": {
+      "status": "hard product gate added; complete touch-control vertical slice not yet verified",
+      "primaryOrientation": "landscape"
     }
   },
   "performanceBudgets": {
@@ -37,36 +46,39 @@
   "technicalDebt": [
     "legacy script-load chain remains long and should be consolidated only when tests protect load order",
     "numeric Golden Battle p95 budget needs repeated CI measurements before a tight regression threshold is frozen",
-    "regiment visual LOD currently composes over the detailed character renderer; fold into the renderer when a safe load-chain consolidation is undertaken"
+    "regiment visual LOD currently composes over the detailed character renderer; fold into the renderer when a safe load-chain consolidation is undertaken",
+    "mobile mouse-versus-touch input paths must converge on shared command logic rather than parallel gameplay authorities"
   ],
   "provenApproaches": [
     "precompute deterministic static render detail instead of regenerating it every frame",
     "viewport-cull decorative and unit rendering",
     "reduce low-zoom per-unit decoration before reducing tactical silhouette readability",
     "stabilize and merge green open work before starting overlapping changes",
-    "separate fixed-step deterministic scenario setup from real requestAnimationFrame render measurement"
+    "separate fixed-step deterministic scenario setup from real requestAnimationFrame render measurement",
+    "measure bridge recovery by signed crossing-axis progress rather than generic visible movement"
   ],
   "avoid": [
     "new gameplay authority in presentation modules",
     "per-frame random terrain generation",
     "visual improvements that introduce canvas remounts or full DOM rebuilds",
-    "tight performance gates derived from a single hosted-CI sample"
+    "tight performance gates derived from a single hosted-CI sample",
+    "treating lateral bridge-mouth oscillation as valid route progress"
   ],
   "candidates": [
     {
       "priority": 1,
-      "name": "Golden Battle V1.1 combat coverage and performance calibration",
-      "reason": "ensure the deterministic benchmark exercises sustained musket/artillery combat and collect another comparable p95 sample"
+      "name": "Bridge/chokepoint axis-stall regression gate",
+      "reason": "user-observed gameplay blocker; eliminate pre-entry bridge-mouth deadlocks and verify bounded recovery"
     },
     {
       "priority": 2,
-      "name": "Pooled black-powder salvo effects",
-      "reason": "high atmosphere gain at regiment/salvo level once combat is explicitly covered by Golden Battle"
+      "name": "Mobile touch-control vertical slice",
+      "reason": "hard product requirement: selection, move/facing orders, pan and pinch zoom must work without mouse or keyboard"
     },
     {
       "priority": 3,
-      "name": "Visual Foundation V2 roads and village-ground integration",
-      "reason": "next broad terrain readability gain after regiment hierarchy without adding expensive per-unit detail"
+      "name": "Golden Battle V1.1 combat coverage and performance calibration",
+      "reason": "exercise sustained musket/artillery combat after movement stability is restored"
     }
   ]
 }
