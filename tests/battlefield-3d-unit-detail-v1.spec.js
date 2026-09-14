@@ -85,8 +85,9 @@ test('3D unit detail work pauses in 2D mode and resumes in 3D', async ({ page })
 
 test('ultra-far tactical zoom suspends the optional 3D detail layer', async ({ page }) => {
   await page.goto('/');
-  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__ && window.__NRTS_THREE_SCENE_HOOK_V1__?.camera?.() && window.__BATTLEFIELD_3D_V1__);
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__);
   await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__ && window.__NRTS_THREE_SCENE_HOOK_V1__?.camera?.());
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_UNIT_DETAIL_V1__.diagnostics().transformBuilds > 0);
 
   await page.evaluate(() => {
