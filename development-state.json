@@ -2,48 +2,61 @@
   "schemaVersion": 1,
   "updatedAt": "2026-09-14",
   "sourceOfTruth": "main",
-  "currentFocus": "2D visual foundation and measurable large-battle stability",
+  "currentFocus": "deterministic Golden Battle baseline and regiment-scale 2D readability",
   "baselines": {
-    "ci": "Test and deploy to GitHub Pages green on f665096c2a9d0632449ab9d9c93fb309d2c19213",
+    "ci": "Test and deploy to GitHub Pages green on c275bc0400c81149d0b2f73c11864abbaaf51f03 before Golden Battle integration",
     "visualFoundation": {
-      "status": "introduced in feat/visual-foundation-v2",
+      "status": "merged on c275bc0400c81149d0b2f73c11864abbaaf51f03",
       "deterministic": true,
       "viewportCulled": true,
       "perFrameRandomGeneration": false
+    },
+    "goldenBattle": {
+      "status": "introduced on feat/golden-battle-v1; numeric baseline awaits green CI artifact",
+      "deterministicSeed": 18150914,
+      "checks": [
+        "real requestAnimationFrame p95 frame pacing",
+        "game-health runtime/position invariants",
+        "formation anchor validity and readiness sample",
+        "stable canvas identity and dimensions",
+        "opaque consecutive frames"
+      ]
     }
   },
   "performanceBudgets": {
-    "status": "needs reliable golden-battle measurements before numeric gates are frozen"
+    "goldenBattle": "temporary catastrophic ceiling p95 < 250 ms; freeze tighter numeric budget only after repeated comparable CI baselines"
   },
   "technicalDebt": [
     "legacy script-load chain remains long and should be consolidated only when tests protect load order",
-    "numeric p95 frametime budget is not yet recorded from a deterministic golden battle"
+    "numeric Golden Battle p95 budget needs repeated CI measurements before a tight regression threshold is frozen"
   ],
   "provenApproaches": [
     "precompute deterministic static render detail instead of regenerating it every frame",
     "viewport-cull decorative rendering",
-    "stabilize and merge green open work before starting overlapping changes"
+    "stabilize and merge green open work before starting overlapping changes",
+    "separate fixed-step deterministic scenario setup from real requestAnimationFrame render measurement"
   ],
   "avoid": [
     "new gameplay authority in presentation modules",
     "per-frame random terrain generation",
-    "visual improvements that introduce canvas remounts or full DOM rebuilds"
+    "visual improvements that introduce canvas remounts or full DOM rebuilds",
+    "tight performance gates derived from a single hosted-CI sample"
   ],
   "candidates": [
     {
       "priority": 1,
-      "name": "Golden Battle deterministic benchmark",
-      "reason": "creates comparable p95 frametime, cohesion, AI and flicker baselines for every later change"
+      "name": "Regiment visual hierarchy and LOD",
+      "reason": "largest next battlefield readability and scale improvement once the Golden Battle regression bench is available"
     },
     {
       "priority": 2,
-      "name": "Regiment visual hierarchy and LOD",
-      "reason": "largest next readability and scale improvement after terrain foundation"
+      "name": "Golden Battle performance budget calibration",
+      "reason": "use repeated artifacts to replace the broad catastrophic ceiling with a stable p95 regression budget"
     },
     {
       "priority": 3,
       "name": "Pooled black-powder salvo effects",
-      "reason": "high atmosphere gain if implemented at regiment/salvo level without allocation spikes"
+      "reason": "high atmosphere gain if implemented at regiment/salvo level and validated against the Golden Battle benchmark"
     }
   ]
 }
