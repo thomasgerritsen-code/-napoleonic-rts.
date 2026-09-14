@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "updatedAt": "2026-09-14",
   "sourceOfTruth": "main",
-  "currentFocus": "deterministic Golden Battle baseline and regiment-scale 2D readability",
+  "currentFocus": "regiment-scale 2D readability, stable zoom LOD and Golden Battle calibration",
   "baselines": {
-    "ci": "Test and deploy to GitHub Pages green on c275bc0400c81149d0b2f73c11864abbaaf51f03 before Golden Battle integration",
+    "ci": "main 8ae5c1751d40126a79fc64537ccd73e4f30fd6eb includes the deterministic Golden Battle regression gate",
     "visualFoundation": {
       "status": "merged on c275bc0400c81149d0b2f73c11864abbaaf51f03",
       "deterministic": true,
@@ -12,7 +12,7 @@
       "perFrameRandomGeneration": false
     },
     "goldenBattle": {
-      "status": "introduced on feat/golden-battle-v1; numeric baseline awaits green CI artifact",
+      "status": "merged on 8ae5c1751d40126a79fc64537ccd73e4f30fd6eb; repeat comparable CI artifacts before tightening budgets",
       "deterministicSeed": 18150914,
       "checks": [
         "real requestAnimationFrame p95 frame pacing",
@@ -21,6 +21,14 @@
         "stable canvas identity and dimensions",
         "opaque consecutive frames"
       ]
+    },
+    "regimentVisualHierarchy": {
+      "status": "candidate implementation on feat/regiment-visual-hierarchy-lod-v1",
+      "lodThresholds": {"massBelow": 0.55, "silhouetteBelow": 0.9},
+      "presentationOnly": true,
+      "viewportCulled": true,
+      "lowZoomMoraleBars": false,
+      "lowZoomRegimentRings": false
     }
   },
   "performanceBudgets": {
@@ -28,11 +36,13 @@
   },
   "technicalDebt": [
     "legacy script-load chain remains long and should be consolidated only when tests protect load order",
-    "numeric Golden Battle p95 budget needs repeated CI measurements before a tight regression threshold is frozen"
+    "numeric Golden Battle p95 budget needs repeated CI measurements before a tight regression threshold is frozen",
+    "regiment visual LOD currently composes over the detailed character renderer; fold into the renderer when a safe load-chain consolidation is undertaken"
   ],
   "provenApproaches": [
     "precompute deterministic static render detail instead of regenerating it every frame",
-    "viewport-cull decorative rendering",
+    "viewport-cull decorative and unit rendering",
+    "reduce low-zoom per-unit decoration before reducing tactical silhouette readability",
     "stabilize and merge green open work before starting overlapping changes",
     "separate fixed-step deterministic scenario setup from real requestAnimationFrame render measurement"
   ],
@@ -45,18 +55,18 @@
   "candidates": [
     {
       "priority": 1,
-      "name": "Regiment visual hierarchy and LOD",
-      "reason": "largest next battlefield readability and scale improvement once the Golden Battle regression bench is available"
+      "name": "Golden Battle V1.1 combat coverage and performance calibration",
+      "reason": "ensure the deterministic benchmark exercises sustained musket/artillery combat and collect another comparable p95 sample"
     },
     {
       "priority": 2,
-      "name": "Golden Battle performance budget calibration",
-      "reason": "use repeated artifacts to replace the broad catastrophic ceiling with a stable p95 regression budget"
+      "name": "Pooled black-powder salvo effects",
+      "reason": "high atmosphere gain at regiment/salvo level once combat is explicitly covered by Golden Battle"
     },
     {
       "priority": 3,
-      "name": "Pooled black-powder salvo effects",
-      "reason": "high atmosphere gain if implemented at regiment/salvo level and validated against the Golden Battle benchmark"
+      "name": "Visual Foundation V2 roads and village-ground integration",
+      "reason": "next broad terrain readability gain after regiment hierarchy without adding expensive per-unit detail"
     }
   ]
 }
