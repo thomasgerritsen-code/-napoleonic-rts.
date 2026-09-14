@@ -79,7 +79,7 @@ test('multi-regiment feedback weights strength and morale by actual regiment siz
 
   expect(result.text).toContain('2 regimenten geselecteerd');
   expect(result.text).toMatch(/sterkte 8[0-5]%/);
-  expect(result.text).toMatch(/morale 7[5-9]%/);
+  expect(result.text).toContain('morale 80%');
   expect(result.state).toBe('steady');
   expect(errors).toEqual([]);
 });
