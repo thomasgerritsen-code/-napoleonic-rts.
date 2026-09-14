@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "updatedAt": "2026-09-14",
   "sourceOfTruth": "main",
-  "currentFocus": "bridge/chokepoint deadlock elimination first; mobile touch-control vertical slice next; preserve stable 2D readability and Golden Battle gates",
+  "currentFocus": "mobile touch-control vertical slice and mobile layout validation after bridge axis-stall recovery merged",
   "baselines": {
-    "ci": "main c7d4eee35f394a2380cfa6a746bf4321608ff4d1 includes regiment-scale 2D visual hierarchy and the deterministic Golden Battle gate",
+    "ci": "main 85c543ba2ecbf17fa9f6e1a6a887fa5e5447da6a includes bridge axis-stall recovery, regiment-scale 2D visual hierarchy and the deterministic Golden Battle gate",
     "visualFoundation": {
       "status": "merged on c275bc0400c81149d0b2f73c11864abbaaf51f03",
       "deterministic": true,
@@ -31,13 +31,23 @@
       "lowZoomRegimentRings": false
     },
     "bridgeRecovery": {
-      "observedFailure": "regiments can visibly move or oscillate laterally near a bridge mouth without making forward crossing progress",
-      "rootCauseCandidate": "group stall detection used Euclidean centroid movement, allowing lateral jitter to reset the stall timer indefinitely",
-      "candidateFix": "track signed forward-axis high-water progress and recover after bounded no-progress time without teleportation"
+      "status": "merged on 85c543ba2ecbf17fa9f6e1a6a887fa5e5447da6a after fully green CI",
+      "failureCovered": "lateral bridge-mouth oscillation no longer resets group progress indefinitely",
+      "progressMetric": "signed high-water progress along selected crossing axis"
     },
     "mobile": {
-      "status": "hard product gate added; complete touch-control vertical slice not yet verified",
-      "primaryOrientation": "landscape"
+      "status": "candidate touch-control vertical slice on feat/mobile-touch-controls-v1",
+      "primaryOrientation": "landscape",
+      "inputModel": "Pointer Events sharing existing selection/order/camera authorities",
+      "candidateCoverage": [
+        "single-tap selection",
+        "tap move order",
+        "drag destination plus facing",
+        "drag box selection",
+        "two-finger pan and pinch zoom",
+        "portrait responsive fallback",
+        "44px touch targets"
+      ]
     }
   },
   "performanceBudgets": {
@@ -47,7 +57,7 @@
     "legacy script-load chain remains long and should be consolidated only when tests protect load order",
     "numeric Golden Battle p95 budget needs repeated CI measurements before a tight regression threshold is frozen",
     "regiment visual LOD currently composes over the detailed character renderer; fold into the renderer when a safe load-chain consolidation is undertaken",
-    "mobile mouse-versus-touch input paths must converge on shared command logic rather than parallel gameplay authorities"
+    "legacy touchstart/touchend listeners remain registered in input.js but the mobile Pointer Events authority suppresses them at capture phase; remove the obsolete legacy touch path in a dedicated input cleanup once compatibility tests cover it"
   ],
   "provenApproaches": [
     "precompute deterministic static render detail instead of regenerating it every frame",
@@ -55,30 +65,32 @@
     "reduce low-zoom per-unit decoration before reducing tactical silhouette readability",
     "stabilize and merge green open work before starting overlapping changes",
     "separate fixed-step deterministic scenario setup from real requestAnimationFrame render measurement",
-    "measure bridge recovery by signed crossing-axis progress rather than generic visible movement"
+    "measure bridge recovery by signed crossing-axis progress rather than generic visible movement",
+    "route mobile touch gestures through existing selection, issueMove, issueMoveWithFacing and camera authorities rather than creating parallel gameplay state"
   ],
   "avoid": [
     "new gameplay authority in presentation modules",
     "per-frame random terrain generation",
     "visual improvements that introduce canvas remounts or full DOM rebuilds",
     "tight performance gates derived from a single hosted-CI sample",
-    "treating lateral bridge-mouth oscillation as valid route progress"
+    "treating lateral bridge-mouth oscillation as valid route progress",
+    "independent mouse and touch command semantics that can diverge"
   ],
   "candidates": [
     {
       "priority": 1,
-      "name": "Bridge/chokepoint axis-stall regression gate",
-      "reason": "user-observed gameplay blocker; eliminate pre-entry bridge-mouth deadlocks and verify bounded recovery"
+      "name": "Validate and merge mobile touch-control vertical slice",
+      "reason": "hard product requirement; ensure selection, move/facing orders, two-finger camera and mobile layout are green without ghost orders"
     },
     {
       "priority": 2,
-      "name": "Mobile touch-control vertical slice",
-      "reason": "hard product requirement: selection, move/facing orders, pan and pinch zoom must work without mouse or keyboard"
+      "name": "Golden Battle V1.1 combat coverage and performance calibration",
+      "reason": "exercise sustained musket/artillery combat now movement stability is improved"
     },
     {
       "priority": 3,
-      "name": "Golden Battle V1.1 combat coverage and performance calibration",
-      "reason": "exercise sustained musket/artillery combat after movement stability is restored"
+      "name": "Mobile performance budget and adaptive DPR/LOD",
+      "reason": "after input correctness, measure high-DPR phone rendering before reducing detail or render scale"
     }
   ]
 }
