@@ -32,7 +32,7 @@ test('selected regiment HUD reports strength, morale and steady state', async ({
   expect(errors).toEqual([]);
 });
 
-test('HUD escalates low-strength regiment feedback without extra simulation state', async ({ page }) => {
+test('HUD escalates low-strength regiment feedback with a readable reason', async ({ page }) => {
   const errors = await openGame(page);
   const id = await selectFreshRegiment(page);
 
@@ -45,8 +45,42 @@ test('HUD escalates low-strength regiment feedback without extra simulation stat
 
   const details = page.locator('#selectionDetails');
   await expect(details).toContainText('sterkte 48%');
-  await expect(details).toContainText('onder druk');
+  await expect(details).toContainText('onder druk (lage sterkte, lage morale)');
   await expect(details).toHaveAttribute('data-tactical-state', 'pressured');
+  expect(errors).toEqual([]);
+});
+
+test('multi-regiment feedback weights strength and morale by actual regiment size', async ({ page }) => {
+  const errors = await openGame(page);
+
+  const result = await page.evaluate(() => {
+    const firstId = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', 860, 860);
+    const secondId = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', 1040, 860);
+    const first = getRegiment(firstId);
+    const second = getRegiment(secondId);
+    const firstMembers = regimentMembers(first);
+    const secondMembers = regimentMembers(second);
+
+    first.morale = 100;
+    second.morale = 40;
+    firstMembers.forEach(u => { u.hp = u.maxHp; });
+    secondMembers.forEach((u, index) => {
+      if (index >= Math.ceil(secondMembers.length / 2)) u.dead = true;
+      else u.hp = u.maxHp * .5;
+    });
+
+    selectedUnits.clear();
+    firstMembers.filter(u => !u.dead).forEach(u => selectedUnits.add(u));
+    secondMembers.filter(u => !u.dead).forEach(u => selectedUnits.add(u));
+    updateHud(true);
+    const details = document.getElementById('selectionDetails');
+    return { text: details.textContent, state: details.dataset.tacticalState };
+  });
+
+  expect(result.text).toContain('2 regimenten geselecteerd');
+  expect(result.text).toMatch(/sterkte 8[0-5]%/);
+  expect(result.text).toMatch(/morale 7[5-9]%/);
+  expect(result.state).toBe('steady');
   expect(errors).toEqual([]);
 });
 
