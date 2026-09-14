@@ -35,9 +35,6 @@ test('stalled soldiers at river banks, bridge corners and ford recover locally w
       const before=window.__RIVER_CROSSING_RECOVERY_V1__.stats();
       let waterSeen=0,maxBlocked=0,movedAfterRecovery=false;
 
-      // Hold the same soldiers physically at a river/bridge corner for 1.5 s.
-      // The recovery sampler runs before each movement tick, so this reproduces a
-      // genuine non-progress condition rather than merely placing them badly once.
       for(let step=0;step<30;step++){
         for(const u of victims){u.x=corner.x;u.y=corner.y;u.arrivedAtTarget=false;}
         window.RTS_SIM.step(.05);
@@ -81,4 +78,67 @@ test('stalled soldiers at river banks, bridge corners and ford recover locally w
     expect(scenario.finalBlocked).toBe(0);
   }
   expect(result.stats.unitRecoveries+result.stats.groupRecoveries).toBeGreaterThanOrEqual(2);
+});
+
+test('bridge holder lateral jitter cannot mask a pre-entry forward-axis stall', async ({ page }) => {
+  test.setTimeout(90_000);
+  await openGame(page);
+
+  const result=await page.evaluate(()=>{
+    resetGame();v05PeaceMode=true;gameOver=false;
+    for(const u of units)u.dead=true;for(const r of regiments)r.destroyed=true;
+    const bridge=WATER_CROSSINGS_V067.find(c=>c.type==='bridge');
+    const side=-1,start=crossingPointV068(bridge,side*(bridge.length/2+95),0),target=crossingPointV068(bridge,-side*(bridge.length/2+230),0);
+    const made=[];for(let i=0;i<24;i++)made.push(createUnit('france','infantry',start.x+(i%6)*12,start.y+Math.floor(i/6)*14));
+    made.push(createUnit('france','officer',start.x+18,start.y-18));made.push(createUnit('france','drummer',start.x+34,start.y-18));
+    const reg=createRegiment('france',made);orderGroupPathV06(reg,target.x,target.y,'column',bridge.angle);
+    for(let i=0;i<16;i++)window.RTS_SIM.step(.05);
+    const info=reg.crossingTrafficV068;
+    if(!info)return{setup:false};
+    info.state='approach';info.entered=false;info.forcedColumn=true;
+    const before=window.__RIVER_CROSSING_RECOVERY_V1__.stats();
+    const local0=crossingLocalV068(bridge,reg.marchV063.anchorX,reg.marchV063.anchorY);
+    const fixedAlong=local0.along;
+
+    // Simulate the real failure shape: visible/lateral motion around the bridge mouth
+    // while no meaningful progress is made along the bridge axis. Legacy Euclidean
+    // stall detection treated this as movement forever and never recovered.
+    for(let step=0;step<42;step++){
+      const lateral=(step%2?1:-1)*5;
+      const p=crossingPointV068(bridge,fixedAlong,lateral);
+      const dx=p.x-reg.marchV063.anchorX,dy=p.y-reg.marchV063.anchorY;
+      reg.marchV063.anchorX=p.x;reg.marchV063.anchorY=p.y;
+      for(const u of regimentMembers(reg)){u.x+=dx;u.y+=dy;u.arrivedAtTarget=false;}
+      window.RTS_SIM.step(.05);
+      info.state='approach';info.entered=false;info.forcedColumn=true;
+    }
+    const during=window.__RIVER_CROSSING_RECOVERY_V1__.stats();
+    const recoveryReason=reg.navigationV2?.bridgeRecoveryReason||null;
+    const recoveryTarget=reg.path?.[0]||null;
+    const safeTarget=!!recoveryTarget&&!waterAtV067(recoveryTarget.x,recoveryTarget.y)&&!segmentCrossesBlockedWaterV067(reg.marchV063.anchorX,reg.marchV063.anchorY,recoveryTarget.x,recoveryTarget.y);
+
+    for(let step=0;step<300;step++)window.RTS_SIM.step(.05);
+    const finalMembers=regimentMembers(reg).filter(u=>!u.dead),center=centroid(finalMembers),after=window.__RIVER_CROSSING_RECOVERY_V1__.stats();
+    const initialSide=Math.sign(bankSideV067(start.x,start.y)),finalSide=Math.sign(bankSideV067(center.x,center.y));
+    return{
+      setup:true,
+      axisRecoveries:during.axisStallRecoveries-before.axisStallRecoveries,
+      groupRecoveries:during.groupRecoveries-before.groupRecoveries,
+      recoveryReason,safeTarget,
+      maxAxisNoProgressSeconds:during.maxAxisNoProgressSeconds,
+      crossed:initialSide!==0&&finalSide!==0&&initialSide!==finalSide,
+      water:finalMembers.filter(u=>waterAtV067(u.x,u.y)).length,
+      finalState:reg.crossingTrafficV068?.state||null,
+      totalAxisRecoveries:after.axisStallRecoveries-before.axisStallRecoveries
+    };
+  });
+
+  console.log('BRIDGE_AXIS_STALL_RECOVERY',JSON.stringify(result));
+  expect(result.setup).toBe(true);
+  expect(result.axisRecoveries).toBeGreaterThan(0);
+  expect(result.groupRecoveries).toBeGreaterThan(0);
+  expect(result.recoveryReason).toBe('axis-stall');
+  expect(result.safeTarget).toBe(true);
+  expect(result.maxAxisNoProgressSeconds).toBeGreaterThanOrEqual(1);
+  expect(result.water).toBe(0);
 });
