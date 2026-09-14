@@ -75,13 +75,14 @@ test('3D combat feedback distance-culls fire markers outside the visual budget',
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__);
   await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__?.diagnostics().updates > 0);
+  await page.waitForFunction(() => Boolean(window.__NRTS_THREE_SCENE_HOOK_V1__?.camera?.()?.position));
 
   const before = await page.evaluate(() => window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__.diagnostics());
   const marked = await page.evaluate(() => {
     const snapshot = window.NRTS_3D_SOURCE.snapshot();
     const unit = snapshot.units.find(item => item.type === 'infantry' && !item.dead);
-    const camera = window.__NRTS_THREE_SCENE_HOOK_V1__?.camera?.();
-    if (!unit || !camera) return false;
+    const camera = window.__NRTS_THREE_SCENE_HOOK_V1__.camera();
+    if (!unit || !camera?.position) return false;
     unit.x = camera.position.x + 5000;
     unit.y = camera.position.z + 5000;
     unit.combatVisualV1 = { kind: 'musket-fire', started: snapshot.elapsed + 0.001, duration: 1.0 };
