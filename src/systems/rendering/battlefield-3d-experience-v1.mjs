@@ -1,4 +1,4 @@
-// v1.3.6: non-invasive 3D experience hardening around the public renderer API.
+// v1.3.7: non-invasive 3D experience hardening around the public renderer API.
 const api = window.__BATTLEFIELD_3D_V1__;
 const canvas = document.getElementById('battlefield3d');
 const modeButton = document.getElementById('renderModeBtn');
@@ -84,20 +84,23 @@ if (!api || !canvas || !modeButton) {
       return;
     }
     visualLayersImportStarted = true;
-    import('./battlefield-3d-unit-detail-v1.mjs?build=graphics12').catch(error => {
+    import('./battlefield-3d-unit-detail-v1.mjs?build=graphics13').catch(error => {
       console.warn('3D unit detail layer failed to load', error);
     });
-    import('./battlefield-3d-selection-feedback-v1.mjs?build=graphics12').catch(error => {
+    import('./battlefield-3d-selection-feedback-v1.mjs?build=graphics13').catch(error => {
       console.warn('3D selection feedback layer failed to load', error);
     });
-    import('./battlefield-3d-combat-feedback-v1.mjs?build=graphics12').catch(error => {
+    import('./battlefield-3d-combat-feedback-v1.mjs?build=graphics13').catch(error => {
       console.warn('3D combat feedback layer failed to load', error);
     });
-    import('./battlefield-3d-salvo-polish-v1.mjs?build=graphics12').catch(error => {
+    import('./battlefield-3d-salvo-polish-v1.mjs?build=graphics13').catch(error => {
       console.warn('3D salvo polish layer failed to load', error);
     });
-    import('./battlefield-3d-volley-readability-v1.mjs?build=graphics12').catch(error => {
+    import('./battlefield-3d-volley-readability-v1.mjs?build=graphics13').catch(error => {
       console.warn('3D volley readability layer failed to load', error);
+    });
+    import('./battlefield-3d-regiment-polish-v1.mjs?build=graphics13').catch(error => {
+      console.warn('3D regiment polish layer failed to load', error);
     });
   }
   importVisualLayersWhenReady();
