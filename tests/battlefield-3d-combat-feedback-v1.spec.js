@@ -16,6 +16,8 @@ test('3D combat feedback loads with hard pooled caps and distance LOD', async ({
       maxFlash: api.maxFlash,
       farLodCameraY: api.farLodCameraY,
       ultraFarLodCameraY: api.ultraFarLodCameraY,
+      nearEffectRadius: api.nearEffectRadius,
+      farEffectRadius: api.farEffectRadius,
       effects: api.effects,
       performanceModel: api.performanceModel,
       attached: Boolean(group),
@@ -28,13 +30,15 @@ test('3D combat feedback loads with hard pooled caps and distance LOD', async ({
   expect(state.maxSmoke).toBeLessThanOrEqual(96);
   expect(state.maxFlash).toBeLessThanOrEqual(48);
   expect(state.ultraFarLodCameraY).toBeGreaterThan(state.farLodCameraY);
+  expect(state.nearEffectRadius).toBeGreaterThan(0);
+  expect(state.farEffectRadius).toBeGreaterThan(state.nearEffectRadius);
   expect(state.effects).toEqual(expect.arrayContaining([
-    'musket-muzzle-flash',
+    'directional-musket-muzzle-flash',
     'musket-smoke',
-    'artillery-muzzle-flash',
+    'directional-artillery-muzzle-flash',
     'layered-artillery-smoke'
   ]));
-  expect(state.performanceModel).toBe('fixed-pool-instanced-effects-with-distance-lod');
+  expect(state.performanceModel).toBe('fixed-pool-instanced-effects-with-distance-culling-and-lod');
   expect(state.attached).toBe(true);
   expect(state.childCount).toBe(2);
   expect(state.diagnostics.active).toBe(true);
@@ -64,6 +68,33 @@ test('3D combat feedback reacts to live fire markers without changing simulation
   const after = await page.evaluate(() => window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__.diagnostics());
   expect(after.emittedMusket).toBeGreaterThan(before.emittedMusket);
   expect(after.smokeVisible).toBeGreaterThan(0);
+});
+
+test('3D combat feedback distance-culls fire markers outside the visual budget', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__);
+  await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.setEnabled(true));
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__?.diagnostics().updates > 0);
+
+  const before = await page.evaluate(() => window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__.diagnostics());
+  const marked = await page.evaluate(() => {
+    const snapshot = window.NRTS_3D_SOURCE.snapshot();
+    const unit = snapshot.units.find(item => item.type === 'infantry' && !item.dead);
+    const camera = window.__NRTS_THREE_SCENE_HOOK_V1__?.camera?.();
+    if (!unit || !camera) return false;
+    unit.x = camera.position.x + 5000;
+    unit.y = camera.position.z + 5000;
+    unit.combatVisualV1 = { kind: 'musket-fire', started: snapshot.elapsed + 0.001, duration: 1.0 };
+    return true;
+  });
+  expect(marked).toBe(true);
+
+  await page.waitForFunction(previous => {
+    return window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__.diagnostics().culledByDistance > previous;
+  }, before.culledByDistance);
+
+  const after = await page.evaluate(() => window.__BATTLEFIELD_3D_COMBAT_FEEDBACK_V1__.diagnostics());
+  expect(after.culledByDistance).toBeGreaterThan(before.culledByDistance);
 });
 
 test('3D combat feedback stops work in 2D mode and resumes in 3D', async ({ page }) => {
