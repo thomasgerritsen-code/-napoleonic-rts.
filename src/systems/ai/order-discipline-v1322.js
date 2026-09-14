@@ -183,3 +183,12 @@
   script.defer=true;
   document.head.appendChild(script);
 })();
+
+// Front/reserve cohesion is intentionally a separate light layer. It only runs when
+// the commander issues ATTACK/FLANK orders and therefore adds no per-frame scan.
+(() => {
+  const script=document.createElement('script');
+  script.src='src/systems/ai/front-reserve-cohesion-v143.js?build=143a';
+  script.defer=true;
+  document.head.appendChild(script);
+})();
