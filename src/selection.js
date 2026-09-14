@@ -1,5 +1,11 @@
 'use strict';
 // ---------- Selection ----------
+  // Compatibility alias: older runtime/debug layers still call the stable HUD helper name.
+  // Keep that contract while v1.4.4 uses the richer tactical implementation internally.
+  function selectionRegimentSummary(regs = selectedRegiments()) {
+    return selectionRegimentSummaryV144(regs);
+  }
+
   function unitAt(wx, wy, side = null) {
     let best = null, bestD = 24 / camera.zoom;
     for (const u of units) {
