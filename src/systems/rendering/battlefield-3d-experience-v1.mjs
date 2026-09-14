@@ -7,7 +7,7 @@ if (!api || !canvas || !modeButton) {
   console.warn('3D experience layer skipped: renderer API not ready.');
 } else {
   const STORAGE_KEY = 'nrts-render-mode';
-  const VISUAL_BUILD = 'graphics14';
+  const VISUAL_BUILD = 'graphics15';
   let fallbackReason = '';
   let visualLayersImportStarted = false;
   let visualLayersReady = 0;
@@ -23,7 +23,8 @@ if (!api || !canvas || !modeButton) {
     ['./battlefield-3d-combat-feedback-v1.mjs', '3D combat feedback layer'],
     ['./battlefield-3d-salvo-polish-v1.mjs', '3D salvo polish layer'],
     ['./battlefield-3d-volley-readability-v1.mjs', '3D volley readability layer'],
-    ['./battlefield-3d-regiment-polish-v1.mjs', '3D regiment polish layer']
+    ['./battlefield-3d-regiment-polish-v1.mjs', '3D regiment polish layer'],
+    ['./battlefield-3d-regimental-identity-v1.mjs', '3D regimental identity layer']
   ];
 
   function importVisualLayer(path, label) {
