@@ -19,6 +19,8 @@ if (!api || !canvas || !modeButton) {
   let deferredBatches = 0;
   let deferredWaits = 0;
   let framePressureWaits = 0;
+  let consecutiveFramePressureWaits = 0;
+  let forcedCosmeticLoads = 0;
   let framePressureTransitions = 0;
   let framePressure = false;
   let framePressureUntil = 0;
@@ -110,11 +112,14 @@ if (!api || !canvas || !modeButton) {
       setTimeout(() => importCosmeticLayers(index), 180);
       return;
     }
-    if (framePressure) {
+    if (framePressure && consecutiveFramePressureWaits < 3) {
       framePressureWaits++;
+      consecutiveFramePressureWaits++;
       setTimeout(() => importCosmeticLayers(index), 240);
       return;
     }
+    if (framePressure) forcedCosmeticLoads++;
+    consecutiveFramePressureWaits = 0;
     const [path, label] = cosmeticVisualLayers[index];
     importVisualLayer(path, label).finally(() => {
       scheduleDeferred(() => importCosmeticLayers(index + 1), 18);
@@ -222,6 +227,7 @@ if (!api || !canvas || !modeButton) {
       deferredWaits,
       framePressure,
       framePressureWaits,
+      forcedCosmeticLoads,
       framePressureTransitions,
       averageFrameMs: Math.round(averageFrameMs * 10) / 10,
       frameMonitorActive: Boolean(frameMonitorRaf)
