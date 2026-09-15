@@ -81,7 +81,15 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
       const reg = regiments.find(r => r.id === id && !r.destroyed);
       return reg ? artilleryForGroupV06(reg) : null;
     }).filter(Boolean);
+    const percentile = (values, p) => {
+      if (!values.length) return 0;
+      const sorted = [...values].sort((a, b) => a - b);
+      const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(p * sorted.length) - 1));
+      return sorted[index];
+    };
     const initialLiving = units.filter(u => !u.dead && (u.side === 'france' || u.side === 'britain')).length;
+    const frameIntervals = [];
+    let previousFrame = performance.now();
     let musketCombatFrames = 0;
     let artilleryFireFrames = 0;
     let maxEngagedRegiments = 0;
@@ -89,6 +97,7 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
     let maxParticles = 0;
     let maxSmokeEvents = 0;
     let maxPooledVolleySize = 0;
+    let maxPersistentVolleyClouds = 0;
     let sawMusketSmoke = false;
     let sawArtillerySmoke = false;
 
@@ -96,6 +105,9 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
       // Advance 12 deterministic simulation seconds while keeping the same 180 rendered samples.
       window.RTS_SIM.step(1 / 15);
       await new Promise(resolve => requestAnimationFrame(resolve));
+      const now = performance.now();
+      frameIntervals.push(now - previousFrame);
+      previousFrame = now;
       const states = infantryStates();
       const engaged = states.filter(state => state.engagement?.mode === 'fire').length;
       if (engaged > 0) musketCombatFrames += 1;
@@ -106,6 +118,7 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
       const smoke = window.__COMBAT_ANIMATIONS_V1__.smokeStats();
       maxSmokeEvents = Math.max(maxSmokeEvents, smoke.active);
       maxPooledVolleySize = Math.max(maxPooledVolleySize, smoke.maxPooledShots);
+      maxPersistentVolleyClouds = Math.max(maxPersistentVolleyClouds, smoke.persistentVolleyClouds || 0);
       sawMusketSmoke ||= smoke.musketClouds > 0;
       sawArtillerySmoke ||= smoke.artilleryClouds > 0;
     }
@@ -113,6 +126,9 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
     const finalLiving = units.filter(u => !u.dead && (u.side === 'france' || u.side === 'britain')).length;
     return {
       simulationSeconds: 12,
+      renderedSamples: frameIntervals.length,
+      p95FrameMs: percentile(frameIntervals, 0.95),
+      maxFrameMs: Math.max(...frameIntervals),
       initialLiving,
       finalLiving,
       casualties: initialLiving - finalLiving,
@@ -123,9 +139,11 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
       maxParticles,
       maxSmokeEvents,
       maxPooledVolleySize,
+      maxPersistentVolleyClouds,
       sawMusketSmoke,
       sawArtillerySmoke,
       smokeEventCap: window.__COMBAT_ANIMATIONS_V1__.smokeStats().cap,
+      combatAnimationsVersion: window.__COMBAT_ANIMATIONS_V1__.version,
       batteryCount: batteryIds.length,
       batteriesOperational: batteryIds.every(id => {
         const reg = regiments.find(r => r.id === id && !r.destroyed);
@@ -135,7 +153,7 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
     };
   }, setup);
 
-  const report = { version: '1.1', scenario: 'golden-battle-combat-v11', deterministicSeed: GOLDEN_SEED, setup, coverage };
+  const report = { version: '1.2', scenario: 'golden-battle-combat-v11', deterministicSeed: GOLDEN_SEED, setup, coverage };
   persistReport(report);
   await testInfo.attach('golden-battle-combat-v11-report', { body: Buffer.from(JSON.stringify(report, null, 2)), contentType: 'application/json' });
   await testInfo.attach('golden-battle-combat-v11-frame', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
@@ -152,6 +170,12 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
   expect(coverage.sawMusketSmoke).toBe(true);
   expect(coverage.sawArtillerySmoke).toBe(true);
   expect(coverage.maxPooledVolleySize).toBeGreaterThan(1);
+  expect(coverage.maxPersistentVolleyClouds).toBeGreaterThan(0);
   expect(coverage.maxSmokeEvents).toBeGreaterThan(0);
   expect(coverage.maxSmokeEvents).toBeLessThanOrEqual(coverage.smokeEventCap);
+  expect(coverage.renderedSamples).toBe(180);
+  expect(coverage.p95FrameMs).toBeGreaterThan(0);
+  // Same broad catastrophic ceiling as Golden Battle V1. Tighten only after
+  // repeated comparable hosted-CI combat baselines exist.
+  expect(coverage.p95FrameMs).toBeLessThan(250);
 });

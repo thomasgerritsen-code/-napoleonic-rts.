@@ -2,69 +2,100 @@
   "schemaVersion": 1,
   "updatedAt": "2026-09-15",
   "sourceOfTruth": "main",
-  "currentFocus": "mobile performance calibration after touch-control vertical slice and bridge axis-stall recovery merged",
+  "currentFocus": "profile and reduce sustained 2D combat render cost without weakening black-powder readability",
   "baselines": {
-    "ci": "main d0a89efea498a2b3eb44093e3553522c84a48134 is green with bridge recovery and mobile touch-control vertical slice",
-    "visualFoundation": {
-      "status": "merged on c275bc0400c81149d0b2f73c11864abbaaf51f03",
-      "deterministic": true,
-      "viewportCulled": true,
-      "perFrameRandomGeneration": false
+    "ci": {
+      "baseMain": "062711e1dd820ef4b7d775554cc748af6db7a959",
+      "functionalValidation": "PR #119 run 712 green before state-only metadata refresh",
+      "version": "1.3.22"
     },
     "goldenBattle": {
-      "status": "merged on 8ae5c1751d40126a79fc64537ccd73e4f30fd6eb; repeat comparable CI artifacts before tightening budgets",
       "deterministicSeed": 18150914,
-      "checks": ["real requestAnimationFrame p95 frame pacing","game-health runtime/position invariants","formation anchor validity and readiness sample","stable canvas identity and dimensions","opaque consecutive frames"]
+      "core": {
+        "renderSamples": 120,
+        "browserP95FrameMs": 60.5,
+        "maxFrameMs": 68.1,
+        "stableCanvas": true,
+        "opaqueFrames": true,
+        "invalidPositions": 0,
+        "runtimeErrors": 0
+      },
+      "combat": {
+        "renderSamples": 180,
+        "simulationSeconds": 12,
+        "browserP95FrameMs": 110.4,
+        "maxFrameMs": 189.5,
+        "maxPersistentVolleyClouds": 5,
+        "maxPooledVolleyShots": 24,
+        "maxSmokeEvents": 10,
+        "smokeEventCap": 80,
+        "musketCombatFrames": 149,
+        "artilleryFireFrames": 34,
+        "casualties": 5,
+        "combatAnimationsVersion": "combat-animations-v1.2"
+      }
     },
-    "regimentVisualHierarchy": {
-      "status": "merged on c7d4eee35f394a2380cfa6a746bf4321608ff4d1",
-      "lodThresholds": {"massBelow": 0.55, "silhouetteBelow": 0.9},
-      "presentationOnly": true,
-      "viewportCulled": true
-    },
-    "bridgeRecovery": {
-      "status": "merged on 85c543ba2ecbf17fa9f6e1a6a887fa5e5447da6a after fully green CI",
-      "failureCovered": "lateral bridge-mouth oscillation no longer resets group progress indefinitely",
-      "progressMetric": "signed high-water progress along selected crossing axis"
+    "bridgeChokepoints": {
+      "crossings": 4,
+      "routesTested": 20,
+      "routesCompleted": 20,
+      "failures": 0,
+      "maxObservedStallSeconds": 2.5,
+      "hardStalls": 0
     },
     "mobile": {
-      "status": "touch-control vertical slice merged on d0a89efea498a2b3eb44093e3553522c84a48134; adaptive render-budget candidate on perf/mobile-adaptive-dpr-v1",
+      "status": "touch-control vertical slice and adaptive 2D canvas render budget are on main",
       "primaryOrientation": "landscape",
       "inputModel": "Pointer Events sharing existing selection/order/camera authorities",
-      "renderBudgetCandidate": {"mobileDprCap": 1.5, "desktopDprCap": 2, "highDprBackingPixelReductionVsCap2": "43.75%"}
+      "mobileDprCap": 1.5,
+      "desktopDprCap": 2,
+      "highDprBackingPixelReductionVsCap2": "43.75%",
+      "coverage": ["844x390 high-DPR touch landscape", "390x844 orientation/portrait coordinate smoke", "desktop DPR ceiling"]
     }
   },
   "performanceBudgets": {
-    "goldenBattle": "temporary catastrophic ceiling p95 < 250 ms; freeze tighter numeric budget only after repeated comparable CI baselines",
-    "mobileCanvas": "candidate cap 1.5 DPR on coarse/small-screen devices; validate touch mapping, orientation and existing CI before merge"
+    "goldenBattle": "temporary catastrophic browser p95 < 250 ms; tighten only after repeated comparable hosted-CI baselines",
+    "combatGolden": "temporary catastrophic browser p95 < 250 ms with persistent smoke invariant and <=80 smoke events",
+    "mobileCanvas": "1.5 DPR cap on coarse/small-screen devices; 2 DPR desktop cap"
   },
   "technicalDebt": [
-    "legacy script-load chain remains long and should be consolidated only when tests protect load order",
-    "numeric Golden Battle p95 budget needs repeated CI measurements before a tight regression threshold is frozen",
-    "regiment visual LOD currently composes over the detailed character renderer; fold into the renderer when a safe load-chain consolidation is undertaken",
-    "legacy touchstart/touchend listeners remain registered in input.js but the mobile Pointer Events authority suppresses them at capture phase; remove the obsolete legacy touch path in a dedicated input cleanup once compatibility tests cover it",
-    "mobile canvas budget currently reapplies after core.js resize listener; consolidate into core resize authority only when load-order regression coverage is stronger"
+    "sustained combat Golden sample is materially heavier than the core Golden sample; profile draw/effect hot paths before adding denser combat effects",
+    "numeric Golden p95 budgets need repeated comparable CI measurements before tighter thresholds are frozen",
+    "legacy touchstart/touchend listeners remain in input.js while Pointer Events are the mobile gameplay authority",
+    "mobile canvas budget reapplies after the core resize listener instead of sharing one resize authority",
+    "legacy script-load chain remains long and should only be consolidated with load-order regression coverage"
   ],
   "provenApproaches": [
-    "precompute deterministic static render detail instead of regenerating it every frame",
-    "viewport-cull decorative and unit rendering",
-    "reduce low-zoom per-unit decoration before reducing tactical silhouette readability",
-    "stabilize and merge green open work before starting overlapping changes",
-    "separate fixed-step deterministic scenario setup from real requestAnimationFrame render measurement",
-    "measure bridge recovery by signed crossing-axis progress rather than generic visible movement",
-    "route mobile touch gestures through existing selection, issueMove, issueMoveWithFacing and camera authorities rather than creating parallel gameplay state"
+    "stabilize and merge green open work before overlapping changes",
+    "separate deterministic fixed-step scenario progression from real requestAnimationFrame render measurement",
+    "pool black-powder effects at regiment/salvo level and keep a hard event cap",
+    "measure bridge progress along the crossing axis and require bounded completion without teleportation",
+    "route touch gestures through the same selection/order/camera authorities as desktop",
+    "cap mobile backing-store DPR while preserving CSS/world coordinate space"
   ],
   "avoid": [
     "new gameplay authority in presentation modules",
     "per-frame random terrain generation",
-    "visual improvements that introduce canvas remounts or full DOM rebuilds",
+    "visual changes that remount/reset the canvas or rebuild the HUD DOM per frame",
     "tight performance gates derived from a single hosted-CI sample",
-    "treating lateral bridge-mouth oscillation as valid route progress",
-    "independent mouse and touch command semantics that can diverge"
+    "treating lateral bridge-mouth oscillation as route progress",
+    "independent mouse and touch gameplay semantics"
   ],
   "candidates": [
-    {"priority":1,"name":"Validate adaptive mobile canvas DPR budget","reason":"high-DPR phones currently render up to DPR 2; a 1.5 cap cuts backing pixels 43.75% while preserving CSS/world coordinate space"},
-    {"priority":2,"name":"Golden Battle V1.1 combat coverage and performance calibration","reason":"exercise sustained musket/artillery combat now movement and mobile input stability are improved"},
-    {"priority":3,"name":"Remove obsolete legacy touch listener path","reason":"reduce duplicate input plumbing only after mobile device-emulation tests protect compatibility"}
+    {
+      "priority": 1,
+      "name": "Profile sustained 2D combat render hot paths",
+      "reason": "same CI run measured combat Golden p95 110.4 ms versus core Golden 60.5 ms; reduce draw/effect cost without losing persistent smoke/readability"
+    },
+    {
+      "priority": 2,
+      "name": "Remove obsolete legacy touch listener path",
+      "reason": "reduce duplicate input plumbing now Pointer Events and phone emulation tests protect the shared command path"
+    },
+    {
+      "priority": 3,
+      "name": "Repeat Golden combat baselines and calibrate tighter budgets",
+      "reason": "one hosted-CI sample is enough for a catastrophic gate but not a reliable tight regression threshold"
+    }
   ]
 }
