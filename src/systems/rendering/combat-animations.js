@@ -13,8 +13,8 @@
   const baseDrawUnit=drawUnit;
   const baseDrawParticles=drawParticles;
 
-  function mark(u,kind,duration){if(!u||u.kind!=='unit')return;u.combatVisualV1={kind,started:elapsed,duration};}
-  function active(u){const a=u?.combatVisualV1;if(!a)return null;const age=elapsed-a.started;return age>=0&&age<a.duration?{...a,age,t:age/a.duration}:null;}
+  function mark(u,kind,duration){if(!u||u.kind!=='unit')return;u.combatVisualV1={kind,started:elapsed,duration,age:0,t:0};}
+  function active(u){const a=u?.combatVisualV1;if(!a)return null;const age=elapsed-a.started;if(age<0||age>=a.duration)return null;a.age=age;a.t=age/a.duration;return a;}
 
   function addSmokeEvent(unit,kind){
     if(!unit)return;
