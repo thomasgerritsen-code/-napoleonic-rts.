@@ -24,7 +24,6 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
   await page.waitForFunction(() => Boolean(
     window.__RTS_DEBUG__?.runScenario &&
     window.__RTS_DEBUG__?.createFreshInfantryRegiment &&
-    window.__RTS_DEBUG__?.selectForBattery &&
     window.__RTS_DEBUG__?.formationState &&
     window.__COMBAT_ANIMATIONS_V1__?.animationFor &&
     window.RTS_SIM?.step
@@ -47,22 +46,27 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
 
     const batteryIds = [];
     for (const side of ['france', 'britain']) {
-      window.__RTS_DEBUG__.selectForBattery(side);
-      const selected = [...selectedUnits];
-      const cannonCandidate = selected.find(u => u.type === 'artillery');
-      const crewCandidates = selected.filter(u => u.type === 'infantry');
+      const x = side === 'france' ? 1730 : 2070;
+      const y = side === 'france' ? 530 : 1370;
+      const facing = side === 'france' ? 0 : Math.PI;
+      const cannonCandidate = createUnit(side, 'artillery', x, y);
+      const crewCandidates = [
+        createUnit(side, 'infantry', x + (side === 'france' ? -24 : 24), y - 12),
+        createUnit(side, 'infantry', x + (side === 'france' ? -24 : 24), y + 12)
+      ];
+      cannonCandidate.facing = facing;
       const battery = createArtilleryBatteryV06(side, cannonCandidate, crewCandidates);
       if (!battery) continue;
       const cannon = artilleryForGroupV06(battery);
       if (!cannon) continue;
-      const x = side === 'france' ? 1730 : 2070;
-      const y = side === 'france' ? 530 : 1370;
       cannon.x = cannon.targetX = x;
       cannon.y = cannon.targetY = y;
-      cannon.facing = side === 'france' ? 0 : Math.PI;
+      cannon.facing = facing;
+      battery.facing = battery.targetFacing = facing;
       for (const crew of artilleryCrewV06(battery)) {
         crew.x = crew.targetX = x + (side === 'france' ? -24 : 24);
         crew.y = crew.targetY = y + (crew.id % 2 ? -12 : 12);
+        crew.facing = facing;
       }
       batteryIds.push(battery.id);
     }
