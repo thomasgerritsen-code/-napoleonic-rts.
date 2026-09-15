@@ -2,19 +2,20 @@
   "schemaVersion": 1,
   "updatedAt": "2026-09-15",
   "sourceOfTruth": "main",
-  "currentFocus": "profile and reduce sustained 2D combat render cost without weakening black-powder readability",
+  "currentFocus": "profile the general 2D draw pass after proven smoke batching gains; reduce regiment/character render cost without weakening battlefield readability",
   "baselines": {
     "ci": {
-      "baseMain": "062711e1dd820ef4b7d775554cc748af6db7a959",
-      "functionalValidation": "PR #119 run 712 green before state-only metadata refresh",
+      "baseMain": "a999122dd4da8e2a83ec5e2bf93bb5628a68fb40",
+      "functionalValidation": "main run 718 green after PR #121 smoke batching",
       "version": "1.3.22"
     },
     "goldenBattle": {
       "deterministicSeed": 18150914,
       "core": {
         "renderSamples": 120,
-        "browserP95FrameMs": 60.5,
-        "maxFrameMs": 68.1,
+        "browserP95FrameMs": 55.2,
+        "drawP95Ms": 41.31,
+        "updateP95Ms": 12.41,
         "stableCanvas": true,
         "opaqueFrames": true,
         "invalidPositions": 0,
@@ -23,8 +24,7 @@
       "combat": {
         "renderSamples": 180,
         "simulationSeconds": 12,
-        "browserP95FrameMs": 110.4,
-        "maxFrameMs": 189.5,
+        "browserP95FrameMs": 100.0,
         "maxPersistentVolleyClouds": 5,
         "maxPooledVolleyShots": 24,
         "maxSmokeEvents": 10,
@@ -32,7 +32,7 @@
         "musketCombatFrames": 149,
         "artilleryFireFrames": 34,
         "casualties": 5,
-        "combatAnimationsVersion": "combat-animations-v1.2"
+        "combatAnimationsVersion": "combat-animations-v1.3"
       }
     },
     "bridgeChokepoints": {
@@ -59,7 +59,7 @@
     "mobileCanvas": "1.5 DPR cap on coarse/small-screen devices; 2 DPR desktop cap"
   },
   "technicalDebt": [
-    "sustained combat Golden sample is materially heavier than the core Golden sample; profile draw/effect hot paths before adding denser combat effects",
+    "core Golden draw p95 41.31 ms materially exceeds update p95 12.41 ms; profile regiment/character rendering before further combat-effect micro-optimization",
     "numeric Golden p95 budgets need repeated comparable CI measurements before tighter thresholds are frozen",
     "legacy touchstart/touchend listeners remain in input.js while Pointer Events are the mobile gameplay authority",
     "mobile canvas budget reapplies after the core resize listener instead of sharing one resize authority",
@@ -69,6 +69,7 @@
     "stabilize and merge green open work before overlapping changes",
     "separate deterministic fixed-step scenario progression from real requestAnimationFrame render measurement",
     "pool black-powder effects at regiment/salvo level and keep a hard event cap",
+    "batch smoke canvas state and avoid per-lobe style allocations; main run improved combat p95 from 110.4 ms to 100.0 ms and core p95 from 60.5 ms to 55.2 ms",
     "measure bridge progress along the crossing axis and require bounded completion without teleportation",
     "route touch gestures through the same selection/order/camera authorities as desktop",
     "cap mobile backing-store DPR while preserving CSS/world coordinate space"
@@ -79,13 +80,14 @@
     "visual changes that remount/reset the canvas or rebuild the HUD DOM per frame",
     "tight performance gates derived from a single hosted-CI sample",
     "treating lateral bridge-mouth oscillation as route progress",
-    "independent mouse and touch gameplay semantics"
+    "independent mouse and touch gameplay semantics",
+    "further smoke micro-optimization without profiling evidence that smoke remains dominant"
   ],
   "candidates": [
     {
       "priority": 1,
-      "name": "Profile sustained 2D combat render hot paths",
-      "reason": "same CI run measured combat Golden p95 110.4 ms versus core Golden 60.5 ms; reduce draw/effect cost without losing persistent smoke/readability"
+      "name": "Profile regiment and character draw cost",
+      "reason": "post-#121 core Golden draw p95 is 41.31 ms versus update p95 12.41 ms; general draw work is now the clearest measured bottleneck"
     },
     {
       "priority": 2,
@@ -95,7 +97,7 @@
     {
       "priority": 3,
       "name": "Repeat Golden combat baselines and calibrate tighter budgets",
-      "reason": "one hosted-CI sample is enough for a catastrophic gate but not a reliable tight regression threshold"
+      "reason": "the 9.4% combat p95 and 8.8% core p95 improvements are encouraging, but tighter thresholds still need repeated comparable CI measurements"
     }
   ]
 }
