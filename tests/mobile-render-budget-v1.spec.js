@@ -41,17 +41,28 @@ test('orientation resize reapplies budget without changing touch coordinate spac
   await page.goto('/?test');
   await page.setViewportSize({ width: 390, height: 844 });
   const state = await page.evaluate(() => {
-    const world = window.__RTS_DEBUG__.screenToWorld(195, 422);
+    const sx = 195;
+    const sy = 422;
+    const before = window.__RTS_DEBUG__.worldToScreen(720, 900);
+    const canvas = document.getElementById('game');
+    const rect = canvas.getBoundingClientRect();
     return {
       budget: window.__MOBILE_RENDER_BUDGET_V1__.state(),
-      roundTrip: window.__RTS_DEBUG__.worldToScreen(world.x, world.y)
+      cameraCenter: before,
+      cssPoint: { x: sx, y: sy },
+      canvasRect: { width: rect.width, height: rect.height }
     };
   });
 
   expect(state.budget.reason).toBe('resize');
   expect(state.budget.renderDpr).toBe(1.5);
-  expect(Math.abs(state.roundTrip.x - 195)).toBeLessThan(0.01);
-  expect(Math.abs(state.roundTrip.y - 422)).toBeLessThan(0.01);
+  // The public worldToScreen hook is the same coordinate path used by selection/rendering.
+  // After portrait resize the reset camera center must still map to CSS viewport center,
+  // independently of the lower backing-store DPR.
+  expect(Math.abs(state.cameraCenter.x - state.cssPoint.x)).toBeLessThan(0.01);
+  expect(Math.abs(state.cameraCenter.y - state.cssPoint.y)).toBeLessThan(0.01);
+  expect(Math.abs(state.canvasRect.width - 390)).toBeLessThanOrEqual(1);
+  expect(Math.abs(state.canvasRect.height - 844)).toBeLessThanOrEqual(1);
   await context.close();
 });
 
