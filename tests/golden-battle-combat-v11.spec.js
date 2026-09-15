@@ -10,7 +10,7 @@ function persistReport(report) {
   fs.writeFileSync(path.join(outputDir, 'golden-battle-combat-v11-report.json'), JSON.stringify(report, null, 2));
 }
 
-test('Golden Battle V1.1 guarantees sustained musket and artillery combat coverage', async ({ page }, testInfo) => {
+test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder coverage', async ({ page }, testInfo) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.addInitScript(seedValue => {
@@ -26,6 +26,7 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
     window.__RTS_DEBUG__?.createFreshInfantryRegiment &&
     window.__RTS_DEBUG__?.formationState &&
     window.__COMBAT_ANIMATIONS_V1__?.animationFor &&
+    window.__COMBAT_ANIMATIONS_V1__?.smokeStats &&
     window.RTS_SIM?.step
   ));
 
@@ -86,6 +87,10 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
     let maxEngagedRegiments = 0;
     let maxProjectiles = 0;
     let maxParticles = 0;
+    let maxSmokeEvents = 0;
+    let maxPooledVolleySize = 0;
+    let sawMusketSmoke = false;
+    let sawArtillerySmoke = false;
 
     for (let frame = 0; frame < 180; frame += 1) {
       // Advance 12 deterministic simulation seconds while keeping the same 180 rendered samples.
@@ -98,6 +103,11 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
       if (batteryCannons().some(cannon => window.__COMBAT_ANIMATIONS_V1__.animationFor(cannon)?.kind === 'artillery-fire')) artilleryFireFrames += 1;
       maxProjectiles = Math.max(maxProjectiles, projectiles.length);
       maxParticles = Math.max(maxParticles, particles.length);
+      const smoke = window.__COMBAT_ANIMATIONS_V1__.smokeStats();
+      maxSmokeEvents = Math.max(maxSmokeEvents, smoke.active);
+      maxPooledVolleySize = Math.max(maxPooledVolleySize, smoke.maxPooledShots);
+      sawMusketSmoke ||= smoke.musketClouds > 0;
+      sawArtillerySmoke ||= smoke.artilleryClouds > 0;
     }
 
     const finalLiving = units.filter(u => !u.dead && (u.side === 'france' || u.side === 'britain')).length;
@@ -111,6 +121,11 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
       maxEngagedRegiments,
       maxProjectiles,
       maxParticles,
+      maxSmokeEvents,
+      maxPooledVolleySize,
+      sawMusketSmoke,
+      sawArtillerySmoke,
+      smokeEventCap: window.__COMBAT_ANIMATIONS_V1__.smokeStats().cap,
       batteryCount: batteryIds.length,
       batteriesOperational: batteryIds.every(id => {
         const reg = regiments.find(r => r.id === id && !r.destroyed);
@@ -134,4 +149,9 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
   expect(coverage.artilleryFireFrames).toBeGreaterThan(0);
   expect(coverage.maxProjectiles).toBeGreaterThan(0);
   expect(coverage.casualties).toBeGreaterThan(0);
+  expect(coverage.sawMusketSmoke).toBe(true);
+  expect(coverage.sawArtillerySmoke).toBe(true);
+  expect(coverage.maxPooledVolleySize).toBeGreaterThan(1);
+  expect(coverage.maxSmokeEvents).toBeGreaterThan(0);
+  expect(coverage.maxSmokeEvents).toBeLessThanOrEqual(coverage.smokeEventCap);
 });
