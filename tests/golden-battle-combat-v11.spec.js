@@ -88,7 +88,8 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
     let maxParticles = 0;
 
     for (let frame = 0; frame < 180; frame += 1) {
-      window.RTS_SIM.step(1 / 30);
+      // Advance 12 deterministic simulation seconds while keeping the same 180 rendered samples.
+      window.RTS_SIM.step(1 / 15);
       await new Promise(resolve => requestAnimationFrame(resolve));
       const states = infantryStates();
       const engaged = states.filter(state => state.engagement?.mode === 'fire').length;
@@ -101,6 +102,7 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
 
     const finalLiving = units.filter(u => !u.dead && (u.side === 'france' || u.side === 'britain')).length;
     return {
+      simulationSeconds: 12,
       initialLiving,
       finalLiving,
       casualties: initialLiving - finalLiving,
