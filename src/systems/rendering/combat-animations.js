@@ -66,26 +66,27 @@
   function seededOffset(seed,index){const n=(Math.imul((seed^(index*374761393))>>>0,668265263)>>>0)/4294967295;return n*2-1;}
 
   function drawSmoke(){
+    if(!smokeEvents.length)return;
+    ctx.save();ctx.fillStyle='#d2cfc2';
     for(let i=smokeEvents.length-1;i>=0;i--){
       const e=smokeEvents[i],age=elapsed-e.born;if(age>=e.life){smokeEvents.splice(i,1);continue;}
       const t=Math.max(0,Math.min(1,age/e.life)),fade=Math.pow(1-t,1.45),artillery=e.kind==='artillery';
       const lobeCount=artillery?7:Math.min(9,3+Math.ceil(e.count/6));
       const forward=(artillery?24:10)*t,spread=(artillery?28:18)*(0.35+t*.9)+Math.min(24,e.count*.52),baseRadius=(artillery?9:5.5)+(artillery?24:15)*t+Math.min(10,e.count*.24);
       const fx=Math.cos(e.facing),fy=Math.sin(e.facing),px=-fy,py=fx;
-      ctx.save();
       for(let l=0;l<lobeCount;l++){
         const lateral=seededOffset(e.seed,l)*spread,along=forward+seededOffset(e.seed^0x9e3779b9,l)*spread*.36,radius=baseRadius*(.72+(seededOffset(e.seed^0x85ebca6b,l)+1)*.18);
-        const alpha=fade*(artillery?.17:.115)*(1-Math.min(.45,l*.04));ctx.fillStyle=`rgba(210,207,194,${alpha})`;ctx.beginPath();ctx.arc(e.x+fx*along+px*lateral,e.y+fy*along+py*lateral,radius,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=fade*(artillery?.17:.115)*(1-Math.min(.45,l*.04));ctx.beginPath();ctx.arc(e.x+fx*along+px*lateral,e.y+fy*along+py*lateral,radius,0,Math.PI*2);ctx.fill();
       }
-      ctx.restore();
     }
+    ctx.restore();
   }
 
   function drawFalls(){for(let i=visualEvents.length-1;i>=0;i--){const e=visualEvents[i],age=elapsed-e.born;if(age>=e.life){visualEvents.splice(i,1);continue;}const t=Math.min(1,age/.42),alpha=Math.min(.72,(e.life-age)*.7);ctx.save();ctx.globalAlpha=alpha;ctx.translate(e.x,e.y);ctx.rotate(e.facing+t*Math.PI*.42);ctx.fillStyle=e.side==='france'?'#244d9a':'#a5322f';if(e.type==='cavalry'){ctx.fillStyle='#564334';ctx.beginPath();ctx.ellipse(0,2,11,5.2,.25,0,Math.PI*2);ctx.fill();}ctx.fillStyle=e.side==='france'?'#244d9a':'#a5322f';ctx.beginPath();ctx.ellipse(0,0,5,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d1a784';ctx.beginPath();ctx.arc(0,-7,2.5,0,Math.PI*2);ctx.fill();ctx.restore();}}
   drawParticles=function drawParticlesCombatAnimationsV1(){baseDrawParticles();drawSmoke();drawFalls();};
 
   function smokeStats(){let musketClouds=0,artilleryClouds=0,maxPooledShots=0,persistentVolleyClouds=0;for(const e of smokeEvents){if(e.kind==='artillery')artilleryClouds+=1;else{musketClouds+=1;if(e.count>=8&&elapsed-e.born>=.35)persistentVolleyClouds+=1;}maxPooledShots=Math.max(maxPooledShots,e.count||1);}return {active:smokeEvents.length,musketClouds,artilleryClouds,maxPooledShots,persistentVolleyClouds,cap:MAX_SMOKE_EVENTS};}
-  const api=Object.freeze({version:'combat-animations-v1.2',eventCount:()=>visualEvents.length,animationFor:u=>active(u),smokeStats,features:Object.freeze(['musket-fire','reload','bayonet','cavalry-charge','artillery-recoil','hit-reaction','death-fall','pooled-volley-smoke','persistent-smoke-line','artillery-smoke'])});
+  const api=Object.freeze({version:'combat-animations-v1.3',eventCount:()=>visualEvents.length,animationFor:u=>active(u),smokeStats,features:Object.freeze(['musket-fire','reload','bayonet','cavalry-charge','artillery-recoil','hit-reaction','death-fall','pooled-volley-smoke','persistent-smoke-line','artillery-smoke','batched-smoke-canvas-state'])});
   nrts.subsystems.register('combat-animations',api,{phase:'architecture-v2',legacyBridge:false,responsibility:'visual-only combat event animation and pooled black-powder smoke synchronized to simulation fire and damage events'});
   global.__COMBAT_ANIMATIONS_V1__=api;
 })(window);
