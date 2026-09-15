@@ -1,4 +1,4 @@
-const { test, expect, devices } = require('@playwright/test');
+const { test, expect } = require('@playwright/test');
 
 const phoneCases = [
   { name: 'compact iPhone landscape', viewport: { width: 844, height: 390 }, dpr: 3 },
@@ -79,22 +79,21 @@ test('single touch on selected-unit terrain emits exactly one move order', async
   await boot(page, { viewport: { width: 915, height: 412 } });
 
   const selected = await page.evaluate(() => {
-    const state = window.__RTS_DEBUG__.getState();
-    const id = state.france.regiments[0]?.id;
-    if (!id) return false;
-    window.__RTS_DEBUG__.selectRegiment(id);
-    return window.__RTS_DEBUG__.getState().selected.length > 0;
+    if (!window.__RTS_DEBUG__?.runScenario?.('morale-35')) return false;
+    return window.RTS_SIM.snapshot().selection.unitIds.length > 0;
   });
   expect(selected).toBeTruthy();
+
   const before = await page.evaluate(() => window.__PLAYABILITY_CONTROLS_V1__.mobile.state());
   await page.evaluate(() => {
     const canvas = document.getElementById('game');
-    const opts = { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: 460, clientY: 205, bubbles: true, cancelable: true };
+    const opts = { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: 650, clientY: 205, bubbles: true, cancelable: true };
     canvas.dispatchEvent(new PointerEvent('pointerdown', opts));
     canvas.dispatchEvent(new PointerEvent('pointerup', opts));
   });
   const after = await page.evaluate(() => window.__PLAYABILITY_CONTROLS_V1__.mobile.state());
-  expect(after.moveOrders - before.moveOrders).toBeLessThanOrEqual(1);
+
+  expect(after.moveOrders - before.moveOrders).toBe(1);
   expect(after.facingOrders).toBe(before.facingOrders);
   await context.close();
 });
