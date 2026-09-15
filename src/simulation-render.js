@@ -1,12 +1,20 @@
 'use strict';
 const HUD_REFRESH_INTERVAL = 0.10;
 let hudRefreshAccumulator = 0;
+const worldViewBounds = { left: 0, right: 0, top: 0, bottom: 0 };
 
-function isWorldVisible(x, y, padding = 0) {
+function refreshWorldViewBounds() {
   const halfW = innerWidth / (2 * camera.zoom);
   const halfH = innerHeight / (2 * camera.zoom);
-  return x >= camera.x - halfW - padding && x <= camera.x + halfW + padding &&
-    y >= camera.y - halfH - padding && y <= camera.y + halfH + padding;
+  worldViewBounds.left = camera.x - halfW;
+  worldViewBounds.right = camera.x + halfW;
+  worldViewBounds.top = camera.y - halfH;
+  worldViewBounds.bottom = camera.y + halfH;
+}
+
+function isWorldVisible(x, y, padding = 0) {
+  return x >= worldViewBounds.left - padding && x <= worldViewBounds.right + padding &&
+    y >= worldViewBounds.top - padding && y <= worldViewBounds.bottom + padding;
 }
 
 // ---------- Victory ----------
@@ -196,6 +204,7 @@ function isWorldVisible(x, y, padding = 0) {
   }
 
   function draw() {
+    refreshWorldViewBounds();
     ctx.clearRect(0, 0, innerWidth, innerHeight);
     ctx.save();
     ctx.translate(innerWidth / 2, innerHeight / 2); ctx.scale(camera.zoom, camera.zoom); ctx.translate(-camera.x, -camera.y);
