@@ -48,8 +48,10 @@ test('Golden Battle V1.1 guarantees sustained musket and artillery combat covera
     const batteryIds = [];
     for (const side of ['france', 'britain']) {
       window.__RTS_DEBUG__.selectForBattery(side);
-      makePlayerArtilleryBatteryV06();
-      const battery = [...regiments].reverse().find(r => !r.destroyed && r.side === side && groupKindV06(r) === 'artillery');
+      const selected = [...selectedUnits];
+      const cannonCandidate = selected.find(u => u.type === 'artillery');
+      const crewCandidates = selected.filter(u => u.type === 'infantry');
+      const battery = createArtilleryBatteryV06(side, cannonCandidate, crewCandidates);
       if (!battery) continue;
       const cannon = artilleryForGroupV06(battery);
       if (!cannon) continue;
