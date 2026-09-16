@@ -1,16 +1,40 @@
 {
-  "version": 1,
-  "endpoint": "fal-ai/nano-banana-pro",
-  "requestDefaults": {
-    "resolution": "2K",
-    "aspect_ratio": "16:9",
-    "output_format": "png",
-    "safety_tolerance": "4",
-    "enable_web_search": false,
-    "limit_generations": true
+  "version": 2,
+  "defaultProvider": "leonardo",
+  "providers": {
+    "leonardo": {
+      "kind": "leonardo-v1",
+      "endpoint": "https://cloud.leonardo.ai/api/rest/v1/generations",
+      "pollEndpoint": "https://cloud.leonardo.ai/api/rest/v1/generations",
+      "envKey": "LEONARDO_API_KEY",
+      "modelId": "b24e16ff-06e3-43eb-8d33-4416c2d75876",
+      "modelLabel": "Leonardo Lightning XL",
+      "requestDefaults": {
+        "width": 1536,
+        "height": 864,
+        "num_images": 1,
+        "alchemy": true,
+        "presetStyle": "ILLUSTRATION",
+        "public": false
+      }
+    },
+    "fal": {
+      "kind": "fal-queue",
+      "endpoint": "fal-ai/nano-banana-pro",
+      "envKey": "FAL_KEY",
+      "modelLabel": "Nano Banana Pro",
+      "requestDefaults": {
+        "resolution": "2K",
+        "aspect_ratio": "16:9",
+        "output_format": "png",
+        "safety_tolerance": "4",
+        "enable_web_search": false,
+        "limit_generations": true
+      }
+    }
   },
   "systemPrompt": "You are producing visual-development art for a playable Napoleonic real-time strategy game. Preserve a consistent high-angle top-down / 2.5D strategy-camera language, semi-realistic painterly rendering, muted historical palette, clean silhouettes, readable regiment structure, coherent soft sunlight and contact shadows, and strong gameplay readability at distance. Avoid cinematic close-ups and avoid decorative detail that obscures tactical information. Keep proportions, terrain scale, facing direction and formation spacing believable. No UI, no text, no logos, no watermarks.",
-  "avoid": "Avoid: cinematic close-up framing, first-person view, fantasy armor, modern weapons, science-fiction elements, bright cartoon palette, oversized smoke, unreadable silhouettes, chaotic overlapping formations, giant props, inconsistent perspective, distorted anatomy, duplicate limbs, malformed horses, text, UI, logos, watermarks.",
+  "avoid": "cinematic close-up framing, first-person view, fantasy armor, modern weapons, science-fiction elements, bright cartoon palette, oversized smoke, unreadable silhouettes, chaotic overlapping formations, giant props, inconsistent perspective, distorted anatomy, duplicate limbs, malformed horses, text, UI, logos, watermarks",
   "categories": [
     {
       "id": "style-keyframe",
