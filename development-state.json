@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
-  "updatedAt": "2026-09-16T11:00:00+02:00",
-  "sourceOfTruth": "main + green PR evidence + current playtest feedback",
-  "baseMain": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
+  "updatedAt": "2026-09-16T12:01:00+02:00",
+  "sourceOfTruth": "main + PR/CI + Vercel preview evidence + playtest feedback",
+  "baseMain": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
   "version": "1.3.22",
   "initiative": {
     "id": "MOVEMENT-CONTACT-V1",
@@ -13,21 +13,23 @@
       "graphicsMobileUx": "readability/diagnostics only; never a second movement or combat authority"
     },
     "roadmapStage": 1,
+    "dominantRootCause": "F engagement-state handoff is the leading contact hypothesis from PR #129 trace work; road/off-road movement A-E remains unclassified until MOVE-LAB-01 produces real replay metrics",
     "rootCauseLadder": ["A route/path geometry", "B formation anchor/slot generation", "C velocity/acceleration/turn model", "D collision/friendly traffic", "E road/corridor transition", "F engagement-state handoff", "G targeting/unit-role behavior"],
-    "coreScenarios": ["straight road march", "curved road", "road-to-open-terrain exit", "open-terrain diagonal march plus large turn", "friendly passing/crossing", "frontal encounter", "oblique approach", "enemy contact during road march", "multi-regiment deploy", "cavalry charge approach", "artillery hold", "bridge/chokepoint plus post-crossing reform"],
     "visualFeelRejects": ["zigzag/weave", "snap turning", "formation explosion", "rubber-band regrouping", "long front penetration", "unexplained stop-start cadence", "cavalry/artillery role break"]
   },
   "health": {
-    "ci": "PR #128 head 68635b2f passed Fast headless, Focused Chromium, Movement Coverage, 520-unit Game Health and Deterministic Golden Battle; merged as 09fefbd0",
-    "gameplay": "movement-to-contact feel remains highest player-visible gap; no newly observed blocker in green gates",
-    "movement": "bridge/chokepoint baseline remains 20/20 complete, 0 failures, 0 hard stalls, max observed stall 2.5s; general road/off-road flow still requires deterministic instrumentation",
-    "aiCombat": "existing deterministic coverage green; contact handoff still requires trace evidence before behavior changes",
-    "graphicsUxMobile": "Pointer Events/shared authority remains baseline; no input/render change this cycle",
+    "ci": "main advanced through merged movement-contact diagnostics PR #130 to c453dbc2; PR #129 head c668800 failed Focused Chromium while Fast headless, 520-unit Game Health, Movement Coverage and Deterministic Golden Battle passed",
+    "gameplay": "movement-to-contact feel remains highest player-visible gap; PR #129 provides first evidence pointing to F state-handoff but is not mergeable yet",
+    "movement": "bridge/chokepoint baseline remains 20/20 complete, 0 failures, 0 hard stalls, max observed stall 2.5s; road/off-road root cause A-E still needs deterministic instrumentation",
+    "aiCombat": "contact trace exists on stale PR #129; candidate must be refreshed onto current main and pass fresh CI plus Preview before merge",
+    "graphicsUxMobile": "movement-contact diagnostics from PR #130 are now on main; Pointer Events/shared input authority remains baseline",
     "performance": "draw p95 41.31ms vs update p95 12.41ms remains deferred behind movement-contact product gap",
-    "openRegressions": []
+    "vercelPreview": "PR #129 c668800 had a Ready Preview, but it is stale after main advanced to c453dbc2. Current connector exposes no Vercel team/project, so Director cannot independently fetch a fresh deployment; fresh Preview evidence is required from the branch/PR before ready_to_merge.",
+    "openRegressions": ["PR #129 Focused Chromium failure at head c668800"]
   },
   "locks": [
-    {"owner": "Unity migration draft #56", "scope": "unity/NapoleonicRTS/**", "note": "parallel native prototype; browser builders do not modify this tree"}
+    {"owner": "Unity migration draft #56", "scope": "unity/NapoleonicRTS/**", "note": "parallel native prototype; browser builders do not modify this tree"},
+    {"owner": "AI/Gameplay / PR #129", "scope": "contact trace test instrumentation", "note": "refresh/rebase only; do not overlap Movement locomotion files"}
   ],
   "queue": [
     {
@@ -36,35 +38,35 @@
       "status": "ready",
       "owner": "Movement/Simulation",
       "slot": ":20",
-      "baseCommit": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
+      "baseCommit": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
       "subsystems": ["movement test instrumentation", "road/off-road flow", "formation cohesion"],
       "files": [],
-      "acceptance": ["wire deterministic same-seed scenario to emit real movement-contact JSON", "capture route completion, heading jitter/reversals, formation deviation, stationary time and max stall where available", "classify first reproduced failure A-E before tuning constants", "do not change production movement behavior merely to make instrumentation pass"],
-      "tests": ["Movement-Contact replay", "Movement Coverage/bridge", "Fast headless", "520-unit Game Health"]
+      "acceptance": ["emit real same-seed movement-contact JSON on current main", "capture route completion, heading jitter/reversals, formation deviation, stationary time and max stall where available", "classify first reproduced road/off-road failure A-E before production tuning", "Vercel Preview must be Ready and core loop/replay launchable for any browser-facing branch", "no production movement behavior change merely to make instrumentation pass"],
+      "tests": ["Movement-Contact replay", "Movement Coverage/bridge", "Fast headless", "520-unit Game Health", "Vercel Preview runtime/replay smoke"]
     },
     {
       "id": "CONTACT-TRACE-01",
       "priority": 2,
-      "status": "ready",
+      "status": "implementing",
       "owner": "AI/Gameplay",
       "slot": ":10",
-      "baseCommit": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
-      "subsystems": ["engagement intent", "deploy/engage/reform state", "target retention"],
-      "files": [],
-      "acceptance": ["instrument one deterministic frontal/road-contact scenario", "identify dominant F/G root cause before production behavior change", "record deploy/stop overshoot, facing at first attack and re-engage/target-switch evidence where available", "no parallel movement authority"],
-      "tests": ["Movement-Contact replay", "Deterministic Golden Battle", "520-unit Game Health", "Fast headless"]
+      "baseCommit": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
+      "subsystems": ["engagement intent", "deploy/engage/reform trace", "target retention"],
+      "files": ["PR #129 test instrumentation"],
+      "acceptance": ["refresh/rebase PR #129 onto c453dbc2 or newer main", "resolve Focused Chromium failure without weakening coverage", "preserve F state-handoff trace evidence and no production behavior change", "fresh non-stale Vercel Preview Ready with core loop and trace launchable", "fresh full GitHub CI green before ready_to_merge"],
+      "tests": ["Focused Chromium", "Fast headless", "Deterministic Golden Battle", "520-unit Game Health", "Movement Coverage", "Vercel Preview runtime/console smoke"]
     },
     {
-      "id": "MOVEMENT-DIAG-01",
+      "id": "MOVEMENT-DIAG-VERIFY-01",
       "priority": 3,
       "status": "ready",
       "owner": "Graphics/Mobile/UX",
       "slot": ":35",
-      "baseCommit": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
-      "subsystems": ["debug visualization", "golden frame capture", "movement/contact readability"],
+      "baseCommit": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
+      "subsystems": ["debug visualization", "golden capture", "preview readability"],
       "files": [],
-      "acceptance": ["add only test/debug observability needed by current replay lab", "prefer anchor/slots/path/facing/state capture over production polish", "debug-off production output/performance unchanged", "no new movement/combat authority"],
-      "tests": ["Focused Chromium", "anti-flicker/stable-canvas", "Deterministic Golden Battle"]
+      "acceptance": ["verify merged PR #130 diagnostics expose enough state for road turn/exit, approach, deploy, first attack and reform captures", "only add missing debug/test observability", "debug-off production output/performance unchanged", "Preview shows no blank/flicker/console error"],
+      "tests": ["Focused Chromium", "anti-flicker/stable-canvas", "Deterministic Golden Battle", "Vercel Preview visual/runtime smoke"]
     },
     {
       "id": "MOVEMENT-INTEGRATION-02",
@@ -72,25 +74,20 @@
       "status": "ready",
       "owner": "Director/Integrator",
       "slot": ":50",
-      "baseCommit": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
-      "subsystems": ["combined replay gate", "CI integration", "development-state.json"],
+      "baseCommit": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
+      "subsystems": ["combined replay gate", "GitHub CI", "Vercel Preview", "development-state.json"],
       "files": ["development-state.json", "tools/compare-movement-contact.mjs", "docs/movement-contact-authority.md"],
-      "acceptance": ["consume real baseline/candidate JSON from replay instrumentation", "same seed/orders required", "visual-feel evidence accompanies numeric comparison where tooling permits", "no merge on material bridge/mobile/core-order regression", "advance roadmap stage only after reproducible baseline exists"],
-      "tests": ["Fast headless", "Focused Chromium", "520-unit Game Health", "Deterministic Golden Battle", "Movement Coverage/bridge", "Movement-Contact combined replay", "anti-flicker"]
+      "acceptance": ["consume real baseline/candidate replay JSON with same seed/orders", "require both GitHub CI and branch Vercel Preview", "require golden/visual evidence where tooling permits", "no merge on material bridge/mobile/core-order regression", "advance roadmap only after reproducible baseline exists"],
+      "tests": ["Fast headless", "Focused Chromium", "520-unit Game Health", "Deterministic Golden Battle", "Movement Coverage/bridge", "Movement-Contact combined replay", "anti-flicker", "Vercel Preview runtime/console/replay gate"]
     }
   ],
   "baselines": {
     "goldenBattle": {"browserP95FrameMs": 55.2, "drawP95Ms": 41.31, "updateP95Ms": 12.41, "stableCanvas": true, "opaqueFrames": true, "runtimeErrors": 0},
     "bridgeChokepoints": {"routesTested": 20, "routesCompleted": 20, "failures": 0, "hardStalls": 0, "maxObservedStallSeconds": 2.5},
     "mobile": {"inputModel": "Pointer Events/shared authorities", "legacyTouchListeners": false},
-    "movementContact": {"status": "instrumentation_required", "roadmapStage": 1, "note": "PR #128 added comparator/contract; next required evidence is real same-seed replay JSON and golden frames"}
+    "movementContact": {"status": "instrumentation_required", "roadmapStage": 1, "contactHypothesis": "F state handoff", "roadOffroadRootCause": "unclassified A-E"}
   },
-  "technicalDebt": [
-    "combined comparator exists but replay generator is not yet wired to real movement/contact metrics",
-    "road/off-road and contact transition still lack shared deterministic feel baseline",
-    "formation-first movement authority must be verified from traces before tuning",
-    "renderer draw p95 remains a later measured performance gap"
-  ],
-  "provenApproaches": ["stabilize green work before overlapping changes", "root-cause trace before constant tuning", "same-seed before/after replay", "shared Pointer Events authority", "bounded bridge progress without teleportation"],
-  "avoid": ["parallel gameplay/movement authorities", "parameter whack-a-mole without trace evidence", "jumping to later roadmap stages before baseline", "single-metric optimizations that degrade overall feel", "cosmetic work ahead of product gates"]
+  "technicalDebt": ["real road/off-road same-seed replay metrics are still missing", "PR #129 contact trace needs current-main refresh and Focused Chromium repair", "Vercel Preview evidence is not currently independently queryable by Director connector", "renderer draw p95 remains a later measured performance gap"],
+  "provenApproaches": ["stabilize green work before overlapping changes", "root-cause trace before constant tuning", "same-seed before/after replay", "Preview-first plus GitHub CI", "shared Pointer Events authority", "bounded bridge progress without teleportation"],
+  "avoid": ["parallel gameplay/movement authorities", "parameter whack-a-mole without trace evidence", "Production as experimental QA", "merging stale Preview evidence", "jumping roadmap stages before baseline", "cosmetic work ahead of product gates"]
 }
