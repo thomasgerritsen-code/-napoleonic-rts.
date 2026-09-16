@@ -5,7 +5,7 @@ if (window.__RTS_DEBUG__) {
     const state = getStateV05ForV06();
     const serializeGroup = r => ({ id:r.id, side:r.side, kind:groupKindV06(r), name:r.name, formation:r.formation, facing:r.facing||0, morale:r.morale, destroyed:r.destroyed, brokenReason:r.brokenReason||null, initialStrength:r.initialStrength||r.memberIds.length, memberIds:[...r.memberIds], crewIds:[...(r.crewIds||[])], officerId:r.officerId||null, drummerId:r.drummerId||null, livingMembers:regimentMembers(r).map(u=>({id:u.id,type:u.type,regimentId:u.regimentId,morale:u.morale})), operational:groupKindV06(r)==='artillery'?canArtilleryOperateV06(artilleryForGroupV06(r)):true, pathLength:r.path?.length||0, pathIndex:r.pathIndex||0, finalFacing:typeof r.finalFacing==='number'?r.finalFacing:null });
     for (const side of ['france','britain']) {
-      state[side].units = livingUnits(side).map(u => ({ id:u.id,type:u.type,regimentId:u.regimentId,x:u.x,y:u.y,targetX:u.targetX,targetY:u.targetY,morale:u.morale,task:u.task,resourceTargetId:u.resourceTarget?.id||null,preferredResourceType:u.preferredResourceType||null }));
+      state[side].units = livingUnits(side).map(u => ({ id:u.id,type:u.type,regimentId:u.regimentId,x:u.x,y:u.y,targetX:u.targetX,targetY:u.targetY,facing:u.facing||0,morale:u.morale,task:u.task,resourceTargetId:u.resourceTarget?.id||null,preferredResourceType:u.preferredResourceType||null }));
       state[side].buildings = livingBuildings(side).map(b => ({ id:b.id,type:b.type,complete:b.complete,queue:b.queue.map(q=>q.type),production:b.production,rallyX:b.rallyX,rallyY:b.rallyY,x:b.x,y:b.y }));
       state[side].groups = regiments.filter(r=>r.side===side).map(serializeGroup);
       state[side].regiments = regiments.filter(r=>r.side===side&&!r.destroyed&&groupKindV06(r)!=='artillery').map(serializeGroup);
@@ -13,6 +13,47 @@ if (window.__RTS_DEBUG__) {
     }
     state.world={width:WORLD.width,height:WORLD.height}; state.exploredCells=exploredCells.size; state.aiStrategy=aiStrategyV06; state.rallyPlacement=rallyPlacementBuilding?.id||null;
     return state;
+  };
+  window.__RTS_DEBUG__.getMovementDiagnostics = function getMovementDiagnostics() {
+    const groups = [];
+    for (const r of regiments) {
+      if (r.destroyed) continue;
+      const members = regimentMembers(r);
+      if (!members.length) continue;
+      const anchor = centroid(members);
+      let targetX = 0, targetY = 0, targetCount = 0, maxDeviation = 0;
+      for (const u of members) {
+        if (Number.isFinite(u.targetX) && Number.isFinite(u.targetY)) {
+          targetX += u.targetX; targetY += u.targetY; targetCount++;
+        }
+        const deviation = Math.hypot(u.x - anchor.x, u.y - anchor.y);
+        if (deviation > maxDeviation) maxDeviation = deviation;
+      }
+      const target = targetCount ? { x: targetX / targetCount, y: targetY / targetCount } : null;
+      const path = Array.isArray(r.path) ? r.path.map((p,index)=>({index,x:p.x,y:p.y,active:index===(r.pathIndex||0)})) : [];
+      groups.push({
+        id:r.id, side:r.side, kind:groupKindV06(r), formation:r.formation,
+        anchor:{x:anchor.x,y:anchor.y}, facing:r.facing||0,
+        finalFacing:typeof r.finalFacing==='number'?r.finalFacing:null,
+        target, path, pathIndex:r.pathIndex||0,
+        memberCount:members.length, maxAnchorDeviation:maxDeviation,
+        members:members.map(u=>({id:u.id,type:u.type,x:u.x,y:u.y,facing:u.facing||0,targetX:u.targetX,targetY:u.targetY}))
+      });
+    }
+    return { elapsed, camera:{x:camera.x,y:camera.y,zoom:camera.zoom}, groups };
+  };
+  window.__RTS_DEBUG__.frameMovementGroup = function frameMovementGroup(id, padding=180) {
+    const r = regiments.find(r=>r.id===id && !r.destroyed);
+    if (!r) return false;
+    const members = regimentMembers(r);
+    if (!members.length) return false;
+    const c = centroid(members);
+    camera.x = c.x; camera.y = c.y;
+    const spanX = Math.max(...members.map(u=>Math.abs(u.x-c.x)), 1) + padding;
+    const spanY = Math.max(...members.map(u=>Math.abs(u.y-c.y)), 1) + padding;
+    camera.zoom = Math.max(0.35, Math.min(1.8, Math.min(innerWidth/(spanX*2), innerHeight/(spanY*2))));
+    clampCamera();
+    return {x:camera.x,y:camera.y,zoom:camera.zoom};
   };
   window.__RTS_DEBUG__.selectForBattery = function(side='france'){selectedUnits.clear();selectedBuilding=null;const cannon=livingUnits(side).find(u=>u.type==='artillery'&&!u.regimentId),crew=freeUnits(side,'infantry').slice(0,2);if(cannon)selectedUnits.add(cannon);crew.forEach(u=>selectedUnits.add(u));actionSignature='';updateHud(true);};
   window.__RTS_DEBUG__.selectForCavalryRegiment = function(side='france'){selectedUnits.clear();selectedBuilding=null;freeUnits(side,'cavalry').slice(0,4).forEach(u=>selectedUnits.add(u));const officer=freeUnits(side,'officer')[0];if(officer)selectedUnits.add(officer);actionSignature='';updateHud(true);};
