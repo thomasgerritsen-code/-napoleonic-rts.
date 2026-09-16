@@ -5,6 +5,13 @@ The primary product target is one polished 10–15 minute battle that feels comp
 
 The North Star battle is the canonical product reference. Material gameplay, movement, renderer, UX and performance changes must improve it or at minimum leave it demonstrably no worse.
 
+## Feature preservation
+Previously working player-facing capabilities are protected product value. New work may not silently remove, hide, disable or materially degrade them. `docs/feature-preservation-v1.md` is the policy and `docs/feature-preservation-matrix-v1.json` is the machine-readable capability inventory.
+
+Every material gameplay, movement, renderer, UX or refactor PR declares `PRESERVATION IMPACT: none`, `compatible change`, or `intentional retirement`. Intentional retirement is exceptional and requires an explicit product decision, reason, replacement/migration or explicit retirement rationale, updated tests/docs and Integrator approval. Absence from a replacement renderer/UI still counts as removal.
+
+Replacement coverage must be green before superseded controls/behaviour/tests are removed. After a material merge, verify the new `main` workflow and core smoke before overlapping work starts. If an accepted capability regresses, restoring or reverting it outranks new feature work.
+
 ## Long-term product ladder
 Depth is added in layers so later systems are built on stable foundations rather than hiding weak fundamentals.
 
@@ -25,7 +32,7 @@ Treat milestone completions as playable releases rather than a stream of unrelat
 - `0.5 Command & Tactics`
 - `0.6 Replayability`
 
-A release candidate requires the applicable Definition of Done, quality scorecard review, exact-head Preview evidence, required CI, and a structured North Star playtest. Release numbering is a planning device, not a deadline promise.
+A release candidate requires the applicable Definition of Done, quality scorecard review, exact-head Preview evidence, required CI, a structured North Star playtest and a green feature-preservation baseline. Release numbering is a planning device, not a deadline promise.
 
 ## Authority contract
 - Gameplay/AI owns intent and state: march, approach, deploy, engage, disengage/reform, targets, role decisions and morale/routing.
@@ -44,7 +51,7 @@ Keep at most three risky technical experiments active at once, normally no more 
 A new experiment starts only when a slot is free or an existing route is merged, stopped or marked BLOCKED. Draft branches may exist, but they do not receive active development capacity unless they occupy an explicit experiment slot.
 
 ## Feature flags
-Risky renderer, AI, pathfinding, formation or telemetry changes should remain opt-in/flagged until their exact-head Preview, deterministic tests and playtest evidence show they are better than the current production path. Flags are temporary safety tools, not permanent duplicate systems. Remove obsolete flags during cleanup cadence once a KEEP/STOP decision is final.
+Risky renderer, AI, pathfinding, formation or telemetry changes should remain opt-in/flagged until their exact-head Preview, deterministic tests, playtest evidence and feature-preservation evidence show they are better than the current production path. Flags are temporary safety tools, not permanent duplicate systems. Remove obsolete flags during cleanup cadence once a KEEP/STOP decision is final.
 
 ## Browser renderer decision
 PixiJS PR #133 is the current GRAPHICS-V2 candidate. Compare Pixi against the current Three.js/2D stack on:
@@ -54,7 +61,7 @@ PixiJS PR #133 is the current GRAPHICS-V2 candidate. Compare Pixi against the cu
 4. asset-production speed and consistency;
 5. implementation and maintenance complexity.
 
-Record an explicit KEEP or STOP decision within two days of starting this evaluation, or earlier when evidence is sufficient. Until then, do not expand Three.js cosmetically; only accept required fixes, safety work and regression repairs.
+Record an explicit KEEP or STOP decision within two days of starting this evaluation, or earlier when evidence is sufficient. Until then, do not expand Three.js cosmetically; only accept required fixes, safety work and regression repairs. The existing renderer fallback remains a protected capability until KEEP plus replacement coverage is proven.
 
 ## Art Bible
 Graphics work must follow one versioned style contract:
@@ -109,7 +116,7 @@ Prefer one coherent subject per PR. Examples: terrain materials, infantry presen
 
 ## Three-gate merge rule
 For browser-facing gameplay, movement and graphics changes, all applicable gates are required:
-1. functional/CI tests;
+1. functional/CI tests including affected feature-preservation evidence;
 2. exact-head Vercel Preview runtime evidence;
 3. visual or structured playtest evidence when the change is player-visible.
 
@@ -119,16 +126,17 @@ A Vercel deployment success alone proves deployment, not runtime or visual quali
 If the same approach receives 2–3 serious iterations without measurable or visible improvement, mark it BLOCKED/STOP, document the evidence and choose another approach. Do not continue because of sunk cost.
 
 ## Technical cleanup cadence
-After roughly 8–10 successful feature/quality PRs, or sooner when duplicated authorities/flags/dependencies are clearly slowing work, schedule at most one small cleanup PR. Cleanup may remove obsolete flags, duplicate systems, unused dependencies and stale documentation, but never outranks an active North Star blocker or regression.
+After roughly 8–10 successful feature/quality PRs, or sooner when duplicated authorities/flags/dependencies are clearly slowing work, schedule at most one small cleanup PR. Cleanup may remove obsolete flags, duplicate systems, unused dependencies and stale documentation, but never outranks an active North Star blocker or regression and must pass the same feature-preservation audit before removal.
 
 ## Priority order
-1. runtime/CI/flicker/blank-frame blockers;
-2. bridge/mobile/core-order regressions;
-3. weakest high-impact North Star scorecard dimension;
-4. current milestone blocker (currently MOVEMENT-CONTACT-V1);
-5. renderer decision / visual pipeline evidence;
-6. performance regressions;
-7. polish inside the North Star build;
-8. later-milestone depth features.
+1. regressions that remove/break a previously working protected feature;
+2. runtime/CI/flicker/blank-frame blockers;
+3. bridge/mobile/core-order regressions;
+4. weakest high-impact North Star scorecard dimension;
+5. current milestone blocker (currently MOVEMENT-CONTACT-V1);
+6. renderer decision / visual pipeline evidence;
+7. performance regressions;
+8. polish inside the North Star build;
+9. later-milestone depth features.
 
-The definition of progress is a more convincing, reliable and replayable North Star battle—not more code, commits, subsystems or feature count.
+The definition of progress is a more convincing, reliable and replayable North Star battle that retains accepted player value—not more code, commits, subsystems or feature count.
