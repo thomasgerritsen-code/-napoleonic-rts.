@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 4,
-  "updatedAt": "2026-09-16T14:40:00+02:00",
+  "schemaVersion": 5,
+  "updatedAt": "2026-09-16T15:02:00+02:00",
   "sourceOfTruth": "current main + exact-head PR/CI/Preview evidence + structured playtest feedback",
   "baseMain": "3faf912ecfb4076976a306c44e180ec0222b073c",
   "version": "1.3.22",
@@ -11,6 +11,16 @@
     "releaseCandidate": "0.2 Movement & Contact",
     "playtestRule": "run structured North Star playtest after material gameplay/renderer changes, at milestone RC, or after about five material player-facing merges; every FAIL becomes a replay/bug capture"
   },
+  "featurePreservation": {
+    "status": "ACTIVE_HARD_GATE",
+    "contract": "docs/feature-preservation-v1.md",
+    "matrix": "docs/feature-preservation-matrix-v1.json",
+    "rule": "previously working player-facing capabilities may not silently disappear, hide, disable or materially regress",
+    "prImpactRequired": ["none", "compatible change", "intentional retirement"],
+    "intentionalRetirementRule": "requires explicit product decision, reason, replacement/migration or explicit retirement, updated tests/docs and Integrator approval",
+    "postMergeCanary": "after material merge verify new main workflow + core smoke before overlapping work",
+    "protectedBaseline": ["boot/core battle", "desktop selection/multi-select/move/facing", "mobile select/multi-select/move/facing/pan/pinch/formation controls", "formations/cohesion", "camera/resize/orientation", "roads/road exits/bridges/chokepoints", "infantry/cavalry/artillery", "combat/morale/targeting", "HUD/order feedback", "replay/debug hooks", "stable canvas/renderer fallback"]
+  },
   "qualityScorecard": {
     "playability": {"status": "AMBER", "evidence": "core loop is automated, but a current structured 10-minute North Star playtest is not yet the release gate"},
     "movementFeel": {"status": "AMBER", "evidence": "player feedback identifies road/off-road and movement-to-contact feel as the main gap; deterministic #132 baseline is stale against current main and still needs interpretation"},
@@ -19,11 +29,12 @@
     "mobileUx": {"status": "AMBER", "evidence": "shared Pointer Events/mobile regression coverage exists, but current North Star mobile playtest/golden proof is incomplete"},
     "performance": {"status": "AMBER", "evidence": "520-unit gate is established; renderer draw cost remains a known gap and GRAPHICS-V2 comparison is incomplete"},
     "audioFeel": {"status": "AMBER", "evidence": "no approved production audio slice yet"},
-    "runtimeStability": {"status": "GREEN", "evidence": "current main 3faf912e completed GitHub workflow run 761 successfully; no current main blank/flicker/runtime blocker recorded"},
-    "maintainability": {"status": "AMBER", "evidence": "authority contracts and operating model exist, but several stale/parallel PRs and prior development-state drift need consolidation"}
+    "runtimeStability": {"status": "GREEN", "evidence": "current main 3faf912e completed workflow run 761 successfully; no current main blank/flicker/runtime blocker recorded"},
+    "maintainability": {"status": "AMBER", "evidence": "authority contracts exist but stale/parallel PRs still need consolidation"},
+    "featurePreservation": {"status": "AMBER", "evidence": "hard contract and machine-readable matrix are being introduced in PR #139; existing regression gates cover many capabilities but preservation impact was not previously mandatory"}
   },
   "milestones": [
-    {"id": "M1", "name": "Movement & Contact", "status": "active", "exit": "formation-first road/off-road movement and approach/deploy/engage/reform feel good in replay plus structured North Star playtest; bridge/mobile/core-order gates green"},
+    {"id": "M1", "name": "Movement & Contact", "status": "active", "exit": "formation-first road/off-road movement and approach/deploy/engage/reform feel good in replay plus structured North Star playtest; bridge/mobile/core-order/preservation gates green"},
     {"id": "M2", "name": "Combat, Morale & Unit Roles", "status": "planned", "exit": "clear fire/melee/charge flow, morale/cohesion and distinct infantry/cavalry/artillery roles"},
     {"id": "M3", "name": "North Star Battle Polish", "status": "planned", "exit": "renderer KEEP/STOP complete, golden battlefield approved, onboarding/mobile/performance/audio slice meet DoD"},
     {"id": "M4", "name": "Command & Tactics", "status": "planned", "exit": "brigade orders, reserves, flanking and coordinated support deepen decisions without excessive micromanagement"},
@@ -36,19 +47,19 @@
       "rendererVisual": "PR #133 PixiJS GRAPHICS-V2 evaluation",
       "observabilityTooling": "free; PR #135 remains draft/paused and receives no active priority until explicitly claimed"
     },
-    "featureFlagRule": "risky renderer/AI/pathfinding/formation/telemetry paths remain opt-in until same-head CI + Preview + applicable visual/playtest evidence proves KEEP; obsolete flags are removed in cleanup"
+    "featureFlagRule": "risky renderer/AI/pathfinding/formation/telemetry paths remain opt-in until same-head CI + Preview + applicable visual/playtest + preservation evidence proves KEEP; obsolete flags are removed in cleanup"
   },
   "rendererDecision": {
     "candidate": "PixiJS PR #133",
     "status": "EVALUATING_BLOCKED",
     "evidence": "exact head 896ddc6d is mergeable but GitHub workflow run 746 failed; visual and comparative performance evidence is not sufficient for KEEP",
     "decision": "PENDING",
-    "rule": "KEEP or STOP as soon as evidence is sufficient; no cosmetic Three.js expansion while undecided"
+    "rule": "KEEP or STOP as soon as evidence is sufficient; existing renderer fallback is protected until KEEP is proven"
   },
   "artBible": {"status": "active", "goldenBattlefield": "PR #136 draft capture-stage; must become approved desktop/mobile golden diff before merge"},
   "performanceBudget": {"status": "active", "hardGate": "520-unit Game Health", "knownGap": "renderer cost remains material; compare frame/update/draw p95 and larger stress behaviour before renderer KEEP"},
   "telemetry": {"status": "paused_draft", "pr": 135, "rule": "no Production enablement; refresh from current main only if telemetry becomes a North Star quality priority"},
-  "cleanupCadence": {"featureQualityMergesSinceAdoption": 0, "trigger": "after about 8-10 successful feature/quality PRs, or sooner for clear duplicate authorities/flags/dependencies", "scope": "one small cleanup PR maximum; never displace an active blocker"},
+  "cleanupCadence": {"featureQualityMergesSinceAdoption": 0, "trigger": "after about 8-10 successful feature/quality PRs, or sooner for clear duplicate authorities/flags/dependencies", "scope": "one small cleanup PR maximum; never displace an active blocker; preservation audit required before removal"},
   "locks": [
     {"owner": "Unity migration draft #56", "scope": "unity/NapoleonicRTS/**", "note": "separate native prototype; browser North Star remains primary"},
     {"owner": "Movement/Simulation", "scope": "movement-contact deterministic baseline/production movement task when claimed", "note": "Gameplay/AI may not modify physical locomotion authority"},
@@ -64,8 +75,8 @@
       "baseCommit": "3faf912ecfb4076976a306c44e180ec0222b073c",
       "subsystems": ["movement", "deterministic replay", "roads/off-road", "formation cohesion"],
       "files": ["PR #132 / tests/movement-contact-lab-v1.spec.js"],
-      "acceptance": ["refresh/rebase instrumentation from current main without production tuning", "run same-seed road/road-exit baseline and classify first reproduced A-E root cause", "capture compact before evidence for later production fix", "full relevant CI + exact-head Preview runtime evidence", "preserve bridge/chokepoint/mobile/core-order gates"],
-      "tests": ["Movement-Contact replay", "Movement Coverage/bridge", "Fast headless", "Focused Chromium", "520-unit Game Health", "Deterministic Golden Battle", "Vercel Preview runtime smoke"]
+      "acceptance": ["refresh/rebase instrumentation from current main without production tuning", "run same-seed road/road-exit baseline and classify first reproduced A-E root cause", "capture compact before evidence for later production fix", "declare preservation impact and keep mapped core capabilities green", "full relevant CI + exact-head Preview runtime evidence", "preserve bridge/chokepoint/mobile/core-order gates"],
+      "tests": ["Movement-Contact replay", "Movement Coverage/bridge", "Fast headless", "Focused Chromium", "520-unit Game Health", "Deterministic Golden Battle", "Vercel Preview runtime smoke", "feature preservation matrix"]
     },
     {
       "id": "NORTHSTAR-GOLDEN-01",
@@ -76,8 +87,8 @@
       "baseCommit": "3faf912ecfb4076976a306c44e180ec0222b073c",
       "subsystems": ["North Star scenario", "golden battlefield", "desktop/mobile visual regression", "structured playtest"],
       "files": ["PR #136"],
-      "acceptance": ["refresh draft from current main", "inspect and approve deterministic battlefield composition", "replace capture-only state with real golden/pixel-diff gate", "desktop + mobile captures remain readable", "run structured 10-minute playtest when battle is startable and convert every FAIL to replay/bug capture"],
-      "tests": ["Deterministic Golden Battle", "Focused Chromium", "anti-flicker/stable canvas", "mobile smoke", "Vercel Preview visual/runtime check", "playtest-protocol-v1"]
+      "acceptance": ["refresh draft from current main", "inspect and approve deterministic battlefield composition", "replace capture-only state with real golden/pixel-diff gate", "desktop + mobile captures remain readable", "declare preservation impact and prove existing core controls/renderer fallback remain", "run structured 10-minute playtest when battle is startable and convert every FAIL to replay/bug capture"],
+      "tests": ["Deterministic Golden Battle", "Focused Chromium", "anti-flicker/stable canvas", "mobile smoke", "Vercel Preview visual/runtime check", "playtest-protocol-v1", "feature preservation matrix"]
     },
     {
       "id": "PIXI-DECISION-01",
@@ -88,8 +99,8 @@
       "baseCommit": "3faf912ecfb4076976a306c44e180ec0222b073c",
       "subsystems": ["PixiJS GRAPHICS-V2", "renderer comparison", "performance", "asset pipeline"],
       "files": ["PR #133"],
-      "acceptance": ["isolate and fix exact-head CI failure without weakening gates", "refresh against current main", "compare current renderer vs Pixi on the same Golden Battlefield", "compare desktop/mobile performance, fallback, asset speed and maintainability", "record explicit KEEP or STOP; no indefinite dual renderer expansion"],
-      "tests": ["full GitHub CI", "exact-head Vercel Preview runtime", "desktop/mobile golden comparison", "520-unit Game Health", "renderer p95/stress comparison"]
+      "acceptance": ["isolate and fix exact-head CI failure without weakening gates", "refresh against current main", "compare current renderer vs Pixi on the same Golden Battlefield", "prove no protected controls/features disappear in Pixi and fallback remains until KEEP", "compare desktop/mobile performance, fallback, asset speed and maintainability", "record explicit KEEP or STOP; no indefinite dual renderer expansion"],
+      "tests": ["full GitHub CI", "exact-head Vercel Preview runtime", "desktop/mobile golden comparison", "520-unit Game Health", "renderer p95/stress comparison", "feature preservation matrix"]
     },
     {
       "id": "CONTACT-ROOTCAUSE-01",
@@ -100,10 +111,10 @@
       "baseCommit": "3faf912ecfb4076976a306c44e180ec0222b073c",
       "subsystems": ["approach/deploy/engage/reform", "state handoff", "target retention"],
       "files": ["PR #129", "PR #131"],
-      "acceptance": ["do not make a third blind trace patch", "isolate why Focused Chromium repeatedly failed", "preserve F state-handoff as hypothesis until trace evidence proves/refutes it", "resume production change only from a reproducible scenario", "full CI + Preview + visual-feel gate before merge"],
-      "tests": ["Focused Chromium root-cause isolation", "Deterministic Golden Battle", "520-unit Game Health", "Movement-Contact replay", "Vercel Preview runtime/console"]
+      "acceptance": ["do not make a third blind trace patch", "isolate why Focused Chromium repeatedly failed", "preserve F state-handoff as hypothesis until trace evidence proves/refutes it", "resume production change only from a reproducible scenario", "declare preservation impact and retain existing combat/order capabilities", "full CI + Preview + visual-feel gate before merge"],
+      "tests": ["Focused Chromium root-cause isolation", "Deterministic Golden Battle", "520-unit Game Health", "Movement-Contact replay", "Vercel Preview runtime/console", "feature preservation matrix"]
     }
   ],
-  "provenApproaches": ["one canonical North Star battle", "root-cause trace before tuning", "replay-first bug capture", "small PRs", "same-seed before/after comparison", "exact-head Preview plus CI", "explicit authority ownership", "STOP after 2-3 failed approaches"],
-  "avoid": ["feature count as progress", "more than three active risky experiments", "parallel authorities", "stale branches merged without refresh", "Production as QA", "deployment success treated as runtime proof", "cosmetic expansion before renderer decision", "campaign/large content expansion before the North Star battle is stable and fun"]
+  "provenApproaches": ["one canonical North Star battle", "root-cause trace before tuning", "replay-first bug capture", "small PRs", "same-seed before/after comparison", "exact-head Preview plus CI", "explicit authority ownership", "feature preservation matrix", "post-merge canary", "STOP after 2-3 failed approaches"],
+  "avoid": ["feature count as progress", "silent feature removal", "deleting old controls/behaviour before replacement coverage is green", "more than three active risky experiments", "parallel authorities", "stale branches merged without refresh", "Production as QA", "deployment success treated as runtime proof", "cosmetic expansion before renderer decision", "campaign/large content expansion before the North Star battle is stable and fun"]
 }
