@@ -1,103 +1,83 @@
 {
-  "schemaVersion": 1,
-  "updatedAt": "2026-09-15",
+  "schemaVersion": 2,
+  "updatedAt": "2026-09-16T10:00:00+02:00",
   "sourceOfTruth": "main",
-  "currentFocus": "profile the general 2D draw pass after proven smoke batching gains; reduce regiment/character render cost without weakening battlefield readability",
-  "baselines": {
-    "ci": {
-      "baseMain": "a999122dd4da8e2a83ec5e2bf93bb5628a68fb40",
-      "functionalValidation": "main run 718 green after PR #121 smoke batching",
-      "version": "1.3.22"
-    },
-    "goldenBattle": {
-      "deterministicSeed": 18150914,
-      "core": {
-        "renderSamples": 120,
-        "browserP95FrameMs": 55.2,
-        "drawP95Ms": 41.31,
-        "updateP95Ms": 12.41,
-        "stableCanvas": true,
-        "opaqueFrames": true,
-        "invalidPositions": 0,
-        "runtimeErrors": 0
-      },
-      "combat": {
-        "renderSamples": 180,
-        "simulationSeconds": 12,
-        "browserP95FrameMs": 100.0,
-        "maxPersistentVolleyClouds": 5,
-        "maxPooledVolleyShots": 24,
-        "maxSmokeEvents": 10,
-        "smokeEventCap": 80,
-        "musketCombatFrames": 149,
-        "artilleryFireFrames": 34,
-        "casualties": 5,
-        "combatAnimationsVersion": "combat-animations-v1.3"
-      }
-    },
-    "bridgeChokepoints": {
-      "crossings": 4,
-      "routesTested": 20,
-      "routesCompleted": 20,
-      "failures": 0,
-      "maxObservedStallSeconds": 2.5,
-      "hardStalls": 0
-    },
-    "mobile": {
-      "status": "touch-control vertical slice and adaptive 2D canvas render budget are on main",
-      "primaryOrientation": "landscape",
-      "inputModel": "Pointer Events sharing existing selection/order/camera authorities",
-      "mobileDprCap": 1.5,
-      "desktopDprCap": 2,
-      "highDprBackingPixelReductionVsCap2": "43.75%",
-      "coverage": ["844x390 high-DPR touch landscape", "390x844 orientation/portrait coordinate smoke", "desktop DPR ceiling"]
-    }
+  "baseMain": "c26129f421161428114914b7ddf95e3b8f903021",
+  "version": "1.3.22",
+  "health": {
+    "ci": "main run 729 green after PR #126",
+    "gameplay": "no known blocker in current gates; Golden Battle remains deterministic and runtime-error free",
+    "movement": "20/20 bridge/chokepoint routes complete, 0 failures, 0 hard stalls, max observed stall 2.5s",
+    "aiCombat": "combat Golden remains covered; no current red regression signal",
+    "graphicsUxMobile": "shared Pointer Events mobile authority is on main; legacy touch listeners removed; phone core-loop regression coverage is green",
+    "performance": "largest measured gap remains rendering: core Golden draw p95 41.31ms vs update p95 12.41ms; core browser p95 55.2ms",
+    "openRegressions": []
   },
-  "performanceBudgets": {
-    "goldenBattle": "temporary catastrophic browser p95 < 250 ms; tighten only after repeated comparable hosted-CI baselines",
-    "combatGolden": "temporary catastrophic browser p95 < 250 ms with persistent smoke invariant and <=80 smoke events",
-    "mobileCanvas": "1.5 DPR cap on coarse/small-screen devices; 2 DPR desktop cap"
+  "locks": [
+    {
+      "owner": "Unity migration draft #56",
+      "scope": "unity/NapoleonicRTS/**",
+      "note": "parallel native prototype; do not schedule browser builders into this tree"
+    }
+  ],
+  "queue": [
+    {
+      "id": "GFX-PERF-01",
+      "priority": 1,
+      "status": "ready",
+      "owner": "Graphics/Mobile/UX",
+      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
+      "subsystems": ["2D renderer", "regiment/character draw pass", "mobile performance"],
+      "files": [],
+      "acceptance": ["profile before changing renderer", "reduce measured draw cost without reducing tactical readability", "stable canvas/opaque frames", "no mobile core-loop regression"],
+      "tests": ["Focused Chromium/mobile", "Deterministic Golden Battle", "520-unit Game Health", "anti-flicker/stable-canvas checks", "Movement Coverage/bridge"]
+    },
+    {
+      "id": "MOVE-AUDIT-01",
+      "priority": 2,
+      "status": "ready",
+      "owner": "Movement/Simulation",
+      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
+      "subsystems": ["movement", "formation cohesion", "bridges/chokepoints"],
+      "files": [],
+      "acceptance": ["audit current crossing queue/recovery metrics before code changes", "preserve 20/20 bounded crossing completion", "no teleport recovery or bridge-mouth oscillation", "identify one reproducible movement defect or leave implementation unchanged"],
+      "tests": ["Movement Coverage/bridge", "520-unit Game Health", "Deterministic Golden Battle", "Fast headless"]
+    },
+    {
+      "id": "GAMEPLAY-AI-01",
+      "priority": 3,
+      "status": "ready",
+      "owner": "AI/Gameplay",
+      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
+      "subsystems": ["AI", "combat", "morale", "orders"],
+      "files": [],
+      "acceptance": ["inspect Golden Battle for the largest observable tactical weakness before implementation", "choose one player-visible AI/combat improvement", "preserve deterministic invariants and command predictability"],
+      "tests": ["Deterministic Golden Battle", "520-unit Game Health", "Fast headless", "Movement Coverage/bridge if movement semantics change"]
+    },
+    {
+      "id": "PERF-BUDGET-01",
+      "priority": 4,
+      "status": "ready",
+      "owner": "Director/Integrator",
+      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
+      "subsystems": ["benchmarks", "CI performance budgets"],
+      "files": ["development-state.json"],
+      "acceptance": ["collect repeated comparable Golden measurements", "tighten numeric budgets only when variance is understood", "do not optimize a subsystem without profiling evidence"],
+      "tests": ["Deterministic Golden Battle", "existing CI gates"]
+    }
+  ],
+  "baselines": {
+    "goldenBattle": {"browserP95FrameMs": 55.2, "drawP95Ms": 41.31, "updateP95Ms": 12.41, "stableCanvas": true, "opaqueFrames": true, "runtimeErrors": 0},
+    "combatGolden": {"browserP95FrameMs": 100.0, "maxSmokeEvents": 10, "smokeEventCap": 80},
+    "bridgeChokepoints": {"routesTested": 20, "routesCompleted": 20, "failures": 0, "hardStalls": 0, "maxObservedStallSeconds": 2.5},
+    "mobile": {"inputModel": "Pointer Events/shared authorities", "mobileDprCap": 1.5, "desktopDprCap": 2, "legacyTouchListeners": false}
   },
   "technicalDebt": [
-    "core Golden draw p95 41.31 ms materially exceeds update p95 12.41 ms; profile regiment/character rendering before further combat-effect micro-optimization",
-    "numeric Golden p95 budgets need repeated comparable CI measurements before tighter thresholds are frozen",
-    "legacy touchstart/touchend listeners remain in input.js while Pointer Events are the mobile gameplay authority",
+    "core Golden draw p95 materially exceeds update p95; renderer profiling is the highest measured gap",
+    "numeric Golden p95 budgets need repeated comparable CI samples before tightening",
     "mobile canvas budget reapplies after the core resize listener instead of sharing one resize authority",
     "legacy script-load chain remains long and should only be consolidated with load-order regression coverage"
   ],
-  "provenApproaches": [
-    "stabilize and merge green open work before overlapping changes",
-    "separate deterministic fixed-step scenario progression from real requestAnimationFrame render measurement",
-    "pool black-powder effects at regiment/salvo level and keep a hard event cap",
-    "batch smoke canvas state and avoid per-lobe style allocations; main run improved combat p95 from 110.4 ms to 100.0 ms and core p95 from 60.5 ms to 55.2 ms",
-    "measure bridge progress along the crossing axis and require bounded completion without teleportation",
-    "route touch gestures through the same selection/order/camera authorities as desktop",
-    "cap mobile backing-store DPR while preserving CSS/world coordinate space"
-  ],
-  "avoid": [
-    "new gameplay authority in presentation modules",
-    "per-frame random terrain generation",
-    "visual changes that remount/reset the canvas or rebuild the HUD DOM per frame",
-    "tight performance gates derived from a single hosted-CI sample",
-    "treating lateral bridge-mouth oscillation as route progress",
-    "independent mouse and touch gameplay semantics",
-    "further smoke micro-optimization without profiling evidence that smoke remains dominant"
-  ],
-  "candidates": [
-    {
-      "priority": 1,
-      "name": "Profile regiment and character draw cost",
-      "reason": "post-#121 core Golden draw p95 is 41.31 ms versus update p95 12.41 ms; general draw work is now the clearest measured bottleneck"
-    },
-    {
-      "priority": 2,
-      "name": "Remove obsolete legacy touch listener path",
-      "reason": "reduce duplicate input plumbing now Pointer Events and phone emulation tests protect the shared command path"
-    },
-    {
-      "priority": 3,
-      "name": "Repeat Golden combat baselines and calibrate tighter budgets",
-      "reason": "the 9.4% combat p95 and 8.8% core p95 improvements are encouraging, but tighter thresholds still need repeated comparable CI measurements"
-    }
-  ]
+  "provenApproaches": ["stabilize green work before overlapping changes", "profile before optimizing", "shared Pointer Events authority for mouse/touch gameplay", "bounded bridge progress checks without teleportation", "regiment/salvo-level pooled black-powder effects"],
+  "avoid": ["parallel gameplay authorities", "unprofiled renderer micro-optimization", "visual changes that remount/reset canvas", "tight budgets from one hosted-CI sample", "cosmetic work ahead of red product gates"]
 }
