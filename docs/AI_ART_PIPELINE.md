@@ -1,16 +1,21 @@
-# AI Art Pipeline v1
+# AI Art Pipeline v2
 
-This pipeline creates **visual-development drafts first** and only promotes selected images into tracked game assets after a human review. It is deliberately separated from the runtime renderer.
+This pipeline creates **visual-development drafts first** and only promotes selected images into tracked game assets after human review. It is deliberately separated from the runtime renderer.
 
 ## Why
 
-The game needs a consistent semi-realistic, painterly, high-angle 2D/2.5D Napoleonic style without letting generated imagery silently replace live assets. The pipeline therefore keeps generation reproducible (prompt, model, seed, run manifest) and follows `docs/asset-provenance-v1.md` when an image is promoted.
+The game needs a consistent semi-realistic, painterly, high-angle 2D/2.5D Napoleonic style without letting generated imagery silently replace live assets. The pipeline keeps generation traceable through prompt, provider, model, seed and a run manifest, and follows `docs/asset-provenance-v1.md` when an image is promoted.
 
-## Model
+## Providers
 
-The v1 config uses `fal-ai/nano-banana-pro` through fal's queue API. The endpoint and exact request defaults live in `art-pipeline/prompts.json`; change them together if the model is deliberately replaced. Do not assume parameters are portable between models.
+The pipeline supports two providers:
 
-The API key is read only from `FAL_KEY` in the shell. Never put a key in Git, browser code, `prompts.json`, or a GitHub Pages build.
+- `leonardo` — default provider. Uses Leonardo.ai REST v1 image generation with a fixed model ID, private generations and fixed seeds. Set `LEONARDO_API_KEY` in the shell.
+- `fal` — fallback/alternative provider using `fal-ai/nano-banana-pro`. Set `FAL_KEY` in the shell.
+
+Provider selection order is: explicit `--provider`, then `ART_PROVIDER`, then an available Leonardo key, then an available fal key, then the configured default. API keys are never stored in Git or browser code.
+
+Leonardo API credits are separate from Leonardo web-app subscriptions. The current model/provider details are centralized in `art-pipeline/prompts.json`; do not assume request parameters are portable between providers.
 
 ## Prompt library
 
@@ -26,38 +31,47 @@ The API key is read only from `FAL_KEY` in the shell. Never put a key in Git, br
 - `artillery`
 - `fx-black-powder`
 
-The common style prompt is intentionally stronger than any category prompt so terrain, units and effects converge on the same camera, lighting and readability rules.
+The common style instruction keeps camera, lighting, palette and tactical readability consistent across categories.
 
 ## Safe workflow
 
-1. Inspect what would be sent without spending anything:
+1. Inspect categories/providers and requests without spending anything:
 
    ```bash
    npm run art:list
-   npm run art:dry -- --category style-keyframe
+   npm run art:dry -- --provider leonardo --category style-keyframe
+   npm run art:dry -- --provider fal --category style-keyframe
    ```
 
-2. Export the fal key locally:
+2. Export exactly the provider key you want to use:
 
    ```bash
+   export LEONARDO_API_KEY="..."
+   # or
    export FAL_KEY="..."
    ```
 
-3. Generate a small batch first:
+3. Generate a small Leonardo batch first:
 
    ```bash
-   npm run art:generate -- --category style-keyframe --variants 2
+   npm run art:generate -- --provider leonardo --category style-keyframe --variants 2
    ```
 
-   Drafts go to `art/generated/<timestamp>/...`. That directory is gitignored. Every run writes a `manifest.json` containing model, prompt, seed, request metadata and original result URLs.
-
-4. Generate several categories only after reviewing a small batch. The script enforces a generation cap. A full run requires an explicit confirmation and a deliberately raised cap:
+   Or use fal explicitly:
 
    ```bash
-   npm run art:generate -- --all --confirm --max-generations 18
+   npm run art:generate -- --provider fal --category style-keyframe --variants 2
    ```
 
-5. Review the generated drafts manually for tactical readability, historical plausibility, matching camera/perspective, clean silhouettes, coherent lighting and suitability for the current renderer.
+   Drafts go to `art/generated/<timestamp>/...`. That directory is gitignored. Every run writes a `manifest.json` containing provider, model, prompt, seed, request metadata and original result URLs.
+
+4. Generate several categories only after reviewing a small batch. The script enforces a generation cap. A full run requires explicit confirmation and a deliberately raised cap:
+
+   ```bash
+   npm run art:generate -- --provider leonardo --all --confirm --max-generations 18
+   ```
+
+5. Review drafts manually for tactical readability, historical plausibility, matching camera/perspective, clean silhouettes, coherent lighting and suitability for the current renderer.
 
 6. Promote only an approved image:
 
@@ -68,7 +82,19 @@ The common style prompt is intentionally stronger than any category prompt so te
      --asset-id french-line-infantry-v1
    ```
 
-   Promotion copies the image under `assets/generated/...` and updates `assets/generated/provenance.json` with its model, prompt, seed, source URL and project version. Before a production merge, add any actual cleanup/crop/recolour/atlas work and record the final scale/anchor/facing convention.
+   Promotion copies the image under `assets/generated/...` and updates `assets/generated/provenance.json` with provider, model, prompt, seed, source URL and project version. Before a production merge, record any cleanup/crop/recolour/atlas work and the final scale/anchor/facing convention.
+
+## Provider notes
+
+### Leonardo
+
+The v2 pipeline uses Leonardo's v1 image-generation endpoint because it supports a fixed seed for consistency. The default model ID is Leonardo Lightning XL and the default request is private, 1536×864, Alchemy enabled, `ILLUSTRATION` preset style. Override provider selection with `--provider leonardo`.
+
+`--aspect` can override the default composition for Leonardo using supported presets such as `16:9`, `4:3`, `3:2` or `1:1`. `--resolution` is intentionally fal-only because the providers expose resolution differently.
+
+### fal
+
+fal keeps the previous 2K, 16:9, PNG defaults. The generator uses the queue API and continues to preserve fixed seeds and the same prompt categories.
 
 ## Guardrails
 
@@ -76,8 +102,9 @@ The common style prompt is intentionally stronger than any category prompt so te
 - `--all` requires `--confirm` and is still bounded by `--max-generations`.
 - Draft generations are not committed by default.
 - A generated image is not automatically a production-ready sprite or texture.
-- Production assets require in-game visual validation and the normal regression/Golden Battle checks.
-- Keep historical reference material and third-party imagery separate from generated outputs; do not feed private/copyright-sensitive source material into this pipeline without appropriate rights.
+- Production assets require in-game visual validation and normal regression/Golden Battle checks.
+- Provider/model/seed/source URL are recorded in provenance when an image is promoted.
+- Keep historical reference material and third-party imagery separate from generated outputs; do not feed private or rights-sensitive source material into providers without appropriate permission.
 
 ## Suggested production loop
 
