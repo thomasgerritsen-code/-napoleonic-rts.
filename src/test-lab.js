@@ -31,13 +31,85 @@ function scenarioBaseV062(){
   messageEl.classList.add('hidden');
   camera.x=WORLD.width/2; camera.y=WORLD.height/2; camera.zoom=.72;
 }
+
+function northStarPointV1(crossing, center, along, perp = 0) {
+  const angle = Number.isFinite(crossing?.angle) ? crossing.angle : 0;
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  return {
+    x: center.x + along * cos - perp * sin,
+    y: center.y + along * sin + perp * cos
+  };
+}
+function setupNorthStarScenarioV1(midX, midY) {
+  const crossing = typeof WATER_CROSSINGS_V067 !== 'undefined'
+    ? WATER_CROSSINGS_V067.find(item => item.type === 'bridge') || WATER_CROSSINGS_V067[0]
+    : null;
+  const center = {
+    x: Number.isFinite(crossing?.x) ? crossing.x : midX,
+    y: Number.isFinite(crossing?.y) ? crossing.y : midY
+  };
+  const angle = Number.isFinite(crossing?.angle) ? crossing.angle : 0;
+  const franceFacing = angle;
+  const britainFacing = angle + Math.PI;
+
+  const frLineA = northStarPointV1(crossing, center, -520, -130);
+  const frLineB = northStarPointV1(crossing, center, -500, 150);
+  const brLineA = northStarPointV1(crossing, center, 520, -130);
+  const brLineB = northStarPointV1(crossing, center, 500, 150);
+  const frCavPos = northStarPointV1(crossing, center, -650, 340);
+  const brCavPos = northStarPointV1(crossing, center, 650, 340);
+  const frGunPos = northStarPointV1(crossing, center, -760, -340);
+  const brGunPos = northStarPointV1(crossing, center, 760, -340);
+
+  const frA = makeInfantryRegimentScenarioV062('france', frLineA.x, frLineA.y, 24);
+  const frB = makeInfantryRegimentScenarioV062('france', frLineB.x, frLineB.y, 24);
+  const brA = makeInfantryRegimentScenarioV062('britain', brLineA.x, brLineA.y, 24);
+  const brB = makeInfantryRegimentScenarioV062('britain', brLineB.x, brLineB.y, 24);
+  const frCav = makeCavalryRegimentScenarioV062('france', frCavPos.x, frCavPos.y, 10);
+  const brCav = makeCavalryRegimentScenarioV062('britain', brCavPos.x, brCavPos.y, 10);
+  const frBattery = makeBatteryScenarioV062('france', frGunPos.x, frGunPos.y);
+  const brBattery = makeBatteryScenarioV062('britain', brGunPos.x, brGunPos.y);
+
+  const frApproachA = northStarPointV1(crossing, center, -170, -110);
+  const frApproachB = northStarPointV1(crossing, center, -230, 145);
+  const brApproachA = northStarPointV1(crossing, center, 170, -110);
+  const brApproachB = northStarPointV1(crossing, center, 230, 145);
+  const frCavTarget = northStarPointV1(crossing, center, -80, 390);
+  const brCavTarget = northStarPointV1(crossing, center, 80, 390);
+
+  if (frA) orderGroupPathV06(frA, frApproachA.x, frApproachA.y, 'line', franceFacing);
+  if (frB) orderGroupPathV06(frB, frApproachB.x, frApproachB.y, 'line', franceFacing);
+  if (brA) orderGroupPathV06(brA, brApproachA.x, brApproachA.y, 'line', britainFacing);
+  if (brB) orderGroupPathV06(brB, brApproachB.x, brApproachB.y, 'line', britainFacing);
+  if (frCav) orderGroupPathV06(frCav, frCavTarget.x, frCavTarget.y, 'line', franceFacing);
+  if (brCav) orderGroupPathV06(brCav, brCavTarget.x, brCavTarget.y, 'line', britainFacing);
+
+  camera.x = center.x;
+  camera.y = center.y;
+  camera.zoom = .58;
+  v05PeaceMode = false;
+  window.__NORTH_STAR_SCENARIO_V1__ = {
+    id: 'north-star-v1',
+    crossingId: crossing?.id || null,
+    crossingName: crossing?.name || null,
+    center,
+    groups: [frA, frB, brA, brB, frCav, brCav, frBattery, brBattery].filter(Boolean).map(group => group.id),
+    factions: { france: 4, britain: 4 },
+    contains: ['infantry', 'cavalry', 'artillery', 'bridge-or-map-center', 'village-scenery-from-static-world']
+  };
+  statusEl.textContent = 'NORTH STAR: vaste kernslag met infanterie, cavalerie, artillerie en brug/chokepoint.';
+  return window.__NORTH_STAR_SCENARIO_V1__;
+}
+
 function runScenarioV062(name){
   testLabState.lastScenario=name;
   scenarioBaseV062();
   if(name==='normaal'){v05PeaceMode=false;statusEl.textContent='Normale slag geladen.';return true;}
   clearScenarioUnitsV062();
   const midX=WORLD.width/2, midY=WORLD.height/2;
-  if(name==='regiment-duel'){
+  if(name==='north-star'){
+    setupNorthStarScenarioV1(midX,midY);
+  } else if(name==='regiment-duel'){
     const fr=makeInfantryRegimentScenarioV062('france',midX-520,midY,24),br=makeInfantryRegimentScenarioV062('britain',midX+520,midY,24);
     if(fr) orderGroupPathV06(fr,midX-120,midY,'line',0); if(br) orderGroupPathV06(br,midX+120,midY,'line',Math.PI);
     statusEl.textContent='TEST: infanterieregiment versus regiment.';
@@ -81,7 +153,7 @@ async function copyBugReportV062(){
 
 const debugPanelV062=document.createElement('aside');
 debugPanelV062.id='debugPanel';debugPanelV062.className='debug-panel hidden';
-debugPanelV062.innerHTML=`<div class="debug-head"><strong>TESTLAB v0.6.2</strong><button type="button" data-debug-action="close">×</button></div><div id="debugMetrics" class="debug-metrics"></div><div id="debugSelection" class="debug-selection"></div><label>Testscenario<select id="debugScenario"><option value="normaal">Normale slag</option><option value="regiment-duel">Regiment vs regiment</option><option value="cavalry-charge">Cavaleriecharge</option><option value="artillery-3">3 bemande kanonnen</option><option value="morale-35">Regiment 35% moraal</option><option value="strength-40">Regiment 40% sterkte</option><option value="performance-520">520 units performance</option><option value="british-developed">Britse basis +5 min</option></select></label><div class="debug-buttons"><button type="button" data-debug-action="run">Laad scenario</button><button type="button" data-debug-action="audit">Controleer state</button><button type="button" data-debug-action="copy">Kopieer bugrapport</button></div><pre id="debugAudit">F3 sluit/open dit venster.</pre>`;
+debugPanelV062.innerHTML=`<div class="debug-head"><strong>TESTLAB v0.6.2</strong><button type="button" data-debug-action="close">×</button></div><div id="debugMetrics" class="debug-metrics"></div><div id="debugSelection" class="debug-selection"></div><label>Testscenario<select id="debugScenario"><option value="normaal">Normale slag</option><option value="north-star">North Star battle</option><option value="regiment-duel">Regiment vs regiment</option><option value="cavalry-charge">Cavaleriecharge</option><option value="artillery-3">3 bemande kanonnen</option><option value="morale-35">Regiment 35% moraal</option><option value="strength-40">Regiment 40% sterkte</option><option value="performance-520">520 units performance</option><option value="british-developed">Britse basis +5 min</option></select></label><div class="debug-buttons"><button type="button" data-debug-action="run">Laad scenario</button><button type="button" data-debug-action="audit">Controleer state</button><button type="button" data-debug-action="copy">Kopieer bugrapport</button></div><pre id="debugAudit">F3 sluit/open dit venster.</pre>`;
 document.body.appendChild(debugPanelV062);
 const debugMetricsV062=debugPanelV062.querySelector('#debugMetrics'),debugSelectionV062=debugPanelV062.querySelector('#debugSelection'),debugAuditV062=debugPanelV062.querySelector('#debugAudit'),debugScenarioV062=debugPanelV062.querySelector('#debugScenario');
 
@@ -106,4 +178,5 @@ if(window.__RTS_DEBUG__){
   window.__RTS_DEBUG__.audit=()=>window.RTS_SIM.audit();
   window.__RTS_DEBUG__.getPerformance=()=>window.RTS_SIM.getMetrics();
   window.__RTS_DEBUG__.simulationSnapshot=()=>window.RTS_SIM.snapshot();
+  window.__RTS_DEBUG__.northStarScenario=()=>window.__NORTH_STAR_SCENARIO_V1__ ? JSON.parse(JSON.stringify(window.__NORTH_STAR_SCENARIO_V1__)) : null;
 }
