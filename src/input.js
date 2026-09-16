@@ -32,30 +32,6 @@
     camera.x += before.x - after.x; camera.y += before.y - after.y; clampCamera();
   }, { passive: false });
 
-  let touchTap = null;
-  canvas.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1) return;
-    touchTap = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  }, { passive: false });
-  canvas.addEventListener('touchend', e => {
-    if (!touchTap || !e.changedTouches.length) return;
-    const t = e.changedTouches[0], w = screenToWorld(t.clientX, t.clientY);
-    if (buildMode) { placeBuilding(buildMode, w.x, w.y); touchTap = null; return; }
-    const hit = unitAt(w.x, w.y, 'france') || buildingAt(w.x, w.y, 'france');
-    if (hit) {
-      if (hit.kind === 'unit' && hit.regimentId) selectWholeRegiment(getRegiment(hit.regimentId));
-      else {
-        selectedUnits.clear(); selectedBuilding = null;
-        if (hit.kind === 'unit') selectedUnits.add(hit); else selectedBuilding = hit;
-      }
-      actionSignature = ''; updateHud(true);
-    } else {
-      const r = resourceAt(w.x, w.y);
-      if (r && !assignGather(r)) issueMove(w.x, w.y); else if (!r) issueMove(w.x, w.y);
-    }
-    touchTap = null;
-  }, { passive: false });
-
   addEventListener('keydown', e => {
     const k = e.key.toLowerCase(); keys.add(k);
     if (k === 'escape') { buildMode = null; buildHintEl.classList.add('hidden'); updateActionVisuals(); }
