@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
-  "updatedAt": "2026-09-16T10:44:00+02:00",
+  "updatedAt": "2026-09-16T11:00:00+02:00",
   "sourceOfTruth": "main + green PR evidence + current playtest feedback",
-  "baseMain": "c26129f421161428114914b7ddf95e3b8f903021",
+  "baseMain": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
   "version": "1.3.22",
   "initiative": {
     "id": "MOVEMENT-CONTACT-V1",
@@ -12,61 +12,47 @@
       "movementSimulation": "physical execution only: route/corridor, speed, acceleration/deceleration, facing/turning, formation anchors/slots, traffic/collision, regrouping",
       "graphicsMobileUx": "readability/diagnostics only; never a second movement or combat authority"
     },
-    "roadmapStages": [
-      {"stage": 1, "name": "deterministic baseline", "exit": "same-seed movement-contact replay exposes reproducible failures and metrics"},
-      {"stage": 2, "name": "formation-first movement", "exit": "regiment anchor/slots dominate motion; members correct locally without swarm/rubber-band behavior"},
-      {"stage": 3, "name": "look-ahead steering", "exit": "road/open-terrain turns are anticipated without waypoint zigzag, snap-turning or stop-start cadence"},
-      {"stage": 4, "name": "friendly traffic", "exit": "regiments pass, merge onto roads and queue at constrained corridors without persistent overlap/deadlock"},
-      {"stage": 5, "name": "contact envelope", "exit": "awareness/approach/deploy/engage distances produce controlled slowdown, facing and frontage before attack"},
-      {"stage": 6, "name": "role-specific momentum", "exit": "infantry, cavalry and artillery have distinct credible acceleration/turn/contact behavior without instant snaps"},
-      {"stage": 7, "name": "predictive order preview", "exit": "player can read intended route, destination frontage/facing and obvious conflicts before execution on desktop/mobile"},
-      {"stage": 8, "name": "battle choreography", "exit": "multi-regiment groups coordinate frontage, reserves, flanks and artillery without collapsing into one target point"}
-    ],
-    "rootCauseLadder": ["route/path geometry", "formation anchor/slot generation", "velocity/acceleration/turn model", "collision/friendly traffic", "road/corridor transition", "engagement-state handoff", "targeting/unit-role behavior"],
+    "roadmapStage": 1,
+    "rootCauseLadder": ["A route/path geometry", "B formation anchor/slot generation", "C velocity/acceleration/turn model", "D collision/friendly traffic", "E road/corridor transition", "F engagement-state handoff", "G targeting/unit-role behavior"],
     "coreScenarios": ["straight road march", "curved road", "road-to-open-terrain exit", "open-terrain diagonal march plus large turn", "friendly passing/crossing", "frontal encounter", "oblique approach", "enemy contact during road march", "multi-regiment deploy", "cavalry charge approach", "artillery hold", "bridge/chokepoint plus post-crossing reform"],
-    "coreMetrics": ["route completion", "road corridor error", "heading jitter/reversals", "start-stop cycles", "velocity jerk", "mean/p95 formation deviation", "overlap/penetration duration", "valid-route stationary time", "deploy overshoot", "time-to-deploy/front", "facing error at first attack", "target-switch/re-engage count", "reform/cohesion recovery", "max stall", "bridge throughput"],
     "visualFeelRejects": ["zigzag/weave", "snap turning", "formation explosion", "rubber-band regrouping", "long front penetration", "unexplained stop-start cadence", "cavalry/artillery role break"]
   },
   "health": {
-    "ci": "main run 729 green after PR #126; PR #127 run 730 was green before movement-contact refresh; newest refresh requires fresh CI",
-    "gameplay": "player playtest identifies movement-to-contact feel as the current highest product gap",
-    "movement": "bridge/chokepoint baseline remains 20/20 complete, 0 failures, 0 hard stalls, max observed stall 2.5s; general road/off-road formation flow needs improvement",
-    "aiCombat": "deterministic combat coverage is green, but approach-to-contact/deploy/engage behavior needs player-visible improvement",
-    "graphicsUxMobile": "shared Pointer Events mobile authority is green; visual work is supporting/diagnostic while movement-contact is priority",
-    "performance": "core Golden draw p95 41.31ms vs update p95 12.41ms remains important but is temporarily below the movement-contact gameplay gap",
+    "ci": "PR #128 head 68635b2f passed Fast headless, Focused Chromium, Movement Coverage, 520-unit Game Health and Deterministic Golden Battle; merged as 09fefbd0",
+    "gameplay": "movement-to-contact feel remains highest player-visible gap; no newly observed blocker in green gates",
+    "movement": "bridge/chokepoint baseline remains 20/20 complete, 0 failures, 0 hard stalls, max observed stall 2.5s; general road/off-road flow still requires deterministic instrumentation",
+    "aiCombat": "existing deterministic coverage green; contact handoff still requires trace evidence before behavior changes",
+    "graphicsUxMobile": "Pointer Events/shared authority remains baseline; no input/render change this cycle",
+    "performance": "draw p95 41.31ms vs update p95 12.41ms remains deferred behind movement-contact product gap",
     "openRegressions": []
   },
   "locks": [
-    {
-      "owner": "Unity migration draft #56",
-      "scope": "unity/NapoleonicRTS/**",
-      "note": "parallel native prototype; browser builders do not modify this tree"
-    }
+    {"owner": "Unity migration draft #56", "scope": "unity/NapoleonicRTS/**", "note": "parallel native prototype; browser builders do not modify this tree"}
   ],
   "queue": [
     {
-      "id": "MOVE-FLOW-01",
+      "id": "MOVE-LAB-01",
       "priority": 1,
       "status": "ready",
       "owner": "Movement/Simulation",
       "slot": ":20",
-      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
-      "subsystems": ["movement", "road/off-road flow", "formation cohesion", "friendly traffic", "bridges/chokepoints"],
+      "baseCommit": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
+      "subsystems": ["movement test instrumentation", "road/off-road flow", "formation cohesion"],
       "files": [],
-      "acceptance": ["establish deterministic before trace in relevant lab scenario", "label one dominant root cause before changing constants", "improve one player-visible movement metric/evidence without material core-metric regression", "no zigzag/snap-turn/formation explosion/teleport recovery", "preserve bridge/chokepoint hard gate", "advance the earliest unfinished roadmap stage before later-stage sophistication"],
-      "tests": ["Movement-Contact deterministic replay", "Movement Coverage/bridge", "520-unit Game Health", "Deterministic Golden Battle", "Fast headless", "Focused Chromium when browser behavior is touched"]
+      "acceptance": ["wire deterministic same-seed scenario to emit real movement-contact JSON", "capture route completion, heading jitter/reversals, formation deviation, stationary time and max stall where available", "classify first reproduced failure A-E before tuning constants", "do not change production movement behavior merely to make instrumentation pass"],
+      "tests": ["Movement-Contact replay", "Movement Coverage/bridge", "Fast headless", "520-unit Game Health"]
     },
     {
-      "id": "CONTACT-HANDOFF-01",
+      "id": "CONTACT-TRACE-01",
       "priority": 2,
       "status": "ready",
       "owner": "AI/Gameplay",
       "slot": ":10",
-      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
-      "subsystems": ["engagement intent", "target retention", "deploy/engage/reform state", "infantry/cavalry/artillery roles"],
+      "baseCommit": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
+      "subsystems": ["engagement intent", "deploy/engage/reform state", "target retention"],
       "files": [],
-      "acceptance": ["trace one dominant contact-state root cause before implementation", "no default march-through-enemy behavior", "no march-engage jitter or target ping-pong", "frontage/facing is credible before first attack", "unit roles remain distinct", "movement authority remains separate", "do not implement brigade choreography before lower roadmap stages are stable"],
-      "tests": ["Movement-Contact deterministic replay", "Deterministic Golden Battle", "520-unit Game Health", "Fast headless", "Movement Coverage/bridge if movement semantics are affected"]
+      "acceptance": ["instrument one deterministic frontal/road-contact scenario", "identify dominant F/G root cause before production behavior change", "record deploy/stop overshoot, facing at first attack and re-engage/target-switch evidence where available", "no parallel movement authority"],
+      "tests": ["Movement-Contact replay", "Deterministic Golden Battle", "520-unit Game Health", "Fast headless"]
     },
     {
       "id": "MOVEMENT-DIAG-01",
@@ -74,40 +60,37 @@
       "status": "ready",
       "owner": "Graphics/Mobile/UX",
       "slot": ":35",
-      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
-      "subsystems": ["debug visualization", "movement/contact readability", "golden frame capture"],
+      "baseCommit": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
+      "subsystems": ["debug visualization", "golden frame capture", "movement/contact readability"],
       "files": [],
-      "acceptance": ["prefer debug/test-only diagnostics over production polish", "make anchor/slots/path-or-corridor/facing/engagement state observable where useful", "debug-off production output and performance unchanged", "no new movement/combat authority", "mobile/core input unaffected", "order-preview work starts only when movement prediction is stable enough to be trustworthy"],
-      "tests": ["Focused Chromium", "anti-flicker/stable-canvas checks", "mobile smoke if production UI is touched", "Deterministic Golden Battle"]
+      "acceptance": ["add only test/debug observability needed by current replay lab", "prefer anchor/slots/path/facing/state capture over production polish", "debug-off production output/performance unchanged", "no new movement/combat authority"],
+      "tests": ["Focused Chromium", "anti-flicker/stable-canvas", "Deterministic Golden Battle"]
     },
     {
-      "id": "MOVEMENT-INTEGRATION-01",
+      "id": "MOVEMENT-INTEGRATION-02",
       "priority": 4,
       "status": "ready",
       "owner": "Director/Integrator",
       "slot": ":50",
-      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
-      "subsystems": ["combined regression", "replay baselines", "merge gate"],
-      "files": ["development-state.json"],
-      "acceptance": ["compare same seed/orders before and after", "reject target-metric wins that materially regress core movement/contact metrics", "require visual-feel pass in addition to numeric pass", "when Movement and AI both change, merge/rebase/retest sequentially", "record new baselines only from verified runs", "advance roadmap stage only when its exit criteria are demonstrated"],
+      "baseCommit": "09fefbd0a67bcc0c513c6d53f5ec2d235ce6fc04",
+      "subsystems": ["combined replay gate", "CI integration", "development-state.json"],
+      "files": ["development-state.json", "tools/compare-movement-contact.mjs", "docs/movement-contact-authority.md"],
+      "acceptance": ["consume real baseline/candidate JSON from replay instrumentation", "same seed/orders required", "visual-feel evidence accompanies numeric comparison where tooling permits", "no merge on material bridge/mobile/core-order regression", "advance roadmap stage only after reproducible baseline exists"],
       "tests": ["Fast headless", "Focused Chromium", "520-unit Game Health", "Deterministic Golden Battle", "Movement Coverage/bridge", "Movement-Contact combined replay", "anti-flicker"]
     }
   ],
   "baselines": {
     "goldenBattle": {"browserP95FrameMs": 55.2, "drawP95Ms": 41.31, "updateP95Ms": 12.41, "stableCanvas": true, "opaqueFrames": true, "runtimeErrors": 0},
-    "combatGolden": {"browserP95FrameMs": 100.0, "maxSmokeEvents": 10, "smokeEventCap": 80},
     "bridgeChokepoints": {"routesTested": 20, "routesCompleted": 20, "failures": 0, "hardStalls": 0, "maxObservedStallSeconds": 2.5},
-    "mobile": {"inputModel": "Pointer Events/shared authorities", "mobileDprCap": 1.5, "desktopDprCap": 2, "legacyTouchListeners": false},
-    "movementContact": {"status": "baseline_required", "roadmapStage": 1, "note": "populate only with reproducible deterministic replay measurements"}
+    "mobile": {"inputModel": "Pointer Events/shared authorities", "legacyTouchListeners": false},
+    "movementContact": {"status": "instrumentation_required", "roadmapStage": 1, "note": "PR #128 added comparator/contract; next required evidence is real same-seed replay JSON and golden frames"}
   },
   "technicalDebt": [
-    "road/off-road movement and contact transition lack one shared deterministic feel baseline",
-    "formation-first movement authority and engagement-state handoff must be verified before parameter tuning",
-    "predictive order preview must wait for stable deterministic movement prediction",
-    "core Golden draw p95 materially exceeds update p95; renderer profiling resumes after the current gameplay-feel gap",
-    "numeric Golden p95 budgets need repeated comparable samples before tightening",
-    "mobile canvas budget reapplies after the core resize listener instead of sharing one resize authority"
+    "combined comparator exists but replay generator is not yet wired to real movement/contact metrics",
+    "road/off-road and contact transition still lack shared deterministic feel baseline",
+    "formation-first movement authority must be verified from traces before tuning",
+    "renderer draw p95 remains a later measured performance gap"
   ],
-  "provenApproaches": ["stabilize green work before overlapping changes", "root-cause trace before constant tuning", "same-seed before/after replay", "shared Pointer Events authority", "bounded bridge progress without teleportation", "regiment/salvo-level pooled black-powder effects"],
-  "avoid": ["parallel gameplay/movement authorities", "parameter whack-a-mole without trace evidence", "jumping to brigade AI before formation movement is stable", "single-metric optimizations that degrade overall feel", "visual polish that masks broken mechanics", "unprofiled renderer micro-optimization during the movement-contact priority", "cosmetic work ahead of product gates"]
+  "provenApproaches": ["stabilize green work before overlapping changes", "root-cause trace before constant tuning", "same-seed before/after replay", "shared Pointer Events authority", "bounded bridge progress without teleportation"],
+  "avoid": ["parallel gameplay/movement authorities", "parameter whack-a-mole without trace evidence", "jumping to later roadmap stages before baseline", "single-metric optimizations that degrade overall feel", "cosmetic work ahead of product gates"]
 }
