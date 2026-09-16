@@ -39,9 +39,7 @@ async function loadJson(file, fallback) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (!args.manifest || !args.localPath || !args.assetId) {
-    throw new Error('--manifest, --file and --asset-id are required.');
-  }
+  if (!args.manifest || !args.localPath || !args.assetId) throw new Error('--manifest, --file and --asset-id are required.');
 
   const manifestPath = path.resolve(args.manifest);
   const sourcePath = path.resolve(args.localPath);
@@ -55,9 +53,7 @@ async function main() {
   const extension = path.extname(sourcePath) || '.png';
   const targetRelative = args.target || path.join('assets', 'generated', match.category, `${args.assetId}${extension}`);
   const targetPath = path.resolve(ROOT, targetRelative);
-  if (!targetPath.startsWith(path.resolve(ROOT, 'assets') + path.sep)) {
-    throw new Error('Promotion target must remain under assets/.');
-  }
+  if (!targetPath.startsWith(path.resolve(ROOT, 'assets') + path.sep)) throw new Error('Promotion target must remain under assets/.');
   await mkdir(path.dirname(targetPath), { recursive: true });
   await copyFile(sourcePath, targetPath);
 
@@ -67,12 +63,16 @@ async function main() {
   const now = new Date().toISOString();
   if (existingIndex >= 0) provenance.assets[existingIndex].supersededBy = `${args.assetId}@${now}`;
 
+  const provider = manifest.provider || 'fal';
   provenance.assets.push({
     recordId: `${args.assetId}@${now}`,
     assetId: args.assetId,
     sourceType: 'generated',
-    sourceTool: 'fal.ai',
-    modelEndpoint: manifest.endpoint,
+    sourceTool: provider === 'leonardo' ? 'Leonardo.ai' : provider === 'fal' ? 'fal.ai' : provider,
+    provider,
+    providerEndpoint: manifest.endpoint,
+    model: manifest.model || manifest.endpoint,
+    modelLabel: manifest.modelLabel || null,
     generationRunId: manifest.runId,
     generationConfigVersion: manifest.configVersion,
     prompt: match.prompt,
