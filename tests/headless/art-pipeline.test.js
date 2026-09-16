@@ -6,11 +6,30 @@ const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..', '..');
 
-test('art prompt config is reproducible and does not contain credentials', () => {
+function dryRun(provider) {
+  return spawnSync(process.execPath, [
+    path.join(root, 'scripts', 'generate-art.mjs'),
+    '--provider', provider,
+    '--dry-run',
+    '--category', 'style-keyframe',
+    '--variants', '1',
+    '--max-generations', '1'
+  ], {
+    cwd: root,
+    env: { ...process.env, FAL_KEY: '', LEONARDO_API_KEY: '', ART_PROVIDER: '' },
+    encoding: 'utf8'
+  });
+}
+
+test('art prompt config contains provider metadata but no credentials', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'art-pipeline', 'prompts.json'), 'utf8'));
-  assert.equal(config.endpoint, 'fal-ai/nano-banana-pro');
-  assert.equal(config.requestDefaults.output_format, 'png');
-  assert.equal(config.requestDefaults.enable_web_search, false);
+  assert.equal(config.defaultProvider, 'leonardo');
+  assert.equal(config.providers.leonardo.kind, 'leonardo-v1');
+  assert.equal(config.providers.leonardo.modelLabel, 'Leonardo Lightning XL');
+  assert.equal(config.providers.leonardo.requestDefaults.public, false);
+  assert.equal(config.providers.fal.endpoint, 'fal-ai/nano-banana-pro');
+  assert.equal(config.providers.fal.requestDefaults.output_format, 'png');
+  assert.equal(config.providers.fal.requestDefaults.enable_web_search, false);
   assert.ok(config.systemPrompt.includes('gameplay readability'));
   assert.ok(Array.isArray(config.categories));
   assert.ok(config.categories.length >= 8);
@@ -19,35 +38,38 @@ test('art prompt config is reproducible and does not contain credentials', () =>
   assert.ok(ids.includes('style-keyframe'));
   assert.ok(ids.includes('french-line-infantry'));
   assert.ok(ids.includes('british-line-infantry'));
-  assert.ok(!JSON.stringify(config).includes('FAL_KEY'));
+  const serialized = JSON.stringify(config);
+  assert.ok(!serialized.includes('Bearer '));
+  assert.ok(!serialized.includes('Key '));
 });
 
-test('art generator dry-run succeeds without FAL_KEY or network generation', () => {
-  const result = spawnSync(process.execPath, [
-    path.join(root, 'scripts', 'generate-art.mjs'),
-    '--dry-run',
-    '--category', 'style-keyframe',
-    '--variants', '1',
-    '--max-generations', '1'
-  ], {
-    cwd: root,
-    env: { ...process.env, FAL_KEY: '' },
-    encoding: 'utf8'
-  });
+test('Leonardo dry-run succeeds without API key or network generation', () => {
+  const result = dryRun('leonardo');
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /style-keyframe/);
+  assert.match(result.stdout, /cloud\.leonardo\.ai\/api\/rest\/v1\/generations/);
+  assert.match(result.stdout, /"seed": 11000/);
+  assert.match(result.stdout, /"modelId": "b24e16ff-06e3-43eb-8d33-4416c2d75876"/);
+  assert.match(result.stdout, /"public": false/);
+});
+
+test('fal dry-run remains available as a second provider', () => {
+  const result = dryRun('fal');
+  assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /fal-ai\/nano-banana-pro/);
   assert.match(result.stdout, /"seed": 11000/);
+  assert.match(result.stdout, /"enable_web_search": false/);
 });
 
 test('full generation remains protected by an explicit hard cap', () => {
   const result = spawnSync(process.execPath, [
     path.join(root, 'scripts', 'generate-art.mjs'),
+    '--provider', 'leonardo',
     '--dry-run',
     '--all'
   ], {
     cwd: root,
-    env: { ...process.env, FAL_KEY: '' },
+    env: { ...process.env, FAL_KEY: '', LEONARDO_API_KEY: '', ART_PROVIDER: '' },
     encoding: 'utf8'
   });
   assert.notEqual(result.status, 0);
