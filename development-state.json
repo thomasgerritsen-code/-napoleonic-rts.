@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-09-16T10:00:00+02:00",
+  "updatedAt": "2026-09-16T10:11:00+02:00",
   "sourceOfTruth": "main",
   "baseMain": "c26129f421161428114914b7ddf95e3b8f903021",
   "version": "1.3.22",
@@ -8,76 +8,28 @@
     "ci": "main run 729 green after PR #126",
     "gameplay": "no known blocker in current gates; Golden Battle remains deterministic and runtime-error free",
     "movement": "20/20 bridge/chokepoint routes complete, 0 failures, 0 hard stalls, max observed stall 2.5s",
-    "aiCombat": "combat Golden remains covered; no current red regression signal",
+    "aiCombat": "combat Golden remains covered; GAMEPLAY-AI-01 claimed to reduce strategic target thrash between similarly scored enemy regiments",
     "graphicsUxMobile": "shared Pointer Events mobile authority is on main; legacy touch listeners removed; phone core-loop regression coverage is green",
     "performance": "largest measured gap remains rendering: core Golden draw p95 41.31ms vs update p95 12.41ms; core browser p95 55.2ms",
     "openRegressions": []
   },
   "locks": [
-    {
-      "owner": "Unity migration draft #56",
-      "scope": "unity/NapoleonicRTS/**",
-      "note": "parallel native prototype; do not schedule browser builders into this tree"
-    }
+    {"owner":"Unity migration draft #56","scope":"unity/NapoleonicRTS/**","note":"parallel native prototype; do not schedule browser builders into this tree"},
+    {"owner":"Gameplay/AI Builder","task":"GAMEPLAY-AI-01","scope":"src/ai/tactics.js","baseCommit":"c26129f421161428114914b7ddf95e3b8f903021"}
   ],
   "queue": [
-    {
-      "id": "GFX-PERF-01",
-      "priority": 1,
-      "status": "ready",
-      "owner": "Graphics/Mobile/UX",
-      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
-      "subsystems": ["2D renderer", "regiment/character draw pass", "mobile performance"],
-      "files": [],
-      "acceptance": ["profile before changing renderer", "reduce measured draw cost without reducing tactical readability", "stable canvas/opaque frames", "no mobile core-loop regression"],
-      "tests": ["Focused Chromium/mobile", "Deterministic Golden Battle", "520-unit Game Health", "anti-flicker/stable-canvas checks", "Movement Coverage/bridge"]
-    },
-    {
-      "id": "MOVE-AUDIT-01",
-      "priority": 2,
-      "status": "ready",
-      "owner": "Movement/Simulation",
-      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
-      "subsystems": ["movement", "formation cohesion", "bridges/chokepoints"],
-      "files": [],
-      "acceptance": ["audit current crossing queue/recovery metrics before code changes", "preserve 20/20 bounded crossing completion", "no teleport recovery or bridge-mouth oscillation", "identify one reproducible movement defect or leave implementation unchanged"],
-      "tests": ["Movement Coverage/bridge", "520-unit Game Health", "Deterministic Golden Battle", "Fast headless"]
-    },
-    {
-      "id": "GAMEPLAY-AI-01",
-      "priority": 3,
-      "status": "ready",
-      "owner": "AI/Gameplay",
-      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
-      "subsystems": ["AI", "combat", "morale", "orders"],
-      "files": [],
-      "acceptance": ["inspect Golden Battle for the largest observable tactical weakness before implementation", "choose one player-visible AI/combat improvement", "preserve deterministic invariants and command predictability"],
-      "tests": ["Deterministic Golden Battle", "520-unit Game Health", "Fast headless", "Movement Coverage/bridge if movement semantics change"]
-    },
-    {
-      "id": "PERF-BUDGET-01",
-      "priority": 4,
-      "status": "ready",
-      "owner": "Director/Integrator",
-      "baseCommit": "c26129f421161428114914b7ddf95e3b8f903021",
-      "subsystems": ["benchmarks", "CI performance budgets"],
-      "files": ["development-state.json"],
-      "acceptance": ["collect repeated comparable Golden measurements", "tighten numeric budgets only when variance is understood", "do not optimize a subsystem without profiling evidence"],
-      "tests": ["Deterministic Golden Battle", "existing CI gates"]
-    }
+    {"id":"GFX-PERF-01","priority":1,"status":"ready","owner":"Graphics/Mobile/UX","baseCommit":"c26129f421161428114914b7ddf95e3b8f903021","subsystems":["2D renderer","regiment/character draw pass","mobile performance"],"files":[],"acceptance":["profile before changing renderer","reduce measured draw cost without reducing tactical readability","stable canvas/opaque frames","no mobile core-loop regression"],"tests":["Focused Chromium/mobile","Deterministic Golden Battle","520-unit Game Health","anti-flicker/stable-canvas checks","Movement Coverage/bridge"]},
+    {"id":"MOVE-AUDIT-01","priority":2,"status":"ready","owner":"Movement/Simulation","baseCommit":"c26129f421161428114914b7ddf95e3b8f903021","subsystems":["movement","formation cohesion","bridges/chokepoints"],"files":[],"acceptance":["audit current crossing queue/recovery metrics before code changes","preserve 20/20 bounded crossing completion","no teleport recovery or bridge-mouth oscillation","identify one reproducible movement defect or leave implementation unchanged"],"tests":["Movement Coverage/bridge","520-unit Game Health","Deterministic Golden Battle","Fast headless"]},
+    {"id":"GAMEPLAY-AI-01","priority":3,"status":"implementing","owner":"Gameplay/AI Builder","baseCommit":"c26129f421161428114914b7ddf95e3b8f903021","subsystems":["AI","combat","morale","orders"],"files":["src/ai/tactics.js"],"hypothesis":"strategic target is recomputed from scratch each commander cycle, so similarly scored enemy regiments can cause player-visible order thrash; retain a still-valid current target unless a challenger is materially better","acceptance":["retain current enemy-regiment target when its score remains within 15% plus a small absolute margin of the best challenger","switch immediately when current target disappears or a challenger is materially better","preserve deterministic invariants and command predictability"],"tests":["Deterministic Golden Battle","520-unit Game Health","Fast headless","Movement Coverage/bridge if movement semantics change"]},
+    {"id":"PERF-BUDGET-01","priority":4,"status":"ready","owner":"Director/Integrator","baseCommit":"c26129f421161428114914b7ddf95e3b8f903021","subsystems":["benchmarks","CI performance budgets"],"files":["development-state.json"],"acceptance":["collect repeated comparable Golden measurements","tighten numeric budgets only when variance is understood","do not optimize a subsystem without profiling evidence"],"tests":["Deterministic Golden Battle","existing CI gates"]}
   ],
   "baselines": {
-    "goldenBattle": {"browserP95FrameMs": 55.2, "drawP95Ms": 41.31, "updateP95Ms": 12.41, "stableCanvas": true, "opaqueFrames": true, "runtimeErrors": 0},
-    "combatGolden": {"browserP95FrameMs": 100.0, "maxSmokeEvents": 10, "smokeEventCap": 80},
-    "bridgeChokepoints": {"routesTested": 20, "routesCompleted": 20, "failures": 0, "hardStalls": 0, "maxObservedStallSeconds": 2.5},
-    "mobile": {"inputModel": "Pointer Events/shared authorities", "mobileDprCap": 1.5, "desktopDprCap": 2, "legacyTouchListeners": false}
+    "goldenBattle":{"browserP95FrameMs":55.2,"drawP95Ms":41.31,"updateP95Ms":12.41,"stableCanvas":true,"opaqueFrames":true,"runtimeErrors":0},
+    "combatGolden":{"browserP95FrameMs":100.0,"maxSmokeEvents":10,"smokeEventCap":80},
+    "bridgeChokepoints":{"routesTested":20,"routesCompleted":20,"failures":0,"hardStalls":0,"maxObservedStallSeconds":2.5},
+    "mobile":{"inputModel":"Pointer Events/shared authorities","mobileDprCap":1.5,"desktopDprCap":2,"legacyTouchListeners":false}
   },
-  "technicalDebt": [
-    "core Golden draw p95 materially exceeds update p95; renderer profiling is the highest measured gap",
-    "numeric Golden p95 budgets need repeated comparable CI samples before tightening",
-    "mobile canvas budget reapplies after the core resize listener instead of sharing one resize authority",
-    "legacy script-load chain remains long and should only be consolidated with load-order regression coverage"
-  ],
-  "provenApproaches": ["stabilize green work before overlapping changes", "profile before optimizing", "shared Pointer Events authority for mouse/touch gameplay", "bounded bridge progress checks without teleportation", "regiment/salvo-level pooled black-powder effects"],
-  "avoid": ["parallel gameplay authorities", "unprofiled renderer micro-optimization", "visual changes that remount/reset canvas", "tight budgets from one hosted-CI sample", "cosmetic work ahead of red product gates"]
+  "technicalDebt":["core Golden draw p95 materially exceeds update p95; renderer profiling is the highest measured gap","numeric Golden p95 budgets need repeated comparable CI samples before tightening","mobile canvas budget reapplies after the core resize listener instead of sharing one resize authority","legacy script-load chain remains long and should only be consolidated with load-order regression coverage"],
+  "provenApproaches":["stabilize green work before overlapping changes","profile before optimizing","shared Pointer Events authority for mouse/touch gameplay","bounded bridge progress checks without teleportation","regiment/salvo-level pooled black-powder effects"],
+  "avoid":["parallel gameplay authorities","unprofiled renderer micro-optimization","visual changes that remount/reset canvas","tight budgets from one hosted-CI sample","cosmetic work ahead of red product gates"]
 }
