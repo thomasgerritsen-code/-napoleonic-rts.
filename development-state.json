@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
-  "updatedAt": "2026-09-16T12:01:00+02:00",
-  "sourceOfTruth": "main + PR/CI + Vercel preview evidence + playtest feedback",
-  "baseMain": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
+  "updatedAt": "2026-09-16T13:00:00+02:00",
+  "sourceOfTruth": "main + exact-head PR/CI + GitHub Vercel status + playtest feedback",
+  "baseMain": "865911745346299a88a3767894783f52bf2e7bb4",
   "version": "1.3.22",
   "initiative": {
     "id": "MOVEMENT-CONTACT-V1",
@@ -13,48 +13,49 @@
       "graphicsMobileUx": "readability/diagnostics only; never a second movement or combat authority"
     },
     "roadmapStage": 1,
-    "dominantRootCause": "F engagement-state handoff is the leading contact hypothesis from PR #129 trace work; road/off-road movement A-E remains unclassified until MOVE-LAB-01 produces real replay metrics",
+    "dominantRootCause": "Contact: F engagement-state handoff remains leading hypothesis. Road/off-road: A-E still unclassified; PR #132 now supplies deterministic instrumentation but its emitted trace must be reviewed before classification/tuning.",
     "rootCauseLadder": ["A route/path geometry", "B formation anchor/slot generation", "C velocity/acceleration/turn model", "D collision/friendly traffic", "E road/corridor transition", "F engagement-state handoff", "G targeting/unit-role behavior"],
     "visualFeelRejects": ["zigzag/weave", "snap turning", "formation explosion", "rubber-band regrouping", "long front penetration", "unexplained stop-start cadence", "cavalry/artillery role break"]
   },
   "health": {
-    "ci": "main advanced through merged movement-contact diagnostics PR #130 to c453dbc2; PR #129 head c668800 failed Focused Chromium while Fast headless, 520-unit Game Health, Movement Coverage and Deterministic Golden Battle passed",
-    "gameplay": "movement-to-contact feel remains highest player-visible gap; PR #129 provides first evidence pointing to F state-handoff but is not mergeable yet",
-    "movement": "bridge/chokepoint baseline remains 20/20 complete, 0 failures, 0 hard stalls, max observed stall 2.5s; road/off-road root cause A-E still needs deterministic instrumentation",
-    "aiCombat": "contact trace exists on stale PR #129; candidate must be refreshed onto current main and pass fresh CI plus Preview before merge",
-    "graphicsUxMobile": "movement-contact diagnostics from PR #130 are now on main; Pointer Events/shared input authority remains baseline",
-    "performance": "draw p95 41.31ms vs update p95 12.41ms remains deferred behind movement-contact product gap",
-    "vercelPreview": "PR #129 c668800 had a Ready Preview, but it is stale after main advanced to c453dbc2. Current connector exposes no Vercel team/project, so Director cannot independently fetch a fresh deployment; fresh Preview evidence is required from the branch/PR before ready_to_merge.",
-    "openRegressions": ["PR #129 Focused Chromium failure at head c668800"]
+    "ci": "main 86591174 is source of truth. PR #132 exact head d85c8eaa completed workflow run 742 successfully. PR #131 exact head 61210d89 failed workflow run 741 at Focused Chromium; Golden Battle, Fast headless, Movement Coverage and 520-unit Game Health passed.",
+    "gameplay": "movement-to-contact feel remains highest player-visible gap; no production tuning accepted yet.",
+    "movement": "PR #132 adds deterministic road/off-road baseline instrumentation only; full CI is green. Existing bridge/chokepoint baseline remains 20/20 complete with no hard stalls from last verified baseline.",
+    "aiCombat": "F state-handoff remains leading contact hypothesis, but refreshed PR #131 is BLOCKED by repeat Focused Chromium failure and must not merge.",
+    "graphicsUxMobile": "movement-contact diagnostics are on main; Pointer Events/shared input authority remains baseline; no new production graphics/mobile regression observed in this scan.",
+    "performance": "draw p95 41.31ms vs update p95 12.41ms remains deferred behind movement-contact product gap.",
+    "vercelPreview": "GitHub exact-head fallback works: PR #132 d85c8eaa Vercel=success target J3kwREvDUQoX3M9kAY8YZBwUXkZD; PR #131 61210d89 Vercel=success target Dm7ogB4oazJdCJwqTDp6ovcE4PfF. Deployment success is verified, but independent visual/runtime inspection is still incomplete, so neither receives a full runtime-quality green solely from Vercel status.",
+    "openRegressions": ["PR #131 Focused Chromium failure at exact head 61210d89; this is the second serious CONTACT-TRACE attempt with the same gate class failing"]
   },
   "locks": [
     {"owner": "Unity migration draft #56", "scope": "unity/NapoleonicRTS/**", "note": "parallel native prototype; browser builders do not modify this tree"},
-    {"owner": "AI/Gameplay / PR #129", "scope": "contact trace test instrumentation", "note": "refresh/rebase only; do not overlap Movement locomotion files"}
+    {"owner": "Movement/Simulation / PR #132", "scope": "tests/movement-contact-lab-v1.spec.js", "note": "instrumentation only; review trace evidence before any A-E tuning"},
+    {"owner": "AI/Gameplay / PR #131", "scope": "contact trace test instrumentation", "note": "blocked on Focused Chromium; no production movement files"}
   ],
   "queue": [
     {
       "id": "MOVE-LAB-01",
       "priority": 1,
-      "status": "ready",
+      "status": "testing",
       "owner": "Movement/Simulation",
       "slot": ":20",
-      "baseCommit": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
+      "baseCommit": "865911745346299a88a3767894783f52bf2e7bb4",
       "subsystems": ["movement test instrumentation", "road/off-road flow", "formation cohesion"],
-      "files": [],
-      "acceptance": ["emit real same-seed movement-contact JSON on current main", "capture route completion, heading jitter/reversals, formation deviation, stationary time and max stall where available", "classify first reproduced road/off-road failure A-E before production tuning", "Vercel Preview must be Ready and core loop/replay launchable for any browser-facing branch", "no production movement behavior change merely to make instrumentation pass"],
-      "tests": ["Movement-Contact replay", "Movement Coverage/bridge", "Fast headless", "520-unit Game Health", "Vercel Preview runtime/replay smoke"]
+      "files": ["tests/movement-contact-lab-v1.spec.js", "PR #132"],
+      "acceptance": ["review emitted same-seed trace and classify first reproduced A-E failure before production tuning", "preserve green run 742 class of gates", "exact-head Vercel deployment success is present", "runtime visual/console evidence must be completed before merge if Preview can be inspected", "no production movement behavior change merely to make instrumentation pass"],
+      "tests": ["Movement-Contact replay", "Movement Coverage/bridge", "Fast headless", "Focused Chromium", "520-unit Game Health", "Deterministic Golden Battle", "Vercel Preview runtime/replay smoke"]
     },
     {
       "id": "CONTACT-TRACE-01",
       "priority": 2,
-      "status": "implementing",
+      "status": "blocked",
       "owner": "AI/Gameplay",
       "slot": ":10",
-      "baseCommit": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
+      "baseCommit": "865911745346299a88a3767894783f52bf2e7bb4",
       "subsystems": ["engagement intent", "deploy/engage/reform trace", "target retention"],
-      "files": ["PR #129 test instrumentation"],
-      "acceptance": ["refresh/rebase PR #129 onto c453dbc2 or newer main", "resolve Focused Chromium failure without weakening coverage", "preserve F state-handoff trace evidence and no production behavior change", "fresh non-stale Vercel Preview Ready with core loop and trace launchable", "fresh full GitHub CI green before ready_to_merge"],
-      "tests": ["Focused Chromium", "Fast headless", "Deterministic Golden Battle", "520-unit Game Health", "Movement Coverage", "Vercel Preview runtime/console smoke"]
+      "files": ["PR #131 test instrumentation"],
+      "acceptance": ["do not weaken Focused Chromium coverage", "because two serious attempts (#129/#131) hit the same gate class, stop patch-loop and isolate the failing trace/test assumption before another implementation attempt", "preserve F state-handoff evidence and no production behavior change", "fresh exact-head Vercel success plus complete runtime evidence", "full GitHub CI green before ready_to_merge"],
+      "tests": ["Focused Chromium root-cause isolation", "Fast headless", "Deterministic Golden Battle", "520-unit Game Health", "Movement Coverage", "Vercel Preview runtime/console smoke"]
     },
     {
       "id": "MOVEMENT-DIAG-VERIFY-01",
@@ -62,10 +63,10 @@
       "status": "ready",
       "owner": "Graphics/Mobile/UX",
       "slot": ":35",
-      "baseCommit": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
+      "baseCommit": "865911745346299a88a3767894783f52bf2e7bb4",
       "subsystems": ["debug visualization", "golden capture", "preview readability"],
       "files": [],
-      "acceptance": ["verify merged PR #130 diagnostics expose enough state for road turn/exit, approach, deploy, first attack and reform captures", "only add missing debug/test observability", "debug-off production output/performance unchanged", "Preview shows no blank/flicker/console error"],
+      "acceptance": ["verify merged diagnostics expose road turn/exit, approach, deploy, first attack and reform state", "only add missing debug/test observability", "debug-off production output/performance unchanged", "exact-head Preview status required and visual/runtime evidence recorded where accessible"],
       "tests": ["Focused Chromium", "anti-flicker/stable-canvas", "Deterministic Golden Battle", "Vercel Preview visual/runtime smoke"]
     },
     {
@@ -74,10 +75,10 @@
       "status": "ready",
       "owner": "Director/Integrator",
       "slot": ":50",
-      "baseCommit": "c453dbc2cbf5c5fc4ca83b5f428e05a518b3cad1",
+      "baseCommit": "865911745346299a88a3767894783f52bf2e7bb4",
       "subsystems": ["combined replay gate", "GitHub CI", "Vercel Preview", "development-state.json"],
       "files": ["development-state.json", "tools/compare-movement-contact.mjs", "docs/movement-contact-authority.md"],
-      "acceptance": ["consume real baseline/candidate replay JSON with same seed/orders", "require both GitHub CI and branch Vercel Preview", "require golden/visual evidence where tooling permits", "no merge on material bridge/mobile/core-order regression", "advance roadmap only after reproducible baseline exists"],
+      "acceptance": ["consume real baseline/candidate replay JSON with same seed/orders", "require full GitHub CI plus exact-head Vercel success", "distinguish deployment success from incomplete visual/runtime evidence", "no merge on material bridge/mobile/core-order regression", "advance roadmap only after reproducible baseline and A-E classification exist"],
       "tests": ["Fast headless", "Focused Chromium", "520-unit Game Health", "Deterministic Golden Battle", "Movement Coverage/bridge", "Movement-Contact combined replay", "anti-flicker", "Vercel Preview runtime/console/replay gate"]
     }
   ],
@@ -85,9 +86,9 @@
     "goldenBattle": {"browserP95FrameMs": 55.2, "drawP95Ms": 41.31, "updateP95Ms": 12.41, "stableCanvas": true, "opaqueFrames": true, "runtimeErrors": 0},
     "bridgeChokepoints": {"routesTested": 20, "routesCompleted": 20, "failures": 0, "hardStalls": 0, "maxObservedStallSeconds": 2.5},
     "mobile": {"inputModel": "Pointer Events/shared authorities", "legacyTouchListeners": false},
-    "movementContact": {"status": "instrumentation_required", "roadmapStage": 1, "contactHypothesis": "F state handoff", "roadOffroadRootCause": "unclassified A-E"}
+    "movementContact": {"status": "instrumentation_testing", "roadmapStage": 1, "contactHypothesis": "F state handoff", "roadOffroadRootCause": "unclassified A-E", "movementLabPr": 132, "movementLabHead": "d85c8eaa8d5196288fb0cb9a4e489c2e935ec973"}
   },
-  "technicalDebt": ["real road/off-road same-seed replay metrics are still missing", "PR #129 contact trace needs current-main refresh and Focused Chromium repair", "Vercel Preview evidence is not currently independently queryable by Director connector", "renderer draw p95 remains a later measured performance gap"],
-  "provenApproaches": ["stabilize green work before overlapping changes", "root-cause trace before constant tuning", "same-seed before/after replay", "Preview-first plus GitHub CI", "shared Pointer Events authority", "bounded bridge progress without teleportation"],
-  "avoid": ["parallel gameplay/movement authorities", "parameter whack-a-mole without trace evidence", "Production as experimental QA", "merging stale Preview evidence", "jumping roadmap stages before baseline", "cosmetic work ahead of product gates"]
+  "technicalDebt": ["PR #132 trace output still needs evidence review/classification before movement tuning", "CONTACT-TRACE has now failed Focused Chromium in two serious attempts and requires assumption/root-cause isolation instead of another patch loop", "Vercel exact-head status is queryable through GitHub but visual/runtime Preview inspection remains incomplete", "renderer draw p95 remains a later measured performance gap"],
+  "provenApproaches": ["stabilize green work before overlapping changes", "root-cause trace before constant tuning", "same-seed before/after replay", "GitHub exact-head Vercel fallback", "Preview-first plus GitHub CI", "shared Pointer Events authority", "bounded bridge progress without teleportation"],
+  "avoid": ["parallel gameplay/movement authorities", "parameter whack-a-mole without trace evidence", "Production as experimental QA", "treating Vercel deployment success as visual/runtime proof", "third blind retry of CONTACT-TRACE without isolating the Focused Chromium failure", "jumping roadmap stages before baseline", "cosmetic work ahead of product gates"]
 }
