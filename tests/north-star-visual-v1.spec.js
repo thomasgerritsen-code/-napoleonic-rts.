@@ -48,6 +48,23 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
     const ok = window.__RTS_DEBUG__.runScenario('north-star');
     window.__RTS_DEBUG__.setPeaceMode(true);
 
+    // The production artillery authority intentionally keeps a newly-created battery
+    // non-operational while its reserved crew physically walks to the gun. Let that
+    // existing authority finish inside the deterministic fixture instead of bypassing
+    // it or weakening the audit. This advances only artillery crew attachment; it does
+    // not introduce a second artillery/movement authority.
+    if (typeof syncBatteryCrewV061 === 'function') {
+      const batteries = regiments.filter(reg => !reg.destroyed && groupKindV06(reg) === 'artillery');
+      for (let step = 0; step < 80; step += 1) {
+        for (const battery of batteries) syncBatteryCrewV061(battery, 0.05);
+        const ready = batteries.every(battery => {
+          const cannon = artilleryForGroupV06(battery);
+          return !!(cannon && canArtilleryOperateV06(cannon));
+        });
+        if (ready) break;
+      }
+    }
+
     // Golden captures need the complete fixed battlefield, not player fog-of-war.
     // This changes only the deterministic test fixture's explored-cell state; it does
     // not alter production visibility/fog authority or renderer behaviour.
@@ -61,10 +78,6 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
 
     const meta = window.__RTS_DEBUG__.northStarScenario();
     const snapshot = window.__RTS_DEBUG__.simulationSnapshot();
-    // Preserve the exact runtime predicate implementation in the artifact. The prior
-    // report proved all visible preconditions true while the authority still returned
-    // false; recording the live function source makes later overrides/shadowing
-    // diagnosable without weakening or duplicating artillery authority.
     const artilleryAuthority = {
       canOperateType: typeof canArtilleryOperateV06,
       canOperateSource: typeof canArtilleryOperateV06 === 'function' ? String(canArtilleryOperateV06) : null,
@@ -89,7 +102,9 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
           resolvedIsArtillery: !!resolvedRegiment && groupKindV06(resolvedRegiment) === 'artillery',
           crewCount: crew.length,
           resolvedCrewCount: resolvedRegiment ? artilleryCrewV06(resolvedRegiment).length : 0,
-          enoughCrew: crew.length >= 2
+          enoughCrew: crew.length >= 2,
+          crewApproachActive: !!reg.crewApproachV1?.active,
+          crewApproachLastDistance: Number.isFinite(reg.crewApproachV1?.lastDistance) ? reg.crewApproachV1.lastDistance : null
         };
         return {
           id: reg.id,
@@ -137,7 +152,7 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   await testInfo.attach('north-star-mobile-baseline-candidate', { body: mobileImage, contentType: 'image/png' });
 
   const report = {
-    version: 3,
+    version: 4,
     scenario: 'north-star-v1',
     deterministicSeed: NORTH_STAR_SEED,
     baselineState: 'candidate-capture',
