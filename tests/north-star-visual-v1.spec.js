@@ -61,6 +61,16 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
 
     const meta = window.__RTS_DEBUG__.northStarScenario();
     const snapshot = window.__RTS_DEBUG__.simulationSnapshot();
+    // Preserve the exact runtime predicate implementation in the artifact. The prior
+    // report proved all visible preconditions true while the authority still returned
+    // false; recording the live function source makes later overrides/shadowing
+    // diagnosable without weakening or duplicating artillery authority.
+    const artilleryAuthority = {
+      canOperateType: typeof canArtilleryOperateV06,
+      canOperateSource: typeof canArtilleryOperateV06 === 'function' ? String(canArtilleryOperateV06) : null,
+      crewResolverSource: typeof artilleryCrewV06 === 'function' ? String(artilleryCrewV06) : null,
+      regimentResolverSource: typeof getRegiment === 'function' ? String(getRegiment) : null
+    };
     const batteryDiagnostics = regiments
       .filter(reg => !reg.destroyed && groupKindV06(reg) === 'artillery')
       .map(reg => {
@@ -103,6 +113,7 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
       ok,
       meta,
       audit,
+      artilleryAuthority,
       batteryDiagnostics,
       livingUnits: (snapshot.units || []).filter(unit => !unit.dead).length,
       livingGroups: (snapshot.groups || []).filter(group => !group.destroyed).length,
@@ -126,7 +137,7 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   await testInfo.attach('north-star-mobile-baseline-candidate', { body: mobileImage, contentType: 'image/png' });
 
   const report = {
-    version: 2,
+    version: 3,
     scenario: 'north-star-v1',
     deterministicSeed: NORTH_STAR_SEED,
     baselineState: 'candidate-capture',
