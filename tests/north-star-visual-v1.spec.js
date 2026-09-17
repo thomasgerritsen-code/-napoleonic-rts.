@@ -66,13 +66,29 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
       .map(reg => {
         const cannon = artilleryForGroupV06(reg);
         const crew = artilleryCrewV06(reg);
+        const resolvedRegiment = cannon?.regimentId ? getRegiment(cannon.regimentId) : null;
+        const predicates = {
+          cannonPresent: !!cannon,
+          cannonAlive: !!cannon && !cannon.dead,
+          cannonType: cannon?.type || null,
+          cannonIsArtillery: cannon?.type === 'artillery',
+          cannonRegimentId: cannon?.regimentId ?? null,
+          regimentResolved: !!resolvedRegiment,
+          regimentIdentityMatches: !!resolvedRegiment && resolvedRegiment.id === reg.id,
+          resolvedKind: resolvedRegiment ? groupKindV06(resolvedRegiment) : null,
+          resolvedIsArtillery: !!resolvedRegiment && groupKindV06(resolvedRegiment) === 'artillery',
+          crewCount: crew.length,
+          resolvedCrewCount: resolvedRegiment ? artilleryCrewV06(resolvedRegiment).length : 0,
+          enoughCrew: crew.length >= 2
+        };
         return {
           id: reg.id,
           side: reg.side,
           memberIds: [...(reg.memberIds || [])],
           crewIds: [...(reg.crewIds || [])],
-          cannon: cannon ? { id: cannon.id, dead: !!cannon.dead, regimentId: cannon.regimentId } : null,
+          cannon: cannon ? { id: cannon.id, type: cannon.type, dead: !!cannon.dead, regimentId: cannon.regimentId } : null,
           crew: crew.map(unit => ({ id: unit.id, dead: !!unit.dead, regimentId: unit.regimentId, type: unit.type })),
+          predicates,
           operational: !!(cannon && canArtilleryOperateV06(cannon))
         };
       });
@@ -110,10 +126,11 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   await testInfo.attach('north-star-mobile-baseline-candidate', { body: mobileImage, contentType: 'image/png' });
 
   const report = {
-    version: 1,
+    version: 2,
     scenario: 'north-star-v1',
     deterministicSeed: NORTH_STAR_SEED,
     baselineState: 'candidate-capture',
+    preservationImpact: 'none',
     setup
   };
   fs.writeFileSync(path.join(outputDir, 'north-star-visual-report.json'), JSON.stringify(report, null, 2));
@@ -135,6 +152,8 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   expect(setup.bySideType['britain:cavalry'] || 0).toBeGreaterThan(0);
   expect(setup.bySideType['france:artillery'] || 0).toBeGreaterThan(0);
   expect(setup.bySideType['britain:artillery'] || 0).toBeGreaterThan(0);
+  expect(setup.batteryDiagnostics).toHaveLength(2);
+  expect(setup.batteryDiagnostics.every(item => item.operational)).toBe(true);
   expect(setup.canvas.width).toBeGreaterThan(0);
   expect(setup.canvas.height).toBeGreaterThan(0);
 });
