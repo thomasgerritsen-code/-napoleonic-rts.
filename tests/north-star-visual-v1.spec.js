@@ -47,8 +47,35 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   const setup = await page.evaluate(() => {
     const ok = window.__RTS_DEBUG__.runScenario('north-star');
     window.__RTS_DEBUG__.setPeaceMode(true);
+
+    // Golden captures need the complete fixed battlefield, not player fog-of-war.
+    // This changes only the deterministic test fixture's explored-cell state; it does
+    // not alter production visibility/fog authority or renderer behaviour.
+    if (typeof exploredCells !== 'undefined' && typeof EXPLORE_CELL === 'number') {
+      for (let y = 0; y <= WORLD.height; y += EXPLORE_CELL) {
+        for (let x = 0; x <= WORLD.width; x += EXPLORE_CELL) {
+          exploredCells.add(`${Math.floor(x / EXPLORE_CELL)},${Math.floor(y / EXPLORE_CELL)}`);
+        }
+      }
+    }
+
     const meta = window.__RTS_DEBUG__.northStarScenario();
     const snapshot = window.__RTS_DEBUG__.simulationSnapshot();
+    const batteryDiagnostics = regiments
+      .filter(reg => !reg.destroyed && groupKindV06(reg) === 'artillery')
+      .map(reg => {
+        const cannon = artilleryForGroupV06(reg);
+        const crew = artilleryCrewV06(reg);
+        return {
+          id: reg.id,
+          side: reg.side,
+          memberIds: [...(reg.memberIds || [])],
+          crewIds: [...(reg.crewIds || [])],
+          cannon: cannon ? { id: cannon.id, dead: !!cannon.dead, regimentId: cannon.regimentId } : null,
+          crew: crew.map(unit => ({ id: unit.id, dead: !!unit.dead, regimentId: unit.regimentId, type: unit.type })),
+          operational: !!(cannon && canArtilleryOperateV06(cannon))
+        };
+      });
     const audit = window.__RTS_DEBUG__.audit();
     const bySideType = {};
     for (const unit of snapshot.units || []) {
@@ -60,6 +87,7 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
       ok,
       meta,
       audit,
+      batteryDiagnostics,
       livingUnits: (snapshot.units || []).filter(unit => !unit.dead).length,
       livingGroups: (snapshot.groups || []).filter(group => !group.destroyed).length,
       bySideType,
