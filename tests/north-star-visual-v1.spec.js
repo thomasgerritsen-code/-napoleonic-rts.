@@ -147,15 +147,16 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
 
   await page.setViewportSize({ width: 844, height: 390 });
   // PRESERVATION IMPACT: none — Golden-fixture composition only. The production
-  // mobile camera/Pointer Events authority is deliberately untouched. The shorter
-  // landscape viewport needs a wider fixed Golden framing so the same eight groups
-  // remain readable above/below the HUD instead of being clipped by screen edges.
+  // mobile camera/Pointer Events authority is deliberately untouched. The short
+  // landscape viewport has only ~200px of unobscured battlefield between the HUDs;
+  // use a wider test-only framing so all eight groups and the bridge/chokepoint remain
+  // visible instead of allowing the top/bottom formations to sit under the controls.
   const mobileComposition = await page.evaluate(() => {
     const meta = window.__RTS_DEBUG__.northStarScenario();
     if (meta?.center && typeof camera !== 'undefined') {
       camera.x = meta.center.x;
       camera.y = meta.center.y;
-      camera.zoom = 0.42;
+      camera.zoom = 0.32;
     }
     const game = document.getElementById('game');
     return {
@@ -174,7 +175,7 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   await testInfo.attach('north-star-mobile-baseline-candidate', { body: mobileImage, contentType: 'image/png' });
 
   const report = {
-    version: 5,
+    version: 6,
     scenario: 'north-star-v1',
     deterministicSeed: NORTH_STAR_SEED,
     baselineState: 'candidate-capture',
@@ -206,6 +207,6 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   expect(setup.batteryDiagnostics.every(item => item.operational)).toBe(true);
   expect(setup.canvas.width).toBeGreaterThan(0);
   expect(setup.canvas.height).toBeGreaterThan(0);
-  expect(mobileComposition.zoom).toBe(0.42);
+  expect(mobileComposition.zoom).toBe(0.32);
   expect(mobileStableCanvas).toEqual({ width: mobileComposition.width, height: mobileComposition.height });
 });
