@@ -146,18 +146,42 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   await testInfo.attach('north-star-desktop-baseline-candidate', { body: desktopImage, contentType: 'image/png' });
 
   await page.setViewportSize({ width: 844, height: 390 });
+  // PRESERVATION IMPACT: none — Golden-fixture composition only. The production
+  // mobile camera/Pointer Events authority is deliberately untouched. The shorter
+  // landscape viewport needs a wider fixed Golden framing so the same eight groups
+  // remain readable above/below the HUD instead of being clipped by screen edges.
+  const mobileComposition = await page.evaluate(() => {
+    const meta = window.__RTS_DEBUG__.northStarScenario();
+    if (meta?.center && typeof camera !== 'undefined') {
+      camera.x = meta.center.x;
+      camera.y = meta.center.y;
+      camera.zoom = 0.42;
+    }
+    const game = document.getElementById('game');
+    return {
+      zoom: typeof camera !== 'undefined' ? camera.zoom : null,
+      width: game?.width || 0,
+      height: game?.height || 0
+    };
+  });
   await settleFrames(page, 4);
+  const mobileStableCanvas = await page.evaluate(() => {
+    const game = document.getElementById('game');
+    return { width: game?.width || 0, height: game?.height || 0 };
+  });
   const mobilePath = path.join(outputDir, 'north-star-visual-mobile-landscape.png');
   const mobileImage = await page.locator('#game').screenshot({ path: mobilePath, animations: 'disabled' });
   await testInfo.attach('north-star-mobile-baseline-candidate', { body: mobileImage, contentType: 'image/png' });
 
   const report = {
-    version: 4,
+    version: 5,
     scenario: 'north-star-v1',
     deterministicSeed: NORTH_STAR_SEED,
     baselineState: 'candidate-capture',
     preservationImpact: 'none',
-    setup
+    setup,
+    mobileComposition,
+    mobileStableCanvas
   };
   fs.writeFileSync(path.join(outputDir, 'north-star-visual-report.json'), JSON.stringify(report, null, 2));
   await testInfo.attach('north-star-visual-report', {
@@ -182,4 +206,6 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   expect(setup.batteryDiagnostics.every(item => item.operational)).toBe(true);
   expect(setup.canvas.width).toBeGreaterThan(0);
   expect(setup.canvas.height).toBeGreaterThan(0);
+  expect(mobileComposition.zoom).toBe(0.42);
+  expect(mobileStableCanvas).toEqual({ width: mobileComposition.width, height: mobileComposition.height });
 });
