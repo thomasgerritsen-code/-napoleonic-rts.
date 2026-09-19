@@ -32,3 +32,10 @@ if (!window.__NRTS_THREE_SCENE_HOOK_V1__) {
     camera: () => activeCamera
   });
 }
+
+// GRAPHICS-V2: install only the lightweight Pixi mode loader here.
+// The PixiJS library itself is fetched lazily only after the player enables Pixi V2,
+// keeping the existing 2D/Three.js startup and CI path independent from the CDN.
+import('./pixi-battlefield-v1.mjs?build=pixi1').catch(error => {
+  console.warn('Pixi V2 loader failed to install', error);
+});
