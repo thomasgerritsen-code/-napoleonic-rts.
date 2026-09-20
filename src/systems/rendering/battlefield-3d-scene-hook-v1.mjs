@@ -33,9 +33,12 @@ if (!window.__NRTS_THREE_SCENE_HOOK_V1__) {
   });
 }
 
-// GRAPHICS-V2: install only the lightweight Pixi mode loader here.
-// The PixiJS library itself is fetched lazily only after the player enables Pixi V2,
-// keeping the existing 2D/Three.js startup and CI path independent from the CDN.
+// GRAPHICS-V2: install the non-authoritative Three.js look layer and the lightweight
+// Pixi mode loader. PixiJS itself is still fetched lazily only after the player opts in.
+import('./battlefield-3d-look-v2.mjs?build=look2').catch(error => {
+  console.warn('Graphics V2 look layer failed to install', error);
+});
+
 import('./pixi-battlefield-v1.mjs?build=pixi1').catch(error => {
   console.warn('Pixi V2 loader failed to install', error);
 });

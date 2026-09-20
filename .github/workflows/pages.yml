@@ -202,7 +202,7 @@ jobs:
         env:
           CI_RELEASE: '0'
           CI_SYSTEM_CHROME: '1'
-        run: npx playwright test tests/golden-battle-v1.spec.js tests/golden-battle-combat-v11.spec.js --project=chromium --workers=1
+        run: npx playwright test tests/golden-battle-v1.spec.js tests/golden-battle-combat-v11.spec.js tests/north-star-visual-v1.spec.js tests/pixi-north-star-visual-v1.spec.js --project=chromium --workers=1
 
       - name: Upload Golden Battle reports
         if: ${{ always() }}
@@ -212,6 +212,12 @@ jobs:
           path: |
             test-results/golden-battle-report.json
             test-results/golden-battle-combat-v11-report.json
+            test-results/north-star-visual-report.json
+            test-results/north-star-visual-desktop.png
+            test-results/north-star-visual-mobile-landscape.png
+            test-results/pixi-north-star-report.json
+            test-results/pixi-north-star-desktop.png
+            test-results/pixi-north-star-mobile-landscape.png
           if-no-files-found: ignore
           retention-days: 30
 

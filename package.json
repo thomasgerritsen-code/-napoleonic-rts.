@@ -8,9 +8,14 @@
     "test:fast": "npm run audit && node --test tests/headless/*.test.js",
     "test:e2e": "playwright test --project=chromium",
     "test:ci": "npm run test:fast && npm run test:e2e",
-    "test:soak": "playwright test --project=chromium -g \"10-minute accelerated soak\""
+    "test:soak": "playwright test --project=chromium -g \"10-minute accelerated soak\"",
+    "art:list": "node scripts/generate-art.mjs --list",
+    "art:dry": "node scripts/generate-art.mjs --dry-run",
+    "art:generate": "node scripts/generate-art.mjs",
+    "art:promote": "node scripts/promote-art.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.1"
+    "@playwright/test": "1.62.1",
+    "pixi.js": "8.21.0"
   }
 }

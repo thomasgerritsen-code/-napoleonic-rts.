@@ -91,3 +91,39 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
   .army-counts { flex-direction: column; gap: 1px; font-size: .68rem; }
   .render-mode-button { padding-inline: 8px; }
 }
+
+/* Short landscape phones need battlefield height more than duplicated chrome.
+   Keep every order/formation control and selection feedback present; compact only
+   spacing and secondary labels. Pointer/input authority is intentionally untouched. */
+@media (orientation: landscape) and (max-height: 480px) and (max-width: 960px) {
+  .topbar {
+    top: 5px; left: 6px; right: 6px; min-height: 40px;
+    padding: 4px 7px; border-radius: 8px;
+    grid-template-columns: auto 1fr auto; gap: 4px 7px;
+  }
+  .brand strong { font-size: .72rem; }
+  .version { margin-left: 4px; font-size: .60rem; }
+  .resources {
+    grid-column: auto; grid-row: auto; justify-content: center;
+    gap: 3px; overflow: hidden; font-size: .68rem;
+  }
+  .resources span { padding: 3px 5px; border-radius: 5px; }
+  .topbar button { padding: 5px 7px; font-size: .66rem; }
+  .bottombar {
+    bottom: 5px; width: calc(100% - 12px); min-height: 62px;
+    padding: 4px 6px; border-radius: 8px;
+    grid-template-columns: minmax(104px, 1.2fr) minmax(0, 3fr) auto;
+    gap: 5px;
+  }
+  .selection-panel .label { font-size: .50rem; }
+  .selection-panel strong { margin: 0; font-size: .68rem; }
+  #selectionDetails { font-size: .54rem; }
+  .actions { flex-wrap: nowrap; gap: 3px; min-width: 0; }
+  .actions button {
+    min-width: 0; min-height: 36px; flex: 1 1 0;
+    padding: 3px 4px; border-radius: 6px; font-size: .58rem;
+  }
+  .actions button small { font-size: .50rem; }
+  .army-counts { gap: 0; font-size: .58rem; }
+  .build-hint { top: 50px; padding: 5px 8px; font-size: .66rem; }
+}

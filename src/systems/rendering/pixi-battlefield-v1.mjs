@@ -1,7 +1,9 @@
 // GRAPHICS-V2 / PixiJS vertical-slice renderer.
 // Opt-in only: normal 2D/Three.js paths stay untouched until the user enables Pixi V2.
 
-const PIXI_CDN = 'https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.mjs';
+const PIXI_VERSION = '8.21.0';
+const PIXI_CDN = `https://cdn.jsdelivr.net/npm/pixi.js@${PIXI_VERSION}/dist/pixi.mjs`;
+const PIXI_MODULE_URL = window.__NRTS_PIXI_MODULE_URL__ || PIXI_CDN;
 const source = window.NRTS_3D_SOURCE;
 const host = document.getElementById('app');
 const canvas2d = document.getElementById('game');
@@ -22,7 +24,7 @@ if (!source || !host || !canvas2d) {
   let returnTo3D = true;
   let lastSnapshot = null;
   let lastResourceSignature = '';
-  let rightDrag = null;
+  let canvas2dStyleBeforePixi = null;
 
   const unitNodes = new Map();
   const buildingNodes = new Map();
@@ -331,53 +333,28 @@ if (!source || !host || !canvas2d) {
     world.scale.set(camera.zoom);
   }
 
-  function screenToWorld(clientX, clientY) {
-    const rect = app.canvas.getBoundingClientRect();
-    const camera = source.camera();
-    return {
-      x: camera.x + (clientX - rect.left - rect.width / 2) / camera.zoom,
-      y: camera.y + (clientY - rect.top - rect.height / 2) / camera.zoom
-    };
-  }
-
-  function nearestSelectableUnit(point) {
-    if (!lastSnapshot) return null;
-    let best = null;
-    let bestD2 = Infinity;
-    for (const unit of lastSnapshot.units || []) {
-      if (unit.dead || !unit.regimentId) continue;
-      const dx = unit.x - point.x;
-      const dy = unit.y - point.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < bestD2) { bestD2 = d2; best = unit; }
+  // Keep the established 2D canvas as the sole input authority. It becomes a
+  // transparent surface above Pixi, so desktop box-select/right-drag and the full
+  // mobile Pointer Events model (tap, facing drag and pinch) remain unchanged.
+  function enableInputProxy() {
+    if (!canvas2dStyleBeforePixi) {
+      canvas2dStyleBeforePixi = {
+        visibility: canvas2d.style.visibility,
+        opacity: canvas2d.style.opacity,
+        zIndex: canvas2d.style.zIndex,
+        pointerEvents: canvas2d.style.pointerEvents
+      };
     }
-    const zoom = Math.max(0.1, source.camera().zoom || 1);
-    return bestD2 <= Math.pow(22 / zoom, 2) ? best : null;
+    canvas2d.style.visibility = 'visible';
+    canvas2d.style.opacity = '0';
+    canvas2d.style.zIndex = '3';
+    canvas2d.style.pointerEvents = 'auto';
   }
 
-  function bindCanvasInput() {
-    app.canvas.addEventListener('contextmenu', e => e.preventDefault());
-    app.canvas.addEventListener('pointerdown', e => {
-      if (!enabled) return;
-      if (e.button === 2) {
-        rightDrag = { point: screenToWorld(e.clientX, e.clientY), x: e.clientX, y: e.clientY };
-      }
-    });
-    app.canvas.addEventListener('pointerup', e => {
-      if (!enabled) return;
-      if (e.button === 0) {
-        const unit = nearestSelectableUnit(screenToWorld(e.clientX, e.clientY));
-        if (unit?.regimentId) source.dispatch({ type: 'select-group', id: unit.regimentId });
-        return;
-      }
-      if (e.button !== 2 || !rightDrag) return;
-      const end = screenToWorld(e.clientX, e.clientY);
-      const dragged = Math.hypot(e.clientX - rightDrag.x, e.clientY - rightDrag.y) > 10;
-      const command = { type: 'move', x: rightDrag.point.x, y: rightDrag.point.y };
-      if (dragged) command.facing = Math.atan2(end.y - rightDrag.point.y, end.x - rightDrag.point.x);
-      source.dispatch(command);
-      rightDrag = null;
-    });
+  function restoreInputProxy() {
+    if (!canvas2dStyleBeforePixi) return;
+    Object.assign(canvas2d.style, canvas2dStyleBeforePixi);
+    canvas2dStyleBeforePixi = null;
   }
 
   function buildStaticWorld() {
@@ -391,7 +368,7 @@ if (!source || !host || !canvas2d) {
     loading = true;
     loadError = '';
     try {
-      PIXI = await import(PIXI_CDN);
+      PIXI = await import(PIXI_MODULE_URL);
       app = new PIXI.Application();
       await app.init({
         resizeTo: window,
@@ -403,7 +380,8 @@ if (!source || !host || !canvas2d) {
       app.canvas.id = 'pixiBattlefield';
       app.canvas.setAttribute('aria-label', 'Napoleonic RTS PixiJS battlefield');
       Object.assign(app.canvas.style, {
-        position: 'absolute', inset: '0', zIndex: '2', display: 'none', touchAction: 'none'
+        position: 'fixed', inset: '0', zIndex: '2', display: 'none',
+        touchAction: 'none', pointerEvents: 'none'
       });
       host.appendChild(app.canvas);
 
@@ -415,7 +393,6 @@ if (!source || !host || !canvas2d) {
       world.addChild(terrainLayer, depthLayer, effectsLayer);
       app.stage.addChild(world);
       buildStaticWorld();
-      bindCanvasInput();
 
       let accumulator = 0;
       app.ticker.add(ticker => {
@@ -467,20 +444,18 @@ if (!source || !host || !canvas2d) {
       try { await createRenderer(); } catch (_) { return; }
       returnTo3D = Boolean(window.__BATTLEFIELD_3D_V1__?.enabled?.());
       window.__BATTLEFIELD_3D_V1__?.setEnabled?.(false);
-      canvas2d.style.visibility = 'hidden';
+      enableInputProxy();
       app.canvas.style.display = 'block';
-      app.canvas.style.pointerEvents = 'auto';
       enabled = true;
       button?.classList.add('active');
       document.documentElement.dataset.renderMode = 'pixi-v2';
-      source.setStatus('Pixi V2 actief · klik regiment · rechtsklik om te bewegen · Alt+4 terug.');
+      source.setStatus('Pixi V2 actief · bestaande desktop- en mobiele bediening behouden · Alt+4 terug.');
     } else {
       enabled = false;
       if (app) {
         app.canvas.style.display = 'none';
-        app.canvas.style.pointerEvents = 'none';
       }
-      canvas2d.style.visibility = '';
+      restoreInputProxy();
       button?.classList.remove('active');
       if (returnTo3D) window.__BATTLEFIELD_3D_V1__?.setEnabled?.(true);
       document.documentElement.dataset.renderMode = returnTo3D ? '3d' : '2d';
@@ -503,7 +478,7 @@ if (!source || !host || !canvas2d) {
 
   window.__NRTS_PIXI_V1__ = Object.freeze({
     version: 'pixi-battlefield-v1',
-    library: 'PixiJS v8 (lazy CDN import)',
+    library: `PixiJS ${PIXI_VERSION} (lazy module import)`,
     enabled: () => enabled,
     loaded: () => Boolean(app),
     loading: () => loading,
@@ -521,7 +496,11 @@ if (!source || !host || !canvas2d) {
         scenery: sceneryNodes.length,
         smoke: smoke.length,
         world: { ...WORLD },
-        renderer: app?.renderer?.name || null
+        renderer: app?.renderer?.name || null,
+        moduleUrl: PIXI_MODULE_URL,
+        inputAuthority: 'game-canvas',
+        inputProxyActive: Boolean(canvas2dStyleBeforePixi),
+        pixiPointerEvents: app?.canvas?.style?.pointerEvents || null
       };
     }
   });

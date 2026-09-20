@@ -4,7 +4,6 @@ import * as THREE from 'three';
 // It only changes rendering: terrain palette/variation, atmosphere and soft contact shadows.
 const source = window.NRTS_3D_SOURCE;
 const sceneHook = window.__NRTS_THREE_SCENE_HOOK_V1__;
-const renderApi = window.__BATTLEFIELD_3D_V1__;
 
 if (!source || !sceneHook) {
   console.warn('Graphics V2 look layer skipped: renderer bridge or scene hook unavailable.');
@@ -141,7 +140,9 @@ if (!source || !sceneHook) {
   }
 
   function updateShadows() {
-    const active = !renderApi?.enabled || renderApi.enabled();
+    const renderApi = window.__BATTLEFIELD_3D_V1__;
+    const pixiApi = window.__NRTS_PIXI_V1__;
+    const active = renderApi?.enabled?.() !== false && pixiApi?.enabled?.() !== true;
     group.visible = active;
     if (!active || document.hidden) {
       unitShadows.count = 0;
