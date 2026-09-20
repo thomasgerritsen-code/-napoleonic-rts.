@@ -1,8 +1,8 @@
 {
   "schemaVersion": 5,
-  "updatedAt": "2026-09-16T15:10:00+02:00",
+  "updatedAt": "2026-09-20T17:27:00Z",
   "sourceOfTruth": "current main + exact-head PR/CI/Preview evidence + structured playtest feedback",
-  "baseMain": "6bc26fbe2e6df59e19fe93b87f6d81d817c8cc35",
+  "baseMain": "9ce5c4759dc6d89f955e1bb380b1b4f16eb77f68",
   "version": "1.3.22",
   "northStar": {
     "status": "AMBER",
@@ -25,9 +25,9 @@
     "playability": {"status": "AMBER", "evidence": "core loop is automated, but a current structured 10-minute North Star playtest is not yet the release gate"},
     "movementFeel": {"status": "AMBER", "evidence": "player feedback identifies road/off-road and movement-to-contact feel as the main gap; deterministic #132 baseline needs refresh/interpretation"},
     "combatClarity": {"status": "AMBER", "evidence": "contact F state-handoff is the leading hypothesis; #129/#131 trace route remains unresolved"},
-    "visualQuality": {"status": "AMBER", "evidence": "#136 Golden Battlefield is still draft/capture-stage and Pixi #133 has no KEEP/STOP decision"},
+    "visualQuality": {"status": "AMBER", "evidence": "the Golden Battlefield baseline is on main; Pixi #133 was stopped because its desktop/mobile captures did not clearly improve on that baseline"},
     "mobileUx": {"status": "AMBER", "evidence": "shared Pointer Events/mobile regression coverage exists, but current North Star mobile playtest/golden proof is incomplete"},
-    "performance": {"status": "AMBER", "evidence": "520-unit gate is established; renderer draw cost remains a known gap and GRAPHICS-V2 comparison is incomplete"},
+    "performance": {"status": "AMBER", "evidence": "the 520-unit gate is established; Pixi #133 was stopped after its 87.5 ms p95 frame interval trailed the existing route's 23.67 ms p95 frame time in exact-head CI"},
     "audioFeel": {"status": "AMBER", "evidence": "no approved production audio slice yet"},
     "runtimeStability": {"status": "AMBER", "evidence": "last verified gameplay main was green; latest main only adds/fixes process documentation and awaits its post-change canary"},
     "maintainability": {"status": "AMBER", "evidence": "authority contracts and operating model exist, but stale/parallel PRs still need consolidation"},
@@ -44,20 +44,20 @@
     "maxActiveRiskyExperiments": 3,
     "slots": {
       "movementGameplay": "PR #132 baseline/refresh path",
-      "rendererVisual": "PR #133 PixiJS GRAPHICS-V2 evaluation",
+      "rendererVisual": "free; PixiJS PR #133 stopped and closed after the GRAPHICS-V2 evaluation",
       "observabilityTooling": "free; PR #135 remains draft/paused and receives no active priority until explicitly claimed"
     },
     "featureFlagRule": "risky renderer/AI/pathfinding/formation/telemetry paths remain opt-in until same-head CI + Preview + applicable visual/playtest + preservation evidence proves KEEP; obsolete flags are removed in cleanup"
   },
   "rendererDecision": {
     "candidate": "PixiJS PR #133",
-    "status": "EVALUATING_BLOCKED",
-    "evidence": "exact head 896ddc6d previously failed GitHub workflow run 746; visual and comparative performance evidence is insufficient for KEEP",
-    "decision": "PENDING",
-    "rule": "KEEP or STOP as soon as evidence is sufficient; existing renderer fallback is protected until KEEP plus replacement coverage is proven"
+    "status": "STOPPED_CLOSED",
+    "evidence": "exact head 82d9d556 in workflow run 35525647841 restored input/fallback and authoritative river/crossings, but the Golden Battlefield captures were not a clear visual improvement and Pixi measured 87.5 ms p95 / 78.88 ms mean at 520 units versus 23.67 ms p95 for the existing route (different harnesses, decisive margin)",
+    "decision": "STOP",
+    "rule": "keep the existing 2D/Three.js stack; any future renderer candidate starts as a new scoped experiment and must beat the current Golden Battlefield and performance baseline before KEEP"
   },
-  "artBible": {"status": "active", "goldenBattlefield": "PR #136 draft capture-stage; must become approved desktop/mobile golden diff before merge"},
-  "performanceBudget": {"status": "active", "hardGate": "520-unit Game Health", "knownGap": "renderer cost remains material; compare frame/update/draw p95 and larger stress behaviour before renderer KEEP"},
+  "artBible": {"status": "active", "goldenBattlefield": "deterministic desktop/mobile North Star baseline merged via PR #136; future renderer work must show a clear improvement against it"},
+  "performanceBudget": {"status": "active", "hardGate": "520-unit Game Health", "knownGap": "renderer cost remains material; Pixi #133 did not meet the comparative frame-time bar and was stopped"},
   "telemetry": {"status": "paused_draft", "pr": 135, "rule": "no Production enablement; refresh from current main only if telemetry becomes a North Star quality priority"},
   "cleanupCadence": {"featureQualityMergesSinceAdoption": 0, "trigger": "after about 8-10 successful feature/quality PRs, or sooner for clear duplicate authorities/flags/dependencies", "scope": "one small cleanup PR maximum; never displace an active blocker; preservation audit required before removal"},
   "locks": [
@@ -93,12 +93,13 @@
     {
       "id": "PIXI-DECISION-01",
       "priority": 3,
-      "status": "blocked",
+      "status": "stopped",
       "owner": "Graphics/Mobile/UX",
       "slot": ":35",
       "baseCommit": "6bc26fbe2e6df59e19fe93b87f6d81d817c8cc35",
       "subsystems": ["PixiJS GRAPHICS-V2", "renderer comparison", "performance", "asset pipeline"],
       "files": ["PR #133"],
+      "outcome": "STOP: closed without merge; retained the existing renderer stack because Pixi did not clearly improve the Golden Battlefield and scaled materially worse at 520 units",
       "acceptance": ["isolate and fix exact-head CI failure without weakening gates", "refresh against current main", "compare current renderer vs Pixi on the same Golden Battlefield", "prove no protected controls/features disappear in Pixi and fallback remains until KEEP", "compare desktop/mobile performance, fallback, asset speed and maintainability", "record explicit KEEP or STOP; no indefinite dual renderer expansion"],
       "tests": ["full GitHub CI", "exact-head Vercel Preview runtime", "desktop/mobile golden comparison", "520-unit Game Health", "renderer p95/stress comparison", "feature preservation matrix"]
     },

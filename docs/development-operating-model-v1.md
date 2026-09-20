@@ -54,14 +54,9 @@ A new experiment starts only when a slot is free or an existing route is merged,
 Risky renderer, AI, pathfinding, formation or telemetry changes should remain opt-in/flagged until their exact-head Preview, deterministic tests, playtest evidence and feature-preservation evidence show they are better than the current production path. Flags are temporary safety tools, not permanent duplicate systems. Remove obsolete flags during cleanup cadence once a KEEP/STOP decision is final.
 
 ## Browser renderer decision
-PixiJS PR #133 is the current GRAPHICS-V2 candidate. Compare Pixi against the current Three.js/2D stack on:
-1. visual quality versus the approved 2.5D keyframe;
-2. desktop and mobile performance;
-3. runtime stability and fallback behaviour;
-4. asset-production speed and consistency;
-5. implementation and maintenance complexity.
+**STOP recorded 2026-09-20:** PixiJS PR #133 was closed without merge. Exact-head evidence at `82d9d556` proved the opt-in input/fallback contract and restored the authoritative river/crossings, but the desktop/mobile Golden Battlefield captures were not a clear visual improvement over the existing stack. At 520 units, the Pixi rAF sample measured 87.5 ms p95 / 78.88 ms mean versus 23.67 ms p95 frame time for the existing route in the same CI run. The harnesses differ, but the margin plus added duplicate-renderer maintenance cost is decisive.
 
-Record an explicit KEEP or STOP decision within two days of starting this evaluation, or earlier when evidence is sufficient. Until then, do not expand Three.js cosmetically; only accept required fixes, safety work and regression repairs. The existing renderer fallback remains a protected capability until KEEP plus replacement coverage is proven.
+Keep the existing 2D/Three.js stack. Any future renderer candidate must be a new scoped experiment and demonstrate a clear Golden Battlefield improvement, desktop/mobile preservation, stable fallback and a competitive same-scenario performance comparison before KEEP.
 
 ## Art Bible
 Graphics work must follow one versioned style contract:
