@@ -33,6 +33,11 @@ test('Pixi renderer changes select the Pixi preservation regression plus smoke',
   assert.deepEqual(selected, ['tests/pixi-battlefield-v1.spec.js','tests/smoke-v1.spec.js']);
 });
 
+test('Pixi North Star visual evidence stays in the sequential golden job', () => {
+  const selected = selectFocusedTests(['tests/pixi-north-star-visual-v1.spec.js']);
+  assert.deepEqual(selected, ['tests/smoke-v1.spec.js']);
+});
+
 test('Battlefield V7 bundle keeps browser coverage targeted on smoke and village regressions', () => {
   const selected = selectFocusedTests(['src/systems/world/map-expansion-v7.js','src/systems/world/village-scale-v7.js','src/systems/navigation/road-index.js','src/systems/navigation/route-planner.js','src/systems/navigation/village-obstacles-v7.js','tests/village-navigation-v7.spec.js']);
   assert.deepEqual(selected, ['tests/building-avoidance-v2.spec.js','tests/smoke-v1.spec.js','tests/village-navigation-v7.spec.js','tests/village-renderer-v2.spec.js']);

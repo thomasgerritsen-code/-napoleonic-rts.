@@ -114,6 +114,7 @@ test('Pixi V2 activates on the canonical input canvas and restores the prior ren
   expect(active.diagnostics.inputProxyActive).toBe(true);
   expect(active.diagnostics.pixiPointerEvents).toBe('none');
   expect(active.diagnostics.moduleUrl).toBe(LOCAL_PIXI_MODULE);
+  expect(active.diagnostics.water).toEqual({ riverPoints: 12, crossings: 4 });
   expect(active.threeEnabled).toBe(false);
   expect(active.game).toEqual({ visibility: 'visible', opacity: '0', pointerEvents: 'auto', zIndex: '3' });
   expect(active.pixiDisplay).toBe('block');
@@ -155,7 +156,7 @@ test('Pixi V2 activates on the canonical input canvas and restores the prior ren
   });
   expect(restored.pixi.enabled).toBe(false);
   expect(restored.pixi.inputProxyActive).toBe(false);
-  expect(restored.threeEnabled).toBe(true);
+  expect(restored.threeEnabled).toBe(active.diagnostics.returnMode === '3d');
   expect(restored.game).toEqual({ visibility: '', opacity: '', pointerEvents: '', zIndex: '' });
   expect(restored.pixiDisplay).toBe('none');
   expect(pageErrors).toEqual([]);

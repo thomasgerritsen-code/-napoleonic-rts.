@@ -111,6 +111,17 @@
     return (source || []).map(item => ({ ...item }));
   }
 
+  function cloneWaterSystem() {
+    const river = typeof RIVER_POINTS_V067 === 'undefined' ? [] : RIVER_POINTS_V067;
+    const crossings = typeof WATER_CROSSINGS_V067 === 'undefined' ? [] : WATER_CROSSINGS_V067;
+    return {
+      name: typeof RIVER_NAME_V067 === 'undefined' ? '' : RIVER_NAME_V067,
+      visualWidth: typeof RIVER_VISUAL_WIDTH_V067 === 'undefined' ? 0 : RIVER_VISUAL_WIDTH_V067,
+      river: river.map(point => ({ x: point.x, y: point.y })),
+      crossings: crossings.map(crossing => ({ ...crossing }))
+    };
+  }
+
   function cloneResources() {
     if (typeof resources === 'undefined') return [];
     const liveResources = [];
@@ -134,7 +145,8 @@
       roads: cloneRoads(),
       villages: cloneVillages(),
       woods: typeof TERRAIN_WOODS === 'undefined' ? [] : cloneTerrainRects(TERRAIN_WOODS),
-      hills: typeof TERRAIN_HILLS === 'undefined' ? [] : cloneTerrainRects(TERRAIN_HILLS)
+      hills: typeof TERRAIN_HILLS === 'undefined' ? [] : cloneTerrainRects(TERRAIN_HILLS),
+      water: cloneWaterSystem()
     };
   }
 

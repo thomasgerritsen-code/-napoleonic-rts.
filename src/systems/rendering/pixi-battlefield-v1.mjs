@@ -53,7 +53,13 @@ if (!source || !host || !canvas2d) {
     roof: 0x68493b,
     plaster: 0xc6b79b,
     stone: 0x8d8274,
-    horse: 0x594131
+    horse: 0x594131,
+    riverBank: 0x2d362f,
+    river: 0x46778b,
+    riverLight: 0xa6cccf,
+    bridgeStone: 0xaea48b,
+    bridgeWood: 0x8e6841,
+    ford: 0xad976f
   });
 
   function mulberry32(seed) {
@@ -117,6 +123,68 @@ if (!source || !host || !canvas2d) {
       for (let i = 1; i < road.points.length; i++) track.lineTo(road.points[i].x, road.points[i].y);
       track.stroke({ width: 2.2, color: 0x5f4935, alpha: 0.28 });
       terrainLayer.addChild(track);
+    }
+  }
+
+  function traceRiver(graphics, points) {
+    graphics.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) graphics.lineTo(points[i].x, points[i].y);
+  }
+
+  function addWater() {
+    const water = staticWorld.water;
+    const points = water?.river || [];
+    if (points.length < 2) return;
+    const width = Math.max(20, water.visualWidth || 58);
+
+    const bank = new PIXI.Graphics();
+    traceRiver(bank, points);
+    bank.stroke({ width: width + 16, color: palette.riverBank, alpha: 0.55, cap: 'round', join: 'round' });
+    terrainLayer.addChild(bank);
+
+    const river = new PIXI.Graphics();
+    traceRiver(river, points);
+    river.stroke({ width, color: palette.river, alpha: 0.94, cap: 'round', join: 'round' });
+    terrainLayer.addChild(river);
+
+    const glint = new PIXI.Graphics();
+    traceRiver(glint, points);
+    glint.stroke({ width: 3, color: palette.riverLight, alpha: 0.38, cap: 'round', join: 'round' });
+    terrainLayer.addChild(glint);
+  }
+
+  function addCrossings() {
+    for (const crossing of staticWorld.water?.crossings || []) {
+      const node = new PIXI.Container();
+      const length = crossing.length || 250;
+      const width = crossing.width || 100;
+      const crossingVisual = new PIXI.Graphics();
+
+      if (crossing.type === 'ford') {
+        crossingVisual.ellipse(0, 0, length * 0.34, width * 0.28)
+          .fill({ color: palette.ford, alpha: 0.68 });
+        for (let x = -length * 0.34; x <= length * 0.34; x += 24) {
+          crossingVisual.roundRect(x - 6, -2, 12, 4, 2)
+            .fill({ color: 0xdecfa4, alpha: 0.68 });
+        }
+      } else {
+        const left = -length * 0.38;
+        const top = -width * 0.30;
+        const deckWidth = length * 0.76;
+        const deckHeight = width * 0.60;
+        crossingVisual.rect(left, top, deckWidth, deckHeight)
+          .fill(crossing.material === 'stone' ? palette.bridgeStone : palette.bridgeWood)
+          .stroke({ width: 4, color: 0x463a2c, alpha: 0.82 });
+        for (let x = left + 18; x < left + deckWidth; x += 22) {
+          crossingVisual.moveTo(x, top + 3).lineTo(x, top + deckHeight - 3)
+            .stroke({ width: 2, color: 0xe8d8b1, alpha: 0.36 });
+        }
+      }
+
+      node.addChild(crossingVisual);
+      node.position.set(crossing.x, crossing.y);
+      node.rotation = crossing.angle || 0;
+      terrainLayer.addChild(node);
     }
   }
 
@@ -359,7 +427,9 @@ if (!source || !host || !canvas2d) {
 
   function buildStaticWorld() {
     addGroundTexture();
+    addWater();
     addRoads();
+    addCrossings();
     rebuildScenery();
   }
 
@@ -441,8 +511,9 @@ if (!source || !host || !canvas2d) {
     next = Boolean(next);
     if (next === enabled && (!next || app)) return;
     if (next) {
+      const prior3D = Boolean(window.__BATTLEFIELD_3D_V1__?.enabled?.());
       try { await createRenderer(); } catch (_) { return; }
-      returnTo3D = Boolean(window.__BATTLEFIELD_3D_V1__?.enabled?.());
+      returnTo3D = prior3D;
       window.__BATTLEFIELD_3D_V1__?.setEnabled?.(false);
       enableInputProxy();
       app.canvas.style.display = 'block';
@@ -498,6 +569,11 @@ if (!source || !host || !canvas2d) {
         world: { ...WORLD },
         renderer: app?.renderer?.name || null,
         moduleUrl: PIXI_MODULE_URL,
+        returnMode: returnTo3D ? '3d' : '2d',
+        water: {
+          riverPoints: staticWorld.water?.river?.length || 0,
+          crossings: staticWorld.water?.crossings?.length || 0
+        },
         inputAuthority: 'game-canvas',
         inputProxyActive: Boolean(canvas2dStyleBeforePixi),
         pixiPointerEvents: app?.canvas?.style?.pointerEvents || null

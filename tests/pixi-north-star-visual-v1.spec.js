@@ -113,6 +113,7 @@ test('Pixi V2 renders the North Star battle on desktop/mobile and stays responsi
   expect(setup.ok).toBe(true);
   expect(setup.meta?.id).toBe('north-star-v1');
   expect(diagnostics.pixi.units).toBeGreaterThanOrEqual(520);
+  expect(diagnostics.pixi.water).toEqual({ riverPoints: 12, crossings: 4 });
   expect(diagnostics.pixi.inputAuthority).toBe('game-canvas');
   expect(diagnostics.pixi.inputProxyActive).toBe(true);
   expect(diagnostics.threeEnabled).toBe(false);
