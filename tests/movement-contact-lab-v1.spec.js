@@ -36,8 +36,21 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
     const center=()=>centroid(members());
     const initial=center();
     const initialDistance=Math.hypot(initial.x-goal.x,initial.y-goal.y);
+    const pointSegmentDistance=(p,a,b)=>{
+      const vx=b.x-a.x,vy=b.y-a.y,wx=p.x-a.x,wy=p.y-a.y;
+      const vv=vx*vx+vy*vy;
+      const t=vv>0?Math.max(0,Math.min(1,(wx*vx+wy*vy)/vv)):0;
+      return Math.hypot(p.x-(a.x+t*vx),p.y-(a.y+t*vy));
+    };
+    const roadDistance=p=>{
+      let best=Infinity;
+      for(let i=1;i<road.points.length;i++) best=Math.min(best,pointSegmentDistance(p,road.points[i-1],road.points[i]));
+      return best;
+    };
+    const exitDistance=p=>Math.hypot(p.x-end.x,p.y-end.y);
     const samples=[];
     let previous=null, previousHeading=null, stationary=0, maxStationary=0, reversals=0;
+    let previousPathIndex=reg.pathIndex||0, roadExitStep=null;
     for(let step=0;step<2400;step++){
       window.RTS_SIM.step(.05);
       if(step%4!==0) continue;
@@ -61,30 +74,39 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
       const radial=ms.map(u=>Math.hypot(u.x-c.x,u.y-c.y));
       const meanRadius=radial.reduce((a,b)=>a+b,0)/Math.max(1,radial.length);
       const spread=radial.map(r=>Math.abs(r-meanRadius));
-      samples.push({remaining,speed,headingDelta,meanFormationDeviation:spread.reduce((a,b)=>a+b,0)/Math.max(1,spread.length),p95FormationDeviation:spread.sort((a,b)=>a-b)[Math.floor(Math.max(0,spread.length-1)*.95)]||0});
+      const pathIndex=reg.pathIndex||0;
+      if(roadExitStep==null && exitDistance(c)<120) roadExitStep=step;
+      samples.push({remaining,speed,headingDelta,meanFormationDeviation:spread.reduce((a,b)=>a+b,0)/Math.max(1,spread.length),p95FormationDeviation:spread.sort((a,b)=>a-b)[Math.floor(Math.max(0,spread.length-1)*.95)]||0,roadDistance:roadDistance(c),exitDistance:exitDistance(c),pathIndex,pathAdvanced:pathIndex>previousPathIndex});
+      previousPathIndex=pathIndex;
       previous={x:c.x,y:c.y};
       if(remaining<55)break;
     }
-    return {seed,ordersHash:'voie-du-moulin:road-exit:line-facing-0:v1',initialDistance,samples,reversals,maxStationary,finalRemaining:samples.at(-1)?.remaining??initialDistance,pathLength:reg.path?.length||0,pathIndex:reg.pathIndex||0};
+    return {seed,ordersHash:'voie-du-moulin:road-exit:line-facing-0:v1',initialDistance,samples,reversals,maxStationary,finalRemaining:samples.at(-1)?.remaining??initialDistance,pathLength:reg.path?.length||0,pathIndex:reg.pathIndex||0,roadExitStep};
   }, {seed:SEED});
 
   const speeds=raw.samples.map(s=>s.speed).filter(Number.isFinite);
   const headingJitter=raw.samples.map(s=>s.headingDelta).filter(Number.isFinite);
   const meanDev=raw.samples.map(s=>s.meanFormationDeviation).filter(Number.isFinite);
   const p95Dev=raw.samples.map(s=>s.p95FormationDeviation).filter(Number.isFinite);
+  const corridorErrors=raw.samples.map(s=>s.roadDistance).filter(Number.isFinite);
+  const exitSamples=raw.roadExitStep==null?[]:raw.samples.filter((_,i)=>i*4>=raw.roadExitStep-80 && i*4<=raw.roadExitStep+160);
+  const exitFormation=exitSamples.map(s=>s.p95FormationDeviation).filter(Number.isFinite);
   let startStopCycles=0;
   for(let i=2;i<speeds.length;i++) if(speeds[i-2]>5&&speeds[i-1]<1&&speeds[i]>5) startStopCycles++;
   const metrics={
     routeCompletion:+Math.max(0,Math.min(1,1-raw.finalRemaining/Math.max(1,raw.initialDistance))).toFixed(4),
+    corridorErrorP95:+percentile(corridorErrors,.95).toFixed(2),
     headingJitter:+percentile(headingJitter,.95).toFixed(4),
     headingReversals:raw.reversals,
     startStopCycles,
     meanFormationDeviation:+(meanDev.reduce((a,b)=>a+b,0)/Math.max(1,meanDev.length)).toFixed(3),
     p95FormationDeviation:+percentile(p95Dev,.95).toFixed(3),
+    roadExitP95FormationDeviation:+percentile(exitFormation,.95).toFixed(3),
     validRouteStationaryTime:+raw.maxStationary.toFixed(2),
     maxStall:+raw.maxStationary.toFixed(2)
   };
-  const report={seed:raw.seed,ordersHash:raw.ordersHash,rootCauseTrace:'A-E unclassified; refreshed instrumentation-only baseline',preservationImpact:'none',preservedCapabilities:['CORE-BOOT','CORE-ROUTES','CORE-FORMATIONS','CORE-REPLAY-DEBUG'],metrics,diagnostics:{pathLength:raw.pathLength,pathIndex:raw.pathIndex,finalRemaining:+raw.finalRemaining.toFixed(2),samples:raw.samples.length}};
+  const diagnostics={pathLength:raw.pathLength,pathIndex:raw.pathIndex,pathProgress:+(raw.pathIndex/Math.max(1,raw.pathLength-1)).toFixed(3),finalRemaining:+raw.finalRemaining.toFixed(2),samples:raw.samples.length,roadExitObserved:raw.roadExitStep!=null,roadExitStep:raw.roadExitStep,pathAdvanceSamples:raw.samples.filter(s=>s.pathAdvanced).length};
+  const report={seed:raw.seed,ordersHash:raw.ordersHash,rootCauseTrace:'A/B/E diagnostic expansion; no production tuning',preservationImpact:'none',preservedCapabilities:['CORE-BOOT','CORE-ROUTES','CORE-FORMATIONS','CORE-REPLAY-DEBUG'],metrics,diagnostics};
   console.log('MOVEMENT_CONTACT_LAB',JSON.stringify(report));
   expect(raw.pathLength).toBeGreaterThan(0);
   expect(metrics.routeCompletion).toBeGreaterThan(.85);
