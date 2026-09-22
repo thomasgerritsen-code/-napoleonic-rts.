@@ -31,6 +31,13 @@ test('game boots with current version and essential UI', async ({ page }) => {
   await expect(page.locator('#game')).toBeVisible();
   await expect(page.locator('#minimap')).toBeVisible();
 
+  const barracksAction = page.locator('[data-action="build-barracks"]');
+  const houseAction = page.locator('[data-action="build-house"]');
+  await expect(barracksAction).toContainText('Kazerne');
+  await expect(barracksAction).toContainText('300 🪵');
+  await expect(houseAction).toContainText('Woning');
+  await expect(houseAction).toContainText('120 🪵');
+
   const versions = await page.evaluate(() => ({
     release: window.RTS_VERSION,
     simulation: window.RTS_SIM.version,
