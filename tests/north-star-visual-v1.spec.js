@@ -170,6 +170,17 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
     const game = document.getElementById('game');
     return { width: game?.width || 0, height: game?.height || 0 };
   });
+  const mobileHudLayout = await page.evaluate(() => {
+    const topbar = document.querySelector('.topbar');
+    const reset = document.getElementById('resetBtn');
+    const topbarRect = topbar?.getBoundingClientRect();
+    const resetRect = reset?.getBoundingClientRect();
+    return {
+      topbarHeight: topbarRect?.height || 0,
+      topbarCenterY: topbarRect ? topbarRect.top + topbarRect.height / 2 : 0,
+      resetCenterY: resetRect ? resetRect.top + resetRect.height / 2 : 0
+    };
+  });
   const mobilePath = path.join(outputDir, 'north-star-visual-mobile-landscape.png');
   const mobileImage = await page.locator('#game').screenshot({ path: mobilePath, animations: 'disabled' });
   await testInfo.attach('north-star-mobile-baseline-candidate', { body: mobileImage, contentType: 'image/png' });
@@ -182,7 +193,8 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
     preservationImpact: 'none',
     setup,
     mobileComposition,
-    mobileStableCanvas
+    mobileStableCanvas,
+    mobileHudLayout
   };
   fs.writeFileSync(path.join(outputDir, 'north-star-visual-report.json'), JSON.stringify(report, null, 2));
   await testInfo.attach('north-star-visual-report', {
@@ -209,4 +221,6 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   expect(setup.canvas.height).toBeGreaterThan(0);
   expect(mobileComposition.zoom).toBe(0.32);
   expect(mobileStableCanvas).toEqual({ width: mobileComposition.width, height: mobileComposition.height });
+  expect(mobileHudLayout.topbarHeight).toBeLessThanOrEqual(60);
+  expect(Math.abs(mobileHudLayout.resetCenterY - mobileHudLayout.topbarCenterY)).toBeLessThanOrEqual(2);
 });

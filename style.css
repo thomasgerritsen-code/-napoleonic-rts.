@@ -99,7 +99,7 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
   .topbar {
     top: 5px; left: 6px; right: 6px; min-height: 40px;
     padding: 4px 7px; border-radius: 8px;
-    grid-template-columns: auto 1fr auto; gap: 4px 7px;
+    grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 4px 7px;
   }
   .brand strong { font-size: .72rem; }
   .version { margin-left: 4px; font-size: .60rem; }
