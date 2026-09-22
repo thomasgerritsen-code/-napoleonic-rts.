@@ -36,6 +36,7 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
     const center=()=>centroid(members());
     const initial=center();
     const initialDistance=Math.hypot(initial.x-goal.x,initial.y-goal.y);
+    const initialPathLength=reg.path?.length||0;
     const pointSegmentDistance=(p,a,b)=>{
       const vx=b.x-a.x,vy=b.y-a.y,wx=p.x-a.x,wy=p.y-a.y;
       const vv=vx*vx+vy*vy;
@@ -50,12 +51,13 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
     const exitDistance=p=>Math.hypot(p.x-end.x,p.y-end.y);
     const samples=[];
     let previous=null, previousHeading=null, stationary=0, maxStationary=0, reversals=0;
-    let previousPathIndex=reg.pathIndex||0, roadExitStep=null;
+    let previousPathIndex=reg.pathIndex||0, roadExitStep=null, pathClearedStep=null, pathClearedRemaining=null;
     for(let step=0;step<2400;step++){
       window.RTS_SIM.step(.05);
       if(step%4!==0) continue;
       const ms=members(), c=center();
       const remaining=Math.hypot(c.x-goal.x,c.y-goal.y);
+      if(pathClearedStep==null && initialPathLength>0 && !(reg.path?.length>0)) { pathClearedStep=step; pathClearedRemaining=remaining; }
       let speed=0, heading=null;
       if(previous){
         const dx=c.x-previous.x,dy=c.y-previous.y;
@@ -81,7 +83,7 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
       previous={x:c.x,y:c.y};
       if(remaining<55)break;
     }
-    return {seed,ordersHash:'voie-du-moulin:road-exit:line-facing-0:v1',initialDistance,samples,reversals,maxStationary,finalRemaining:samples.at(-1)?.remaining??initialDistance,pathLength:reg.path?.length||0,pathIndex:reg.pathIndex||0,roadExitStep};
+    return {seed,ordersHash:'voie-du-moulin:road-exit:line-facing-0:v1',initialDistance,initialPathLength,samples,reversals,maxStationary,finalRemaining:samples.at(-1)?.remaining??initialDistance,pathLength:reg.path?.length||0,pathIndex:reg.pathIndex||0,roadExitStep,pathClearedStep,pathClearedRemaining};
   }, {seed:SEED});
 
   const speeds=raw.samples.map(s=>s.speed).filter(Number.isFinite);
@@ -105,10 +107,10 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
     validRouteStationaryTime:+raw.maxStationary.toFixed(2),
     maxStall:+raw.maxStationary.toFixed(2)
   };
-  const diagnostics={pathLength:raw.pathLength,pathIndex:raw.pathIndex,pathProgress:+(raw.pathIndex/Math.max(1,raw.pathLength-1)).toFixed(3),finalRemaining:+raw.finalRemaining.toFixed(2),samples:raw.samples.length,roadExitObserved:raw.roadExitStep!=null,roadExitStep:raw.roadExitStep,pathAdvanceSamples:raw.samples.filter(s=>s.pathAdvanced).length};
-  const report={seed:raw.seed,ordersHash:raw.ordersHash,rootCauseTrace:'A/B/E diagnostic expansion; no production tuning',preservationImpact:'none',preservedCapabilities:['CORE-BOOT','CORE-ROUTES','CORE-FORMATIONS','CORE-REPLAY-DEBUG'],metrics,diagnostics};
+  const diagnostics={initialPathLength:raw.initialPathLength,pathLength:raw.pathLength,pathIndex:raw.pathIndex,pathProgress:+(raw.pathIndex/Math.max(1,raw.initialPathLength-1)).toFixed(3),finalRemaining:+raw.finalRemaining.toFixed(2),samples:raw.samples.length,roadExitObserved:raw.roadExitStep!=null,roadExitStep:raw.roadExitStep,pathAdvanceSamples:raw.samples.filter(s=>s.pathAdvanced).length,pathClearedStep:raw.pathClearedStep,pathClearedRemaining:raw.pathClearedRemaining==null?null:+raw.pathClearedRemaining.toFixed(2)};
+  const report={seed:raw.seed,ordersHash:raw.ordersHash,rootCauseTrace:'A route/path release diagnostic; no production tuning',preservationImpact:'none',preservedCapabilities:['CORE-BOOT','CORE-ROUTES','CORE-FORMATIONS','CORE-REPLAY-DEBUG'],metrics,diagnostics};
   console.log('MOVEMENT_CONTACT_LAB',JSON.stringify(report));
-  expect(raw.pathLength).toBeGreaterThan(0);
+  expect(raw.initialPathLength).toBeGreaterThan(0);
   expect(metrics.routeCompletion).toBeGreaterThan(.85);
   expect(metrics.headingReversals).toBeLessThan(4);
   expect(metrics.validRouteStationaryTime).toBeLessThan(5);
