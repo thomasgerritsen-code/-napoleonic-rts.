@@ -33,6 +33,7 @@ test('game boots with current version and essential UI', async ({ page }) => {
   await expect(page.locator('.help')).toContainText('Klik groepslid: selecteer hele groep');
   await expect(page.locator('.help')).toContainText('Shift+slepen: toevoegen');
   await expect(page.locator('.help')).toContainText('Muiswiel: in-/uitzoomen');
+  await expect(page.locator('.help')).toContainText('WASD / pijltjes: camera');
 
   const barracksAction = page.locator('[data-action="build-barracks"]');
   const houseAction = page.locator('[data-action="build-house"]');
