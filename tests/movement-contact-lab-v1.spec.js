@@ -79,7 +79,9 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
       samples.push({remaining,speed,headingDelta,meanFormationDeviation:spread.reduce((a,b)=>a+b,0)/Math.max(1,spread.length),p95FormationDeviation:spread.sort((a,b)=>a-b)[Math.floor(Math.max(0,spread.length-1)*.95)]||0,roadDistance:roadDistance(c),exitDistance:exitDistance(c),pathIndex,pathAdvanced:pathIndex>previousPathIndex});
       previousPathIndex=pathIndex;
       previous={x:c.x,y:c.y};
-      if(remaining<55)break;
+      // Measure completion at the actual destination instead of truncating the replay
+      // at the old 55-unit acceptance radius (which capped completion near 91%).
+      if(remaining<8)break;
     }
     return {seed,ordersHash:'voie-du-moulin:road-exit:line-facing-0:v1',initialDistance,samples,reversals,maxStationary,finalRemaining:samples.at(-1)?.remaining??initialDistance,pathLength:reg.path?.length||0,pathIndex:reg.pathIndex||0,roadExitStep};
   }, {seed:SEED});
@@ -106,7 +108,7 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
     maxStall:+raw.maxStationary.toFixed(2)
   };
   const diagnostics={pathLength:raw.pathLength,pathIndex:raw.pathIndex,pathProgress:+(raw.pathIndex/Math.max(1,raw.pathLength-1)).toFixed(3),finalRemaining:+raw.finalRemaining.toFixed(2),samples:raw.samples.length,roadExitObserved:raw.roadExitStep!=null,roadExitStep:raw.roadExitStep,pathAdvanceSamples:raw.samples.filter(s=>s.pathAdvanced).length};
-  const report={seed:raw.seed,ordersHash:raw.ordersHash,rootCauseTrace:'A/B/E diagnostic expansion; no production tuning',preservationImpact:'none',preservedCapabilities:['CORE-BOOT','CORE-ROUTES','CORE-FORMATIONS','CORE-REPLAY-DEBUG'],metrics,diagnostics};
+  const report={seed:raw.seed,ordersHash:raw.ordersHash,rootCauseTrace:'A route/path completion probe; no production tuning',preservationImpact:'none',preservedCapabilities:['CORE-BOOT','CORE-ROUTES','CORE-FORMATIONS','CORE-REPLAY-DEBUG'],metrics,diagnostics};
   console.log('MOVEMENT_CONTACT_LAB',JSON.stringify(report));
   expect(raw.pathLength).toBeGreaterThan(0);
   expect(metrics.routeCompletion).toBeGreaterThan(.85);
