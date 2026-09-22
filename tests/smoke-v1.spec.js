@@ -38,14 +38,17 @@ test('game boots with current version and essential UI', async ({ page }) => {
   await expect(houseAction).toContainText('Woning');
   await expect(houseAction).toContainText('120 🪵');
 
-  await page.keyboard.press('Tab');
-  const focusedButton = page.locator('button:focus-visible');
-  await expect(focusedButton).toHaveCount(1);
-  const focusRing = await focusedButton.evaluate(button => {
+  const beforeFocus = await barracksAction.boundingBox();
+  for (let tab = 0; tab < 10 && !(await barracksAction.evaluate(button => button === document.activeElement)); tab += 1) {
+    await page.keyboard.press('Tab');
+  }
+  await expect(barracksAction).toBeFocused();
+  const focusRing = await barracksAction.evaluate(button => {
     const style = getComputedStyle(button);
     return { style: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor };
   });
   expect(focusRing).toEqual({ style: 'solid', width: '2px', color: 'rgb(244, 216, 109)' });
+  expect(await barracksAction.boundingBox()).toEqual(beforeFocus);
 
   const versions = await page.evaluate(() => ({
     release: window.RTS_VERSION,
