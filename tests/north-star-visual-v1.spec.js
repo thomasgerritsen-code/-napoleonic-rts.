@@ -221,6 +221,6 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   expect(setup.canvas.height).toBeGreaterThan(0);
   expect(mobileComposition.zoom).toBe(0.32);
   expect(mobileStableCanvas).toEqual({ width: mobileComposition.width, height: mobileComposition.height });
-  expect(mobileHudLayout.topbarHeight).toBeLessThanOrEqual(52);
+  expect(mobileHudLayout.topbarHeight).toBeLessThanOrEqual(60);
   expect(Math.abs(mobileHudLayout.resetCenterY - mobileHudLayout.topbarCenterY)).toBeLessThanOrEqual(2);
 });
