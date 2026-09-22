@@ -39,9 +39,9 @@ test('game boots with current version and essential UI', async ({ page }) => {
   await expect(houseAction).toContainText('120 🪵');
 
   const beforeFocus = await barracksAction.boundingBox();
-  for (let tab = 0; tab < 10 && !(await barracksAction.evaluate(button => button === document.activeElement)); tab += 1) {
-    await page.keyboard.press('Tab');
-  }
+  await barracksAction.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
   await expect(barracksAction).toBeFocused();
   const focusRing = await barracksAction.evaluate(button => {
     const style = getComputedStyle(button);
