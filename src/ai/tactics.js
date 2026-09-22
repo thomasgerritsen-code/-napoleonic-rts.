@@ -7,6 +7,7 @@ const AI_COMMANDER_V1 = {
   flankSide:1, retreatUntil:0, target:null, regroupPoint:null,
   threatDistance:null, reserveRegimentId:null
 };
+const AI_TARGET_RETENTION_MARGIN=90;
 
 function aiClamp01(v){ return Math.max(0,Math.min(1,v)); }
 function aiBritishTC(){ return livingBuildings('britain').find(b=>b.type==='towncenter'&&b.complete); }
@@ -56,15 +57,20 @@ function aiNearestEnemyTo(point){
 function aiStrategicTarget(){
   const base=aiBritishTC()||{x:2640,y:900};
   const enemyRegs=activeRegiments('france').filter(r=>regimentMembers(r).length);
-  let best=null;
+  let best=null,incumbent=null;
   for(const r of enemyRegs){
     const c=aiRegCenter(r),members=regimentMembers(r),d=Math.hypot(c.x-base.x,c.y-base.y);
     const strength=aiRegStrength(r),maxStrength=Math.max(1,members.length);
     const condition=aiClamp01(strength/maxStrength);
     // Prefer threats near the British base, but opportunistically punish weakened formations.
     const score=d*(0.72+condition*0.28)-Math.max(0,1-condition)*260;
-    if(!best||score<best.score)best={...c,d,score,strength,condition,kind:'regiment',id:r.id};
+    const candidate={...c,d,score,strength,condition,kind:'regiment',id:r.id};
+    if(r.id===AI_COMMANDER_V1.target?.id)incumbent=candidate;
+    if(!best||score<best.score)best=candidate;
   }
+  // Keep a valid near-equal objective so tiny score changes do not redirect the army
+  // between neighbouring enemy regiments on consecutive commander ticks.
+  if(incumbent&&best&&incumbent.score<=best.score+AI_TARGET_RETENTION_MARGIN)return incumbent;
   if(best)return best;
   const tc=aiFrenchTC(); return tc?{x:tc.x,y:tc.y,kind:'towncenter',id:tc.id,score:0}:{x:650,y:900,kind:'fallback',score:0};
 }

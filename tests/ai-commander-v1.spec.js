@@ -152,3 +152,41 @@ test('AI Commander tracks urgent base threats and keeps a reserve during a three
   expect(typeof result.target.condition).toBe('number');
   expect(result.target.condition).toBeLessThan(0.6);
 });
+
+
+test('AI Commander retains a near-equal target but switches for a decisive advantage', async ({ page }) => {
+  await page.goto('/?test=v071',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment&&window.__AI_COMMANDER_V1__));
+  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
+
+  const result=await page.evaluate(()=>{
+    gameOver=false;v05PeaceMode=false;
+    activeRegiments('france').forEach(reg=>{reg.destroyed=true;});
+    for(const u of units){if(u.side==='france'&&u.type!=='worker'){u.dead=true;}}
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,820);
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,980);
+    const firstId=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1600,820);
+    const secondId=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1540,980);
+    const first=getRegiment(firstId),second=getRegiment(secondId);
+    const place=(reg,x,y)=>regimentMembers(reg).forEach((u,i)=>{
+      u.x=x+(i%4)*3;u.y=y+Math.floor(i/4)*3;u.targetX=u.x;u.targetY=u.y;u.morale=100;u.hp=u.maxHp;
+    });
+    place(first,1600,820);place(second,1540,980);
+    eval('elapsed=100');
+    window.__AI_COMMANDER_V1__.forceState('ATTACK');
+    window.__AI_COMMANDER_V1__.tick();
+    const initial=window.__AI_COMMANDER_V1__.state().target.id;
+
+    place(first,1540,820);place(second,1580,980);
+    const retained=window.__AI_COMMANDER_V1__.strategicTarget().id;
+
+    place(first,900,820);place(second,1700,980);
+    const switched=window.__AI_COMMANDER_V1__.strategicTarget().id;
+    v05PeaceMode=true;
+    return{firstId,secondId,initial,retained,switched};
+  });
+
+  expect(result.initial).toBe(result.firstId);
+  expect(result.retained).toBe(result.firstId);
+  expect(result.switched).toBe(result.secondId);
+});

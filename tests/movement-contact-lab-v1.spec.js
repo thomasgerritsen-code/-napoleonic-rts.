@@ -81,7 +81,7 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
       samples.push({remaining,speed,headingDelta,meanFormationDeviation:spread.reduce((a,b)=>a+b,0)/Math.max(1,spread.length),p95FormationDeviation:spread.sort((a,b)=>a-b)[Math.floor(Math.max(0,spread.length-1)*.95)]||0,roadDistance:roadDistance(c),exitDistance:exitDistance(c),pathIndex,pathAdvanced:pathIndex>previousPathIndex});
       previousPathIndex=pathIndex;
       previous={x:c.x,y:c.y};
-      if(remaining<55)break;
+      if(pathClearedStep!=null) break;
     }
     return {seed,ordersHash:'voie-du-moulin:road-exit:line-facing-0:v1',initialDistance,initialPathLength,samples,reversals,maxStationary,finalRemaining:samples.at(-1)?.remaining??initialDistance,pathLength:reg.path?.length||0,pathIndex:reg.pathIndex||0,roadExitStep,pathClearedStep,pathClearedRemaining};
   }, {seed:SEED});
@@ -108,9 +108,11 @@ test('MOVEMENT-CONTACT-V1 emits deterministic road/off-road locomotion metrics',
     maxStall:+raw.maxStationary.toFixed(2)
   };
   const diagnostics={initialPathLength:raw.initialPathLength,pathLength:raw.pathLength,pathIndex:raw.pathIndex,pathProgress:+(raw.pathIndex/Math.max(1,raw.initialPathLength-1)).toFixed(3),finalRemaining:+raw.finalRemaining.toFixed(2),samples:raw.samples.length,roadExitObserved:raw.roadExitStep!=null,roadExitStep:raw.roadExitStep,pathAdvanceSamples:raw.samples.filter(s=>s.pathAdvanced).length,pathClearedStep:raw.pathClearedStep,pathClearedRemaining:raw.pathClearedRemaining==null?null:+raw.pathClearedRemaining.toFixed(2)};
-  const report={seed:raw.seed,ordersHash:raw.ordersHash,rootCauseTrace:'A route/path release diagnostic; no production tuning',preservationImpact:'none',preservedCapabilities:['CORE-BOOT','CORE-ROUTES','CORE-FORMATIONS','CORE-REPLAY-DEBUG'],metrics,diagnostics};
+  const report={seed:raw.seed,ordersHash:raw.ordersHash,rootCauseTrace:'A route/path release observation; stop at release to exclude post-arrival idle time',preservationImpact:'none',preservedCapabilities:['CORE-BOOT','CORE-ROUTES','CORE-FORMATIONS','CORE-REPLAY-DEBUG'],metrics,diagnostics};
   console.log('MOVEMENT_CONTACT_LAB',JSON.stringify(report));
   expect(raw.initialPathLength).toBeGreaterThan(0);
+  expect(raw.pathClearedStep).not.toBeNull();
+  expect(raw.pathClearedRemaining).toBeLessThan(62);
   expect(metrics.routeCompletion).toBeGreaterThan(.85);
   expect(metrics.headingReversals).toBeLessThan(4);
   expect(metrics.validRouteStationaryTime).toBeLessThan(5);
