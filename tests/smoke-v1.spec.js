@@ -31,6 +31,7 @@ test('game boots with current version and essential UI', async ({ page }) => {
   await expect(page.locator('#game')).toBeVisible();
   await expect(page.locator('#minimap')).toBeVisible();
   await expect(page.locator('.help')).toContainText('Klik groepslid: selecteer hele groep');
+  await expect(page.locator('.help')).toContainText('Rechtsklik: lopen of verzamelen');
   await expect(page.locator('.help')).toContainText('Shift+slepen: toevoegen');
   await expect(page.locator('.help')).toContainText('Muiswiel: in-/uitzoomen');
   await expect(page.locator('.help')).toContainText('WASD / pijltjes: camera');
