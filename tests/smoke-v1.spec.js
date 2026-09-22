@@ -38,6 +38,15 @@ test('game boots with current version and essential UI', async ({ page }) => {
   await expect(houseAction).toContainText('Woning');
   await expect(houseAction).toContainText('120 🪵');
 
+  await page.keyboard.press('Tab');
+  const focusedButton = page.locator('button:focus-visible');
+  await expect(focusedButton).toHaveCount(1);
+  const focusRing = await focusedButton.evaluate(button => {
+    const style = getComputedStyle(button);
+    return { style: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor };
+  });
+  expect(focusRing).toEqual({ style: 'solid', width: '2px', color: 'rgb(244, 216, 109)' });
+
   const versions = await page.evaluate(() => ({
     release: window.RTS_VERSION,
     simulation: window.RTS_SIM.version,

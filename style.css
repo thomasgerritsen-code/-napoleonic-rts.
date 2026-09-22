@@ -32,7 +32,12 @@ button {
   border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
   color: inherit; border-radius: 8px; padding: 8px 11px; font-weight: 650; cursor: pointer;
 }
-button:hover, button:focus-visible { background: rgba(255,255,255,.16); outline: none; }
+button:hover { background: rgba(255,255,255,.16); }
+button:focus-visible {
+  background: rgba(255,255,255,.16);
+  outline: 2px solid #f4d86d;
+  outline-offset: 2px;
+}
 button:disabled { opacity: .35; cursor: not-allowed; }
 button.active { outline: 2px solid #f4d86d; background: rgba(244,216,109,.16); }
 button small { opacity: .72; font-size: .68rem; font-weight: 500; }
