@@ -145,7 +145,7 @@ test('Village V6 uses hierarchy, archetypes, shared landscape and collision-safe
   expect(result.authority.collisionSafe).toBe(true);
   expect(result.authority.hierarchical).toBe(true);
   expect(result.authority.naturalVillageFabric).toBe(true);
-  expect(result.authority.landscape).toBe('village-landscape-v6');
+  expect(result.authority.landscape).toBe('village-landscape-v6.1-road-clearance');
   expect(result.activeAuthority).toBe('village-authority-v6');
 
   expect(result.sampleBlocked).toBe(true);
