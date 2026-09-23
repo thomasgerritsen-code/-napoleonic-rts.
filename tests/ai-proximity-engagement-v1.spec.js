@@ -68,10 +68,11 @@ test('British regiments react to nearby French troops with stable contact hyster
     api.apply();
     const close = api.state().find(item => item.regimentId === british.id);
 
-    // Beyond 520 m the local contact is released again.
+    // Beyond 520 m the local contact is released and the prior order is restored.
     placeRegiment(french, initialBritishX - 550, 900);
     const releasedEngaged = api.apply();
     const released = api.state().find(item => item.regimentId === british.id);
+    const releasedTargetX = british.targetX;
 
     return {
       config: api.config,
@@ -83,12 +84,14 @@ test('British regiments react to nearby French troops with stable contact hyster
       retained,
       close,
       releasedEngaged,
-      released
+      released,
+      releasedTargetX
     };
   });
 
   expect(result.config.contactEnterRadius).toBe(430);
   expect(result.config.contactExitRadius).toBe(520);
+  expect(result.config.scanInterval).toBe(1);
   expect(result.firstEngaged).toBe(1);
   expect(result.first.targetKey).toMatch(/^regiment:/);
   expect(result.first.distance).toBeLessThanOrEqual(430);
@@ -103,5 +106,51 @@ test('British regiments react to nearby French troops with stable contact hyster
   expect(result.close.formation).toBe('line');
   expect(result.releasedEngaged).toBe(0);
   expect(result.released.targetKey).toBeNull();
+  expect(Math.abs(result.releasedTargetX - result.initialBritishX)).toBeLessThan(2);
+  expect(errors).toEqual([]);
+});
+
+test('loose British combat troops also move toward a nearby French threat', async ({ page }) => {
+  const errors = await openGame(page);
+  const result = await page.evaluate(() => {
+    for (const unit of units) {
+      if (unit.type !== 'worker') unit.dead = true;
+    }
+    for (const reg of regiments) reg.destroyed = true;
+
+    const british = createUnit('britain', 'infantry', 1900, 900);
+    const french = createUnit('france', 'infantry', 1540, 900);
+    british.targetX = british.x;
+    british.targetY = british.y;
+    window.__AI_COMMANDER_V1__.forceState('DEFEND');
+
+    const api = window.__AI_PROXIMITY_ENGAGEMENT_V1__;
+    const engaged = api.apply();
+    const contact = api.looseState().find(item => item.unitId === british.id);
+    const targetDuringContact = british.targetX;
+
+    french.x = 1340;
+    french.targetX = french.x;
+    const releasedEngaged = api.apply();
+    const released = api.looseState().find(item => item.unitId === british.id);
+
+    return {
+      engaged,
+      contact,
+      targetDuringContact,
+      originalX: 1900,
+      releasedEngaged,
+      released,
+      targetAfterRelease: british.targetX
+    };
+  });
+
+  expect(result.engaged).toBe(1);
+  expect(result.contact.targetKey).toMatch(/^unit:/);
+  expect(result.contact.distance).toBeLessThanOrEqual(430);
+  expect(result.targetDuringContact).toBeLessThan(result.originalX);
+  expect(result.releasedEngaged).toBe(0);
+  expect(result.released.targetKey).toBeNull();
+  expect(result.targetAfterRelease).toBe(result.originalX);
   expect(errors).toEqual([]);
 });
