@@ -33,6 +33,7 @@
   }
 
   function nearbyCandidates(group) {
+    if (!group?.length) return [];
     const selectedIds = new Set(group.map(unit => unit.id));
     const anchor = selectionAnchor(group);
     return freeUnits('france', 'infantry')
