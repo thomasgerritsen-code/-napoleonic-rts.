@@ -1,7 +1,10 @@
 const { test, expect } = require('@playwright/test');
 
-async function readBerryAccess(page) {
+async function render2DAndReadBerryAccess(page) {
   return page.evaluate(() => {
+    // Regression pages use manual simulation timing. Render the authoritative 2D
+    // canvas explicitly so this test does not depend on an animation-frame race.
+    draw();
     const ecology = window.__BATTLEFIELD_ECOLOGY_V1__;
     const natural = window.__NATURAL_RESOURCES_V1__;
     const local = resources.filter(r => !r.dead && r.type === 'food' && r.localVillageBerry === true);
@@ -55,15 +58,14 @@ test('both starting bases get explicit nearby berry bushes that are visible in t
   await page.setViewportSize({ width: 430, height: 840 });
   await page.goto('/?test');
   await page.waitForFunction(() => window.__BATTLEFIELD_ECOLOGY_V1__?.baseVillageBerryStats && window.__NATURAL_RESOURCES_V1__?.diagnostics);
-  await page.waitForFunction(() => window.__NATURAL_RESOURCES_V1__.diagnostics().localVillageBerryDraws > 0);
 
-  const initial = await readBerryAccess(page);
+  const initial = await render2DAndReadBerryAccess(page);
   expect(initial.version).toContain('base-berries-near-town');
   expectSafeLocalBerries(initial);
 
   await page.locator('#resetBtn').click();
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(50);
 
-  const afterReset = await readBerryAccess(page);
+  const afterReset = await render2DAndReadBerryAccess(page);
   expectSafeLocalBerries(afterReset);
 });
