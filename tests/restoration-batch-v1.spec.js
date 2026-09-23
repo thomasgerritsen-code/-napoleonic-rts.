@@ -19,18 +19,21 @@ async function openRestoration(page){
   return errors;
 }
 
-test('restored world keeps resources clear, berries outside villages, water visible and buildings larger',async({page})=>{
+test('restored world keeps resources clear, regular berries outside villages, water visible and buildings larger',async({page})=>{
   const errors=await openRestoration(page);
   const result=await page.evaluate(()=>{
     const ecology=window.__BATTLEFIELD_ECOLOGY_V1__;
     const live=resources.filter(r=>!r.dead);
     const food=live.filter(r=>r.type==='food');
+    const regularFood=food.filter(r=>r.localVillageBerry!==true);
+    const localFood=food.filter(r=>r.localVillageBerry===true);
     return{
       liveResources:live.length,
       foodCount:food.length,
+      localFoodCount:localFood.length,
       resourceBuildingConflicts:live.filter(r=>ecology.buildingConflict(r.type,r.x,r.y)).length,
       resourceVillageHouseConflicts:live.filter(r=>ecology.villageHouseConflict(r.type,r.x,r.y)).length,
-      berriesInsideVillage:food.filter(r=>ecology.insideVillage(r.x,r.y)).length,
+      regularBerriesInsideVillage:regularFood.filter(r=>ecology.insideVillage(r.x,r.y)).length,
       foodVisualKinds:[...new Set(food.map(r=>r.visualKind))],
       buildingScale:window.__GAMEPLAY_BUILDING_SCALE_V1__.scale,
       towncenter:window.__GAMEPLAY_BUILDING_SCALE_V1__.types.towncenter,
@@ -41,9 +44,10 @@ test('restored world keeps resources clear, berries outside villages, water visi
   });
   expect(result.liveResources).toBeGreaterThan(10);
   expect(result.foodCount).toBeGreaterThan(0);
+  expect(result.localFoodCount).toBeGreaterThanOrEqual(10);
   expect(result.resourceBuildingConflicts).toBe(0);
   expect(result.resourceVillageHouseConflicts).toBe(0);
-  expect(result.berriesInsideVillage).toBe(0);
+  expect(result.regularBerriesInsideVillage).toBe(0);
   expect(result.foodVisualKinds).toEqual(['berry-bush']);
   expect(result.buildingScale).toBeGreaterThan(1.3);
   expect(result.towncenter.w).toBeGreaterThan(120);
