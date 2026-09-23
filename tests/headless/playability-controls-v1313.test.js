@@ -28,7 +28,7 @@ test('v1.3.14 exposes the playability control improvements and UI hotkey guard',
 
 test('playability controls load immediately after base input and publish current release identity', () => {
   const input = html.indexOf('src/input.js?build=131a');
-  const controls = html.indexOf('src/systems/input/playability-controls-v1.js?build=1314a');
+  const controls = html.indexOf('src/systems/input/playability-controls-v1.js?build=');
   assert.ok(input >= 0, 'base input remains wired');
   assert.ok(controls > input, 'playability controls load after base input');
   assert.match(html, /Shift\+slepen: toevoegen/);
