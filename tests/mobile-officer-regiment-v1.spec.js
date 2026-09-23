@@ -46,15 +46,9 @@ test('one selected officer can automatically form a regiment', async ({ page }) 
   expect(result.snap.selection.unitIds).toHaveLength(14);
 });
 
-test('a loose officer is tappable directly in the 3D mobile battlefield', async ({ browser }) => {
-  const context = await browser.newContext({
-    viewport: { width: 844, height: 390 },
-    deviceScaleFactor: 3,
-    hasTouch: true,
-    isMobile: true
-  });
-  const page = await context.newPage();
-  await page.goto('/?test');
+test('a loose officer is tappable directly in the 3D mobile battlefield', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto('/?test=3d');
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__?.enabled?.(), null, { timeout: 20000 });
   await page.waitForFunction(() => window.__OFFICER_REGIMENT_MOBILE_V1__?.threeDReady?.(), null, { timeout: 20000 });
   await page.waitForFunction(() => Boolean(window.__OFFICER_REGIMENT_MOBILE_V1__?.screenPointForOfficer?.()), null, { timeout: 20000 });
@@ -87,5 +81,4 @@ test('a loose officer is tappable directly in the 3D mobile battlefield', async 
   expect(result.selected).toEqual([target.id]);
   expect(result.claimedTaps).toBe(1);
   expect(result.buttonDisabled).toBe(false);
-  await context.close();
 });
