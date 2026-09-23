@@ -62,6 +62,82 @@ for (const phone of phoneCases) {
   });
 }
 
+test('phone HUD leaves the central battlefield clear and opens map and menu on demand', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  await boot(page, { viewport: { width: 844, height: 390 } });
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__ || document.readyState === 'complete');
+  const layout = await page.evaluate(() => {
+    const top = document.querySelector('.topbar').getBoundingClientRect();
+    const bottom = document.querySelector('.bottombar').getBoundingClientRect();
+    return {
+      topHeight: top.height,
+      bottomHeight: bottom.height,
+      freeHeight: bottom.top - top.bottom,
+      mapHidden: getComputedStyle(document.getElementById('minimap')).display === 'none',
+      modeHidden: !document.getElementById('renderModeBtn') || getComputedStyle(document.getElementById('renderModeBtn')).display === 'none',
+      hintHidden: getComputedStyle(document.getElementById('mobileGestureHint')).display === 'none'
+    };
+  });
+  expect(layout.topHeight).toBeLessThanOrEqual(50);
+  expect(layout.bottomHeight).toBeLessThanOrEqual(85);
+  expect(layout.freeHeight).toBeGreaterThan(240);
+  expect(layout.mapHidden).toBe(true);
+  expect(layout.modeHidden).toBe(true);
+  expect(layout.hintHidden).toBe(true);
+
+  await page.locator('#mobileMapBtn').tap();
+  await expect(page.locator('#mobileMapBtn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#minimap')).toBeVisible();
+  await page.locator('#mobileMapBtn').tap();
+  await expect(page.locator('#minimap')).toBeHidden();
+  await page.locator('#mobileMenuBtn').tap();
+  await expect(page.locator('#resetBtn')).toBeVisible();
+  if (await page.locator('#renderModeBtn').count()) await expect(page.locator('#renderModeBtn')).toBeVisible();
+  await context.close();
+});
+
+test('3D touch moves selected troops and pinches the camera without a ghost order', async ({ page }) => {
+  await page.goto('/?test=3d');
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__?.enabled(), null, { timeout: 20000 });
+  await page.setViewportSize({ width: 844, height: 390 });
+  expect(await page.evaluate(() => window.__RTS_DEBUG__?.runScenario?.('morale-35'))).toBe(true);
+  const beforeOrder = await page.evaluate(() => {
+    const state = window.RTS_SIM.snapshot();
+    const unit = state.units.find(u => state.selection.unitIds.includes(u.id));
+    return { x: unit.targetX, y: unit.targetY };
+  });
+
+  await page.locator('#battlefield3d').evaluate(canvas => {
+    const touch = (type, id, x, y) => canvas.dispatchEvent(new PointerEvent(type, {
+      pointerType: 'touch', pointerId: id, clientX: x, clientY: y, bubbles: true, cancelable: true
+    }));
+    touch('pointerdown', 1, 580, 185);
+    touch('pointerup', 1, 580, 185);
+  });
+  const afterOrder = await page.evaluate(() => {
+    const state = window.RTS_SIM.snapshot();
+    const unit = state.units.find(u => state.selection.unitIds.includes(u.id));
+    return { x: unit.targetX, y: unit.targetY };
+  });
+  expect(afterOrder).not.toEqual(beforeOrder);
+
+  const before = await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.diagnostics().cameraDistance);
+  await page.locator('#battlefield3d').evaluate(canvas => {
+    const touch = (type, id, x, y) => canvas.dispatchEvent(new PointerEvent(type, {
+      pointerType: 'touch', pointerId: id, clientX: x, clientY: y, bubbles: true, cancelable: true
+    }));
+    touch('pointerdown', 2, 340, 185);
+    touch('pointerdown', 3, 480, 185);
+    touch('pointermove', 2, 300, 185);
+    touch('pointermove', 3, 520, 185);
+    touch('pointerup', 2, 300, 185);
+    touch('pointerup', 3, 520, 185);
+  });
+  const after = await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.diagnostics().cameraDistance);
+  expect(after).toBeLessThan(before);
+});
+
 test('single touch selects a French battlefield unit', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
   const page = await context.newPage();
@@ -256,7 +332,7 @@ test('orientation change keeps the same canvas and HUD inside the viewport', asy
   expect(portrait.canvasHeight).toBeGreaterThan(0);
   expect(portrait.scrollWidth).toBeLessThanOrEqual(portrait.innerWidth + 1);
   expect(portrait.rects.every(r => r.left >= -1 && r.right <= portrait.innerWidth + 1 && r.top >= -1 && r.bottom <= portrait.innerHeight + 1)).toBeTruthy();
-  expect(portrait.rotateHint).not.toBe('none');
+  expect(portrait.rotateHint).toBe('none');
   expect(portrait.activePointers).toBe(0);
 
   await page.setViewportSize({ width: 844, height: 390 });

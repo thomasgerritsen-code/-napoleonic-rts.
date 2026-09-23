@@ -183,6 +183,12 @@
     camera() {
       return { x: camera.x, y: camera.y, zoom: camera.zoom };
     },
+    panCamera(dx, dy) {
+      if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+      camera.x += dx;
+      camera.y += dy;
+      clampCamera();
+    },
     dispatch(command) {
       return Boolean(global.RTS_SIM?.dispatch?.(command));
     },
