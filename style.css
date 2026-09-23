@@ -138,7 +138,9 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
    larger layouts; command overflow becomes a horizontal touch strip. */
 @media (orientation: landscape) and (max-height: 480px) and (max-width: 960px) {
   .bottombar {
+    height: 50px;
     min-height: 50px;
+    max-height: 50px;
     padding: 3px 5px;
     grid-template-columns: minmax(82px, .9fr) minmax(0, 4.1fr);
     gap: 4px;
@@ -161,8 +163,10 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
   .actions button {
     flex: 0 0 auto;
     min-width: 62px;
-    max-width: 96px;
+    max-width: none;
+    height: 44px;
     min-height: 44px;
     padding: 3px 5px;
+    white-space: nowrap;
   }
 }
