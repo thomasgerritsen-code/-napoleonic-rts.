@@ -6,6 +6,7 @@
   const cfg=global.NRTS_CONFIG?.world?.vegetation || {};
   let foodDraws=0;
   let localVillageBerryDraws=0;
+  let localOverlayFrames=0;
 
   function rand01(seed){
     let x=(seed>>>0)||1;x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;
@@ -75,34 +76,63 @@
     ctx.restore();
   }
 
+  function drawFoodResource(r,ratio){
+    if(overlapsRoad(r,ratio))return false;
+    drawBerryBush(r,ratio);
+    foodDraws++;
+    if(r.localVillageBerry===true)localVillageBerryDraws++;
+    return true;
+  }
+
   drawResource=function drawNaturalResourceV1(r){
     if(!r||r.dead)return;
     const ratio=Math.max(0,Math.min(1,r.amount/Math.max(1,r.maxAmount)));
-    // Final visual safety net: never paint a canopy/bush over a road, even if
-    // stale coordinates or an older save slipped past the world-placement pass.
+    // Guaranteed start berries are deliberately drawn by the explicit 2D overlay
+    // pass below. This prevents later viewport/performance wrappers from silently
+    // removing the bushes while still allowing them to cull ordinary resources.
+    if(r.localVillageBerry===true)return;
     if(overlapsRoad(r,ratio))return;
     if(r.type==='wood')drawTree(r,ratio);
-    else{
-      drawBerryBush(r,ratio);
-      foodDraws++;
-      if(r.localVillageBerry===true)localVillageBerryDraws++;
+    else drawFoodResource(r,ratio);
+  };
+
+  // Keep guaranteed start berries on the authoritative 2D canvas regardless of
+  // later drawResource wrappers. Only the ten small local bushes use this pass.
+  // World visibility is still respected, so off-screen bases cost virtually nothing.
+  const previousDraw=draw;
+  draw=function drawWithGuaranteedLocalBerriesV1(){
+    previousDraw();
+    const local=resources.filter(r=>r&&!r.dead&&r.amount>0&&r.type==='food'&&r.localVillageBerry===true);
+    if(!local.length)return;
+    ctx.save();
+    ctx.translate(innerWidth/2,innerHeight/2);
+    ctx.scale(camera.zoom,camera.zoom);
+    ctx.translate(-camera.x,-camera.y);
+    let drawn=0;
+    for(const r of local){
+      if(typeof isWorldVisible==='function'&&!isWorldVisible(r.x,r.y,42))continue;
+      const ratio=Math.max(0,Math.min(1,r.amount/Math.max(1,r.maxAmount)));
+      if(drawFoodResource(r,ratio))drawn++;
     }
+    ctx.restore();
+    if(drawn)localOverlayFrames++;
   };
 
   const api=Object.freeze({
-    version:'natural-resources-v1.2-local-berry-visibility',
+    version:'natural-resources-v1.3-local-berry-2d-overlay',
     projection:'orthographic-top-down',
     treeStyle:'layered-deciduous-canopy',
     foodStyle:'berry-bush',
     localVillageBerryEmphasis:true,
+    explicitLocalBerry2DPass:true,
     ecologyAware:Boolean(global.__BATTLEFIELD_ECOLOGY_V1__),
     roadRenderGuard:true,
     overlapsRoad,
-    diagnostics:()=>({foodDraws,localVillageBerryDraws})
+    diagnostics:()=>({foodDraws,localVillageBerryDraws,localOverlayFrames})
   });
   global.__NATURAL_RESOURCES_V1__=api;
   nrts.subsystems.register('natural-resources-renderer',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'realistic top-down tree crowns and visible berry bushes with hard road-overlap exclusion'
+    responsibility:'realistic top-down tree crowns plus guaranteed visible 2D start berry bushes with hard road-overlap exclusion'
   });
 })(window);
