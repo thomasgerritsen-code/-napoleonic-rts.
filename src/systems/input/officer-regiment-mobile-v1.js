@@ -163,14 +163,16 @@
     }
 
     const source = global.NRTS_3D_SOURCE;
-    const sceneHook = global.__NRTS_THREE_SCENE_HOOK_V1__;
+    const renderApi = global.__BATTLEFIELD_3D_V1__;
     const canvas = document.getElementById('battlefield3d');
-    if (!source || !sceneHook || !canvas) return;
+    if (!source || !renderApi || !canvas) return;
 
     const staticWorld = source.staticWorld?.() || {};
+    const world = staticWorld.world || { width: 3200, height: 1850 };
     const hills = staticWorld.hills || [];
     const claimed = new Map();
     const point = new THREE.Vector3();
+    const projectionCamera = new THREE.PerspectiveCamera(43, 1, 1, 9500);
     const OFFICER_TOUCH_RADIUS_PX = 48;
     const TAP_DRAG_PX = 12;
 
@@ -187,16 +189,38 @@
       return height;
     }
 
+    function syncProjectionCamera(rect) {
+      const simCamera = source.camera?.();
+      if (!simCamera || !rect.width || !rect.height) return false;
+      const diagnostics = renderApi.diagnostics?.() || {};
+      const cameraDistance = Number.isFinite(diagnostics.cameraDistance) ? diagnostics.cameraDistance : 760;
+      const cameraAzimuth = Number.isFinite(diagnostics.cameraAzimuth) ? diagnostics.cameraAzimuth : 0;
+      const centerX = Math.max(0, Math.min(world.width, simCamera.x));
+      const centerZ = Math.max(0, Math.min(world.height, simCamera.y));
+      const back = cameraDistance * 0.78;
+      const height = cameraDistance * 0.82;
+      projectionCamera.aspect = rect.width / rect.height;
+      projectionCamera.position.set(
+        centerX + Math.sin(cameraAzimuth) * back,
+        height,
+        centerZ + Math.cos(cameraAzimuth) * back
+      );
+      projectionCamera.lookAt(centerX, hillHeightAt(centerX, centerZ), centerZ);
+      projectionCamera.updateProjectionMatrix();
+      projectionCamera.updateMatrixWorld(true);
+      return true;
+    }
+
     function screenPoint(unit) {
-      const camera = sceneHook.camera?.();
-      if (!camera) return null;
       const rect = canvas.getBoundingClientRect();
-      point.set(unit.x, hillHeightAt(unit.x, unit.y) + 8, unit.y).project(camera);
+      if (!syncProjectionCamera(rect)) return null;
+      point.set(unit.x, hillHeightAt(unit.x, unit.y) + 8, unit.y).project(projectionCamera);
       if (point.z < -1 || point.z > 1) return null;
-      return {
-        x: rect.left + (point.x + 1) * 0.5 * rect.width,
-        y: rect.top + (1 - point.y) * 0.5 * rect.height
-      };
+      const x = rect.left + (point.x + 1) * 0.5 * rect.width;
+      const y = rect.top + (1 - point.y) * 0.5 * rect.height;
+      if (x < rect.left - OFFICER_TOUCH_RADIUS_PX || x > rect.right + OFFICER_TOUCH_RADIUS_PX ||
+          y < rect.top - OFFICER_TOUCH_RADIUS_PX || y > rect.bottom + OFFICER_TOUCH_RADIUS_PX) return null;
+      return { x, y };
     }
 
     function looseFrenchOfficers() {
@@ -270,7 +294,7 @@
 
   function start3DEnhancement() {
     const tryInstall = () => {
-      if (document.getElementById('battlefield3d') && global.__NRTS_THREE_SCENE_HOOK_V1__ && global.NRTS_3D_SOURCE) {
+      if (document.getElementById('battlefield3d') && global.__BATTLEFIELD_3D_V1__ && global.NRTS_3D_SOURCE) {
         install3DOfficerTap();
         return;
       }
