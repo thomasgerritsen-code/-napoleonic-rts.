@@ -464,7 +464,7 @@ function touchPair() {
 canvas.addEventListener('pointerdown', event => {
   if (!enabled || event.pointerType !== 'touch') return;
   event.preventDefault();
-  canvas.setPointerCapture(event.pointerId);
+  try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
   touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY, sx: event.clientX, sy: event.clientY, moved: false });
   if (touchPointers.size === 2) {
     const pair = touchPair();

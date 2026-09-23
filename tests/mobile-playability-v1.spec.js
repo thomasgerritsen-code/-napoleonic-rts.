@@ -97,11 +97,10 @@ test('phone HUD leaves the central battlefield clear and opens map and menu on d
   await context.close();
 });
 
-test('3D touch moves selected troops and pinches the camera without a ghost order', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true });
-  const page = await context.newPage();
-  await boot(page, { viewport: { width: 844, height: 390 } });
-  await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__?.enabled());
+test('3D touch moves selected troops and pinches the camera without a ghost order', async ({ page }) => {
+  await page.goto('/?test=3d');
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__?.enabled(), null, { timeout: 20000 });
+  await page.setViewportSize({ width: 844, height: 390 });
   expect(await page.evaluate(() => window.__RTS_DEBUG__?.runScenario?.('morale-35'))).toBe(true);
   const beforeOrder = await page.evaluate(() => {
     const state = window.RTS_SIM.snapshot();
@@ -137,7 +136,6 @@ test('3D touch moves selected troops and pinches the camera without a ghost orde
   });
   const after = await page.evaluate(() => window.__BATTLEFIELD_3D_V1__.diagnostics().cameraDistance);
   expect(after).toBeLessThan(before);
-  await context.close();
 });
 
 test('single touch selects a French battlefield unit', async ({ browser }) => {

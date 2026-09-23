@@ -146,6 +146,10 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   await testInfo.attach('north-star-desktop-baseline-candidate', { body: desktopImage, contentType: 'image/png' });
 
   await page.setViewportSize({ width: 844, height: 390 });
+  await page.waitForFunction(() => {
+    const game = document.getElementById('game');
+    return game?.width === 844 && game?.height === 390;
+  });
   // PRESERVATION IMPACT: none — Golden-fixture composition only. The production
   // mobile camera/Pointer Events authority is deliberately untouched. Use a
   // wider test-only framing so all eight groups and the bridge/chokepoint remain
