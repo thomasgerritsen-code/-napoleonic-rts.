@@ -5,6 +5,7 @@
   if(!nrts)throw new Error('NRTS foundation runtime must load before map realism renderer.');
   const roadCfg=global.NRTS_CONFIG?.world?.roads?.rendering || {};
   const activeRoads=global.NRTS_ROAD_NETWORK_V7 || ROAD_NETWORK_V066;
+  const vegetationRoadPadding=roadCfg.vegetationPadding??10;
 
   function seeded(seed){let s=seed>>>0;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
   function visibleBounds(margin=0){
@@ -16,6 +17,22 @@
   }
   function pointVisible(b,x,y,margin=0){return x>=b.left-margin&&x<=b.right+margin&&y>=b.top-margin&&y<=b.bottom+margin;}
   function rectVisible(b,x,y,w,h,margin=0){return x+w>=b.left-margin&&x<=b.right+margin&&y+h>=b.top-margin&&y<=b.bottom+margin;}
+  function pointSegmentDistanceSq(px,py,ax,ay,bx,by){
+    const dx=bx-ax,dy=by-ay,lenSq=dx*dx+dy*dy;
+    if(lenSq<=.0001){const ex=px-ax,ey=py-ay;return ex*ex+ey*ey;}
+    const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/lenSq));
+    const qx=ax+t*dx,qy=ay+t*dy,ex=px-qx,ey=py-qy;
+    return ex*ex+ey*ey;
+  }
+  function roadConflictAt(x,y,radius=0,padding=vegetationRoadPadding){
+    const rr=Math.max(0,Number(radius)||0),pad=Math.max(0,Number(padding)||0);
+    for(const road of activeRoads){
+      const points=road.points||[],clearance=Math.max(9,Number(road.width)||9)*.5+rr+pad;
+      const clearanceSq=clearance*clearance;
+      for(let i=1;i<points.length;i++)if(pointSegmentDistanceSq(x,y,points[i-1].x,points[i-1].y,points[i].x,points[i].y)<=clearanceSq)return true;
+    }
+    return false;
+  }
 
   const rand=seeded(1805),fields=[];
   for(let i=0;i<18;i++){
@@ -46,7 +63,10 @@
     }
     const trees=[];
     const count=Math.max(12,Math.floor(w.w*w.h/3400));
-    for(let i=0;i<count;i++)trees.push({x:w.x+local()*w.w,y:w.y+local()*w.h,canopy:5+local()*8});
+    for(let i=0;i<count;i++){
+      const tree={x:w.x+local()*w.w,y:w.y+local()*w.h,canopy:5+local()*8};
+      if(!roadConflictAt(tree.x,tree.y,tree.canopy))trees.push(tree);
+    }
     return{w,index,outline,trees};
   });
 
@@ -84,11 +104,20 @@
   function drawFields(bounds){
     fields.forEach((f,index)=>{
       if(!rectVisible(bounds,f.x,f.y,f.w,f.h,35))return;
-      ctx.save();ctx.translate(f.x+f.w/2,f.y+f.h/2);ctx.rotate(f.angle);
+      const centerX=f.x+f.w/2,centerY=f.y+f.h/2,ca=Math.cos(f.angle),sa=Math.sin(f.angle);
+      ctx.save();ctx.translate(centerX,centerY);ctx.rotate(f.angle);
       ctx.fillStyle=f.tone===0?'rgba(154,145,88,.20)':f.tone===1?'rgba(130,126,78,.17)':'rgba(175,157,101,.16)';ctx.fillRect(-f.w/2,-f.h/2,f.w,f.h);
       ctx.strokeStyle='rgba(96,82,53,.25)';ctx.lineWidth=1.6;ctx.strokeRect(-f.w/2,-f.h/2,f.w,f.h);
       ctx.strokeStyle='rgba(88,75,45,.15)';ctx.lineWidth=1;const spacing=f.h/f.rows;
-      for(let y=-f.h/2+spacing;y<f.h/2;y+=spacing){ctx.beginPath();ctx.moveTo(-f.w/2+5,y);ctx.lineTo(f.w/2-5,y);ctx.stroke();}
+      for(let y=-f.h/2+spacing;y<f.h/2;y+=spacing){
+        const start=-f.w/2+5,end=f.w/2-5,step=18;
+        for(let x=start;x<end;x+=step){
+          const x2=Math.min(end,x+step),mx=(x+x2)/2;
+          const wx=centerX+mx*ca-y*sa,wy=centerY+mx*sa+y*ca;
+          if(roadConflictAt(wx,wy,2))continue;
+          ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y);ctx.stroke();
+        }
+      }
       if(index%3===0){ctx.strokeStyle='rgba(75,70,43,.30)';ctx.lineWidth=2.3;ctx.beginPath();ctx.moveTo(-f.w/2,-f.h/2);ctx.lineTo(f.w/2,-f.h/2);ctx.stroke();}
       ctx.restore();
     });
@@ -104,7 +133,7 @@
     ctx.save();ctx.fillStyle='rgba(39,67,38,.15)';ctx.beginPath();
     data.outline.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);});ctx.closePath();ctx.fill();
     for(const tree of data.trees){
-      if(!pointVisible(bounds,tree.x,tree.y,16))continue;
+      if(!pointVisible(bounds,tree.x,tree.y,16)||roadConflictAt(tree.x,tree.y,tree.canopy))continue;
       ctx.fillStyle='rgba(29,65,34,.58)';ctx.beginPath();ctx.arc(tree.x,tree.y,tree.canopy,0,Math.PI*2);ctx.fill();
       ctx.fillStyle='rgba(83,112,61,.32)';ctx.beginPath();ctx.arc(tree.x-2,tree.y-2,tree.canopy*.55,0,Math.PI*2);ctx.fill();
     }
@@ -159,7 +188,7 @@
   };
 
   const api=Object.freeze({
-    version:'map-realism-v2.3',
+    version:'map-realism-v2.4-road-clearance',
     fieldCount:fields.length,
     preservesNavigation:true,
     roadCount:activeRoads.length,
@@ -171,8 +200,11 @@
     precomputedGroundMarks:true,
     precomputedRoadPaths:true,
     precomputedJunctions:true,
+    roadClearance2D:true,
+    vegetationRoadPadding,
+    roadConflictAt,
     visibleBounds
   });
   if(nrts.subsystems.has('map-renderer'))global.__MAP_REALISM_V2__=api;
-  else{nrts.subsystems.register('map-renderer',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'viewport-culled deterministic terrain with precomputed static detail and seam-free active-road rendering'});global.__MAP_REALISM_V2__=api;}
+  else{nrts.subsystems.register('map-renderer',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'viewport-culled deterministic terrain with road-cleared woodland/crops and seam-free active-road rendering'});global.__MAP_REALISM_V2__=api;}
 })(window);
