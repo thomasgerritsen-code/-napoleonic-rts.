@@ -264,7 +264,7 @@
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.6-base-berries-per-town-center',
+    version:'battlefield-ecology-v1.6-base-berries-near-town-per-town-center',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
