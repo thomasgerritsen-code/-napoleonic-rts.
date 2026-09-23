@@ -18,12 +18,19 @@ canvas.setAttribute('aria-label', 'Napoleonic RTS 3D battlefield');
 canvas.tabIndex = 0;
 app.insertBefore(canvas, canvas2d.nextSibling);
 
-const renderer = new THREE.WebGLRenderer({
-  canvas,
-  antialias: true,
-  alpha: false,
-  powerPreference: 'high-performance'
-});
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: true,
+    alpha: false,
+    powerPreference: 'high-performance'
+  });
+} catch (error) {
+  // Keep the 2D canvas accessible if a phone/browser cannot start WebGL.
+  canvas.remove();
+  throw error;
+}
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
