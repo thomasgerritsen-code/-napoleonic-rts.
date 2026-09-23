@@ -34,7 +34,7 @@ test('both starting bases keep safe berry bushes just outside their linked villa
   await page.waitForFunction(() => window.__BATTLEFIELD_ECOLOGY_V1__?.baseVillageBerryStats);
 
   const initial = await readBerryAccess(page);
-  expect(initial.version).toContain('base-village-berry-ring');
+  expect(initial.version).toContain('base-village-home-ring');
   expectSafeLocalBerries(initial);
 
   await page.locator('#resetBtn').click();
