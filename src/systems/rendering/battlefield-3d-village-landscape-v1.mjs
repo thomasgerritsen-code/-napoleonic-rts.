@@ -5,6 +5,7 @@ const scene = window.__NRTS_THREE_SCENE__;
 if (!source || !scene) throw new Error('3D village landscape requires the simulation bridge and captured Three.js scene.');
 
 const world = source.staticWorld();
+const ecology = window.__BATTLEFIELD_ECOLOGY_V1__;
 const root = new THREE.Group();
 root.name = 'village-landscape-3d';
 root.userData.renderOnly = true;
@@ -12,6 +13,9 @@ scene.add(root);
 
 const counts = { parish: 0, ribbon: 0, agrarian: 0, woodland: 0, crossroads: 0 };
 const featureCounts = { villageGreen: 0, ribbonVerges: 0, paddocks: 0, woodlandGroves: 0, crossroadsMarkers: 0 };
+let suppressedNearRoad = 0;
+let terrainTilesSuppressed = 0;
+let terrainTilesKept = 0;
 
 const mats = {
   green: new THREE.MeshStandardMaterial({ color: 0x718456, roughness: 1 }),
@@ -46,23 +50,129 @@ function terrainHeight(x, z) {
   return height;
 }
 
-function box(parent, x, z, w, d, h, material, y = 0.35, angle = 0) {
+function roadBlocked(x, z, radius = 0, padding = 5) {
+  return Boolean(ecology?.roadConflictAt?.(x, z, radius, padding));
+}
+
+function box(parent, x, z, w, d, h, material, y = 0.35, angle = 0, vegetationKind = null) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
   mesh.position.set(x, terrainHeight(x, z) + y, z);
   mesh.rotation.y = -angle;
   mesh.userData.renderOnly = true;
+  if (vegetationKind) {
+    mesh.userData.vegetationKind = vegetationKind;
+    mesh.userData.vegetationClearanceRadius = Math.min(Math.hypot(w, d) * 0.5, 16);
+  }
   parent.add(mesh);
   return mesh;
 }
 
+function segmentedBox(parent, x, z, w, d, h, material, y = 0.35, angle = 0, vegetationKind = 'vegetation') {
+  const splitAlongWidth = w >= d;
+  const longSide = splitAlongWidth ? w : d;
+  const count = Math.max(1, Math.ceil(longSide / 14));
+  const segmentLength = longSide / count;
+  let added = 0;
+
+  for (let i = 0; i < count; i++) {
+    const local = -longSide / 2 + segmentLength * (i + 0.5);
+    let sx = x;
+    let sz = z;
+    let sw = w;
+    let sd = d;
+    if (splitAlongWidth) {
+      sx += Math.cos(angle) * local;
+      sz += Math.sin(angle) * local;
+      sw = segmentLength;
+    } else {
+      sx += -Math.sin(angle) * local;
+      sz += Math.cos(angle) * local;
+      sd = segmentLength;
+    }
+    const clearanceRadius = Math.hypot(sw, sd) * 0.5 + 1.5;
+    if (roadBlocked(sx, sz, clearanceRadius, 3)) {
+      suppressedNearRoad++;
+      continue;
+    }
+    const mesh = box(parent, sx, sz, sw, sd, h, material, y, angle, vegetationKind);
+    mesh.userData.vegetationClearanceRadius = clearanceRadius;
+    added++;
+  }
+  return added;
+}
+
+function clearTerrainPatchesFromRoads() {
+  if (!ecology?.roadConflictAt) return;
+  const group = scene.getObjectByName('terrain-patches-3d');
+  if (!group || !group.children.length || group.userData.roadClearanceV1) return;
+
+  const tiles = [];
+  let material = null;
+  for (const patch of [...group.children]) {
+    const params = patch.geometry?.parameters || {};
+    const w = Number(params.width) || 0;
+    const d = Number(params.depth) || 0;
+    if (!w || !d) continue;
+    material ||= patch.material;
+    const cols = Math.max(1, Math.ceil(w / 26));
+    const rows = Math.max(1, Math.ceil(d / 26));
+    const tw = w / cols;
+    const td = d / rows;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const x = patch.position.x - w / 2 + tw * (col + 0.5);
+        const z = patch.position.z - d / 2 + td * (row + 0.5);
+        const clearanceRadius = Math.hypot(tw, td) * 0.5;
+        if (roadBlocked(x, z, clearanceRadius, 2)) {
+          terrainTilesSuppressed++;
+          continue;
+        }
+        tiles.push({ x, z, w: tw, d: td, clearanceRadius });
+      }
+    }
+    group.remove(patch);
+    patch.geometry?.dispose?.();
+  }
+
+  if (tiles.length && material) {
+    const geometry = new THREE.BoxGeometry(1, 0.35, 1);
+    const instanced = new THREE.InstancedMesh(geometry, material, tiles.length);
+    instanced.name = 'terrain-patches-road-cleared-v1';
+    instanced.userData = { renderOnly: true, vegetationKind: 'terrain-crop-patch', roadClearance: true };
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    tiles.forEach((tile, i) => {
+      position.set(tile.x, terrainHeight(tile.x, tile.z) + 0.25, tile.z);
+      quaternion.identity();
+      scale.set(tile.w, 1, tile.d);
+      matrix.compose(position, quaternion, scale);
+      instanced.setMatrixAt(i, matrix);
+    });
+    instanced.instanceMatrix.needsUpdate = true;
+    group.add(instanced);
+    terrainTilesKept = tiles.length;
+  }
+  group.userData.roadClearanceV1 = true;
+}
+
 function tree(parent, x, z, scale = 1) {
+  const clearanceRadius = 7.5 * scale;
+  if (roadBlocked(x, z, clearanceRadius, 6)) {
+    suppressedNearRoad++;
+    return false;
+  }
   const y = terrainHeight(x, z);
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.6 * scale, 2.1 * scale, 11 * scale, 6), mats.trunk);
   trunk.position.set(x, y + 5.5 * scale, z);
   const crown = new THREE.Mesh(new THREE.ConeGeometry(7.2 * scale, 16 * scale, 7), mats.crown);
   crown.position.set(x, y + 16 * scale, z);
   trunk.userData.renderOnly = crown.userData.renderOnly = true;
+  trunk.userData.vegetationKind = crown.userData.vegetationKind = 'tree';
+  trunk.userData.vegetationClearanceRadius = crown.userData.vegetationClearanceRadius = clearanceRadius;
   parent.add(trunk, crown);
+  return true;
 }
 
 function parish(parent, village, angle) {
@@ -80,7 +190,7 @@ function ribbon(parent, village, angle) {
   for (const side of [-1, 1]) {
     const ox = -sa * side * 30;
     const oz = ca * side * 30;
-    box(parent, village.x + ox, village.y + oz, 190, 7, 4.5, mats.hedge, 2.25, angle);
+    segmentedBox(parent, village.x + ox, village.y + oz, 190, 7, 4.5, mats.hedge, 2.25, angle, 'hedge');
   }
   featureCounts.ribbonVerges++;
 }
@@ -88,7 +198,7 @@ function ribbon(parent, village, angle) {
 function agrarian(parent, village, angle) {
   box(parent, village.x + 26, village.y + 54, 112, 74, 0.45, mats.soil, 0.45, angle + 0.08);
   for (let i = -4; i <= 4; i++) {
-    box(parent, village.x + 26 + i * 10, village.y + 54, 3, 66, 0.28, mats.furrow, 0.7, angle + 0.08);
+    segmentedBox(parent, village.x + 26 + i * 10, village.y + 54, 3, 66, 0.28, mats.furrow, 0.7, angle + 0.08, 'crop-row');
   }
   featureCounts.paddocks++;
 }
@@ -112,6 +222,8 @@ function crossroads(parent, village) {
   featureCounts.crossroadsMarkers++;
 }
 
+clearTerrainPatchesFromRoads();
+
 for (const village of world.villages || []) {
   const archetype = normalize(village.archetype);
   counts[archetype]++;
@@ -128,9 +240,13 @@ for (const village of world.villages || []) {
 }
 
 window.__BATTLEFIELD_3D_LANDSCAPE_V1__ = Object.freeze({
-  version: 'battlefield-3d-village-landscape-v1.3.9',
+  version: 'battlefield-3d-village-landscape-v1.4-road-clearance',
   contract: 'render-only-archetype-landscape-v1',
   renderOnly: true,
+  roadClearance: Boolean(ecology?.roadConflictAt),
+  suppressedNearRoad,
+  terrainTilesSuppressed,
+  terrainTilesKept,
   counts: Object.freeze({ ...counts }),
   features: Object.freeze({ ...featureCounts }),
   objectCount: root.children.reduce((sum, group) => sum + group.children.length, 0)

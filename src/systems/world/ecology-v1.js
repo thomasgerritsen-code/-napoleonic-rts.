@@ -12,15 +12,45 @@
   const relocationStep=cfg.relocationStep ?? 22;
   const relocationRings=cfg.relocationRings ?? 18;
   const berryVillagePadding=villageCfg.berryExclusionPadding ?? 70;
+  const roadPadding=cfg.roadPadding ?? 8;
 
   function villageData(){
     return global.VILLAGE_SCENERY_V4 || global.__VILLAGE_SCENERY_V4_DATA__ || [];
+  }
+  function activeRoads(){
+    return global.NRTS_ROAD_NETWORK_V7 || global.ROAD_NETWORK_V066 || [];
   }
   function houseRadius(h){
     return Number.isFinite(h?.plotRadius) ? h.plotRadius : Math.hypot(h?.w||0,h?.h||0)*.72+10;
   }
   function resourceRadius(type){
     return type==='wood' ? 22 : (cfg.berryRadius ?? 19);
+  }
+  function pointSegmentDistanceSq(px,py,ax,ay,bx,by){
+    const dx=bx-ax,dy=by-ay;
+    const lenSq=dx*dx+dy*dy;
+    if(lenSq<=.0001){const ex=px-ax,ey=py-ay;return ex*ex+ey*ey;}
+    const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/lenSq));
+    const qx=ax+t*dx,qy=ay+t*dy,ex=px-qx,ey=py-qy;
+    return ex*ex+ey*ey;
+  }
+  function roadConflictAt(x,y,radius=0,padding=roadPadding){
+    const rr=Math.max(0,Number(radius)||0);
+    const pad=Math.max(0,Number(padding)||0);
+    for(const road of activeRoads()){
+      const points=road?.points||[];
+      const halfWidth=Math.max(9,Number(road?.width)||9)*.5;
+      const clearance=halfWidth+rr+pad;
+      const clearanceSq=clearance*clearance;
+      for(let i=1;i<points.length;i++){
+        const a=points[i-1],b=points[i];
+        if(pointSegmentDistanceSq(x,y,a.x,a.y,b.x,b.y)<=clearanceSq)return true;
+      }
+    }
+    return false;
+  }
+  function roadConflict(type,x,y){
+    return roadConflictAt(x,y,resourceRadius(type),roadPadding);
   }
   function buildingConflict(type,x,y,padding=buildingPadding){
     const rr=resourceRadius(type);
@@ -66,7 +96,7 @@
   function validResourceSpot(type,x,y,ignore=null){
     const rr=resourceRadius(type);
     if(x<rr+16||y<rr+16||x>WORLD.width-rr-16||y>WORLD.height-rr-16)return false;
-    if(buildingConflict(type,x,y)||villageHouseConflict(type,x,y))return false;
+    if(roadConflict(type,x,y)||buildingConflict(type,x,y)||villageHouseConflict(type,x,y))return false;
     if(type==='food'&&insideVillage(x,y))return false;
     return !resourceConflict(type,x,y,ignore);
   }
@@ -104,12 +134,16 @@
 
   // Initial resources are generated before Architecture-v2 world systems load. Normalize
   // them once and keep the same gameplay resource objects/amounts.
-  let relocated=0,removed=0;
+  let relocated=0,removed=0,roadRelocated=0;
   for(const r of [...resources]){
     if(!r||r.dead)continue;
+    const startedOnRoad=roadConflict(r.type,r.x,r.y);
     const safe=nearestEcologySpot(r.type,r.x,r.y,r);
     if(!safe){r.dead=true;removed++;continue;}
-    if(Math.hypot(safe.x-r.x,safe.y-r.y)>.5)relocated++;
+    if(Math.hypot(safe.x-r.x,safe.y-r.y)>.5){
+      relocated++;
+      if(startedOnRoad)roadRelocated++;
+    }
     r.x=safe.x;r.y=safe.y;
     r.radius=resourceRadius(r.type);
     r.visualKind=r.type==='food'?'berry-bush':'deciduous-tree';
@@ -117,20 +151,26 @@
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1',
+    version:'battlefield-ecology-v1.1-road-clearance',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
     buildingConflict,
     villageHouseConflict,
+    roadConflict,
+    roadConflictAt,
+    resourceRadius,
+    roadPadding,
     relocatedInitial:relocated,
+    relocatedFromRoad:roadRelocated,
     removedInitial:removed,
     berryVillageExclusion:true,
-    resourceBuildingExclusion:true
+    resourceBuildingExclusion:true,
+    resourceRoadExclusion:true
   });
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'collision-safe tree and berry placement with village exclusion for food resources'
+    responsibility:'collision-safe tree and berry placement with building, village and road exclusion'
   });
 })(window);
