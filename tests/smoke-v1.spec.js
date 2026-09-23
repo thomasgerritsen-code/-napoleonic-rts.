@@ -40,7 +40,7 @@ test('game boots with current version and essential UI', async ({ page }) => {
   await expect(page.locator('.help')).toContainText('Minimap: camera verplaatsen');
   await expect(page.locator('.help')).toContainText('Shift+slepen: toevoegen');
   await expect(page.locator('.help')).toContainText('Muiswiel: in-/uitzoomen');
-  await expect(page.locator('.help')).toContainText('WASD / pijltjes: camera');
+  await expect(page.locator('.help')).toContainText('WASD / pijltjes: camera verplaatsen');
 
   const barracksAction = page.locator('[data-action="build-barracks"]');
   const houseAction = page.locator('[data-action="build-house"]');
