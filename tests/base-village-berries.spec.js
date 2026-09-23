@@ -22,7 +22,8 @@ async function readBerryAccess(page) {
       localTaggedCount: local.length,
       visibleFrenchCount: visibleFrench.length,
       render: natural?.diagnostics?.() || null,
-      renderVersion: natural?.version || null
+      renderVersion: natural?.version || null,
+      explicit2DPass: natural?.explicitLocalBerry2DPass === true
     };
   });
 }
@@ -44,8 +45,10 @@ function expectSafeLocalBerries(state) {
     expect(base.houseConflicts).toBe(0);
   }
   expect(state.visibleFrenchCount).toBeGreaterThanOrEqual(3);
-  expect(state.renderVersion).toContain('local-berry-visibility');
+  expect(state.renderVersion).toContain('local-berry-2d-overlay');
+  expect(state.explicit2DPass).toBe(true);
   expect(state.render?.localVillageBerryDraws || 0).toBeGreaterThan(0);
+  expect(state.render?.localOverlayFrames || 0).toBeGreaterThan(0);
 }
 
 test('both starting bases get explicit nearby berry bushes that are visible in the 2D mobile start view', async ({ page }) => {
