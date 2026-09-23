@@ -9,6 +9,22 @@
     let x=(seed>>>0)||1;x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;
   }
   function seedFor(r,salt=0){return(((r.id||1)*2654435761)^((Math.round(r.x)*73856093)>>>0)^((Math.round(r.y)*19349663)>>>0)^salt)>>>0;}
+  function visualRadius(r,ratio=1){
+    if(r?.type==='wood'){
+      const scale=(cfg.treeCanopyScale??1.18)*(0.88+ratio*.16);
+      return 16.5*scale*1.12;
+    }
+    return (cfg.berryRadius??19)*(0.88+ratio*.12)*1.08;
+  }
+  function overlapsRoad(r,ratio=1){
+    const ecology=global.__BATTLEFIELD_ECOLOGY_V1__;
+    if(!ecology||!r)return false;
+    if(typeof ecology.roadConflictAt==='function'){
+      return ecology.roadConflictAt(r.x,r.y,visualRadius(r,ratio),ecology.roadPadding??8);
+    }
+    if(typeof ecology.roadConflict==='function')return ecology.roadConflict(r.type,r.x,r.y);
+    return false;
+  }
 
   function drawTree(r,ratio){
     const scale=(cfg.treeCanopyScale??1.18)*(0.88+ratio*.16);
@@ -59,19 +75,24 @@
   drawResource=function drawNaturalResourceV1(r){
     if(!r||r.dead)return;
     const ratio=Math.max(0,Math.min(1,r.amount/Math.max(1,r.maxAmount)));
+    // Final visual safety net: never paint a canopy/bush over a road, even if
+    // stale coordinates or an older save slipped past the world-placement pass.
+    if(overlapsRoad(r,ratio))return;
     if(r.type==='wood')drawTree(r,ratio);else drawBerryBush(r,ratio);
   };
 
   const api=Object.freeze({
-    version:'natural-resources-v1',
+    version:'natural-resources-v1.1-road-guard',
     projection:'orthographic-top-down',
     treeStyle:'layered-deciduous-canopy',
     foodStyle:'berry-bush',
-    ecologyAware:Boolean(global.__BATTLEFIELD_ECOLOGY_V1__)
+    ecologyAware:Boolean(global.__BATTLEFIELD_ECOLOGY_V1__),
+    roadRenderGuard:true,
+    overlapsRoad
   });
   global.__NATURAL_RESOURCES_V1__=api;
   nrts.subsystems.register('natural-resources-renderer',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'realistic top-down tree crowns and berry bushes without changing resource economy'
+    responsibility:'realistic top-down tree crowns and berry bushes with hard road-overlap exclusion'
   });
 })(window);
