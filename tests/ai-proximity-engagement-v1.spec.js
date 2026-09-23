@@ -36,14 +36,34 @@ test('British regiments react to nearby French troops with stable contact hyster
       reg.targetY = y;
     }
 
+    // Build a minimal valid runtime regiment directly. This avoids legacy wrappers
+    // around createRegiment changing the setup of this isolated AI test.
     function makeRegimentAt(side, x, y) {
-      const candidates = [];
+      const infantry = [];
       for (let i = 0; i < 12; i++) {
-        candidates.push(createUnit(side, 'infantry', x + (i % 6) * 8, y + Math.floor(i / 6) * 8));
+        infantry.push(createUnit(side, 'infantry', x + (i % 6) * 8, y + Math.floor(i / 6) * 8));
       }
-      candidates.push(createUnit(side, 'officer', x, y + 22));
-      candidates.push(createUnit(side, 'drummer', x - 14, y + 22));
-      const reg = createRegiment(side, candidates);
+      const officer = createUnit(side, 'officer', x, y + 22);
+      const drummer = createUnit(side, 'drummer', x - 14, y + 22);
+      const members = [...infantry, officer, drummer];
+      const reg = {
+        id: nextRegimentId++,
+        side,
+        name: `${side === 'france' ? 'Frans' : 'Brits'} proximity test regiment`,
+        memberIds: members.map(unit => unit.id),
+        officerId: officer.id,
+        drummerId: drummer.id,
+        formation: 'line',
+        facing: side === 'france' ? 0 : Math.PI,
+        morale: 100,
+        destroyed: false,
+        targetX: x,
+        targetY: y,
+        formedAt: elapsed,
+        formedInfantryCount: infantry.length
+      };
+      members.forEach(unit => { unit.regimentId = reg.id; });
+      regiments.push(reg);
       placeRegiment(reg, x, y);
       return reg;
     }
