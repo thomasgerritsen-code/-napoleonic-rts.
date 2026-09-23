@@ -15,12 +15,13 @@
     for(const road of network){const g=roadGeometryV069(road,x,y);if(g&&(!best||g.edgeClearance<best.edgeClearance))best=g;}
     return best;
   }
+  function roadConflictAt(x,y,radius=0,padding=8){const road=roadAt(x,y);return Boolean(road&&Number.isFinite(road.edgeClearance)&&road.edgeClearance<Math.max(0,radius)+Math.max(0,padding));}
   function strokePath(ax,ay,bx,by,width,color,dash){ctx.save();ctx.strokeStyle=color;ctx.lineWidth=Math.max(width,width/camera.zoom);ctx.lineCap='round';if(dash)ctx.setLineDash(dash.map(v=>v/camera.zoom));ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();ctx.restore();}
   function drawWell(x,y){
     const r=5.5;ctx.save();ctx.fillStyle='rgba(94,92,79,.72)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(64,68,67,.74)';ctx.beginPath();ctx.arc(x,y,r*.52,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(197,187,155,.45)';ctx.lineWidth=Math.max(.7,1/camera.zoom);ctx.stroke();ctx.restore();
   }
   function drawCommonTree(x,y,seed){
-    const r=7+hash01(seed^0x77)*3;ctx.save();ctx.fillStyle='rgba(66,83,43,.28)';ctx.beginPath();ctx.arc(x,y,r+2,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(43,76,40,.62)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(54,43,30,.55)';ctx.fillRect(x-.8,y-.8,1.6,1.6);ctx.restore();
+    const r=7+hash01(seed^0x77)*3;if(roadConflictAt(x,y,r,8))return;ctx.save();ctx.fillStyle='rgba(66,83,43,.28)';ctx.beginPath();ctx.arc(x,y,r+2,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(43,76,40,.62)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(54,43,30,.55)';ctx.fillRect(x-.8,y-.8,1.6,1.6);ctx.restore();
   }
   function drawBench(x,y,angle){
     ctx.save();ctx.translate(x,y);ctx.rotate(angle||0);ctx.fillStyle='rgba(91,66,43,.52)';ctx.fillRect(-6,-1.3,12,2.6);ctx.fillRect(-4.5,-3.2,1.2,2.2);ctx.fillRect(3.3,-3.2,1.2,2.2);ctx.restore();
@@ -58,10 +59,15 @@
   }
   function drawAgrarianPaddocks(village,seed){
     const houses=(village.houses||[]).filter(h=>h.zone==='farm-edge');
-    for(let i=0;i<houses.length;i+=2){const h=houses[i];const s=seed^(i*977+0x51);ctx.save();ctx.translate(h.x,h.y);ctx.rotate(h.angle||0);const w=Math.max(58,h.w*1.7),d=Math.max(32,h.h*1.8);ctx.strokeStyle='rgba(76,91,50,.30)';ctx.lineWidth=Math.max(.7,1/camera.zoom);ctx.setLineDash([7/camera.zoom,5/camera.zoom]);ctx.strokeRect(-w/2,-d/2,w,d);ctx.setLineDash([]);if(hash01(s)>.35){ctx.strokeStyle='rgba(126,111,70,.14)';ctx.lineWidth=Math.max(.55,.8/camera.zoom);for(let fy=-d*.32;fy<=d*.32;fy+=7){ctx.beginPath();ctx.moveTo(-w*.38,fy);ctx.lineTo(w*.38,fy);ctx.stroke();}}ctx.restore();if(hash01(s^0x19)>.25)drawHaystack(h.x+Math.cos(h.angle||0)*w*.34,h.y+Math.sin(h.angle||0)*w*.34,.85+hash01(s^0x28)*.45);}
+    for(let i=0;i<houses.length;i+=2){
+      const h=houses[i],s=seed^(i*977+0x51),angle=(h.angle||0),ca=Math.cos(angle),sa=Math.sin(angle);
+      ctx.save();ctx.translate(h.x,h.y);ctx.rotate(angle);const w=Math.max(58,h.w*1.7),d=Math.max(32,h.h*1.8);ctx.strokeStyle='rgba(76,91,50,.30)';ctx.lineWidth=Math.max(.7,1/camera.zoom);ctx.setLineDash([7/camera.zoom,5/camera.zoom]);ctx.strokeRect(-w/2,-d/2,w,d);ctx.setLineDash([]);
+      if(hash01(s)>.35){ctx.strokeStyle='rgba(126,111,70,.14)';ctx.lineWidth=Math.max(.55,.8/camera.zoom);for(let fy=-d*.32;fy<=d*.32;fy+=7){for(let fx=-w*.38;fx<w*.38;fx+=12){const fx2=Math.min(w*.38,fx+12),mx=(fx+fx2)/2,wx=h.x+mx*ca-fy*sa,wy=h.y+mx*sa+fy*ca;if(roadConflictAt(wx,wy,1.5,7))continue;ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(fx2,fy);ctx.stroke();}}}
+      ctx.restore();if(hash01(s^0x19)>.25){const hx=h.x+Math.cos(angle)*w*.34,hy=h.y+Math.sin(angle)*w*.34;if(!roadConflictAt(hx,hy,5,7))drawHaystack(hx,hy,.85+hash01(s^0x28)*.45);}
+    }
   }
   function drawWoodlandEdge(village,seed){
-    for(let i=0;i<16;i++){const a=hash01(seed^(i*149+0x90))*Math.PI*2;const d=114+hash01(seed^(i*173+0x91))*54;const x=village.x+Math.cos(a)*d,y=village.y+Math.sin(a)*d;const r=3.8+hash01(seed^(i*197+0x92))*4.2;ctx.fillStyle='rgba(35,66,38,.46)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();if(i%3===0){ctx.fillStyle='rgba(68,48,31,.35)';ctx.fillRect(x-.6,y-.6,1.2,1.2);}if(i%2===0){ctx.fillStyle='rgba(58,89,45,.18)';for(let j=0;j<3;j++){const ox=(hash01(seed^(i*311+j*17))-.5)*14,oy=(hash01(seed^(i*353+j*19))-.5)*14;ctx.beginPath();ctx.arc(x+ox,y+oy,1.8,0,Math.PI*2);ctx.fill();}}}
+    for(let i=0;i<16;i++){const a=hash01(seed^(i*149+0x90))*Math.PI*2;const d=114+hash01(seed^(i*173+0x91))*54;const x=village.x+Math.cos(a)*d,y=village.y+Math.sin(a)*d;const r=3.8+hash01(seed^(i*197+0x92))*4.2;if(roadConflictAt(x,y,r,8))continue;ctx.fillStyle='rgba(35,66,38,.46)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();if(i%3===0){ctx.fillStyle='rgba(68,48,31,.35)';ctx.fillRect(x-.6,y-.6,1.2,1.2);}if(i%2===0){ctx.fillStyle='rgba(58,89,45,.18)';for(let j=0;j<3;j++){const ox=(hash01(seed^(i*311+j*17))-.5)*14,oy=(hash01(seed^(i*353+j*19))-.5)*14;if(roadConflictAt(x+ox,y+oy,2,6))continue;ctx.beginPath();ctx.arc(x+ox,y+oy,1.8,0,Math.PI*2);ctx.fill();}}}
   }
   function drawHouseGateHints(village){
     for(const h of village.houses||[]){if(!Number.isFinite(h.accessX)||!Number.isFinite(h.accessY))continue;const dx=h.accessX-h.x,dy=h.accessY-h.y,d=Math.hypot(dx,dy)||1;const start=Math.min(18,d*.35);const important=h.kind==='inn'||h.kind==='chapel';strokePath(h.x+dx/d*start,h.y+dy/d*start,h.accessX,h.accessY,important?3.4:2.1,important?'rgba(149,126,83,.29)':'rgba(149,126,83,.22)');if(important){const nx=-dy/d,ny=dx/d;ctx.save();ctx.fillStyle='rgba(81,68,47,.40)';for(const side of[-1,1])ctx.fillRect(h.accessX+nx*side*3-1,h.accessY+ny*side*3-1,2,2);ctx.restore();}}
@@ -79,8 +85,8 @@
     drawHouseGateHints(village);
   }
 
-  const api=Object.freeze({version:'village-landscape-v7.2',base:'village-landscape-v6',archetypeLandmarks:true,roadsideEdges:true,sharedWell:true,paddocks:true,woodlandEdge:true,accessGateHints:true,commonFootpaths:true,commonTree:true,ribbonDitches:true,paddockFurrows:true,crossroadsWear:true,importantGateposts:true,parishBench:true,ribbonOrchardTrees:true,agrarianHaystacks:true,woodlandUndergrowth:true,crossroadsMilestone:true,navigationUnchanged:true});
+  const api=Object.freeze({version:'village-landscape-v7.3-road-clearance',base:'village-landscape-v6',archetypeLandmarks:true,roadsideEdges:true,sharedWell:true,paddocks:true,woodlandEdge:true,accessGateHints:true,commonFootpaths:true,commonTree:true,ribbonDitches:true,paddockFurrows:true,crossroadsWear:true,importantGateposts:true,parishBench:true,ribbonOrchardTrees:true,agrarianHaystacks:true,woodlandUndergrowth:true,crossroadsMilestone:true,navigationUnchanged:true,roadVegetationClearance:true});
   global.drawVillageLandscapeV7=drawVillageLandscapeV7;
   global.__VILLAGE_LANDSCAPE_V7__=api;
-  nrts.subsystems.register('village-landscape-v7',api,{phase:'architecture-v2',legacyBridge:false,responsibility:'archetype-specific village character, lived-in microdetail and roadside transition without navigation changes'});
+  nrts.subsystems.register('village-landscape-v7',api,{phase:'architecture-v2',legacyBridge:false,responsibility:'archetype-specific village character with road-cleared vegetation and crops'});
 })(window);

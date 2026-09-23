@@ -44,6 +44,10 @@
     }
     return best;
   }
+  function roadConflictAt(x,y,radius=0,padding=8){
+    const road=activeRoadGeometryAt(x,y);
+    return Boolean(road&&Number.isFinite(road.edgeClearance)&&road.edgeClearance<Math.max(0,radius)+Math.max(0,padding));
+  }
 
   function archetypeGround(village,seed,coreCount){
     const road=activeRoadGeometryAt(village.x,village.y);
@@ -95,32 +99,42 @@
       const d=72+hash01(seed^(i*131+0x802))*64;
       const x=village.x+Math.cos(a)*d,y=village.y+Math.sin(a)*d;
       const r=3.5+hash01(seed^(i*151+0x803))*3.8;
+      if(roadConflictAt(x,y,r,8))continue;
       ctx.fillStyle='rgba(45,73,42,.52)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
     }
   }
 
   function drawFarmStrip(house,seed){
     const rear=house.side>0?1:-1;
-    const w=Math.max(56,house.w*1.45),h=Math.max(34,house.h*1.55);
-    ctx.save();ctx.translate(house.x,house.y);ctx.rotate(house.angle||0);
+    const w=Math.max(56,house.w*1.45),h=Math.max(34,house.h*1.55),angle=house.angle||0;
+    const ca=Math.cos(angle),sa=Math.sin(angle);
+    ctx.save();ctx.translate(house.x,house.y);ctx.rotate(angle);
     const cx=0,cy=rear*(house.h*.75+h*.48);
     ctx.fillStyle='rgba(108,93,55,.16)';ctx.fillRect(cx-w/2,cy-h/2,w,h);
     ctx.strokeStyle='rgba(79,99,56,.34)';ctx.lineWidth=Math.max(.55,.9/camera.zoom);
     const rows=5+Math.floor(hash01(seed^0x511)*3);
     for(let i=1;i<=rows;i++){
-      const yy=cy-h/2+i*h/(rows+1);ctx.beginPath();ctx.moveTo(cx-w*.44,yy);ctx.lineTo(cx+w*.44,yy);ctx.stroke();
+      const yy=cy-h/2+i*h/(rows+1),start=cx-w*.44,end=cx+w*.44,step=12;
+      for(let xx=start;xx<end;xx+=step){
+        const xx2=Math.min(end,xx+step),mx=(xx+xx2)/2;
+        const wx=house.x+mx*ca-yy*sa,wy=house.y+mx*sa+yy*ca;
+        if(roadConflictAt(wx,wy,1.5,7))continue;
+        ctx.beginPath();ctx.moveTo(xx,yy);ctx.lineTo(xx2,yy);ctx.stroke();
+      }
     }
     ctx.restore();
   }
 
   function drawEdgeVegetation(house,seed){
     if(house.zone!=='farm-edge') return;
-    const rear=house.side>0?1:-1;
-    ctx.save();ctx.translate(house.x,house.y);ctx.rotate(house.angle||0);
+    const rear=house.side>0?1:-1,angle=house.angle||0,ca=Math.cos(angle),sa=Math.sin(angle);
+    ctx.save();ctx.translate(house.x,house.y);ctx.rotate(angle);
     for(let i=0;i<5;i++){
       const px=(hash01(seed^(0x700+i*23))-.5)*house.w*1.8;
       const py=rear*(house.h*.9+hash01(seed^(0x800+i*31))*house.h*1.5);
       const r=3+hash01(seed^(0x900+i*37))*3.2;
+      const wx=house.x+px*ca-py*sa,wy=house.y+px*sa+py*ca;
+      if(roadConflictAt(wx,wy,r,8))continue;
       ctx.fillStyle='rgba(42,72,39,.70)';ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.fill();
       ctx.fillStyle='rgba(78,104,56,.34)';ctx.beginPath();ctx.arc(px-1.2,py-1.2,r*.55,0,Math.PI*2);ctx.fill();
     }
@@ -225,14 +239,14 @@
   }
 
   const api=Object.freeze({
-    version:'village-landscape-v6',sharedGround:true,footpaths:true,agriculturalFringe:true,farmTracks:true,individualPlotDominance:false,
+    version:'village-landscape-v6.1-road-clearance',sharedGround:true,footpaths:true,agriculturalFringe:true,farmTracks:true,individualPlotDominance:false,
     clusterCommons:true,roadFrontageConnections:true,continuousVillageFabric:true,postCollisionPathAnchoring:true,activeRoadNetworkAware:true,
-    archetypeGroundProfiles:true,parishCommon:true,ribbonGroundAxis:true,woodlandPockets:true,archetypePathDensity:true
+    archetypeGroundProfiles:true,parishCommon:true,ribbonGroundAxis:true,woodlandPockets:true,archetypePathDensity:true,roadVegetationClearance:true
   });
   global.drawVillageLandscapeV6=drawVillageLandscapeV6;
   global.__VILLAGE_LANDSCAPE_V6__=api;
   nrts.subsystems.register('village-landscape-v6',api,{
     phase:'architecture-v2',legacyBridge:false,
-    responsibility:'archetype-aware settlement ground with shared household commons, footpaths and agricultural transition'
+    responsibility:'archetype-aware settlement ground with road-cleared crops/vegetation and shared household commons'
   });
 })(window);
