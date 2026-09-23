@@ -147,9 +147,8 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
 
   await page.setViewportSize({ width: 844, height: 390 });
   // PRESERVATION IMPACT: none — Golden-fixture composition only. The production
-  // mobile camera/Pointer Events authority is deliberately untouched. The short
-  // landscape viewport has only ~200px of unobscured battlefield between the HUDs;
-  // use a wider test-only framing so all eight groups and the bridge/chokepoint remain
+  // mobile camera/Pointer Events authority is deliberately untouched. Use a
+  // wider test-only framing so all eight groups and the bridge/chokepoint remain
   // visible instead of allowing the top/bottom formations to sit under the controls.
   const mobileComposition = await page.evaluate(() => {
     const meta = window.__RTS_DEBUG__.northStarScenario();
@@ -172,13 +171,14 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   });
   const mobileHudLayout = await page.evaluate(() => {
     const topbar = document.querySelector('.topbar');
-    const reset = document.getElementById('resetBtn');
+    const bottom = document.querySelector('.bottombar');
+    const menu = document.getElementById('mobileMenuBtn');
     const topbarRect = topbar?.getBoundingClientRect();
-    const resetRect = reset?.getBoundingClientRect();
+    const bottomRect = bottom?.getBoundingClientRect();
     return {
       topbarHeight: topbarRect?.height || 0,
-      topbarCenterY: topbarRect ? topbarRect.top + topbarRect.height / 2 : 0,
-      resetCenterY: resetRect ? resetRect.top + resetRect.height / 2 : 0
+      freeHeight: bottomRect && topbarRect ? bottomRect.top - topbarRect.bottom : 0,
+      menuVisible: menu ? getComputedStyle(menu).display !== 'none' : false
     };
   });
   const mobilePath = path.join(outputDir, 'north-star-visual-mobile-landscape.png');
@@ -222,5 +222,6 @@ test('North Star battle is reproducible and emits desktop/mobile visual baseline
   expect(mobileComposition.zoom).toBe(0.32);
   expect(mobileStableCanvas).toEqual({ width: mobileComposition.width, height: mobileComposition.height });
   expect(mobileHudLayout.topbarHeight).toBeLessThanOrEqual(60);
-  expect(Math.abs(mobileHudLayout.resetCenterY - mobileHudLayout.topbarCenterY)).toBeLessThanOrEqual(2);
+  expect(mobileHudLayout.freeHeight).toBeGreaterThan(240);
+  expect(mobileHudLayout.menuVisible).toBe(true);
 });

@@ -66,6 +66,7 @@ test('phone HUD leaves the central battlefield clear and opens map and menu on d
   const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   await boot(page, { viewport: { width: 844, height: 390 } });
+  await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__?.enabled());
   const layout = await page.evaluate(() => {
     const top = document.querySelector('.topbar').getBoundingClientRect();
     const bottom = document.querySelector('.bottombar').getBoundingClientRect();
