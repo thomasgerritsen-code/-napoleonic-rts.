@@ -9,9 +9,13 @@
   const MUSKET_STANDOFF = 108;
   const ARTILLERY_STANDOFF = 280;
   const COLUMN_TO_LINE_DISTANCE = 260;
+  const PROXIMITY_SCAN_INTERVAL = 1.0;
+  const REORDER_DISTANCE = 45;
   const regimentContacts = new Map();
   const looseContacts = new Map();
   const baseCommanderMilitaryOrder = aiCommanderMilitaryOrderV1;
+  const baseUpdate = typeof update === 'function' ? update : null;
+  let proximityClock = 0;
 
   function distance(a, b) {
     return Math.hypot((a?.x || 0) - (b?.x || 0), (a?.y || 0) - (b?.y || 0));
@@ -91,22 +95,49 @@
     }
   }
 
-  function orderRegimentTowardContact(reg, contact) {
+  function regimentStrategicOrder(reg, center) {
+    return {
+      x: Number.isFinite(reg.targetX) ? reg.targetX : center.x,
+      y: Number.isFinite(reg.targetY) ? reg.targetY : center.y,
+      formation: reg.formation || 'line',
+      facing: Number.isFinite(reg.facing) ? reg.facing : -Math.PI / 2
+    };
+  }
+
+  function orderRegimentTowardContact(reg, contact, captureStrategic) {
     const center = aiRegCenter(reg);
+    const prior = reg.proximityEngagementV1 || null;
+    const resumeOrder = captureStrategic || !prior
+      ? regimentStrategicOrder(reg, center)
+      : prior.resumeOrder;
     const direction = aiDirection(center, contact);
     const formation = contact.distance > COLUMN_TO_LINE_DISTANCE ? 'column' : 'line';
     const target = contact.distance > MUSKET_STANDOFF + 12
       ? aiOffset(contact, direction, -MUSKET_STANDOFF)
       : center;
+    const targetChanged = !prior || prior.targetKey !== contact.key ||
+      distance({ x: reg.targetX, y: reg.targetY }, target) > REORDER_DISTANCE;
+    const formationChanged = !prior || prior.formation !== formation;
 
-    aiOrderReg(reg, target, formation, direction.angle);
+    if (targetChanged || formationChanged || captureStrategic) {
+      aiOrderReg(reg, target, formation, direction.angle);
+    }
     reg.proximityEngagementV1 = {
       targetKey: contact.key,
       targetKind: contact.kind,
       targetId: contact.id,
       distance: Math.round(contact.distance),
-      formation
+      formation,
+      resumeOrder
     };
+  }
+
+  function releaseRegimentContact(reg) {
+    const prior = reg.proximityEngagementV1;
+    if (!prior) return;
+    const resume = prior.resumeOrder;
+    delete reg.proximityEngagementV1;
+    if (resume) aiOrderReg(reg, { x: resume.x, y: resume.y }, resume.formation, resume.facing);
   }
 
   function looseStandoff(unit) {
@@ -116,11 +147,26 @@
     return MUSKET_STANDOFF;
   }
 
-  function orderLooseUnitTowardContact(unit, contact) {
+  function looseStrategicOrder(unit) {
+    return {
+      x: Number.isFinite(unit.targetX) ? unit.targetX : unit.x,
+      y: Number.isFinite(unit.targetY) ? unit.targetY : unit.y,
+      facing: Number.isFinite(unit.facing) ? unit.facing : Math.PI
+    };
+  }
+
+  function orderLooseUnitTowardContact(unit, contact, captureStrategic) {
+    const prior = unit.proximityEngagementV1 || null;
+    const resumeOrder = captureStrategic || !prior ? looseStrategicOrder(unit) : prior.resumeOrder;
     const direction = aiDirection(unit, contact);
     const standoff = looseStandoff(unit);
-    if (contact.distance > standoff + 8) {
-      const target = aiOffset(contact, direction, -standoff);
+    const target = contact.distance > standoff + 8
+      ? aiOffset(contact, direction, -standoff)
+      : { x: unit.x, y: unit.y };
+    const targetChanged = !prior || prior.targetKey !== contact.key ||
+      distance({ x: unit.targetX, y: unit.targetY }, target) > REORDER_DISTANCE;
+
+    if (targetChanged || captureStrategic) {
       unit.targetX = Math.max(20, Math.min(WORLD.width - 20, target.x));
       unit.targetY = Math.max(20, Math.min(WORLD.height - 20, target.y));
       unit.task = null;
@@ -132,28 +178,41 @@
       targetKind: contact.kind,
       targetId: contact.id,
       distance: Math.round(contact.distance),
-      standoff
+      standoff,
+      resumeOrder
     };
   }
 
-  function clearResponseState(regs, loose) {
+  function releaseLooseContact(unit) {
+    const prior = unit.proximityEngagementV1;
+    if (!prior) return;
+    const resume = prior.resumeOrder;
+    delete unit.proximityEngagementV1;
+    if (!resume) return;
+    unit.targetX = resume.x;
+    unit.targetY = resume.y;
+    unit.facing = resume.facing;
+  }
+
+  function clearResponseState(regs, loose, restoreOrders = true) {
     regimentContacts.clear();
     looseContacts.clear();
-    regs.forEach(reg => { delete reg.proximityEngagementV1; });
-    loose.forEach(unit => { delete unit.proximityEngagementV1; });
+    regs.forEach(reg => restoreOrders ? releaseRegimentContact(reg) : delete reg.proximityEngagementV1);
+    loose.forEach(unit => restoreOrders ? releaseLooseContact(unit) : delete unit.proximityEngagementV1);
     AI_COMMANDER_V1.localContacts = 0;
     AI_COMMANDER_V1.localRegimentContacts = 0;
     AI_COMMANDER_V1.localLooseContacts = 0;
   }
 
-  function applyLocalContactResponse() {
+  function applyLocalContactResponse(options = {}) {
+    const captureStrategic = Boolean(options.captureStrategic);
     const regs = aiRegs();
     const loose = looseBritishCombatUnits();
     clearStaleContacts(regimentContacts, new Set(regs.map(reg => reg.id)));
     clearStaleContacts(looseContacts, new Set(loose.map(unit => unit.id)));
 
     if (AI_COMMANDER_V1.state === 'RETREAT') {
-      clearResponseState(regs, loose);
+      clearResponseState(regs, loose, !captureStrategic);
       return 0;
     }
 
@@ -165,10 +224,11 @@
     for (const reg of regs) {
       const contact = contactForRegiment(reg, candidates);
       if (!contact) {
-        delete reg.proximityEngagementV1;
+        if (!captureStrategic) releaseRegimentContact(reg);
+        else delete reg.proximityEngagementV1;
         continue;
       }
-      orderRegimentTowardContact(reg, contact);
+      orderRegimentTowardContact(reg, contact, captureStrategic);
       engagedRegiments++;
       nearestDistance = Math.min(nearestDistance, contact.distance);
     }
@@ -176,10 +236,11 @@
     for (const unit of loose) {
       const contact = contactForPoint(looseContacts, unit.id, unit, candidates);
       if (!contact) {
-        delete unit.proximityEngagementV1;
+        if (!captureStrategic) releaseLooseContact(unit);
+        else delete unit.proximityEngagementV1;
         continue;
       }
-      orderLooseUnitTowardContact(unit, contact);
+      orderLooseUnitTowardContact(unit, contact, captureStrategic);
       engagedLoose++;
       nearestDistance = Math.min(nearestDistance, contact.distance);
     }
@@ -191,7 +252,7 @@
     if (engaged) {
       const parts = [];
       if (engagedRegiments) parts.push(`${engagedRegiments} regiment${engagedRegiments === 1 ? '' : 'en'}`);
-      if (engagedLoose) parts.push(`${engagedLoose} losse eenheid${engagedLoose === 1 ? '' : 'heden'}`);
+      if (engagedLoose) parts.push(engagedLoose === 1 ? '1 losse eenheid' : `${engagedLoose} losse eenheden`);
       aiPlan = `Commandant: lokaal contact · ${parts.join(' + ')} reageert · dichtstbij ${Math.round(nearestDistance)}m`;
     }
     return engaged;
@@ -199,18 +260,33 @@
 
   aiCommanderMilitaryOrderV1 = function aiCommanderMilitaryOrderWithProximityV1() {
     const result = baseCommanderMilitaryOrder();
-    applyLocalContactResponse();
+    applyLocalContactResponse({ captureStrategic: true });
     return result;
   };
 
+  if (baseUpdate) {
+    update = function updateWithProximityEngagementV1(dt) {
+      const result = baseUpdate(dt);
+      if (!gameOver) {
+        proximityClock += Math.max(0, Number(dt) || 0);
+        if (proximityClock >= PROXIMITY_SCAN_INTERVAL) {
+          proximityClock %= PROXIMITY_SCAN_INTERVAL;
+          applyLocalContactResponse();
+        }
+      }
+      return result;
+    };
+  }
+
   const api = Object.freeze({
-    version: 'ai-proximity-engagement-v1.1',
+    version: 'ai-proximity-engagement-v1.2',
     config: Object.freeze({
       contactEnterRadius: CONTACT_ENTER_RADIUS,
       contactExitRadius: CONTACT_EXIT_RADIUS,
       musketStandoff: MUSKET_STANDOFF,
       artilleryStandoff: ARTILLERY_STANDOFF,
-      columnToLineDistance: COLUMN_TO_LINE_DISTANCE
+      columnToLineDistance: COLUMN_TO_LINE_DISTANCE,
+      scanInterval: PROXIMITY_SCAN_INTERVAL
     }),
     apply: applyLocalContactResponse,
     state() {
@@ -249,6 +325,6 @@
   global.NRTS?.subsystems.register('ai-proximity-engagement', api, {
     phase: 'architecture-v2',
     legacyBridge: false,
-    responsibility: 'local British troop reaction when French combat troops enter contact radius'
+    responsibility: 'responsive local British troop reaction when French combat troops enter contact radius'
   });
 })(window);
