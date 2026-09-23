@@ -132,3 +132,58 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
   .army-counts { gap: 0; font-size: .58rem; }
   .build-hint { top: 50px; padding: 5px 8px; font-size: .66rem; }
 }
+
+/* Mobile landscape HUD v2: preserve the selected unit and commands while giving
+   the battlefield back vertical space. Secondary diagnostics stay available on
+   larger layouts; command overflow becomes a horizontal touch strip. The important
+   row geometry intentionally wins over the later runtime mobile-presentation style. */
+@media (orientation: landscape) and (max-height: 480px) and (max-width: 960px) {
+  .bottombar {
+    height: 50px !important;
+    min-height: 50px !important;
+    max-height: 50px !important;
+    padding: 3px 5px;
+    grid-template-columns: minmax(82px, .9fr) minmax(0, 4.1fr) !important;
+    grid-template-rows: 44px !important;
+    align-items: center;
+    gap: 4px !important;
+    overflow: hidden;
+  }
+  .selection-panel {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .selection-panel .label,
+  #selectionDetails,
+  .army-counts { display: none; }
+  .selection-panel strong {
+    font-size: .66rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .actions {
+    height: 44px;
+    max-height: 44px;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0 !important;
+  }
+  .actions::-webkit-scrollbar { display: none; }
+  .actions button {
+    flex: 0 0 auto;
+    min-width: 62px;
+    max-width: none;
+    height: 44px;
+    min-height: 44px;
+    padding: 3px 5px;
+    white-space: nowrap;
+  }
+}
