@@ -178,6 +178,10 @@
     }
     return best&&bestDistance<=baseVillageSearchRadius?best:null;
   }
+  function villageEdgeDistance(anchor,x,y){
+    if(!anchor)return null;
+    return Math.max(0,Math.hypot(x-anchor.x,y-anchor.y)-anchor.radius);
+  }
   function localBerryNodes(tc){
     return resources.filter(r=>r&&!r.dead&&r.amount>0&&r.type==='food'&&
       r.localVillageBerry===true&&r.homeSide===tc.side&&
@@ -245,6 +249,7 @@
         count:local.length,
         insideVillageCount:local.filter(r=>insideVillage(r.x,r.y)).length,
         maxVillageDistance:anchor&&local.length?Math.max(...local.map(r=>Math.hypot(r.x-anchor.x,r.y-anchor.y))):null,
+        maxVillageEdgeDistance:anchor&&local.length?Math.max(...local.map(r=>villageEdgeDistance(anchor,r.x,r.y))):null,
         maxTownDistance:local.length?Math.max(...local.map(r=>Math.hypot(r.x-tc.x,r.y-tc.y))):null,
         roadConflicts:local.filter(r=>roadConflictAt(r.x,r.y,resourceRadius('food')+7,roadPadding)).length,
         buildingConflicts:local.filter(r=>buildingConflict('food',r.x,r.y)).length,
