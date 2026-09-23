@@ -21,26 +21,6 @@ test('British regiments react to nearby French troops with stable contact hyster
     }
     for (const reg of regiments) reg.destroyed = true;
 
-    function makeRegimentAt(side, x, y) {
-      const candidates = [];
-      for (let i = 0; i < 12; i++) {
-        const unit = createUnit(side, 'infantry', x + (i % 6) * 8, y + Math.floor(i / 6) * 8);
-        candidates.push(unit);
-      }
-      candidates.push(createUnit(side, 'officer', x, y + 22));
-      candidates.push(createUnit(side, 'drummer', x - 14, y + 22));
-      const reg = createRegiment(side, candidates);
-      for (const unit of regimentMembers(reg)) {
-        unit.x += x - centroid(regimentMembers(reg)).x;
-        unit.y += y - centroid(regimentMembers(reg)).y;
-        unit.targetX = unit.x;
-        unit.targetY = unit.y;
-      }
-      reg.targetX = x;
-      reg.targetY = y;
-      return reg;
-    }
-
     function placeRegiment(reg, x, y) {
       const members = regimentMembers(reg);
       const center = centroid(members);
@@ -54,6 +34,18 @@ test('British regiments react to nearby French troops with stable contact hyster
       }
       reg.targetX = x;
       reg.targetY = y;
+    }
+
+    function makeRegimentAt(side, x, y) {
+      const candidates = [];
+      for (let i = 0; i < 12; i++) {
+        candidates.push(createUnit(side, 'infantry', x + (i % 6) * 8, y + Math.floor(i / 6) * 8));
+      }
+      candidates.push(createUnit(side, 'officer', x, y + 22));
+      candidates.push(createUnit(side, 'drummer', x - 14, y + 22));
+      const reg = createRegiment(side, candidates);
+      placeRegiment(reg, x, y);
+      return reg;
     }
 
     const british = makeRegimentAt('britain', 1900, 900);
