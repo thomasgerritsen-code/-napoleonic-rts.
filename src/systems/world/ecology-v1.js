@@ -12,6 +12,11 @@
   const relocationStep=cfg.relocationStep ?? 22;
   const relocationRings=cfg.relocationRings ?? 18;
   const berryVillagePadding=villageCfg.berryExclusionPadding ?? 70;
+  const baseVillageBerryMin=villageCfg.baseBerryMin ?? 5;
+  const baseVillageBerryRadius=villageCfg.baseBerryRadius ?? 220;
+  const baseVillageBerryTownRadius=villageCfg.baseBerryTownRadius ?? 380;
+  const baseVillageSearchRadius=villageCfg.baseVillageSearchRadius ?? 460;
+  const baseVillageBerryAmount=villageCfg.baseBerryAmount ?? 360;
   const roadPadding=cfg.roadPadding ?? 8;
 
   function villageData(){
@@ -97,7 +102,6 @@
     const rr=resourceRadius(type);
     if(x<rr+16||y<rr+16||x>WORLD.width-rr-16||y>WORLD.height-rr-16)return false;
     if(roadConflict(type,x,y)||buildingConflict(type,x,y)||villageHouseConflict(type,x,y))return false;
-    if(type==='food'&&insideVillage(x,y))return false;
     return !resourceConflict(type,x,y,ignore);
   }
   function deterministicPhase(type,x,y){
@@ -118,18 +122,20 @@
     }
     return null;
   }
+  function stampResource(r,type,extra=null){
+    if(!r)return null;
+    r.radius=resourceRadius(type);
+    r.visualKind=type==='food'?'berry-bush':'deciduous-tree';
+    r.ecologyV1=true;
+    if(extra)Object.assign(r,extra);
+    return r;
+  }
 
   const previousCreateResource=createResource;
   createResource=function createResourceEcologyV1(type,x,y,amount){
     const safe=nearestEcologySpot(type,x,y,null);
     if(!safe)return null;
-    const r=previousCreateResource(type,safe.x,safe.y,amount);
-    if(r){
-      r.radius=resourceRadius(type);
-      r.visualKind=type==='food'?'berry-bush':'deciduous-tree';
-      r.ecologyV1=true;
-    }
-    return r;
+    return stampResource(previousCreateResource(type,safe.x,safe.y,amount),type);
   };
 
   // Initial resources are generated before Architecture-v2 world systems load. Normalize
@@ -145,13 +151,89 @@
       if(startedOnRoad)roadRelocated++;
     }
     r.x=safe.x;r.y=safe.y;
-    r.radius=resourceRadius(r.type);
-    r.visualKind=r.type==='food'?'berry-bush':'deciduous-tree';
-    r.ecologyV1=true;
+    stampResource(r,r.type);
+  }
+
+  function townCenters(){
+    return buildings.filter(b=>b&&!b.dead&&b.complete&&b.type==='towncenter');
+  }
+  function nearestVillageForTownCenter(tc){
+    let best=null,bestDistance=Infinity;
+    for(const village of villageData()){
+      const e=villageEnvelope(village);
+      const d=Math.hypot(e.x-tc.x,e.y-tc.y);
+      if(d<bestDistance){bestDistance=d;best={village,x:e.x,y:e.y,distance:d};}
+    }
+    return best&&bestDistance<=baseVillageSearchRadius?best:null;
+  }
+  function localBerryNodes(tc,anchor){
+    return resources.filter(r=>r&&!r.dead&&r.amount>0&&r.type==='food'&&
+      Math.hypot(r.x-anchor.x,r.y-anchor.y)<=baseVillageBerryRadius&&
+      Math.hypot(r.x-tc.x,r.y-tc.y)<=baseVillageBerryTownRadius);
+  }
+  function localBerryCandidate(tc,anchor,ordinal){
+    const phase=deterministicPhase('food',anchor.x+tc.x+ordinal*17,anchor.y+tc.y-ordinal*13);
+    const radii=[105,130,155,180,205,220];
+    for(let ring=0;ring<radii.length;ring++){
+      const radius=radii[ring],steps=18;
+      for(let step=0;step<steps;step++){
+        const a=phase+(step+ordinal*3)/steps*Math.PI*2;
+        const x=anchor.x+Math.cos(a)*radius,y=anchor.y+Math.sin(a)*radius;
+        if(Math.hypot(x-tc.x,y-tc.y)>baseVillageBerryTownRadius)continue;
+        if(validResourceSpot('food',x,y,null))return{x,y};
+      }
+    }
+    return null;
+  }
+  function ensureBaseVillageBerries(){
+    let added=0;
+    for(const tc of townCenters()){
+      const anchor=nearestVillageForTownCenter(tc);
+      if(!anchor)continue;
+      let local=localBerryNodes(tc,anchor);
+      for(let ordinal=local.length;ordinal<baseVillageBerryMin;ordinal++){
+        const spot=localBerryCandidate(tc,anchor,ordinal);
+        if(!spot)break;
+        const r=stampResource(previousCreateResource('food',spot.x,spot.y,baseVillageBerryAmount),'food',{
+          localVillageBerry:true,
+          homeSide:tc.side,
+          villageName:anchor.village?.name||null
+        });
+        if(!r)break;
+        added++;
+        local=localBerryNodes(tc,anchor);
+        if(local.length>=baseVillageBerryMin)break;
+      }
+    }
+    return added;
+  }
+  function baseVillageBerryStats(){
+    return townCenters().map(tc=>{
+      const anchor=nearestVillageForTownCenter(tc);
+      if(!anchor)return{side:tc.side,villageName:null,count:0,maxVillageDistance:null,maxTownDistance:null};
+      const local=localBerryNodes(tc,anchor);
+      return{
+        side:tc.side,
+        villageName:anchor.village?.name||null,
+        count:local.length,
+        maxVillageDistance:local.length?Math.max(...local.map(r=>Math.hypot(r.x-anchor.x,r.y-anchor.y))):null,
+        maxTownDistance:local.length?Math.max(...local.map(r=>Math.hypot(r.x-tc.x,r.y-tc.y))):null
+      };
+    });
+  }
+
+  const addedInitialBaseVillageBerries=ensureBaseVillageBerries();
+  const previousCreateResourceClusters=typeof createResourceClusters==='function'?createResourceClusters:null;
+  if(previousCreateResourceClusters){
+    createResourceClusters=function createResourceClustersEcologyV1(){
+      const result=previousCreateResourceClusters();
+      ensureBaseVillageBerries();
+      return result;
+    };
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.1-road-clearance',
+    version:'battlefield-ecology-v1.2-base-village-berries',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
@@ -164,13 +246,20 @@
     relocatedInitial:relocated,
     relocatedFromRoad:roadRelocated,
     removedInitial:removed,
-    berryVillageExclusion:true,
+    berryVillageExclusion:false,
+    berryVillageAccess:true,
+    baseVillageBerryMin,
+    baseVillageBerryRadius,
+    baseVillageBerryTownRadius,
+    addedInitialBaseVillageBerries,
+    ensureBaseVillageBerries,
+    baseVillageBerryStats,
     resourceBuildingExclusion:true,
     resourceRoadExclusion:true
   });
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'collision-safe tree and berry placement with building, village and road exclusion'
+    responsibility:'collision-safe tree and berry placement with local base-village berry access plus building and road exclusion'
   });
 })(window);
