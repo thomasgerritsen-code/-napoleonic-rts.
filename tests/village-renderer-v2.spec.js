@@ -117,7 +117,7 @@ test('Village V6 uses hierarchy, archetypes, shared landscape and collision-safe
   expect(result.yardBlend.sharedHouseholdBlend).toBe(true);
   expect(result.yardBlend.sharedBoundarySuppression).toBe(true);
 
-  expect(result.landscape.version).toBe('village-landscape-v6');
+  expect(result.landscape.version).toBe('village-landscape-v6.1-road-clearance');
   expect(result.landscape.sharedGround).toBe(true);
   expect(result.landscape.footpaths).toBe(true);
   expect(result.landscape.agriculturalFringe).toBe(true);
@@ -132,6 +132,7 @@ test('Village V6 uses hierarchy, archetypes, shared landscape and collision-safe
   expect(result.landscape.ribbonGroundAxis).toBe(true);
   expect(result.landscape.woodlandPockets).toBe(true);
   expect(result.landscape.archetypePathDensity).toBe(true);
+  expect(result.landscape.roadVegetationClearance).toBe(true);
 
   expect(result.sharedGroupCount).toBeGreaterThan(result.layout.villageCount);
   expect(result.pairedSharedGroupCount).toBeGreaterThanOrEqual(result.layout.villageCount*3);
