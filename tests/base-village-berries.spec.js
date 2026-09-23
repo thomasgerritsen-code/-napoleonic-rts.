@@ -8,7 +8,7 @@ async function readBerryAccess(page) {
       enabled: ecology?.berryVillageAccess === true,
       exclusion: ecology?.berryVillageExclusion,
       min: ecology?.baseVillageBerryMin || 0,
-      radius: ecology?.baseVillageBerryRadius || 0,
+      edgeRadius: ecology?.baseVillageBerryRadius || 0,
       townRadius: ecology?.baseVillageBerryTownRadius || 0,
       stats: ecology?.baseVillageBerryStats?.() || []
     };
@@ -17,23 +17,24 @@ async function readBerryAccess(page) {
 
 function expectSafeLocalBerries(state) {
   expect(state.enabled).toBe(true);
-  expect(state.exclusion).toBe(false);
+  expect(state.exclusion).toBe(true);
   expect(state.stats).toHaveLength(2);
   for (const base of state.stats) {
     expect(base.count).toBeGreaterThanOrEqual(state.min);
-    expect(base.maxVillageDistance).not.toBeNull();
+    expect(base.insideVillageCount).toBe(0);
+    expect(base.maxVillageEdgeDistance).not.toBeNull();
     expect(base.maxTownDistance).not.toBeNull();
-    expect(base.maxVillageDistance).toBeLessThanOrEqual(state.radius + 0.01);
+    expect(base.maxVillageEdgeDistance).toBeLessThanOrEqual(state.edgeRadius + 0.01);
     expect(base.maxTownDistance).toBeLessThanOrEqual(state.townRadius + 0.01);
   }
 }
 
-test('both starting bases keep safe berry bushes close to their linked village', async ({ page }) => {
+test('both starting bases keep safe berry bushes just outside their linked village', async ({ page }) => {
   await page.goto('/?test');
   await page.waitForFunction(() => window.__BATTLEFIELD_ECOLOGY_V1__?.baseVillageBerryStats);
 
   const initial = await readBerryAccess(page);
-  expect(initial.version).toContain('base-village-berries');
+  expect(initial.version).toContain('base-village-berry-ring');
   expectSafeLocalBerries(initial);
 
   await page.locator('#resetBtn').click();
