@@ -116,6 +116,7 @@
     const style = document.createElement('style');
     style.id = 'mobile-playability-v1-style';
     style.textContent = `
+      .mobile-chrome-button{display:none}
       #mobileGestureHint{display:none;position:fixed;z-index:19;left:50%;transform:translateX(-50%);padding:6px 10px;border-radius:999px;background:rgba(16,20,17,.88);border:1px solid rgba(245,241,232,.2);color:#f5f1e8;font:650 12px/1.2 system-ui,sans-serif;pointer-events:none;white-space:nowrap}
       #mobileRotateHint{display:none;position:fixed;z-index:18;top:50%;left:50%;transform:translate(-50%,-50%);max-width:260px;padding:10px 14px;border-radius:10px;background:rgba(16,20,17,.92);border:1px solid rgba(244,216,109,.45);color:#f5f1e8;font:650 13px/1.35 system-ui,sans-serif;text-align:center;pointer-events:none}
       @media (pointer:coarse),(max-width:860px){
@@ -133,6 +134,31 @@
         .selection-panel strong{font-size:.7rem}.selection-panel .label{font-size:.56rem}#selectionDetails{font-size:.57rem}
       }
       @media (pointer:coarse) and (orientation:portrait) and (max-width:700px){#mobileRotateHint{display:block}.bottombar{grid-template-columns:1fr}.army-counts{display:none}.actions{justify-content:flex-start}.selection-panel{max-height:48px}}
+      @media (pointer:coarse),(max-width:860px){
+        .topbar{top:max(4px,env(safe-area-inset-top));left:max(4px,env(safe-area-inset-left));right:max(4px,env(safe-area-inset-right));min-height:44px;height:44px;padding:3px 5px;display:flex;gap:4px}
+        .topbar .brand,.topbar #status{display:none}
+        .topbar .resources{display:flex;flex:1 1 auto;min-width:0;grid-column:auto;grid-row:auto;gap:2px;overflow:hidden;justify-content:flex-start;font-size:clamp(.59rem,2.7vw,.76rem)}
+        .topbar .resources span{padding:4px 3px;white-space:nowrap}
+        .topbar #resetBtn,.topbar #renderModeBtn{display:none}
+        .topbar button.mobile-chrome-button{display:block;flex:0 0 auto;min-width:44px;min-height:44px;padding:3px 6px;font-size:.7rem}
+        body.mobile-menu-open .topbar #resetBtn,body.mobile-menu-open .topbar #renderModeBtn{display:block;position:fixed;top:calc(max(4px,env(safe-area-inset-top)) + 49px);right:max(4px,env(safe-area-inset-right));min-width:110px;min-height:44px;background:#202720;z-index:31}
+        body.mobile-menu-open .topbar #renderModeBtn{right:calc(max(4px,env(safe-area-inset-right)) + 114px)}
+        .bottombar{bottom:max(4px,env(safe-area-inset-bottom));left:max(4px,env(safe-area-inset-left));transform:none;width:calc(100% - max(4px,env(safe-area-inset-left)) - max(4px,env(safe-area-inset-right)));min-height:0;padding:3px 5px;display:grid;grid-template-columns:minmax(0,1fr);gap:2px}
+        .selection-panel{max-height:27px;display:block;overflow:hidden;white-space:nowrap}
+        .selection-panel .label,#selectionDetails,.army-counts{display:none}
+        .selection-panel strong{display:block;font-size:.72rem;line-height:25px;margin:0}
+        .actions{min-width:0;max-width:100%;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;gap:4px;scrollbar-width:thin;touch-action:pan-x}
+        .actions button{flex:0 0 auto;min-width:58px;min-height:44px;font-size:.65rem;padding:3px 6px}
+        #minimap{display:none;right:max(5px,env(safe-area-inset-right));bottom:calc(max(4px,env(safe-area-inset-bottom)) + 84px);width:150px;height:88px}
+        body.mobile-map-open #minimap{display:block}
+        .village-identity-3d{display:none}
+        .production-queue{right:max(5px,env(safe-area-inset-right));bottom:calc(max(4px,env(safe-area-inset-bottom)) + 84px);width:min(190px,45vw);max-height:94px;padding:5px;font-size:.65rem}
+        .production-queue .rally-line,.production-queue li.empty{display:none}
+        #mobileGestureHint{display:none;bottom:calc(max(4px,env(safe-area-inset-bottom)) + 85px);max-width:calc(100vw - 16px);overflow:hidden;text-overflow:ellipsis;font-size:.65rem}
+        #mobileGestureHint.visible{display:block}
+        #mobileRotateHint{display:none !important}
+        .build-hint{top:calc(max(4px,env(safe-area-inset-top)) + 48px);max-width:calc(100vw - 12px);white-space:nowrap;font-size:.65rem}
+      }
     `;
     document.head.appendChild(style);
     const hint = document.createElement('div');
@@ -144,12 +170,34 @@
     rotate.id = 'mobileRotateHint';
     rotate.textContent = 'Landscape geeft de beste slagveldweergave. Portrait blijft speelbaar.';
     document.body.appendChild(rotate);
+    const topbar = document.querySelector('.topbar');
+    for (const [id, label, className] of [
+      ['mobileMapBtn', 'Kaart', 'mobile-map-open'],
+      ['mobileMenuBtn', 'Menu', 'mobile-menu-open']
+    ]) {
+      const button = document.createElement('button');
+      button.id = id;
+      button.type = 'button';
+      button.className = 'mobile-chrome-button';
+      button.textContent = label;
+      button.setAttribute('aria-pressed', 'false');
+      button.addEventListener('click', () => {
+        const open = document.body.classList.toggle(className);
+        button.setAttribute('aria-pressed', String(open));
+      });
+      topbar.appendChild(button);
+    }
   }
   injectMobilePresentation();
 
+  let hintTimeout;
   function hint(text) {
     const el = document.getElementById('mobileGestureHint');
-    if (el) el.textContent = text;
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('visible');
+    clearTimeout(hintTimeout);
+    hintTimeout = setTimeout(() => el.classList.remove('visible'), 2200);
   }
   function touchHitAt(clientX, clientY) {
     const w = screenToWorld(clientX, clientY);

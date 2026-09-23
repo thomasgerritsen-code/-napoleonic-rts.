@@ -51,6 +51,9 @@ let cameraAzimuth = 0;
 let renderFrame = 0;
 let lastSnapshot = null;
 let rightDrag = null;
+const touchPointers = new Map();
+let touchGesture = null;
+let suppressTouchTap = false;
 let lastResourceSignature = '';
 
 const colors = {
@@ -425,6 +428,91 @@ function selectUnitFromEvent(event) {
   if (ok) source.setStatus('3D: regiment geselecteerd. Rechtsklik op het terrein om te bewegen.');
   return ok;
 }
+
+function selectTouchTarget(event) {
+  // Mesh ray hits require pixel-perfect taps. Use a screen-space radius for fingers.
+  const state = source.snapshot();
+  let closest = null;
+  let distance = 30;
+  for (const unit of state?.units || []) {
+    if (unit.side !== 'france') continue;
+    const projected = new THREE.Vector3(unit.x, hillHeightAt(unit.x, unit.y) + 8, unit.y).project(camera3d);
+    if (projected.z < -1 || projected.z > 1) continue;
+    const x = (projected.x + 1) * canvas.clientWidth / 2;
+    const y = (1 - projected.y) * canvas.clientHeight / 2;
+    const d = Math.hypot(x - event.clientX, y - event.clientY);
+    if (d < distance) { closest = unit; distance = d; }
+  }
+  if (!closest) return false;
+  if (closest.regimentId) return source.dispatch({ type: 'select-group', id: closest.regimentId });
+  return source.dispatch({ type: 'select-point', x: closest.x, y: closest.y });
+}
+
+function touchPair() {
+  const [a, b] = [...touchPointers.values()];
+  if (!a || !b) return null;
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, distance: Math.hypot(a.x - b.x, a.y - b.y) };
+}
+
+canvas.addEventListener('pointerdown', event => {
+  if (!enabled || event.pointerType !== 'touch') return;
+  event.preventDefault();
+  canvas.setPointerCapture(event.pointerId);
+  touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY, sx: event.clientX, sy: event.clientY, moved: false });
+  if (touchPointers.size === 2) {
+    const pair = touchPair();
+    touchGesture = { ...pair, zoom: cameraDistance, anchor: groundPointFromEvent({ clientX: pair.x, clientY: pair.y }) };
+    suppressTouchTap = true;
+  }
+});
+canvas.addEventListener('pointermove', event => {
+  if (!enabled || event.pointerType !== 'touch') return;
+  const point = touchPointers.get(event.pointerId);
+  if (!point) return;
+  event.preventDefault();
+  point.x = event.clientX; point.y = event.clientY;
+  if (Math.hypot(point.x - point.sx, point.y - point.sy) > 12) point.moved = true;
+  const pair = touchPair();
+  if (!pair || !touchGesture) return;
+  cameraDistance = THREE.MathUtils.clamp(touchGesture.zoom * touchGesture.distance / Math.max(8, pair.distance), 280, 1500);
+  updateCamera();
+  const ground = groundPointFromEvent({ clientX: pair.x, clientY: pair.y });
+  if (ground && touchGesture.anchor) {
+    source.panCamera(touchGesture.anchor.x - ground.x, touchGesture.anchor.y - ground.y);
+    updateCamera();
+  }
+});
+canvas.addEventListener('pointerup', event => {
+  if (!enabled || event.pointerType !== 'touch') return;
+  const point = touchPointers.get(event.pointerId);
+  if (!point) return;
+  event.preventDefault();
+  const wasMulti = suppressTouchTap;
+  touchPointers.delete(event.pointerId);
+  if (touchPointers.size < 2) touchGesture = null;
+  if (!touchPointers.size) suppressTouchTap = false;
+  if (wasMulti) return;
+  if (point.moved) {
+    const start = groundPointFromEvent({ clientX: point.sx, clientY: point.sy });
+    const end = groundPointFromEvent(event);
+    if (start && end && source.snapshot()?.selection?.unitIds?.length) {
+      source.dispatch({ type: 'move', x: start.x, y: start.y, facing: Math.atan2(end.y - start.y, end.x - start.x) });
+    }
+  } else if (!selectTouchTarget(event)) {
+    const ground = groundPointFromEvent(event);
+    if (ground) {
+      // A building can be selected; otherwise a selected unit receives a move order.
+      const building = source.snapshot()?.buildings?.find(b => b.side === 'france' && Math.hypot(b.x - ground.x, b.y - ground.y) < 28);
+      if (building) source.dispatch({ type: 'select-point', x: building.x, y: building.y });
+      else if (source.snapshot()?.selection?.unitIds?.length) source.dispatch({ type: 'move', ...ground });
+    }
+  }
+});
+canvas.addEventListener('pointercancel', event => {
+  touchPointers.delete(event.pointerId);
+  if (touchPointers.size < 2) touchGesture = null;
+  if (!touchPointers.size) suppressTouchTap = false;
+});
 
 canvas.addEventListener('mousedown', event => {
   if (!enabled) return;

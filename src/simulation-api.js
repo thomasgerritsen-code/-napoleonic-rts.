@@ -188,6 +188,10 @@ function dispatchSimulationCommandV062(command) {
       const reg = getRegiment(command.id); if (!reg) return false;
       selectWholeRegiment(reg); updateHud(true); return true;
     }
+    case 'select-point':
+      if (!Number.isFinite(command.x) || !Number.isFinite(command.y)) return false;
+      selectPoint(command.x, command.y, false);
+      return true;
     default: return false;
   }
 }
