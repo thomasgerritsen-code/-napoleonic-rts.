@@ -13,8 +13,8 @@
   const relocationRings=cfg.relocationRings ?? 18;
   const berryVillagePadding=villageCfg.berryExclusionPadding ?? 70;
   const baseVillageBerryMin=villageCfg.baseBerryMin ?? 5;
-  const baseVillageBerryRadius=villageCfg.baseBerryRadius ?? 220;
-  const baseVillageBerryTownRadius=villageCfg.baseBerryTownRadius ?? 380;
+  const baseVillageBerryRadius=villageCfg.baseBerryRadius ?? 190;
+  const baseVillageBerryTownRadius=villageCfg.baseBerryTownRadius ?? 560;
   const baseVillageSearchRadius=villageCfg.baseVillageSearchRadius ?? 460;
   const baseVillageBerryAmount=villageCfg.baseBerryAmount ?? 360;
   const roadPadding=cfg.roadPadding ?? 8;
@@ -102,6 +102,7 @@
     const rr=resourceRadius(type);
     if(x<rr+16||y<rr+16||x>WORLD.width-rr-16||y>WORLD.height-rr-16)return false;
     if(roadConflict(type,x,y)||buildingConflict(type,x,y)||villageHouseConflict(type,x,y))return false;
+    if(type==='food'&&insideVillage(x,y))return false;
     return !resourceConflict(type,x,y,ignore);
   }
   function deterministicPhase(type,x,y){
@@ -162,22 +163,29 @@
     for(const village of villageData()){
       const e=villageEnvelope(village);
       const d=Math.hypot(e.x-tc.x,e.y-tc.y);
-      if(d<bestDistance){bestDistance=d;best={village,x:e.x,y:e.y,distance:d};}
+      if(d<bestDistance){bestDistance=d;best={village,x:e.x,y:e.y,radius:e.radius,distance:d};}
     }
     return best&&bestDistance<=baseVillageSearchRadius?best:null;
   }
+  function villageEdgeDistance(anchor,x,y){
+    return Math.max(0,Math.hypot(x-anchor.x,y-anchor.y)-anchor.radius);
+  }
   function localBerryNodes(tc,anchor){
     return resources.filter(r=>r&&!r.dead&&r.amount>0&&r.type==='food'&&
-      Math.hypot(r.x-anchor.x,r.y-anchor.y)<=baseVillageBerryRadius&&
+      !insideVillage(r.x,r.y)&&
+      villageEdgeDistance(anchor,r.x,r.y)<=baseVillageBerryRadius&&
       Math.hypot(r.x-tc.x,r.y-tc.y)<=baseVillageBerryTownRadius);
   }
   function localBerryCandidate(tc,anchor,ordinal){
     const phase=deterministicPhase('food',anchor.x+tc.x+ordinal*17,anchor.y+tc.y-ordinal*13);
-    const radii=[105,130,155,180,205,220];
-    for(let ring=0;ring<radii.length;ring++){
-      const radius=radii[ring],steps=18;
+    const rr=resourceRadius('food');
+    const inner=anchor.radius+rr+Math.max(10,resourceGap);
+    const outer=anchor.radius+baseVillageBerryRadius;
+    const ringStep=Math.max(26,rr+resourceGap+4);
+    for(let radius=inner,ring=0;radius<=outer+.01;radius+=ringStep,ring++){
+      const steps=48+ring*8;
       for(let step=0;step<steps;step++){
-        const a=phase+(step+ordinal*3)/steps*Math.PI*2;
+        const a=phase+(step+ordinal*5)/steps*Math.PI*2;
         const x=anchor.x+Math.cos(a)*radius,y=anchor.y+Math.sin(a)*radius;
         if(Math.hypot(x-tc.x,y-tc.y)>baseVillageBerryTownRadius)continue;
         if(validResourceSpot('food',x,y,null))return{x,y};
@@ -191,18 +199,20 @@
       const anchor=nearestVillageForTownCenter(tc);
       if(!anchor)continue;
       let local=localBerryNodes(tc,anchor);
-      for(let ordinal=local.length;ordinal<baseVillageBerryMin;ordinal++){
+      let attempts=0;
+      while(local.length<baseVillageBerryMin&&attempts<baseVillageBerryMin*3){
+        const ordinal=local.length+attempts;
         const spot=localBerryCandidate(tc,anchor,ordinal);
-        if(!spot)break;
+        attempts++;
+        if(!spot)continue;
         const r=stampResource(previousCreateResource('food',spot.x,spot.y,baseVillageBerryAmount),'food',{
           localVillageBerry:true,
           homeSide:tc.side,
           villageName:anchor.village?.name||null
         });
-        if(!r)break;
+        if(!r)continue;
         added++;
         local=localBerryNodes(tc,anchor);
-        if(local.length>=baseVillageBerryMin)break;
       }
     }
     return added;
@@ -210,13 +220,14 @@
   function baseVillageBerryStats(){
     return townCenters().map(tc=>{
       const anchor=nearestVillageForTownCenter(tc);
-      if(!anchor)return{side:tc.side,villageName:null,count:0,maxVillageDistance:null,maxTownDistance:null};
+      if(!anchor)return{side:tc.side,villageName:null,count:0,insideVillageCount:0,maxVillageEdgeDistance:null,maxTownDistance:null};
       const local=localBerryNodes(tc,anchor);
       return{
         side:tc.side,
         villageName:anchor.village?.name||null,
         count:local.length,
-        maxVillageDistance:local.length?Math.max(...local.map(r=>Math.hypot(r.x-anchor.x,r.y-anchor.y))):null,
+        insideVillageCount:local.filter(r=>insideVillage(r.x,r.y)).length,
+        maxVillageEdgeDistance:local.length?Math.max(...local.map(r=>villageEdgeDistance(anchor,r.x,r.y))):null,
         maxTownDistance:local.length?Math.max(...local.map(r=>Math.hypot(r.x-tc.x,r.y-tc.y))):null
       };
     });
@@ -233,7 +244,7 @@
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.2-base-village-berries',
+    version:'battlefield-ecology-v1.3-base-village-berry-ring',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
@@ -246,7 +257,7 @@
     relocatedInitial:relocated,
     relocatedFromRoad:roadRelocated,
     removedInitial:removed,
-    berryVillageExclusion:false,
+    berryVillageExclusion:true,
     berryVillageAccess:true,
     baseVillageBerryMin,
     baseVillageBerryRadius,
@@ -260,6 +271,6 @@
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'collision-safe tree and berry placement with local base-village berry access plus building and road exclusion'
+    responsibility:'collision-safe tree and berry placement with village-core exclusion and guaranteed safe base-village berry rings'
   });
 })(window);
