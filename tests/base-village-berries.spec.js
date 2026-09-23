@@ -40,8 +40,8 @@ function expectSafeLocalBerries(state) {
     expect(base.count).toBeGreaterThanOrEqual(state.min);
     expect(base.maxTownDistance).not.toBeNull();
     expect(base.maxTownDistance).toBeLessThanOrEqual(state.townRadius + 0.01);
-    if (base.maxVillageDistance !== null) {
-      expect(base.maxVillageDistance).toBeLessThanOrEqual(state.villageRadius + 0.01);
+    if (base.maxVillageEdgeDistance !== null) {
+      expect(base.maxVillageEdgeDistance).toBeLessThanOrEqual(state.villageRadius + 0.01);
     }
     expect(base.roadConflicts).toBe(0);
     expect(base.buildingConflicts).toBe(0);
