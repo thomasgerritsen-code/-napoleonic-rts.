@@ -32,7 +32,7 @@ test('playability controls load immediately after base input and publish current
   assert.ok(input >= 0, 'base input remains wired');
   assert.ok(controls > input, 'playability controls load after base input');
   assert.match(html, /Shift\+slepen: toevoegen/);
-  assert.match(html, /1\/2\/3: linie \/ colonne \/ carré/);
+  assert.match(html, /1\/2\/3: linie, colonne of carré/);
   assert.match(html, /Tab \/ Shift\+Tab: volgend \/ vorig regiment/);
   assert.match(html, /F: camera naar selectie/);
   assert.ok(version.includes(`const VERSION = '${packageVersion}'`), 'runtime version follows package version');
