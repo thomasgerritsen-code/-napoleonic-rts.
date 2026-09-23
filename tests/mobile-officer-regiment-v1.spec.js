@@ -51,9 +51,23 @@ test('a loose officer is tappable directly in the 3D mobile battlefield', async 
   await page.goto('/?test=3d');
   await page.waitForFunction(() => window.__BATTLEFIELD_3D_V1__?.enabled?.(), null, { timeout: 20000 });
   await page.waitForFunction(() => window.__OFFICER_REGIMENT_MOBILE_V1__?.threeDReady?.(), null, { timeout: 20000 });
-  await page.waitForFunction(() => Boolean(window.__OFFICER_REGIMENT_MOBILE_V1__?.screenPointForOfficer?.()), null, { timeout: 20000 });
 
-  const target = await page.evaluate(() => window.__OFFICER_REGIMENT_MOBILE_V1__.screenPointForOfficer());
+  const officerId = await page.evaluate(() => {
+    const source = window.NRTS_3D_SOURCE;
+    const officer = source.snapshot().units.find(u => u.side === 'france' && u.type === 'officer' && !u.regimentId);
+    if (!officer) return null;
+    const camera = source.camera();
+    source.panCamera(officer.x - camera.x, officer.y - camera.y);
+    return officer.id;
+  });
+  expect(officerId).not.toBeNull();
+
+  await page.waitForFunction(
+    id => Boolean(window.__OFFICER_REGIMENT_MOBILE_V1__?.screenPointForOfficer?.(id)),
+    officerId,
+    { timeout: 20000 }
+  );
+  const target = await page.evaluate(id => window.__OFFICER_REGIMENT_MOBILE_V1__.screenPointForOfficer(id), officerId);
   expect(target).not.toBeNull();
 
   await page.locator('#battlefield3d').evaluate((canvas, target) => {
