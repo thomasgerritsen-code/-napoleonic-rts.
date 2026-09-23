@@ -36,6 +36,8 @@ test('game boots with current version and essential UI', async ({ page }) => {
   await expect(page.locator('.help')).toContainText('Tab / Shift+Tab: volgend / vorig regiment');
   await expect(page.locator('.help')).toContainText('F: camera centreren op selectie');
   await expect(page.locator('.help')).toContainText('Q/E: groep 15° draaien');
+  await expect(page.locator('.help')).toContainText('F3: test- en debugpaneel');
+  await expect(page.locator('.help')).toContainText('Minimap: camera verplaatsen');
   await expect(page.locator('.help')).toContainText('Shift+slepen: toevoegen');
   await expect(page.locator('.help')).toContainText('Muiswiel: in-/uitzoomen');
   await expect(page.locator('.help')).toContainText('WASD / pijltjes: camera');

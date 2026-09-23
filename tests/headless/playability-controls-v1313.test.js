@@ -36,6 +36,8 @@ test('playability controls load immediately after base input and publish current
   assert.match(html, /Tab \/ Shift\+Tab: volgend \/ vorig regiment/);
   assert.match(html, /F: camera centreren op selectie/);
   assert.match(html, /Q\/E: groep 15° draaien/);
+  assert.match(html, /F3: test- en debugpaneel/);
+  assert.match(html, /Minimap: camera verplaatsen/);
   assert.ok(version.includes(`const VERSION = '${packageVersion}'`), 'runtime version follows package version');
   assert.ok(html.includes(`Napoleonic RTS v${packageVersion}`), 'visible release identity follows package version');
 });
