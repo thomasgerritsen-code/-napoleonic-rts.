@@ -13,8 +13,8 @@
   const relocationRings=cfg.relocationRings ?? 18;
   const berryVillagePadding=villageCfg.berryExclusionPadding ?? 70;
   const baseVillageBerryMin=villageCfg.baseBerryMin ?? 5;
-  const baseVillageBerryRadius=villageCfg.baseBerryRadius ?? 190;
-  const baseVillageBerryTownRadius=villageCfg.baseBerryTownRadius ?? 560;
+  const baseVillageBerryRadius=villageCfg.baseBerryRadius ?? 240;
+  const baseVillageBerryTownRadius=villageCfg.baseBerryTownRadius ?? 620;
   const baseVillageSearchRadius=villageCfg.baseVillageSearchRadius ?? 460;
   const baseVillageBerryAmount=villageCfg.baseBerryAmount ?? 360;
   const roadPadding=cfg.roadPadding ?? 8;
@@ -176,22 +176,38 @@
       villageEdgeDistance(anchor,r.x,r.y)<=baseVillageBerryRadius&&
       Math.hypot(r.x-tc.x,r.y-tc.y)<=baseVillageBerryTownRadius);
   }
-  function localBerryCandidate(tc,anchor,ordinal){
-    const phase=deterministicPhase('food',anchor.x+tc.x+ordinal*17,anchor.y+tc.y-ordinal*13);
+  function angleDistance(a,b){
+    let d=a-b;
+    while(d>Math.PI)d-=Math.PI*2;
+    while(d<-Math.PI)d+=Math.PI*2;
+    return Math.abs(d);
+  }
+  function localBerryCandidate(tc,anchor){
     const rr=resourceRadius('food');
-    const inner=anchor.radius+rr+Math.max(10,resourceGap);
-    const outer=anchor.radius+baseVillageBerryRadius;
-    const ringStep=Math.max(26,rr+resourceGap+4);
-    for(let radius=inner,ring=0;radius<=outer+.01;radius+=ringStep,ring++){
-      const steps=48+ring*8;
-      for(let step=0;step<steps;step++){
-        const a=phase+(step+ordinal*5)/steps*Math.PI*2;
-        const x=anchor.x+Math.cos(a)*radius,y=anchor.y+Math.sin(a)*radius;
-        if(Math.hypot(x-tc.x,y-tc.y)>baseVillageBerryTownRadius)continue;
-        if(validResourceSpot('food',x,y,null))return{x,y};
+    const minEdge=rr+Math.max(10,resourceGap);
+    const radialStep=Math.max(16,Math.round((rr*2+resourceGap)*.42));
+    const angleSteps=144;
+    const homeAngle=Math.atan2(tc.y-anchor.y,tc.x-anchor.x);
+    let best=null;
+
+    // Scan the complete legal village-edge ring, but score the own-base side first.
+    // Re-running this after each addition automatically picks the next collision-free
+    // patch instead of repeatedly landing on the same narrow opening.
+    for(let edge=minEdge;edge<=baseVillageBerryRadius+.01;edge+=radialStep){
+      const radius=anchor.radius+edge;
+      for(let step=0;step<angleSteps;step++){
+        const a=homeAngle+step/angleSteps*Math.PI*2;
+        const x=anchor.x+Math.cos(a)*radius;
+        const y=anchor.y+Math.sin(a)*radius;
+        const townDistance=Math.hypot(x-tc.x,y-tc.y);
+        if(townDistance>baseVillageBerryTownRadius)continue;
+        if(!validResourceSpot('food',x,y,null))continue;
+        const homeBias=angleDistance(a,homeAngle);
+        const score=townDistance+edge*.22+homeBias*34;
+        if(!best||score<best.score)best={x,y,score};
       }
     }
-    return null;
+    return best?{x:best.x,y:best.y}:null;
   }
   function ensureBaseVillageBerries(){
     let added=0;
@@ -199,18 +215,15 @@
       const anchor=nearestVillageForTownCenter(tc);
       if(!anchor)continue;
       let local=localBerryNodes(tc,anchor);
-      let attempts=0;
-      while(local.length<baseVillageBerryMin&&attempts<baseVillageBerryMin*3){
-        const ordinal=local.length+attempts;
-        const spot=localBerryCandidate(tc,anchor,ordinal);
-        attempts++;
-        if(!spot)continue;
+      while(local.length<baseVillageBerryMin){
+        const spot=localBerryCandidate(tc,anchor);
+        if(!spot)break;
         const r=stampResource(previousCreateResource('food',spot.x,spot.y,baseVillageBerryAmount),'food',{
           localVillageBerry:true,
           homeSide:tc.side,
           villageName:anchor.village?.name||null
         });
-        if(!r)continue;
+        if(!r)break;
         added++;
         local=localBerryNodes(tc,anchor);
       }
@@ -244,7 +257,7 @@
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.3-base-village-berry-ring',
+    version:'battlefield-ecology-v1.4-base-village-home-ring',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
@@ -271,6 +284,6 @@
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'collision-safe tree and berry placement with village-core exclusion and guaranteed safe base-village berry rings'
+    responsibility:'collision-safe tree and berry placement with village-core exclusion and guaranteed own-base village-edge berry access'
   });
 })(window);
