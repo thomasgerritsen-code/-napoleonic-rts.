@@ -135,22 +135,38 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
 
 /* Mobile landscape HUD v2: preserve the selected unit and commands while giving
    the battlefield back vertical space. Secondary diagnostics stay available on
-   larger layouts; command overflow becomes a horizontal touch strip. */
+   larger layouts; command overflow becomes a horizontal touch strip. The important
+   row geometry intentionally wins over the later runtime mobile-presentation style. */
 @media (orientation: landscape) and (max-height: 480px) and (max-width: 960px) {
   .bottombar {
-    height: 50px;
-    min-height: 50px;
-    max-height: 50px;
+    height: 50px !important;
+    min-height: 50px !important;
+    max-height: 50px !important;
     padding: 3px 5px;
-    grid-template-columns: minmax(82px, .9fr) minmax(0, 4.1fr);
-    gap: 4px;
+    grid-template-columns: minmax(82px, .9fr) minmax(0, 4.1fr) !important;
+    grid-template-rows: 44px !important;
+    align-items: center;
+    gap: 4px !important;
+    overflow: hidden;
+  }
+  .selection-panel {
+    min-width: 0;
+    overflow: hidden;
   }
   .selection-panel .label,
   #selectionDetails,
   .army-counts { display: none; }
-  .selection-panel strong { font-size: .66rem; }
+  .selection-panel strong {
+    font-size: .66rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .actions {
+    height: 44px;
+    max-height: 44px;
     justify-content: flex-start;
+    align-items: center;
     flex-wrap: nowrap;
     min-width: 0;
     overflow-x: auto;
@@ -158,6 +174,7 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    padding-bottom: 0 !important;
   }
   .actions::-webkit-scrollbar { display: none; }
   .actions button {
