@@ -132,3 +132,37 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
   .army-counts { gap: 0; font-size: .58rem; }
   .build-hint { top: 50px; padding: 5px 8px; font-size: .66rem; }
 }
+
+/* Mobile landscape HUD v2: preserve the selected unit and commands while giving
+   the battlefield back vertical space. Secondary diagnostics stay available on
+   larger layouts; command overflow becomes a horizontal touch strip. */
+@media (orientation: landscape) and (max-height: 480px) and (max-width: 960px) {
+  .bottombar {
+    min-height: 50px;
+    padding: 3px 5px;
+    grid-template-columns: minmax(82px, .9fr) minmax(0, 4.1fr);
+    gap: 4px;
+  }
+  .selection-panel .label,
+  #selectionDetails,
+  .army-counts { display: none; }
+  .selection-panel strong { font-size: .66rem; }
+  .actions {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .actions::-webkit-scrollbar { display: none; }
+  .actions button {
+    flex: 0 0 auto;
+    min-width: 62px;
+    max-width: 96px;
+    min-height: 44px;
+    padding: 3px 5px;
+  }
+}
