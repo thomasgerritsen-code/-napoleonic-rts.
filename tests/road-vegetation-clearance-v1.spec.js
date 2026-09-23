@@ -14,7 +14,6 @@ test('trees, food plants and 3D crop scenery stay clear of road corridors', asyn
     const ecology = window.__BATTLEFIELD_ECOLOGY_V1__;
     const source = window.NRTS_3D_SOURCE;
     const scene = window.__NRTS_THREE_SCENE__;
-    const THREE = scene.constructor;
 
     const resourceConflicts = source.resources()
       .filter(resource => !resource.dead)
@@ -25,7 +24,7 @@ test('trees, food plants and 3D crop scenery stay clear of road corridors', asyn
     scene.traverse(object => {
       const radius = object.userData?.vegetationClearanceRadius;
       if (!Number.isFinite(radius) || object.isInstancedMesh) return;
-      const position = object.getWorldPosition({ x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } });
+      const position = object.position;
       if (ecology.roadConflictAt(position.x, position.z, radius, 0)) {
         taggedConflicts.push({ name: object.name || object.type, kind: object.userData.vegetationKind, x: position.x, z: position.z, radius });
       }
@@ -34,13 +33,13 @@ test('trees, food plants and 3D crop scenery stay clear of road corridors', asyn
     const terrain = scene.getObjectByName('terrain-patches-road-cleared-v1');
     const terrainConflicts = [];
     if (terrain?.isInstancedMesh) {
-      const matrix = new Float32Array(16);
+      const data = terrain.instanceMatrix.array;
       for (let i = 0; i < terrain.count; i++) {
-        terrain.getMatrixAt(i, { elements: matrix });
-        const x = matrix[12];
-        const z = matrix[14];
-        const sx = Math.hypot(matrix[0], matrix[1], matrix[2]);
-        const sz = Math.hypot(matrix[8], matrix[9], matrix[10]);
+        const offset = i * 16;
+        const x = data[offset + 12];
+        const z = data[offset + 14];
+        const sx = Math.hypot(data[offset], data[offset + 1], data[offset + 2]);
+        const sz = Math.hypot(data[offset + 8], data[offset + 9], data[offset + 10]);
         const radius = Math.hypot(sx, sz) * 0.5;
         if (ecology.roadConflictAt(x, z, radius, 0)) terrainConflicts.push({ i, x, z, radius });
       }
