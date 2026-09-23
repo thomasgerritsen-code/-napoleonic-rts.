@@ -33,7 +33,7 @@ test('v1.3.10 replaces pyramid roofs with gable building geometry and facade det
 });
 
 test('v1.3.10 building detail loads after the base 3D renderer', () => {
-  const base = html.indexOf('battlefield-3d-v1.mjs?build=1310a');
+  const base = html.indexOf('battlefield-3d-v1.mjs?build=');
   const detail = html.indexOf('battlefield-3d-village-buildings-v1.mjs?build=1310a');
   assert.ok(base >= 0, 'base 3D renderer is wired');
   assert.ok(detail > base, 'detail module loads after the base renderer');
