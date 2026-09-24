@@ -34,6 +34,9 @@ test('British regiments react to nearby French troops with stable contact hyster
       }
       reg.targetX = x;
       reg.targetY = y;
+      reg.path = null;
+      reg.finalTarget = null;
+      reg.finalFacing = null;
     }
 
     // Build a minimal valid runtime regiment directly. This avoids legacy wrappers
@@ -72,11 +75,22 @@ test('British regiments react to nearby French troops with stable contact hyster
     const french = makeRegimentAt('france', 1540, 900);
     window.__AI_COMMANDER_V1__.forceState('DEFEND');
 
+    // Give the regiment a real strategic path before local contact interrupts it.
+    // The proximity system must remember the final destination, not the current waypoint.
+    const strategicTargetX = 2300;
+    orderGroupPathV06(british, strategicTargetX, 900, 'line', Math.PI);
+
     const api = window.__AI_PROXIMITY_ENGAGEMENT_V1__;
     const initialBritishX = centroid(regimentMembers(british)).x;
     const firstEngaged = api.apply();
     const first = api.state().find(item => item.regimentId === british.id);
-    const firstTargetX = british.targetX;
+    const firstContactFinalX = british.finalTarget?.x ?? null;
+    const firstContactPath = british.path;
+
+    // Re-scanning an unchanged contact must not restart the route from waypoint zero.
+    const repeatedEngaged = api.apply();
+    const repeated = api.state().find(item => item.regimentId === british.id);
+    const sameContactPathPreserved = british.path === firstContactPath;
 
     // Once contact exists, 480 m remains engaged because the release radius is 520 m.
     placeRegiment(french, initialBritishX - 480, 900);
@@ -88,24 +102,29 @@ test('British regiments react to nearby French troops with stable contact hyster
     api.apply();
     const close = api.state().find(item => item.regimentId === british.id);
 
-    // Beyond 520 m the local contact is released and the prior order is restored.
+    // Beyond 520 m the local contact is released and the original strategic order is restored.
     placeRegiment(french, initialBritishX - 550, 900);
     const releasedEngaged = api.apply();
     const released = api.state().find(item => item.regimentId === british.id);
-    const releasedTargetX = british.targetX;
+    const releasedFinalX = british.finalTarget?.x ?? null;
 
     return {
       config: api.config,
       firstEngaged,
       first,
-      firstTargetX,
+      firstContactFinalX,
       initialBritishX,
+      repeatedEngaged,
+      repeated,
+      sameContactPathPreserved,
       retainedEngaged,
       retained,
       close,
       releasedEngaged,
       released,
-      releasedTargetX
+      releasedFinalX,
+      releasedFormation: british.formation,
+      strategicTargetX
     };
   });
 
@@ -116,7 +135,12 @@ test('British regiments react to nearby French troops with stable contact hyster
   expect(result.first.targetKey).toMatch(/^regiment:/);
   expect(result.first.distance).toBeLessThanOrEqual(430);
   expect(result.first.formation).toBe('column');
-  expect(result.firstTargetX).toBeLessThan(result.initialBritishX);
+  expect(result.first.commandTarget.x).toBeLessThan(result.initialBritishX);
+  expect(result.firstContactFinalX).toBeCloseTo(result.first.commandTarget.x, 5);
+
+  expect(result.repeatedEngaged).toBe(1);
+  expect(result.repeated.targetKey).toBe(result.first.targetKey);
+  expect(result.sameContactPathPreserved).toBe(true);
 
   expect(result.retainedEngaged).toBe(1);
   expect(result.retained.targetKey).toBe(result.first.targetKey);
@@ -126,7 +150,8 @@ test('British regiments react to nearby French troops with stable contact hyster
   expect(result.close.formation).toBe('line');
   expect(result.releasedEngaged).toBe(0);
   expect(result.released.targetKey).toBeNull();
-  expect(Math.abs(result.releasedTargetX - result.initialBritishX)).toBeLessThan(2);
+  expect(result.releasedFinalX).toBeCloseTo(result.strategicTargetX, 5);
+  expect(result.releasedFormation).toBe('line');
   expect(errors).toEqual([]);
 });
 
@@ -172,5 +197,46 @@ test('loose British combat troops also move toward a nearby French threat', asyn
   expect(result.releasedEngaged).toBe(0);
   expect(result.released.targetKey).toBeNull();
   expect(result.targetAfterRelease).toBe(result.originalX);
+  expect(errors).toEqual([]);
+});
+
+test('RETREAT cancels local proximity aggression and restores the prior loose-unit order', async ({ page }) => {
+  const errors = await openGame(page);
+  const result = await page.evaluate(() => {
+    for (const unit of units) {
+      if (unit.type !== 'worker') unit.dead = true;
+    }
+    for (const reg of regiments) reg.destroyed = true;
+
+    const british = createUnit('britain', 'infantry', 1900, 900);
+    createUnit('france', 'infantry', 1540, 900);
+    const strategicTargetX = 2200;
+    british.targetX = strategicTargetX;
+    british.targetY = british.y;
+    window.__AI_COMMANDER_V1__.forceState('DEFEND');
+
+    const api = window.__AI_PROXIMITY_ENGAGEMENT_V1__;
+    const engagedBeforeRetreat = api.apply();
+    const contactTargetX = british.targetX;
+
+    window.__AI_COMMANDER_V1__.forceState('RETREAT');
+    const engagedDuringRetreat = api.apply();
+    const contact = api.looseState().find(item => item.unitId === british.id);
+
+    return {
+      engagedBeforeRetreat,
+      contactTargetX,
+      strategicTargetX,
+      engagedDuringRetreat,
+      restoredTargetX: british.targetX,
+      targetKey: contact?.targetKey ?? null
+    };
+  });
+
+  expect(result.engagedBeforeRetreat).toBe(1);
+  expect(result.contactTargetX).toBeLessThan(1900);
+  expect(result.engagedDuringRetreat).toBe(0);
+  expect(result.targetKey).toBeNull();
+  expect(result.restoredTargetX).toBe(result.strategicTargetX);
   expect(errors).toEqual([]);
 });
