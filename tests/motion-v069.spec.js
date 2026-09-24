@@ -111,6 +111,50 @@ test('flank fire contact halts and realigns the whole battalion before the ancho
   expect(errors).toEqual([]);
 });
 
+test('fire contact keeps its regiment lock when a closer loose target appears', async ({ page }) => {
+  const errors = await openGame(page);
+  await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
+  const setup = await page.evaluate(() => {
+    const french = window.__RTS_DEBUG__.createFreshInfantryRegiment('france',900,700);
+    const british = window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1080,700);
+    window.RTS_SIM.step(.6);
+    window.__RTS_DEBUG__.selectRegiment(french);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(1300,700,0);
+    window.RTS_SIM.step(.2);
+    return {french,british};
+  });
+
+  await page.evaluate(() => window.RTS_SIM.step(.15));
+  const locked = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), setup.french);
+  expect(locked.engagement).toBeTruthy();
+  expect(locked.engagement.enemyGroupId).toBe(setup.british);
+  expect(locked.engagement.stableGroupLock).toBe(true);
+
+  const looseId = await page.evaluate(frenchId => {
+    const reg = getRegiment(frenchId);
+    const members = regimentMembers(reg).filter(u => u.type === 'infantry' && !u.dead && !u.routing);
+    const anchor = groupAnchorV068(reg) || centroid(members);
+    let shooter = members[0], radius = -1;
+    for (const u of members) {
+      const d = Math.hypot(u.x-anchor.x,u.y-anchor.y);
+      if (d > radius) { radius=d; shooter=u; }
+    }
+    const loose = createUnit('britain','infantry',shooter.x+18,shooter.y+8);
+    loose.hp = 9999;
+    loose.targetX = loose.x;
+    loose.targetY = loose.y;
+    return loose.id;
+  }, setup.french);
+  expect(looseId).toBeTruthy();
+
+  await page.evaluate(() => window.RTS_SIM.step(.1));
+  const retained = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), setup.french);
+  expect(retained.engagement).toBeTruthy();
+  expect(retained.engagement.enemyGroupId).toBe(setup.british);
+  expect(retained.engagement.stableGroupLock).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('enemy contact switches the whole battalion into a coherent combat formation', async ({ page }, testInfo) => {
   const errors = await openGame(page);
   await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
