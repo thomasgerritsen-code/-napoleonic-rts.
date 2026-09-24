@@ -74,6 +74,39 @@ if (window.__RTS_DEBUG__) {
     return true;
   };
 
+  window.__RTS_DEBUG__.setupFlankFireContactV069 = id => {
+    const reg = getRegiment(id);
+    if (!reg || groupKindV06(reg) !== 'infantry') return null;
+    const anchor = groupAnchorV068(reg) || centroid(regimentMembers(reg));
+    const infantry = regimentMembers(reg).filter(u => u.type === 'infantry' && !u.dead && !u.routing);
+    if (!infantry.length) return null;
+    let shooter = infantry[0], shooterRadius = -1;
+    for (const u of infantry) {
+      const radius = Math.hypot(u.x-anchor.x,u.y-anchor.y);
+      if (radius > shooterRadius) { shooter=u; shooterRadius=radius; }
+    }
+    let nx = shooter.x-anchor.x, ny = shooter.y-anchor.y;
+    const nl = Math.hypot(nx,ny) || 1;
+    nx /= nl; ny /= nl;
+    const range = Number(TYPES[shooter.type]?.range) || 122;
+    const requestedDistance = Math.min(range-10, 100);
+    const ex = Math.max(30,Math.min(WORLD.width-30,shooter.x+nx*requestedDistance));
+    const ey = Math.max(30,Math.min(WORLD.height-30,shooter.y+ny*requestedDistance));
+    const enemy = createUnit(opposite(reg.side),'infantry',ex,ey);
+    enemy.targetX=enemy.x; enemy.targetY=enemy.y;
+    return {
+      regimentId:reg.id,
+      shooterId:shooter.id,
+      enemyId:enemy.id,
+      shooterStart:{x:shooter.x,y:shooter.y},
+      anchor:{x:anchor.x,y:anchor.y},
+      shooterRadius,
+      shooterDistance:Math.hypot(enemy.x-shooter.x,enemy.y-shooter.y),
+      anchorDistance:Math.hypot(enemy.x-anchor.x,enemy.y-anchor.y),
+      weaponRange:range
+    };
+  };
+
   window.__RTS_DEBUG__.villageSystemV069 = () => ({
     labelsVisible:false,
     villages:VILLAGE_SCENERY_V069.map(v => ({

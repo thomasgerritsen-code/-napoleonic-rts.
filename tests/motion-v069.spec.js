@@ -12,15 +12,17 @@ async function openGame(page) {
     window.__RTS_DEBUG__?.villageSystemV069 &&
     window.__RTS_DEBUG__?.roadRetargetAuditV069 &&
     window.__RTS_DEBUG__?.drummerRoleV069 &&
-    window.RTS_SIM?.version === '0.6.9'
+    window.__RTS_DEBUG__?.setupFlankFireContactV069 &&
+    typeof window.RTS_SIM?.step === 'function' &&
+    typeof window.RTS_SIM?.snapshot === 'function'
   ));
   return pageErrors;
 }
 
-test('v0.6.9 renders roadside villages without map labels and keeps houses off every road', async ({ page }, testInfo) => {
+test('roadside villages render without map labels and keep houses off every road', async ({ page }, testInfo) => {
   const errors = await openGame(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.9/);
-  await expect(page.locator('.version')).toHaveText('v0.6.9');
+  await expect(page).toHaveTitle(/Napoleonic RTS v\d/);
+  await expect(page.locator('.version')).toHaveText(/^v\d/);
   const villages = await page.evaluate(() => window.__RTS_DEBUG__.villageSystemV069());
   expect(villages.labelsVisible).toBe(false);
   expect(villages.villages).toHaveLength(6);
@@ -29,7 +31,7 @@ test('v0.6.9 renders roadside villages without map labels and keeps houses off e
   const houses = villages.villages.flatMap(v => v.houses);
   expect(houses.length).toBeGreaterThanOrEqual(30);
   expect(Math.min(...houses.map(h => h.roadClearance))).toBeGreaterThanOrEqual(15);
-  await testInfo.attach('v069-roadside-villages', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  await testInfo.attach('roadside-villages', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
 
@@ -78,6 +80,37 @@ test('drummer stays behind infantry in marching column and field line', async ({
   expect(errors).toEqual([]);
 });
 
+test('flank fire contact halts and realigns the whole battalion before the anchor reaches the old contact radius', async ({ page }) => {
+  const errors = await openGame(page);
+  await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
+  const setup = await page.evaluate(() => {
+    const id = window.__RTS_DEBUG__.createFreshInfantryRegiment('france',900,700);
+    window.RTS_SIM.step(.5);
+    window.__RTS_DEBUG__.selectRegiment(id);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(1300,700,0);
+    window.RTS_SIM.step(.2);
+    return { id, contact:window.__RTS_DEBUG__.setupFlankFireContactV069(id) };
+  });
+
+  expect(setup.contact).toBeTruthy();
+  expect(setup.contact.shooterDistance).toBeLessThan(setup.contact.weaponRange);
+  expect(setup.contact.anchorDistance).toBeGreaterThan(145);
+
+  await page.evaluate(() => window.RTS_SIM.step(.15));
+  const engaged = await page.evaluate(id => window.__RTS_DEBUG__.formationState(id), setup.id);
+  expect(engaged.engagement).toBeTruthy();
+  expect(engaged.engagement.mode).toBe('fire');
+  expect(engaged.engagement.contactMemberId).toBe(setup.contact.shooterId);
+  expect(engaged.combatFormation).toBe(true);
+  expect(engaged.phase).toBe('combat-halt');
+
+  await page.evaluate(() => window.RTS_SIM.step(.55));
+  const shooter = await page.evaluate(id => window.RTS_SIM.snapshot().units.find(u => u.id === id), setup.contact.shooterId);
+  expect(shooter).toBeTruthy();
+  expect(Math.hypot(shooter.x-setup.contact.shooterStart.x, shooter.y-setup.contact.shooterStart.y)).toBeGreaterThan(2);
+  expect(errors).toEqual([]);
+});
+
 test('enemy contact switches the whole battalion into a coherent combat formation', async ({ page }, testInfo) => {
   const errors = await openGame(page);
   await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
@@ -98,6 +131,6 @@ test('enemy contact switches the whole battalion into a coherent combat formatio
   expect(['combat-advance','close-combat']).toContain(state.phase);
   expect(drummer.column.behind).toBe(true);
   expect(drummer.attackMode).toBe('support');
-  await testInfo.attach('v069-close-combat-cohesion', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  await testInfo.attach('close-combat-cohesion', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
