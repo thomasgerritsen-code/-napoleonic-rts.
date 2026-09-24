@@ -227,7 +227,7 @@
     clearStaleContacts(looseContacts, new Set(loose.map(unit => unit.id)));
 
     if (AI_COMMANDER_V1.state === 'RETREAT') {
-      clearResponseState(regs, loose, !captureStrategic);
+      clearResponseState(regs, loose, false);
       return 0;
     }
 
