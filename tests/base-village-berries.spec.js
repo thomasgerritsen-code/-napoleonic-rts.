@@ -60,7 +60,7 @@ test('both starting bases get explicit nearby berry bushes that are visible in t
   await page.waitForFunction(() => window.__BATTLEFIELD_ECOLOGY_V1__?.baseVillageBerryStats && window.__NATURAL_RESOURCES_V1__?.diagnostics);
 
   const initial = await render2DAndReadBerryAccess(page);
-  expect(initial.version).toContain('base-berries-near-town');
+  expect(initial.version).toContain('base-berries');
   expectSafeLocalBerries(initial);
 
   await page.locator('#resetBtn').click();
