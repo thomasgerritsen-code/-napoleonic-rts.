@@ -95,12 +95,25 @@
     }
   }
 
-  function regimentStrategicOrder(reg, center) {
+  function regimentCommandTarget(reg, center) {
+    if (Number.isFinite(reg?.finalTarget?.x) && Number.isFinite(reg?.finalTarget?.y)) {
+      return { x: reg.finalTarget.x, y: reg.finalTarget.y };
+    }
     return {
-      x: Number.isFinite(reg.targetX) ? reg.targetX : center.x,
-      y: Number.isFinite(reg.targetY) ? reg.targetY : center.y,
+      x: Number.isFinite(reg?.targetX) ? reg.targetX : center.x,
+      y: Number.isFinite(reg?.targetY) ? reg.targetY : center.y
+    };
+  }
+
+  function regimentStrategicOrder(reg, center) {
+    const target = regimentCommandTarget(reg, center);
+    return {
+      x: target.x,
+      y: target.y,
       formation: reg.formation || 'line',
-      facing: Number.isFinite(reg.facing) ? reg.facing : -Math.PI / 2
+      facing: Number.isFinite(reg.finalFacing)
+        ? reg.finalFacing
+        : Number.isFinite(reg.facing) ? reg.facing : -Math.PI / 2
     };
   }
 
@@ -115,8 +128,9 @@
     const target = contact.distance > MUSKET_STANDOFF + 12
       ? aiOffset(contact, direction, -MUSKET_STANDOFF)
       : center;
+    const previouslyIssuedTarget = prior?.commandTarget || regimentCommandTarget(reg, center);
     const targetChanged = !prior || prior.targetKey !== contact.key ||
-      distance({ x: reg.targetX, y: reg.targetY }, target) > REORDER_DISTANCE;
+      distance(previouslyIssuedTarget, target) > REORDER_DISTANCE;
     const formationChanged = !prior || prior.formation !== formation;
 
     if (targetChanged || formationChanged || captureStrategic) {
@@ -128,6 +142,7 @@
       targetId: contact.id,
       distance: Math.round(contact.distance),
       formation,
+      commandTarget: { x: target.x, y: target.y },
       resumeOrder
     };
   }
@@ -279,7 +294,7 @@
   }
 
   const api = Object.freeze({
-    version: 'ai-proximity-engagement-v1.2',
+    version: 'ai-proximity-engagement-v1.3',
     config: Object.freeze({
       contactEnterRadius: CONTACT_ENTER_RADIUS,
       contactExitRadius: CONTACT_EXIT_RADIUS,
@@ -300,7 +315,8 @@
           regimentId: reg.id,
           targetKey: activeKey,
           distance: target ? Math.round(distance(center, target)) : null,
-          formation: reg.proximityEngagementV1?.formation || null
+          formation: reg.proximityEngagementV1?.formation || null,
+          commandTarget: reg.proximityEngagementV1?.commandTarget || null
         };
       });
     },
