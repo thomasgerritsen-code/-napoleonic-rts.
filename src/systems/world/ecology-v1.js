@@ -239,6 +239,14 @@
     }
     return added;
   }
+  function centerCameraOnHomeBase(){
+    const tc=townCenters().find(b=>b.side==='france');
+    if(!tc)return false;
+    camera.x=tc.x;
+    camera.y=tc.y;
+    if(typeof clampCamera==='function')clampCamera();
+    return true;
+  }
   function baseVillageBerryStats(){
     return townCenters().map(tc=>{
       const anchor=nearestVillageForTownCenter(tc);
@@ -259,17 +267,19 @@
   }
 
   const addedInitialBaseVillageBerries=ensureBaseVillageBerries();
+  const centeredInitialCamera=centerCameraOnHomeBase();
   const previousCreateResourceClusters=typeof createResourceClusters==='function'?createResourceClusters:null;
   if(previousCreateResourceClusters){
     createResourceClusters=function createResourceClustersEcologyV1(){
       const result=previousCreateResourceClusters();
       ensureBaseVillageBerries();
+      centerCameraOnHomeBase();
       return result;
     };
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.6-base-berries-near-town-per-town-center',
+    version:'battlefield-ecology-v1.7-base-berries-home-camera',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
@@ -289,6 +299,8 @@
     baseVillageBerryTownRadius,
     baseVillageBerryStartRadius,
     addedInitialBaseVillageBerries,
+    centeredInitialCamera,
+    centerCameraOnHomeBase,
     ensureBaseVillageBerries,
     baseVillageBerryStats,
     resourceBuildingExclusion:true,
@@ -297,6 +309,6 @@
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'collision-safe tree and berry placement with general village exclusion plus five guaranteed visible 2D berry bushes per starting Town Center'
+    responsibility:'collision-safe tree and berry placement with general village exclusion plus five guaranteed visible 2D berry bushes per starting Town Center and home-base-aligned start camera'
   });
 })(window);
