@@ -63,6 +63,9 @@ test('both starting bases get explicit nearby berry bushes that are visible in t
   expect(initial.version).toContain('base-berries');
   expectSafeLocalBerries(initial);
 
+  // On mobile, Nieuwe slag intentionally lives behind the compact Menu button.
+  // Exercise the real player flow rather than force-clicking a hidden desktop control.
+  await page.locator('#mobileMenuBtn').click();
   await page.locator('#resetBtn').click();
   await page.waitForTimeout(50);
 
