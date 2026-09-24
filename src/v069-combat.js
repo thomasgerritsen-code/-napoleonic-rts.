@@ -14,6 +14,31 @@ function nearestEnemyToAnchorV069(reg, maxRange = 180) {
   return best ? { enemy:best, distance:Math.sqrt(bestD2), anchor } : null;
 }
 
+function nearestFireContactV069(reg) {
+  const anchor = groupAnchorV068(reg);
+  if (!anchor) return null;
+  let best = null;
+  for (const member of regimentMembers(reg)) {
+    if (member.dead || member.routing || (member.type !== 'infantry' && member.type !== 'officer')) continue;
+    const range = Number(TYPES[member.type]?.range) || 0;
+    if (range <= 0) continue;
+    const enemy = nearestEnemyEntity(member, range);
+    if (!enemy) continue;
+    const memberDistance = Math.hypot(enemy.x - member.x, enemy.y - member.y);
+    const anchorDistance = Math.hypot(enemy.x - anchor.x, enemy.y - anchor.y);
+    if (!best || memberDistance < best.memberDistance) {
+      best = {
+        enemy,
+        distance:anchorDistance,
+        memberDistance,
+        memberId:member.id,
+        anchor
+      };
+    }
+  }
+  return best;
+}
+
 function refreshEngagementStatesV069() {
   for (const reg of regiments) {
     if (reg.destroyed || groupKindV06(reg) !== 'infantry' || !reg.marchV063?.v064) {
@@ -27,7 +52,7 @@ function refreshEngagementStatesV069() {
     }
     const members = regimentMembers(reg);
     const bayonet = members.some(u => (u.type === 'infantry' || u.type === 'officer') && u.attackMode === 'bayonet');
-    const hit = nearestEnemyToAnchorV069(reg, bayonet ? 155 : 145);
+    const hit = bayonet ? nearestEnemyToAnchorV069(reg, 155) : nearestFireContactV069(reg);
     if (!hit) {
       reg.engagementV069 = null;
       continue;
@@ -36,6 +61,8 @@ function refreshEngagementStatesV069() {
       mode:bayonet ? 'bayonet' : 'fire',
       enemyId:hit.enemy.id,
       distance:hit.distance,
+      contactMemberId:hit.memberId || null,
+      contactDistance:Number.isFinite(hit.memberDistance) ? hit.memberDistance : hit.distance,
       heading:Math.atan2(hit.enemy.y - hit.anchor.y, hit.enemy.x - hit.anchor.x),
       hold:bayonet ? hit.distance <= 72 : true,
       updatedAt:elapsed
@@ -126,8 +153,23 @@ finalFormationOffsetsV063 = function finalFormationOffsetsV069(reg, mode = reg.f
 const updateUnitV068ForV069 = updateUnit;
 updateUnit = function updateUnitV069(u, dt) {
   const reg = u.regimentId ? getRegiment(u.regimentId) : null;
-  if (u.type !== 'drummer' || !reg || groupKindV06(reg) !== 'infantry' || u.routing) {
+  const infantryRegiment = !!(reg && groupKindV06(reg) === 'infantry');
+  if (u.type !== 'drummer' || !infantryRegiment || u.routing) {
     updateUnitV068ForV069(u, dt);
+
+    // The legacy unit controller freezes an individual shooter as soon as that soldier
+    // has a target in range. During regiment fire contact the group controller owns the
+    // halt and rotates/re-forms the complete line. Let shooters still make their small
+    // slot correction so a flank contact cannot pin one man while the rest of the line
+    // pivots around him.
+    if (!u.dead && !u.routing && infantryRegiment && reg.engagementV069?.mode === 'fire' &&
+        (u.type === 'infantry' || u.type === 'officer')) {
+      const slotDistance = Math.hypot(u.targetX - u.x, u.targetY - u.y);
+      if (slotDistance > .85) {
+        const range = Number(TYPES[u.type]?.range) || 0;
+        if (range > 0 && nearestEnemyEntity(u, range)) moveToward(u, u.targetX, u.targetY, dt, TYPES[u.type].speed);
+      }
+    }
     return;
   }
   if (u.dead) return;
