@@ -247,6 +247,11 @@
     if(typeof clampCamera==='function')clampCamera();
     return true;
   }
+  function refreshBaseVillageAccess(){
+    const added=ensureBaseVillageBerries();
+    const centered=centerCameraOnHomeBase();
+    return {added,centered};
+  }
   function baseVillageBerryStats(){
     return townCenters().map(tc=>{
       const anchor=nearestVillageForTownCenter(tc);
@@ -266,20 +271,25 @@
     });
   }
 
-  const addedInitialBaseVillageBerries=ensureBaseVillageBerries();
-  const centeredInitialCamera=centerCameraOnHomeBase();
-  const previousCreateResourceClusters=typeof createResourceClusters==='function'?createResourceClusters:null;
-  if(previousCreateResourceClusters){
-    createResourceClusters=function createResourceClustersEcologyV1(){
-      const result=previousCreateResourceClusters();
-      ensureBaseVillageBerries();
-      centerCameraOnHomeBase();
-      return result;
-    };
+  const initialRefresh=refreshBaseVillageAccess();
+
+  // resetBtn bound the original resetGame before Architecture-v2 systems load, so
+  // updating createResourceClusters is too early: later reset work can still move a
+  // Town Center. Refresh after the complete reset instead. Direct resetGame callers
+  // use the wrapper; the existing button binding gets a post-dispatch microtask.
+  const previousResetGame=resetGame;
+  resetGame=function resetGameEcologyV1(...args){
+    const result=previousResetGame(...args);
+    refreshBaseVillageAccess();
+    return result;
+  };
+  const resetButton=document.getElementById('resetBtn');
+  if(resetButton){
+    resetButton.addEventListener('click',()=>queueMicrotask(refreshBaseVillageAccess));
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.7-base-berries-home-camera',
+    version:'battlefield-ecology-v1.8-base-berries-post-reset',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
@@ -298,9 +308,10 @@
     baseVillageBerryRadius,
     baseVillageBerryTownRadius,
     baseVillageBerryStartRadius,
-    addedInitialBaseVillageBerries,
-    centeredInitialCamera,
+    addedInitialBaseVillageBerries:initialRefresh.added,
+    centeredInitialCamera:initialRefresh.centered,
     centerCameraOnHomeBase,
+    refreshBaseVillageAccess,
     ensureBaseVillageBerries,
     baseVillageBerryStats,
     resourceBuildingExclusion:true,
@@ -309,6 +320,6 @@
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'collision-safe tree and berry placement with general village exclusion plus five guaranteed visible 2D berry bushes per starting Town Center and home-base-aligned start camera'
+    responsibility:'collision-safe tree and berry placement with general village exclusion plus five guaranteed visible 2D berry bushes per starting Town Center, refreshed only after reset completion'
   });
 })(window);
