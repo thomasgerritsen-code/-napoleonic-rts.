@@ -13,15 +13,16 @@ async function openGame(page) {
     window.__RTS_DEBUG__?.roadRetargetAuditV069 &&
     window.__RTS_DEBUG__?.drummerRoleV069 &&
     window.__RTS_DEBUG__?.setupFlankFireContactV069 &&
-    window.RTS_SIM?.version === '0.6.9'
+    typeof window.RTS_SIM?.step === 'function' &&
+    typeof window.RTS_SIM?.snapshot === 'function'
   ));
   return pageErrors;
 }
 
-test('v0.6.9 renders roadside villages without map labels and keeps houses off every road', async ({ page }, testInfo) => {
+test('roadside villages render without map labels and keep houses off every road', async ({ page }, testInfo) => {
   const errors = await openGame(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.9/);
-  await expect(page.locator('.version')).toHaveText('v0.6.9');
+  await expect(page).toHaveTitle(/Napoleonic RTS v\d/);
+  await expect(page.locator('.version')).toHaveText(/^v\d/);
   const villages = await page.evaluate(() => window.__RTS_DEBUG__.villageSystemV069());
   expect(villages.labelsVisible).toBe(false);
   expect(villages.villages).toHaveLength(6);
@@ -30,7 +31,7 @@ test('v0.6.9 renders roadside villages without map labels and keeps houses off e
   const houses = villages.villages.flatMap(v => v.houses);
   expect(houses.length).toBeGreaterThanOrEqual(30);
   expect(Math.min(...houses.map(h => h.roadClearance))).toBeGreaterThanOrEqual(15);
-  await testInfo.attach('v069-roadside-villages', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  await testInfo.attach('roadside-villages', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
 
@@ -127,6 +128,6 @@ test('enemy contact switches the whole battalion into a coherent combat formatio
   expect(['combat-advance','close-combat']).toContain(state.phase);
   expect(drummer.column.behind).toBe(true);
   expect(drummer.attackMode).toBe('support');
-  await testInfo.attach('v069-close-combat-cohesion', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
+  await testInfo.attach('close-combat-cohesion', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
