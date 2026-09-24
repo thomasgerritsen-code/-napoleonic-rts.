@@ -109,3 +109,67 @@ promoteTrafficQueuesV068 = function promoteTrafficQueuesExclusiveV070() {
     });
   }
 };
+
+// v0.7 replaced the v0.6.9 member-level fire scan with a stable regiment-center
+// lock. Keep that stability, but do not let it hide a real flank shooter that
+// already has an enemy inside its own weapon range. This wrapper runs after the
+// v0.7 group calculation and only overrides ordinary fire contact; bayonet and
+// forced bridge-column behavior stay under the existing v0.7 policy.
+const refreshEngagementStatesV070BeforeFlankContact = refreshEngagementStatesV069;
+refreshEngagementStatesV069 = function refreshEngagementStatesV070FlankContact() {
+  refreshEngagementStatesV070BeforeFlankContact();
+
+  for (const reg of regiments) {
+    if (!reg || reg.destroyed || groupKindV06(reg) !== 'infantry' || !reg.marchV063?.v064) continue;
+    const traffic = reg.crossingTrafficV068;
+    if (traffic?.forcedColumn && ['waiting','approach','crossing'].includes(traffic.state)) continue;
+
+    const members = regimentMembers(reg);
+    const bayonet = members.some(u =>
+      (u.type === 'infantry' || u.type === 'officer') && u.attackMode === 'bayonet'
+    );
+    if (bayonet) continue;
+
+    const hit = nearestFireContactV069(reg);
+    if (!hit) continue;
+
+    const enemyReg = hit.enemy?.regimentId
+      ? (getRegiment(hit.enemy.regimentId) || regiments.find(r => r.id === hit.enemy.regimentId))
+      : null;
+    const enemyGroupId = enemyReg && !enemyReg.destroyed && enemyReg.side !== reg.side
+      ? enemyReg.id
+      : null;
+    const previousLock = reg.engagementLockV070;
+    const wasLocked = !!(enemyGroupId && previousLock?.enemyGroupId === enemyGroupId);
+
+    if (enemyGroupId) {
+      if (!wasLocked) {
+        if (previousLock?.enemyGroupId) V070_STATS.engagementSwitches++;
+        V070_STATS.engagementLocks++;
+      }
+      reg.engagementLockV070 = {
+        enemyGroupId,
+        lockedAt:wasLocked ? previousLock.lockedAt : elapsed
+      };
+    } else {
+      // Buildings and loose enemy units can still create legitimate fire
+      // contact, but there is no regiment identity to retain as a stable lock.
+      reg.engagementLockV070 = null;
+    }
+
+    reg.engagementV069 = {
+      mode:'fire',
+      enemyGroupId,
+      enemyId:hit.enemy.id,
+      distance:hit.distance,
+      centerDistance:null,
+      frontGap:hit.memberDistance,
+      contactMemberId:hit.memberId,
+      contactDistance:hit.memberDistance,
+      heading:Math.atan2(hit.enemy.y - hit.anchor.y, hit.enemy.x - hit.anchor.x),
+      hold:true,
+      stableGroupLock:!!enemyGroupId,
+      updatedAt:elapsed
+    };
+  }
+};
