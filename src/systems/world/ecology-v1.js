@@ -13,8 +13,9 @@
   const relocationRings=cfg.relocationRings ?? 18;
   const berryVillagePadding=villageCfg.berryExclusionPadding ?? 70;
   const baseVillageBerryMin=villageCfg.baseBerryMin ?? 5;
-  const baseVillageBerryRadius=villageCfg.baseBerryRadius ?? 240;
-  const baseVillageBerryTownRadius=villageCfg.baseBerryTownRadius ?? 620;
+  const baseVillageBerryRadius=villageCfg.baseBerryRadius ?? 460;
+  const baseVillageBerryTownRadius=villageCfg.baseBerryTownRadius ?? 260;
+  const baseVillageBerryStartRadius=villageCfg.baseBerryStartRadius ?? 110;
   const baseVillageSearchRadius=villageCfg.baseVillageSearchRadius ?? 460;
   const baseVillageBerryAmount=villageCfg.baseBerryAmount ?? 360;
   const roadPadding=cfg.roadPadding ?? 8;
@@ -105,6 +106,16 @@
     if(type==='food'&&insideVillage(x,y))return false;
     return !resourceConflict(type,x,y,ignore);
   }
+  // Guaranteed starting berries are a deliberate exception to the broad village
+  // envelope. They may sit in open village-edge space, but never on a road, house,
+  // gameplay building or another resource. This keeps them genuinely close to the
+  // player's Town Center on small/mobile viewports.
+  function validBaseBerrySpot(x,y){
+    const rr=resourceRadius('food');
+    if(x<rr+16||y<rr+16||x>WORLD.width-rr-16||y>WORLD.height-rr-16)return false;
+    if(roadConflictAt(x,y,rr+7,roadPadding)||buildingConflict('food',x,y)||villageHouseConflict('food',x,y))return false;
+    return !resourceConflict('food',x,y,null);
+  }
   function deterministicPhase(type,x,y){
     let seed=((Math.round(x)*73856093)^(Math.round(y)*19349663)^(type==='wood'?83492791:2654435761))>>>0;
     seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
@@ -168,12 +179,12 @@
     return best&&bestDistance<=baseVillageSearchRadius?best:null;
   }
   function villageEdgeDistance(anchor,x,y){
+    if(!anchor)return null;
     return Math.max(0,Math.hypot(x-anchor.x,y-anchor.y)-anchor.radius);
   }
-  function localBerryNodes(tc,anchor){
+  function localBerryNodes(tc){
     return resources.filter(r=>r&&!r.dead&&r.amount>0&&r.type==='food'&&
-      !insideVillage(r.x,r.y)&&
-      villageEdgeDistance(anchor,r.x,r.y)<=baseVillageBerryRadius&&
+      r.localVillageBerry===true&&r.homeSide===tc.side&&
       Math.hypot(r.x-tc.x,r.y-tc.y)<=baseVillageBerryTownRadius);
   }
   function angleDistance(a,b){
@@ -183,27 +194,26 @@
     return Math.abs(d);
   }
   function localBerryCandidate(tc,anchor){
-    const rr=resourceRadius('food');
-    const minEdge=rr+Math.max(10,resourceGap);
-    const radialStep=Math.max(16,Math.round((rr*2+resourceGap)*.42));
-    const angleSteps=144;
-    const homeAngle=Math.atan2(tc.y-anchor.y,tc.x-anchor.x);
+    const radialStep=16;
+    const angleSteps=180;
+    const homeAngle=anchor
+      ? Math.atan2(tc.y-anchor.y,tc.x-anchor.x)
+      : (tc.x<WORLD.width*.5?Math.PI:0);
     let best=null;
 
-    // Scan the complete legal village-edge ring, but score the own-base side first.
-    // Re-running this after each addition automatically picks the next collision-free
-    // patch instead of repeatedly landing on the same narrow opening.
-    for(let edge=minEdge;edge<=baseVillageBerryRadius+.01;edge+=radialStep){
-      const radius=anchor.radius+edge;
+    // Town Center proximity is the hard gameplay guarantee. A nearby village only
+    // influences which side of the base is preferred; it can never block a base
+    // from receiving its own five berry bushes.
+    for(let radius=baseVillageBerryStartRadius;radius<=baseVillageBerryTownRadius+.01;radius+=radialStep){
       for(let step=0;step<angleSteps;step++){
-        const a=homeAngle+step/angleSteps*Math.PI*2;
-        const x=anchor.x+Math.cos(a)*radius;
-        const y=anchor.y+Math.sin(a)*radius;
-        const townDistance=Math.hypot(x-tc.x,y-tc.y);
-        if(townDistance>baseVillageBerryTownRadius)continue;
-        if(!validResourceSpot('food',x,y,null))continue;
+        const offset=(step%2===0?1:-1)*Math.ceil(step/2)/angleSteps*Math.PI*2;
+        const a=homeAngle+offset;
+        const x=tc.x+Math.cos(a)*radius;
+        const y=tc.y+Math.sin(a)*radius;
+        if(!validBaseBerrySpot(x,y))continue;
         const homeBias=angleDistance(a,homeAngle);
-        const score=townDistance+edge*.22+homeBias*34;
+        const villageDistance=anchor?Math.hypot(x-anchor.x,y-anchor.y):0;
+        const score=radius+homeBias*20+(anchor?villageDistance*.015:0);
         if(!best||score<best.score)best={x,y,score};
       }
     }
@@ -213,51 +223,73 @@
     let added=0;
     for(const tc of townCenters()){
       const anchor=nearestVillageForTownCenter(tc);
-      if(!anchor)continue;
-      let local=localBerryNodes(tc,anchor);
+      let local=localBerryNodes(tc);
       while(local.length<baseVillageBerryMin){
         const spot=localBerryCandidate(tc,anchor);
         if(!spot)break;
         const r=stampResource(previousCreateResource('food',spot.x,spot.y,baseVillageBerryAmount),'food',{
           localVillageBerry:true,
           homeSide:tc.side,
-          villageName:anchor.village?.name||null
+          villageName:anchor?.village?.name||null
         });
         if(!r)break;
         added++;
-        local=localBerryNodes(tc,anchor);
+        local=localBerryNodes(tc);
       }
     }
     return added;
   }
+  function centerCameraOnHomeBase(){
+    const tc=townCenters().find(b=>b.side==='france');
+    if(!tc)return false;
+    camera.x=tc.x;
+    camera.y=tc.y;
+    if(typeof clampCamera==='function')clampCamera();
+    return true;
+  }
+  function refreshBaseVillageAccess(){
+    const added=ensureBaseVillageBerries();
+    const centered=centerCameraOnHomeBase();
+    return {added,centered};
+  }
   function baseVillageBerryStats(){
     return townCenters().map(tc=>{
       const anchor=nearestVillageForTownCenter(tc);
-      if(!anchor)return{side:tc.side,villageName:null,count:0,insideVillageCount:0,maxVillageEdgeDistance:null,maxTownDistance:null};
-      const local=localBerryNodes(tc,anchor);
+      const local=localBerryNodes(tc);
       return{
         side:tc.side,
-        villageName:anchor.village?.name||null,
+        villageName:anchor?.village?.name||null,
         count:local.length,
         insideVillageCount:local.filter(r=>insideVillage(r.x,r.y)).length,
-        maxVillageEdgeDistance:local.length?Math.max(...local.map(r=>villageEdgeDistance(anchor,r.x,r.y))):null,
-        maxTownDistance:local.length?Math.max(...local.map(r=>Math.hypot(r.x-tc.x,r.y-tc.y))):null
+        maxVillageDistance:anchor&&local.length?Math.max(...local.map(r=>Math.hypot(r.x-anchor.x,r.y-anchor.y))):null,
+        maxVillageEdgeDistance:anchor&&local.length?Math.max(...local.map(r=>villageEdgeDistance(anchor,r.x,r.y))):null,
+        maxTownDistance:local.length?Math.max(...local.map(r=>Math.hypot(r.x-tc.x,r.y-tc.y))):null,
+        roadConflicts:local.filter(r=>roadConflictAt(r.x,r.y,resourceRadius('food')+7,roadPadding)).length,
+        buildingConflicts:local.filter(r=>buildingConflict('food',r.x,r.y)).length,
+        houseConflicts:local.filter(r=>villageHouseConflict('food',r.x,r.y)).length
       };
     });
   }
 
-  const addedInitialBaseVillageBerries=ensureBaseVillageBerries();
-  const previousCreateResourceClusters=typeof createResourceClusters==='function'?createResourceClusters:null;
-  if(previousCreateResourceClusters){
-    createResourceClusters=function createResourceClustersEcologyV1(){
-      const result=previousCreateResourceClusters();
-      ensureBaseVillageBerries();
-      return result;
-    };
+  const initialRefresh=refreshBaseVillageAccess();
+
+  // resetBtn bound the original resetGame before Architecture-v2 systems load, so
+  // updating createResourceClusters is too early: later reset work can still move a
+  // Town Center. Refresh after the complete reset instead. Direct resetGame callers
+  // use the wrapper; the existing button binding gets a post-dispatch microtask.
+  const previousResetGame=resetGame;
+  resetGame=function resetGameEcologyV1(...args){
+    const result=previousResetGame(...args);
+    refreshBaseVillageAccess();
+    return result;
+  };
+  const resetButton=document.getElementById('resetBtn');
+  if(resetButton){
+    resetButton.addEventListener('click',()=>queueMicrotask(refreshBaseVillageAccess));
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.4-base-village-home-ring',
+    version:'battlefield-ecology-v1.8-base-berries-post-reset',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
@@ -275,7 +307,11 @@
     baseVillageBerryMin,
     baseVillageBerryRadius,
     baseVillageBerryTownRadius,
-    addedInitialBaseVillageBerries,
+    baseVillageBerryStartRadius,
+    addedInitialBaseVillageBerries:initialRefresh.added,
+    centeredInitialCamera:initialRefresh.centered,
+    centerCameraOnHomeBase,
+    refreshBaseVillageAccess,
     ensureBaseVillageBerries,
     baseVillageBerryStats,
     resourceBuildingExclusion:true,
@@ -284,6 +320,6 @@
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'collision-safe tree and berry placement with village-core exclusion and guaranteed own-base village-edge berry access'
+    responsibility:'collision-safe tree and berry placement with general village exclusion plus five guaranteed visible 2D berry bushes per starting Town Center, refreshed only after reset completion'
   });
 })(window);

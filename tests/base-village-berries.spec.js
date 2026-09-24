@@ -1,16 +1,32 @@
 const { test, expect } = require('@playwright/test');
 
-async function readBerryAccess(page) {
+async function render2DAndReadBerryAccess(page) {
   return page.evaluate(() => {
+    // Regression pages use manual simulation timing. Render the authoritative 2D
+    // canvas explicitly so this test does not depend on an animation-frame race.
+    draw();
     const ecology = window.__BATTLEFIELD_ECOLOGY_V1__;
+    const natural = window.__NATURAL_RESOURCES_V1__;
+    const local = resources.filter(r => !r.dead && r.type === 'food' && r.localVillageBerry === true);
+    const frenchLocal = local.filter(r => r.homeSide === 'france');
+    const visibleFrench = frenchLocal.filter(r => {
+      const p = worldToScreen(r.x, r.y);
+      return p.x >= 0 && p.x <= innerWidth && p.y >= 0 && p.y <= innerHeight;
+    });
     return {
       version: ecology?.version || null,
       enabled: ecology?.berryVillageAccess === true,
       exclusion: ecology?.berryVillageExclusion,
       min: ecology?.baseVillageBerryMin || 0,
-      edgeRadius: ecology?.baseVillageBerryRadius || 0,
+      villageRadius: ecology?.baseVillageBerryRadius || 0,
       townRadius: ecology?.baseVillageBerryTownRadius || 0,
-      stats: ecology?.baseVillageBerryStats?.() || []
+      startRadius: ecology?.baseVillageBerryStartRadius || 0,
+      stats: ecology?.baseVillageBerryStats?.() || [],
+      localTaggedCount: local.length,
+      visibleFrenchCount: visibleFrench.length,
+      render: natural?.diagnostics?.() || null,
+      renderVersion: natural?.version || null,
+      explicit2DPass: natural?.explicitLocalBerry2DPass === true
     };
   });
 }
@@ -19,27 +35,40 @@ function expectSafeLocalBerries(state) {
   expect(state.enabled).toBe(true);
   expect(state.exclusion).toBe(true);
   expect(state.stats).toHaveLength(2);
+  expect(state.localTaggedCount).toBeGreaterThanOrEqual(state.min * 2);
   for (const base of state.stats) {
     expect(base.count).toBeGreaterThanOrEqual(state.min);
-    expect(base.insideVillageCount).toBe(0);
-    expect(base.maxVillageEdgeDistance).not.toBeNull();
     expect(base.maxTownDistance).not.toBeNull();
-    expect(base.maxVillageEdgeDistance).toBeLessThanOrEqual(state.edgeRadius + 0.01);
     expect(base.maxTownDistance).toBeLessThanOrEqual(state.townRadius + 0.01);
+    if (base.maxVillageEdgeDistance !== null) {
+      expect(base.maxVillageEdgeDistance).toBeLessThanOrEqual(state.villageRadius + 0.01);
+    }
+    expect(base.roadConflicts).toBe(0);
+    expect(base.buildingConflicts).toBe(0);
+    expect(base.houseConflicts).toBe(0);
   }
+  expect(state.visibleFrenchCount).toBeGreaterThanOrEqual(3);
+  expect(state.renderVersion).toContain('local-berry-2d-overlay');
+  expect(state.explicit2DPass).toBe(true);
+  expect(state.render?.localVillageBerryDraws || 0).toBeGreaterThan(0);
+  expect(state.render?.localOverlayFrames || 0).toBeGreaterThan(0);
 }
 
-test('both starting bases keep safe berry bushes just outside their linked village', async ({ page }) => {
+test('both starting bases get explicit nearby berry bushes that are visible in the 2D mobile start view', async ({ page }) => {
+  await page.setViewportSize({ width: 430, height: 840 });
   await page.goto('/?test');
-  await page.waitForFunction(() => window.__BATTLEFIELD_ECOLOGY_V1__?.baseVillageBerryStats);
+  await page.waitForFunction(() => window.__BATTLEFIELD_ECOLOGY_V1__?.baseVillageBerryStats && window.__NATURAL_RESOURCES_V1__?.diagnostics);
 
-  const initial = await readBerryAccess(page);
-  expect(initial.version).toContain('base-village-home-ring');
+  const initial = await render2DAndReadBerryAccess(page);
+  expect(initial.version).toContain('base-berries');
   expectSafeLocalBerries(initial);
 
+  // On mobile, Nieuwe slag intentionally lives behind the compact Menu button.
+  // Exercise the real player flow rather than force-clicking a hidden desktop control.
+  await page.locator('#mobileMenuBtn').click();
   await page.locator('#resetBtn').click();
   await page.waitForTimeout(50);
 
-  const afterReset = await readBerryAccess(page);
+  const afterReset = await render2DAndReadBerryAccess(page);
   expectSafeLocalBerries(afterReset);
 });
