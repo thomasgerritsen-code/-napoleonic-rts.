@@ -200,7 +200,7 @@ test('loose British combat troops also move toward a nearby French threat', asyn
   expect(errors).toEqual([]);
 });
 
-test('RETREAT cancels local proximity aggression and restores the prior loose-unit order', async ({ page }) => {
+test('RETREAT keeps the active retreat order authoritative over proximity aggression', async ({ page }) => {
   const errors = await openGame(page);
   const result = await page.evaluate(() => {
     for (const unit of units) {
@@ -210,8 +210,7 @@ test('RETREAT cancels local proximity aggression and restores the prior loose-un
 
     const british = createUnit('britain', 'infantry', 1900, 900);
     createUnit('france', 'infantry', 1540, 900);
-    const strategicTargetX = 2200;
-    british.targetX = strategicTargetX;
+    british.targetX = 2200;
     british.targetY = british.y;
     window.__AI_COMMANDER_V1__.forceState('DEFEND');
 
@@ -219,16 +218,22 @@ test('RETREAT cancels local proximity aggression and restores the prior loose-un
     const engagedBeforeRetreat = api.apply();
     const contactTargetX = british.targetX;
 
+    // Simulate the commander issuing a real retreat destination before the next
+    // proximity scan. The proximity layer may clear its own state but must not
+    // restore the pre-contact order over this retreat command.
     window.__AI_COMMANDER_V1__.forceState('RETREAT');
+    const retreatTargetX = 2500;
+    british.targetX = retreatTargetX;
+    british.targetY = 900;
     const engagedDuringRetreat = api.apply();
     const contact = api.looseState().find(item => item.unitId === british.id);
 
     return {
       engagedBeforeRetreat,
       contactTargetX,
-      strategicTargetX,
+      retreatTargetX,
       engagedDuringRetreat,
-      restoredTargetX: british.targetX,
+      targetDuringRetreat: british.targetX,
       targetKey: contact?.targetKey ?? null
     };
   });
@@ -237,6 +242,6 @@ test('RETREAT cancels local proximity aggression and restores the prior loose-un
   expect(result.contactTargetX).toBeLessThan(1900);
   expect(result.engagedDuringRetreat).toBe(0);
   expect(result.targetKey).toBeNull();
-  expect(result.restoredTargetX).toBe(result.strategicTargetX);
+  expect(result.targetDuringRetreat).toBe(result.retreatTargetX);
   expect(errors).toEqual([]);
 });
