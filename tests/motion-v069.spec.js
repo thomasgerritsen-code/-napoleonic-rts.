@@ -84,10 +84,10 @@ test('flank fire contact halts and realigns the whole battalion before the ancho
   const errors = await openGame(page);
   await page.evaluate(() => window.__RTS_DEBUG__.setPeaceMode(true));
   const setup = await page.evaluate(() => {
-    const id = window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1500,900);
+    const id = window.__RTS_DEBUG__.createFreshInfantryRegiment('france',900,700);
     window.RTS_SIM.step(.5);
     window.__RTS_DEBUG__.selectRegiment(id);
-    window.__RTS_DEBUG__.orderSelectedWithFacing(1950,900,0);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(1300,700,0);
     window.RTS_SIM.step(.2);
     return { id, contact:window.__RTS_DEBUG__.setupFlankFireContactV069(id) };
   });
