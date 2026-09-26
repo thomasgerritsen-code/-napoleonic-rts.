@@ -296,6 +296,11 @@
     mobile.taps++;
     const hit = touchHitAt(clientX, clientY);
     if (hit) {
+      const regimentMultiselect = root.__MOBILE_REGIMENT_MULTISELECT_V1__;
+      if (regimentMultiselect?.toggleTappedRegiment?.(hit)) {
+        hint('Regimentselectie bijgewerkt');
+        return;
+      }
       selectPoint(endWorld.x, endWorld.y, false);
       hint(hit.kind === 'unit' && hit.regimentId ? 'Regiment geselecteerd' : 'Selectie bijgewerkt');
       return;
