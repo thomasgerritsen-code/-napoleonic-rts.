@@ -163,9 +163,10 @@ test('expired regiment lock yields immediately to a nearer valid regiment', asyn
   const errors=await openV070(page);
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
   const ids=await page.evaluate(()=>{
-    const french=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',900,700);
-    const stale=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1310,700);
-    const near=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1040,700);
+    const french=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1030,1120);
+    const stale=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1440,1120);
+    const near=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1230,1120);
+    window.__RTS_DEBUG__.setRegimentBayonetV069(french);
     const reg=getRegiment(french);
     reg.engagementLockV070={enemyGroupId:stale,lockedAt:elapsed};
     return {french,stale,near};
