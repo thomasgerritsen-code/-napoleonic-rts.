@@ -46,6 +46,7 @@ function expectSafeLocalBerries(state) {
     expect(base.roadConflicts).toBe(0);
     expect(base.buildingConflicts).toBe(0);
     expect(base.houseConflicts).toBe(0);
+    expect(base.blockedApproaches).toBe(0);
   }
   expect(state.visibleFrenchCount).toBeGreaterThanOrEqual(3);
   expect(state.renderVersion).toContain('local-berry-2d-overlay');
