@@ -6,8 +6,8 @@ test('phone adds the nearest regiment to the current selection with one action',
   await page.waitForFunction(() => window.RTS_SIM && window.__MOBILE_REGIMENT_MULTISELECT_V1__);
 
   const regiments = await page.evaluate(() => {
-    const first = window.__RTS_DEBUG__.createRegimentDirect('france');
-    const second = window.__RTS_DEBUG__.createRegimentDirect('france');
+    const first = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', 950, 980);
+    const second = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', 1350, 980);
     if (!first || !second) return null;
     window.__RTS_DEBUG__.selectRegiment(first);
     return [first, second];
