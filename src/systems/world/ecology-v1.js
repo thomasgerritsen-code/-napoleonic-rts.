@@ -116,6 +116,21 @@
     if(roadConflictAt(x,y,rr+7,roadPadding)||buildingConflict('food',x,y)||villageHouseConflict('food',x,y))return false;
     return !resourceConflict('food',x,y,null);
   }
+  function baseBerryApproachClear(tc,x,y){
+    const workerClearance=14;
+    for(const b of buildings){
+      if(!b||b.dead||b===tc)continue;
+      const radius=Math.hypot(b.w||0,b.h||0)*.5+workerClearance;
+      if(pointSegmentDistanceSq(b.x,b.y,tc.x,tc.y,x,y)<radius*radius)return false;
+    }
+    for(const village of villageData()){
+      for(const h of village.houses||[]){
+        const radius=houseRadius(h)+workerClearance;
+        if(pointSegmentDistanceSq(h.x,h.y,tc.x,tc.y,x,y)<radius*radius)return false;
+      }
+    }
+    return true;
+  }
   function deterministicPhase(type,x,y){
     let seed=((Math.round(x)*73856093)^(Math.round(y)*19349663)^(type==='wood'?83492791:2654435761))>>>0;
     seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
@@ -210,7 +225,7 @@
         const a=homeAngle+offset;
         const x=tc.x+Math.cos(a)*radius;
         const y=tc.y+Math.sin(a)*radius;
-        if(!validBaseBerrySpot(x,y))continue;
+        if(!validBaseBerrySpot(x,y)||!baseBerryApproachClear(tc,x,y))continue;
         const homeBias=angleDistance(a,homeAngle);
         const villageDistance=anchor?Math.hypot(x-anchor.x,y-anchor.y):0;
         const score=radius+homeBias*20+(anchor?villageDistance*.015:0);
@@ -266,7 +281,8 @@
         maxTownDistance:local.length?Math.max(...local.map(r=>Math.hypot(r.x-tc.x,r.y-tc.y))):null,
         roadConflicts:local.filter(r=>roadConflictAt(r.x,r.y,resourceRadius('food')+7,roadPadding)).length,
         buildingConflicts:local.filter(r=>buildingConflict('food',r.x,r.y)).length,
-        houseConflicts:local.filter(r=>villageHouseConflict('food',r.x,r.y)).length
+        houseConflicts:local.filter(r=>villageHouseConflict('food',r.x,r.y)).length,
+        blockedApproaches:local.filter(r=>!baseBerryApproachClear(tc,r.x,r.y)).length
       };
     });
   }
@@ -289,12 +305,13 @@
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.8-base-berries-post-reset',
+    version:'battlefield-ecology-v1.9-worker-accessible-base-berries',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
     buildingConflict,
     villageHouseConflict,
+    baseBerryApproachClear,
     roadConflict,
     roadConflictAt,
     resourceRadius,
@@ -320,6 +337,6 @@
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'collision-safe tree and berry placement with general village exclusion plus five guaranteed visible 2D berry bushes per starting Town Center, refreshed only after reset completion'
+    responsibility:'collision-safe tree and berry placement with five visible, directly worker-accessible 2D berry bushes per starting Town Center, refreshed only after reset completion'
   });
 })(window);
