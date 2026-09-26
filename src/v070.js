@@ -96,7 +96,7 @@ function enemyGroupByIdV070(id, side) {
   return regimentMembers(reg).some(u => !u.dead && !u.routing) ? reg : null;
 }
 
-function nearestEnemyGroupV070(reg, maxCenterDistance = 360) {
+function nearestEnemyGroupV070(reg, maxCenterDistance = 360, excludedId = null) {
   const own = groupCenterV070(reg);
   if (!own) return null;
   const locked = enemyGroupByIdV070(reg.engagementLockV070?.enemyGroupId, reg.side);
@@ -110,6 +110,7 @@ function nearestEnemyGroupV070(reg, maxCenterDistance = 360) {
   let best = null;
   for (const candidate of regiments) {
     if (!candidate || candidate.destroyed || candidate.side === reg.side) continue;
+    if (candidate.id === excludedId) continue;
     if (!['infantry','cavalry'].includes(groupKindV06(candidate))) continue;
     const center = groupCenterV070(candidate);
     if (!center) continue;
@@ -134,19 +135,34 @@ refreshEngagementStatesV069 = function refreshEngagementStatesV070() {
     const members = regimentMembers(reg);
     const bayonet = members.some(u => (u.type === 'infantry' || u.type === 'officer') && u.attackMode === 'bayonet');
     const own = groupCenterV070(reg);
-    const hit = nearestEnemyGroupV070(reg, bayonet ? 390 : 330);
+    const maxCenterDistance = bayonet ? 390 : 330;
+    let hit = nearestEnemyGroupV070(reg, maxCenterDistance);
     if (!own || !hit) {
       reg.engagementV069 = null;
       reg.engagementLockV070 = null;
       continue;
     }
-    const heading = Math.atan2(hit.center.y-own.y, hit.center.x-own.x);
-    const ownExtent = projectedExtentV070(reg, own, heading);
-    const enemyExtent = projectedExtentV070(hit.reg, hit.center, heading);
-    const frontGap = Math.max(0, hit.centerDistance - ownExtent - enemyExtent);
+    let heading = Math.atan2(hit.center.y-own.y, hit.center.x-own.x);
+    let ownExtent = projectedExtentV070(reg, own, heading);
+    let enemyExtent = projectedExtentV070(hit.reg, hit.center, heading);
+    let frontGap = Math.max(0, hit.centerDistance - ownExtent - enemyExtent);
     const acquire = bayonet ? 165 : 145;
     const retain = bayonet ? 205 : 185;
-    const wasLocked = reg.engagementLockV070?.enemyGroupId === hit.reg.id;
+    let wasLocked = reg.engagementLockV070?.enemyGroupId === hit.reg.id;
+    if (wasLocked && frontGap > retain) {
+      const expiredId = hit.reg.id;
+      reg.engagementLockV070 = null;
+      hit = nearestEnemyGroupV070(reg, maxCenterDistance, expiredId);
+      if (!hit) {
+        reg.engagementV069 = null;
+        continue;
+      }
+      heading = Math.atan2(hit.center.y-own.y, hit.center.x-own.x);
+      ownExtent = projectedExtentV070(reg, own, heading);
+      enemyExtent = projectedExtentV070(hit.reg, hit.center, heading);
+      frontGap = Math.max(0, hit.centerDistance - ownExtent - enemyExtent);
+      wasLocked = false;
+    }
     if (frontGap > (wasLocked ? retain : acquire)) {
       reg.engagementV069 = null;
       if (!wasLocked) reg.engagementLockV070 = null;
