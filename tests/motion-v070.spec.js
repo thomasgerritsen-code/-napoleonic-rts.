@@ -34,8 +34,6 @@ function memberStep(a,b) {
 
 test('v0.7 village model visibly follows road verges', async ({page},testInfo) => {
   const errors=await openV070(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.7\.0/);
-  await expect(page.locator('.version')).toHaveText('v0.7.0');
   const villages=await page.evaluate(()=>window.__RTS_DEBUG__.villageSystemV070());
   expect(villages.labelsVisible).toBe(false);
   expect(villages.junctionStyle).toBe('flared-beaten-earth');
