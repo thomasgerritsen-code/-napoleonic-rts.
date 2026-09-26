@@ -160,3 +160,24 @@ test('enemy interaction keeps one battalion lock without teleporting the combat 
   await testInfo.attach('v070-stable-bayonet-contact',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
   expect(errors).toEqual([]);
 });
+
+test('expired regiment lock yields immediately to a nearer valid regiment', async ({page}) => {
+  const errors=await openV070(page);
+  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
+  const ids=await page.evaluate(()=>{
+    const french=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',900,700);
+    const stale=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1310,700);
+    const near=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1080,700);
+    const reg=getRegiment(french);
+    reg.engagementLockV070={enemyGroupId:stale,lockedAt:elapsed};
+    return {french,stale,near};
+  });
+
+  await page.evaluate(()=>window.RTS_SIM.step(.15));
+  const state=await motion(page,ids.french);
+  expect(state.engagement).toBeTruthy();
+  expect(state.engagement.enemyGroupId).toBe(ids.near);
+  expect(state.engagement.enemyGroupId).not.toBe(ids.stale);
+  expect(state.engagement.stableGroupLock).toBe(true);
+  expect(errors).toEqual([]);
+});
