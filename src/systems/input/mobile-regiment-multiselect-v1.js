@@ -5,6 +5,7 @@
   if (typeof renderDynamicActions !== 'function') return;
 
   const baseRenderDynamicActions = renderDynamicActions;
+  let tapSelectionMode = false;
 
   function selectedFrenchRegiments() {
     return selectedRegiments().filter(regiment => regiment.side === 'france' && !regiment.destroyed);
@@ -45,20 +46,65 @@
     return true;
   }
 
+  function toggleTappedRegiment(unit) {
+    if (!tapSelectionMode || !unit?.regimentId || unit.side !== 'france') return false;
+    const regiment = getRegiment(unit.regimentId);
+    if (!regiment || regiment.destroyed) return false;
+
+    const selected = selectedFrenchRegiments();
+    const isSelected = selected.some(candidate => candidate.id === regiment.id);
+    if (isSelected && selected.length === 1) {
+      statusEl.textContent = 'Minstens één regiment blijft geselecteerd · tik een ander regiment om het toe te voegen.';
+      return true;
+    }
+
+    const members = regimentMembers(regiment).filter(member => !member.dead);
+    if (isSelected) members.forEach(member => selectedUnits.delete(member));
+    else members.forEach(member => selectedUnits.add(member));
+    selectedBuilding = null;
+    actionSignature = '';
+    updateHud(true);
+    const count = selectedFrenchRegiments().length;
+    statusEl.textContent = `${regiment.name} ${isSelected ? 'verwijderd uit' : 'toegevoegd aan'} selectie · ${count} regiment${count === 1 ? '' : 'en'} geselecteerd.`;
+    return true;
+  }
+
   renderDynamicActions = function renderMobileRegimentMultiselectActions(force = false) {
     baseRenderDynamicActions(force);
     const selected = selectedFrenchRegiments();
-    if (!selected.length || !nearestUnselectedRegiment(selected)) return;
-    if (actionsEl.querySelector('[data-action="add-nearest-regiment"]')) return;
-    const button = makeDynamicButton(
+    if (!selected.length) {
+      tapSelectionMode = false;
+      return;
+    }
+    if (!actionsEl.querySelector('[data-action="toggle-regiment-tap-selection"]')) {
+      const toggle = makeDynamicButton(
+        'toggle-regiment-tap-selection',
+        `Tik regimenten<br><small>${tapSelectionMode ? 'aan · tik om te wisselen' : 'uit'}</small>`
+      );
+      toggle.title = 'Zet aantikken aan om regimenten aan de huidige selectie toe te voegen of eruit te verwijderen.';
+      toggle.setAttribute('aria-pressed', String(tapSelectionMode));
+      actionsEl.prepend(toggle);
+    }
+    if (!nearestUnselectedRegiment(selected) || actionsEl.querySelector('[data-action="add-nearest-regiment"]')) return;
+    const add = makeDynamicButton(
       'add-nearest-regiment',
       `Voeg regiment toe<br><small>${selected.length} geselecteerd</small>`
     );
-    button.title = 'Voeg het dichtstbijzijnde andere regiment toe aan de huidige selectie.';
-    actionsEl.prepend(button);
+    add.title = 'Voeg het dichtstbijzijnde andere regiment toe aan de huidige selectie.';
+    actionsEl.prepend(add);
   };
 
   actionsEl.addEventListener('click', event => {
+    const toggle = event.target.closest('button[data-action="toggle-regiment-tap-selection"]');
+    if (toggle && !toggle.disabled) {
+      tapSelectionMode = !tapSelectionMode;
+      actionSignature = '';
+      updateHud(true);
+      statusEl.textContent = tapSelectionMode
+        ? 'Tik regimenten aan · tik regimenten op het slagveld om ze toe te voegen of te verwijderen.'
+        : 'Tik regimenten uit · normale selectie is actief.';
+      return;
+    }
     const button = event.target.closest('button[data-action="add-nearest-regiment"]');
     if (!button || button.disabled) return;
     addNearestRegiment();
@@ -67,6 +113,8 @@
   global.__MOBILE_REGIMENT_MULTISELECT_V1__ = Object.freeze({
     selectedCount: () => selectedFrenchRegiments().length,
     hasAvailableRegiment: () => Boolean(nearestUnselectedRegiment(selectedFrenchRegiments())),
-    addNearestRegiment
+    addNearestRegiment,
+    tapSelectionActive: () => tapSelectionMode,
+    toggleTappedRegiment
   });
 })(window);
