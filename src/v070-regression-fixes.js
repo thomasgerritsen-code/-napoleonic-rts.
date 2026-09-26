@@ -142,6 +142,12 @@ refreshEngagementStatesV069 = function refreshEngagementStatesV070FlankContact()
     const previousLock = reg.engagementLockV070;
     const wasLocked = !!(enemyGroupId && previousLock?.enemyGroupId === enemyGroupId);
 
+    // The v0.7 group pass has already proven that this lock is still valid.
+    // A nearer loose soldier (or a member of another regiment) may provide a
+    // local fire contact, but must not replace that stable regiment identity.
+    if (reg.engagementV069?.stableGroupLock && previousLock?.enemyGroupId &&
+        enemyGroupId !== previousLock.enemyGroupId) continue;
+
     if (enemyGroupId) {
       if (!wasLocked) {
         if (previousLock?.enemyGroupId) V070_STATS.engagementSwitches++;
