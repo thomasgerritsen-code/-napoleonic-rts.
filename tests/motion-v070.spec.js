@@ -130,11 +130,14 @@ test('enemy interaction keeps one battalion lock without teleporting the combat 
   const ids=await page.evaluate(()=>{
     const french=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1030,1120);
     const british=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1230,1120);
+    return {french,british};
+  });
+  await page.evaluate(()=>window.RTS_SIM.step(.9));
+  await page.evaluate(({french})=>{
     window.__RTS_DEBUG__.setRegimentBayonetV069(french);
     window.__RTS_DEBUG__.selectRegiment(french);
     window.__RTS_DEBUG__.orderSelectedWithFacing(1280,1120,0);
-    return {french,british};
-  });
+  },ids);
   const engaged=[];
   for(let i=0;i<40;i++){
     await page.evaluate(()=>window.RTS_SIM.step(.1));
@@ -145,10 +148,7 @@ test('enemy interaction keeps one battalion lock without teleporting the combat 
   expect(engaged.every(s=>s.engagement.stableGroupLock===true)).toBe(true);
   expect(new Set(engaged.map(s=>s.engagement.enemyGroupId)).size).toBe(1);
   expect(engaged[0].engagement.enemyGroupId).toBe(ids.british);
-  // The production combat adapter keeps a wider contact spacing than the old
-  // v0.7 fixture. Keep that formation bounded while the stats below guard the
-  // entire manoeuvre against snapping or teleporting.
-  expect(Math.max(...engaged.map(s=>s.maxSlotError))).toBeLessThan(75);
+  expect(Math.max(...engaged.map(s=>s.maxSlotError))).toBeLessThan(45);
   const headings=engaged.map(s=>s.engagement.heading);
   const turnJumps=headings.slice(1).map((h,i)=>Math.abs(Math.atan2(Math.sin(h-headings[i]),Math.cos(h-headings[i]))));
   expect(Math.max(...turnJumps)).toBeLessThan(.10);
