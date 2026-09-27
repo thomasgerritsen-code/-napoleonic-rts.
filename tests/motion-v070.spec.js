@@ -178,7 +178,7 @@ test('explicit retreat order breaks fire contact long enough for the battalion t
 
   await page.evaluate(id=>{
     window.__RTS_DEBUG__.selectRegiment(id);
-    window.__RTS_DEBUG__.orderSelectedWithFacing(970,1120,Math.PI);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(1000,1120,Math.PI);
   },ids.french);
   await expect(page.locator('#status')).toContainText('Contact wordt verbroken');
   await page.evaluate(()=>window.RTS_SIM.step(1.2));
