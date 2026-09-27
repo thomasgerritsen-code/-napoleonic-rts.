@@ -165,7 +165,7 @@ if (V071_ACTIVE) {
   // the single authority while marching and during final deployment.
   const applyFormationTargetsV063ForV071 = applyFormationTargetsV063;
   applyFormationTargetsV063 = function applyFormationTargetsV071(reg, ...args) {
-    const preserveFacing = !!reg?.marchV063?.v064 && groupKindV06(reg) !== 'artillery';
+    const preserveFacing = !!reg?.marchV063 && groupKindV06(reg) !== 'artillery';
     const previousFacing = preserveFacing
       ? new Map(regimentMembers(reg).map(u => [u.id, u.facing]))
       : null;
