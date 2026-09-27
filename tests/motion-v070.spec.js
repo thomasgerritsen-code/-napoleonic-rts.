@@ -172,7 +172,7 @@ test('expired regiment lock yields immediately to a nearer valid regiment', asyn
     return {french,stale,near};
   });
 
-  await page.evaluate(()=>window.RTS_SIM.step(.15));
+  await page.evaluate(()=>refreshEngagementStatesV069());
   const state=await motion(page,ids.french);
   expect(state.engagement).toBeTruthy();
   expect(state.engagement.enemyGroupId).toBe(ids.near);
