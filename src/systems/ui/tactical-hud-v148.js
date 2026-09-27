@@ -85,9 +85,25 @@
     };
   }
 
+  function regimentCombatLabelV148(reg) {
+    const engagement = reg?.engagementV069;
+    if (!engagement) return null;
+    const distance = Math.max(0, Math.round(Number(
+      engagement.contactDistance ?? engagement.frontGap ?? engagement.distance
+    ) || 0));
+    const distanceText = distance ? ` · doel op ${distance} m` : '';
+    if (engagement.mode === 'fire') return `vuurt${distanceText}`;
+    if (engagement.mode === 'bayonet') {
+      return engagement.hold ? 'bajonetgevecht' : `bajonetaanval${distanceText}`;
+    }
+    return null;
+  }
+
   function regimentOrderLabelV148(reg, order = baseOrderState(reg)) {
     const formation = formationLabel(reg.formation || 'line');
     const reform = baseReformLabel(reg);
+    const combat = regimentCombatLabelV148(reg);
+    if (combat) return `${formation} · ${combat}`;
     if (!order.moving) return `${formation} · ${reform || 'positie ingenomen'}`;
     return `${formation} · ${reform ? `${reform} · ` : ''}marcheert · ${Math.max(1, Math.round(order.distance))} m te gaan`;
   }
