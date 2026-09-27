@@ -133,7 +133,9 @@
       const draft = officerDraft(group, 'france');
       if (!draft) return;
       const ready = draft.eligibility.canCreate;
-      button.innerHTML = `Maak regiment<br><small>auto · ${draft.eligibility.infantry}/12 · D${draft.eligibility.drummers}</small>`;
+      button.innerHTML = ready
+        ? `Maak regiment<br><small>auto · ${draft.eligibility.infantry}/12 · D${draft.eligibility.drummers}</small>`
+        : `Maak regiment<br><small>binnen ${AUTO_FILL_RADIUS} m · ${draft.eligibility.infantry}/12 · D${draft.eligibility.drummers}</small>`;
       button.title = ready
         ? 'Vorm rond deze officier automatisch een regiment met minimaal 12 nabijgelegen musketiers en de dichtstbijzijnde vrije drummer.'
         : `Binnen ${AUTO_FILL_RADIUS} meter zijn nog niet genoeg vrije musketiers en/of geen vrije drummer beschikbaar.`;

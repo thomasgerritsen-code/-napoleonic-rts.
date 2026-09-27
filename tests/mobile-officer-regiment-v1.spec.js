@@ -83,6 +83,7 @@ test('automatic regiment creation never recruits distant loose troops', async ({
   const createButton = page.locator('#actions [data-action="create-regiment"]');
   await expect(createButton).toBeVisible();
   await expect(createButton).toBeDisabled();
+  await expect(createButton).toContainText('binnen 320 m');
   await expect(createButton).toHaveAttribute('title', /Binnen 320 meter/);
 });
 
