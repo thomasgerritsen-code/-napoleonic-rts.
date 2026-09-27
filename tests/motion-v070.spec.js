@@ -32,10 +32,11 @@ function memberStep(a,b) {
   return max;
 }
 
-test('v0.7.0 is the production build and villages visibly follow road verges', async ({page},testInfo) => {
+test('legacy v0.7 motion and villages remain available in the production build', async ({page},testInfo) => {
   const errors=await openV070(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.7\.0/);
-  await expect(page.locator('.version')).toHaveText('v0.7.0');
+  const version=await page.evaluate(()=>window.RTS_VERSION);
+  await expect(page).toHaveTitle(`Napoleonic RTS v${version}`);
+  await expect(page.locator('.version')).toHaveText(`v${version}`);
   const villages=await page.evaluate(()=>window.__RTS_DEBUG__.villageSystemV070());
   expect(villages.labelsVisible).toBe(false);
   expect(villages.junctionStyle).toBe('flared-beaten-earth');
@@ -167,7 +168,9 @@ test('explicit retreat order breaks fire contact long enough for the battalion t
   const ids=await page.evaluate(()=>{
     const french=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1030,1120);
     const british=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1230,1120);
-    window.RTS_SIM.step(.8);
+    window.__RTS_DEBUG__.selectRegiment(french);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(1280,1120,0);
+    window.RTS_SIM.step(3);
     return {french,british};
   });
   const before=await motion(page,ids.french);
