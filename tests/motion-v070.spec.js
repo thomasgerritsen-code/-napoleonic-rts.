@@ -175,7 +175,7 @@ test('explicit retreat order breaks fire contact long enough for the battalion t
 
   await page.evaluate(id=>{
     window.__RTS_DEBUG__.selectRegiment(id);
-    window.__RTS_DEBUG__.orderSelectedWithFacing(760,1120,Math.PI);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(970,1120,Math.PI);
     window.RTS_SIM.step(1.2);
   },ids.french);
 
@@ -184,5 +184,11 @@ test('explicit retreat order breaks fire contact long enough for the battalion t
   expect(after.engagementLockV070).toBeNull();
   expect(after.centroid.x).toBeLessThan(before.centroid.x-20);
   await expect(page.locator('#status')).toContainText('Contact wordt verbroken');
+
+  await page.evaluate(()=>window.RTS_SIM.step(1.5));
+  const reacquired=await motion(page,ids.french);
+  expect(reacquired.engagement?.mode).toBe('fire');
+  expect(reacquired.engagement?.enemyGroupId).toBe(ids.british);
+  expect(reacquired.engagement?.stableGroupLock).toBe(true);
   expect(errors).toEqual([]);
 });
