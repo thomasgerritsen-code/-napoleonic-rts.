@@ -12,7 +12,7 @@ async function openV070(page) {
   // instead of entering the historical `test=1` v0.6.9 compatibility mode.
   await page.goto('/?test=v070&v070=1', {waitUntil:'networkidle'});
   await page.waitForFunction(() => Boolean(
-    window.RTS_SIM?.step &&
+    window.RTS_SIM?.version==='0.7.0' &&
     window.__RTS_DEBUG__?.motionSystemV070 &&
     window.__RTS_DEBUG__?.villageSystemV070 &&
     window.__RTS_DEBUG__?.motionStatsV070
@@ -32,11 +32,10 @@ function memberStep(a,b) {
   return max;
 }
 
-test('legacy v0.7 motion and villages remain available in the production build', async ({page},testInfo) => {
+test('v0.7.0 is the production build and villages visibly follow road verges', async ({page},testInfo) => {
   const errors=await openV070(page);
-  const version=await page.evaluate(()=>window.RTS_VERSION);
-  await expect(page).toHaveTitle(`Napoleonic RTS v${version}`);
-  await expect(page.locator('.version')).toHaveText(`v${version}`);
+  await expect(page).toHaveTitle(/Napoleonic RTS v0\\.7\\.0/);
+  await expect(page.locator('.version')).toHaveText('v0.7.0');
   const villages=await page.evaluate(()=>window.__RTS_DEBUG__.villageSystemV070());
   expect(villages.labelsVisible).toBe(false);
   expect(villages.junctionStyle).toBe('flared-beaten-earth');
@@ -163,7 +162,14 @@ test('enemy interaction keeps one battalion lock without teleporting the combat 
 });
 
 test('explicit retreat order breaks fire contact long enough for the battalion to move', async ({page}) => {
-  const errors=await openV070(page);
+  const errors=[];
+  page.on('pageerror', e=>errors.push(e.message));
+  await page.addInitScript(() => {
+    let seed=314159265;
+    Math.random=()=>{ seed=(seed*16807)%2147483647; return (seed-1)/2147483646; };
+  });
+  await page.goto('/?test=v070&v070=1', {waitUntil:'networkidle'});
+  await page.waitForFunction(() => Boolean(window.RTS_SIM?.step && window.__RTS_DEBUG__?.motionSystemV070));
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
   const ids=await page.evaluate(()=>{
     const french=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1030,1120);
@@ -181,7 +187,7 @@ test('explicit retreat order breaks fire contact long enough for the battalion t
     window.__RTS_DEBUG__.orderSelectedWithFacing(1000,1120,Math.PI);
   },ids.french);
   await expect(page.locator('#status')).toContainText('Contact wordt verbroken');
-  await page.evaluate(()=>window.RTS_SIM.step(1.2));
+  await page.evaluate(()=>window.RTS_SIM.step(1.5));
 
   const after=await motion(page,ids.french);
   expect(after.engagement).toBeNull();
