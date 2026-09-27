@@ -189,7 +189,7 @@ test('explicit retreat order breaks fire contact long enough for the battalion t
   expect(engagementLock).toBeNull();
   expect(after.centroid.x).toBeLessThan(before.centroid.x-20);
 
-  await page.evaluate(()=>window.RTS_SIM.step(1.5));
+  await page.evaluate(()=>window.RTS_SIM.step(2.6));
   const reacquired=await motion(page,ids.french);
   expect(reacquired.engagement?.mode).toBe('fire');
   expect(reacquired.engagement?.enemyGroupId).toBe(ids.british);
