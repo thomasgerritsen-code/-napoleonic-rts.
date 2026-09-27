@@ -150,6 +150,9 @@ test('soldiers turn progressively with the marching formation instead of keeping
       start.y+Math.sin(turnHeading)*300,
       initialFacing*180/Math.PI
     );
+    const reg=getRegiment(id);
+    reg.facing=initialFacing;
+    for(const unit of regimentMembers(reg)) unit.facing=initialFacing;
 
     const sample=() => ({
       state:window.__RTS_DEBUG__.motionSystemV071(id),
