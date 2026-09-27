@@ -148,7 +148,7 @@ test('soldiers turn progressively with the marching formation instead of keeping
     window.__RTS_DEBUG__.orderSelectedWithFacing(
       start.x+Math.cos(turnHeading)*300,
       start.y+Math.sin(turnHeading)*300,
-      turnHeading*180/Math.PI
+      initialFacing*180/Math.PI
     );
 
     const sample=() => ({
