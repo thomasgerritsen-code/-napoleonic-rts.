@@ -83,21 +83,6 @@ if (!V070_LEGACY_TEST_MODE) {
     V070_STATS.snappedMembers = 0;
   }
 
-  function cohereCombatDrummerTargetV070() {
-    for (const reg of regiments) {
-      if (!reg?.engagementV069 || reg.destroyed || groupKindV06(reg) !== 'infantry') continue;
-      const drummer = regimentMembers(reg).find(u => u.id === reg.drummerId && !u.dead && !u.routing);
-      if (!drummer || !Number.isFinite(drummer.targetX) || !Number.isFinite(drummer.targetY)) continue;
-      const dx = drummer.targetX - drummer.x;
-      const dy = drummer.targetY - drummer.y;
-      const distance = Math.hypot(dx, dy);
-      const maxTargetStep = 44;
-      if (distance <= maxTargetStep) continue;
-      drummer.targetX = drummer.x + dx / distance * maxTargetStep;
-      drummer.targetY = drummer.y + dy / distance * maxTargetStep;
-    }
-  }
-
   // Bypass only updateV070's enforceBattalionKinematicsV070() call. The captured
   // updateV069ForV070 is the complete simulation update immediately before that
   // post-processing wrapper was installed.
@@ -106,18 +91,6 @@ if (!V070_LEGACY_TEST_MODE) {
     updateV069ForV070(dt);
     auditContinuousBattalionMotionV070(before, dt);
   };
-
-  // Movement and crossing subsystems loaded after this file wrap `update` and
-  // may replace follower targets after the v0.7 motion pass. Install this final
-  // guard once the complete production stack has loaded so combat support roles
-  // cannot inherit a one-frame target jump from a later wrapper.
-  addEventListener('load', () => {
-    const updateBeforeCombatDrummerCohesionV070 = update;
-    update = function updateWithCombatDrummerCohesionV070(dt) {
-      updateBeforeCombatDrummerCohesionV070(dt);
-      if (dt > 0 && !gameOver) cohereCombatDrummerTargetV070();
-    };
-  }, { once:true });
 
   const resetGameV070BeforeContinuousMotion = resetGame;
   resetGame = function resetGameV070ContinuousMotion() {
