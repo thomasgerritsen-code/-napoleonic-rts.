@@ -83,12 +83,28 @@ if (!V070_LEGACY_TEST_MODE) {
     V070_STATS.snappedMembers = 0;
   }
 
+  function cohereCombatDrummerTargetV070() {
+    for (const reg of regiments) {
+      if (!reg?.engagementV069 || reg.destroyed || groupKindV06(reg) !== 'infantry') continue;
+      const drummer = regimentMembers(reg).find(u => u.id === reg.drummerId && !u.dead && !u.routing);
+      if (!drummer || !Number.isFinite(drummer.targetX) || !Number.isFinite(drummer.targetY)) continue;
+      const dx = drummer.targetX - drummer.x;
+      const dy = drummer.targetY - drummer.y;
+      const distance = Math.hypot(dx, dy);
+      const maxTargetStep = 44;
+      if (distance <= maxTargetStep) continue;
+      drummer.targetX = drummer.x + dx / distance * maxTargetStep;
+      drummer.targetY = drummer.y + dy / distance * maxTargetStep;
+    }
+  }
+
   // Bypass only updateV070's enforceBattalionKinematicsV070() call. The captured
   // updateV069ForV070 is the complete simulation update immediately before that
   // post-processing wrapper was installed.
   update = function updateV070Continuous(dt) {
     const before = trackedBattalionPositionsV070();
     updateV069ForV070(dt);
+    cohereCombatDrummerTargetV070();
     auditContinuousBattalionMotionV070(before, dt);
   };
 
