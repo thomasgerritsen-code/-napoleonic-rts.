@@ -104,9 +104,20 @@ if (!V070_LEGACY_TEST_MODE) {
   update = function updateV070Continuous(dt) {
     const before = trackedBattalionPositionsV070();
     updateV069ForV070(dt);
-    cohereCombatDrummerTargetV070();
     auditContinuousBattalionMotionV070(before, dt);
   };
+
+  // Movement and crossing subsystems loaded after this file wrap `update` and
+  // may replace follower targets after the v0.7 motion pass. Install this final
+  // guard once the complete production stack has loaded so combat support roles
+  // cannot inherit a one-frame target jump from a later wrapper.
+  addEventListener('load', () => {
+    const updateBeforeCombatDrummerCohesionV070 = update;
+    update = function updateWithCombatDrummerCohesionV070(dt) {
+      updateBeforeCombatDrummerCohesionV070(dt);
+      if (dt > 0 && !gameOver) cohereCombatDrummerTargetV070();
+    };
+  }, { once:true });
 
   const resetGameV070BeforeContinuousMotion = resetGame;
   resetGame = function resetGameV070ContinuousMotion() {
