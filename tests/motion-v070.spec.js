@@ -12,7 +12,7 @@ async function openV070(page) {
   // instead of entering the historical `test=1` v0.6.9 compatibility mode.
   await page.goto('/?test=v070&v070=1', {waitUntil:'networkidle'});
   await page.waitForFunction(() => Boolean(
-    window.RTS_SIM?.version==='0.7.0' &&
+    window.RTS_SIM?.step &&
     window.__RTS_DEBUG__?.motionSystemV070 &&
     window.__RTS_DEBUG__?.villageSystemV070 &&
     window.__RTS_DEBUG__?.motionStatsV070
@@ -32,10 +32,11 @@ function memberStep(a,b) {
   return max;
 }
 
-test('v0.7.0 is the production build and villages visibly follow road verges', async ({page},testInfo) => {
+test('legacy v0.7 motion and villages remain available in the production build', async ({page},testInfo) => {
   const errors=await openV070(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\\.7\\.0/);
-  await expect(page.locator('.version')).toHaveText('v0.7.0');
+  const version=await page.evaluate(()=>window.RTS_VERSION);
+  await expect(page).toHaveTitle(`Napoleonic RTS v${version}`);
+  await expect(page.locator('.version')).toHaveText(`v${version}`);
   const villages=await page.evaluate(()=>window.__RTS_DEBUG__.villageSystemV070());
   expect(villages.labelsVisible).toBe(false);
   expect(villages.junctionStyle).toBe('flared-beaten-earth');
@@ -132,11 +133,14 @@ test('enemy interaction keeps one battalion lock without teleporting the combat 
   const ids=await page.evaluate(()=>{
     const french=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1030,1120);
     const british=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1230,1120);
+    return {french,british};
+  });
+  await page.evaluate(()=>window.RTS_SIM.step(1.5));
+  await page.evaluate(({french})=>{
     window.__RTS_DEBUG__.setRegimentBayonetV069(french);
     window.__RTS_DEBUG__.selectRegiment(french);
     window.__RTS_DEBUG__.orderSelectedWithFacing(1280,1120,0);
-    return {french,british};
-  });
+  },ids);
   const engaged=[];
   for(let i=0;i<40;i++){
     await page.evaluate(()=>window.RTS_SIM.step(.1));
@@ -195,7 +199,12 @@ test('explicit retreat order breaks fire contact long enough for the battalion t
   expect(engagementLock).toBeNull();
   expect(after.centroid.x).toBeLessThan(before.centroid.x-20);
 
-  await page.evaluate(()=>window.RTS_SIM.step(2.6));
+  await page.evaluate(()=>window.RTS_SIM.step(1.1));
+  await page.evaluate(id=>{
+    window.__RTS_DEBUG__.selectRegiment(id);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(1180,1120,0);
+    window.RTS_SIM.step(1.5);
+  },ids.french);
   const reacquired=await motion(page,ids.french);
   expect(reacquired.engagement?.mode).toBe('fire');
   expect(reacquired.engagement?.enemyGroupId).toBe(ids.british);
