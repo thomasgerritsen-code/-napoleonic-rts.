@@ -78,7 +78,8 @@ const issueMoveWithFacingV067ForV070 = issueMoveWithFacingV06;
 issueMoveWithFacingV06 = function issueMoveWithFacingV070(x, y, finalFacing = null) {
   const commanded = selectedRegiments().filter(reg => !reg.destroyed);
   for (const reg of commanded) {
-    reg.manualDisengageUntilV070 = elapsed + 2.5;
+    const isDisengaging = Boolean(reg.engagementV069 || reg.engagementLockV070);
+    reg.manualDisengageUntilV070 = isDisengaging ? elapsed + 2.5 : 0;
     reg.engagementV069 = null;
     reg.engagementLockV070 = null;
   }
