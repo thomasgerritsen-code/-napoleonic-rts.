@@ -132,7 +132,7 @@ test('enemy interaction keeps one battalion lock without teleporting the combat 
     const british=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1230,1120);
     return {french,british};
   });
-  await page.evaluate(()=>window.RTS_SIM.step(.9));
+  await page.evaluate(()=>window.RTS_SIM.step(1.5));
   await page.evaluate(({french})=>{
     window.__RTS_DEBUG__.setRegimentBayonetV069(french);
     window.__RTS_DEBUG__.selectRegiment(french);
