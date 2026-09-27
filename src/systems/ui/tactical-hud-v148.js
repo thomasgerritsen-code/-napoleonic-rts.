@@ -88,10 +88,12 @@
   function regimentCombatLabelV148(reg) {
     const engagement = reg?.engagementV069;
     if (!engagement) return null;
-    const distance = Math.max(0, Math.round(Number(
+    const rawDistance = Number(
       engagement.contactDistance ?? engagement.frontGap ?? engagement.distance
-    ) || 0));
-    const distanceText = distance ? ` · doel op ${distance} m` : '';
+    );
+    const distanceText = Number.isFinite(rawDistance)
+      ? ` · doel op ${Math.max(0, Math.round(rawDistance))} m`
+      : '';
     if (engagement.mode === 'fire') return `vuurt${distanceText}`;
     if (engagement.mode === 'bayonet') {
       return engagement.hold ? 'bajonetgevecht' : `bajonetaanval${distanceText}`;
