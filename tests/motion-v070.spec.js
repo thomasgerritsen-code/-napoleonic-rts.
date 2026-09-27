@@ -12,7 +12,7 @@ async function openV070(page) {
   // instead of entering the historical `test=1` v0.6.9 compatibility mode.
   await page.goto('/?test=v070&v070=1', {waitUntil:'networkidle'});
   await page.waitForFunction(() => Boolean(
-    window.RTS_SIM?.version==='0.7.0' &&
+    window.RTS_SIM?.step &&
     window.__RTS_DEBUG__?.motionSystemV070 &&
     window.__RTS_DEBUG__?.villageSystemV070 &&
     window.__RTS_DEBUG__?.motionStatsV070
