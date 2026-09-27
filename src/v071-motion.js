@@ -143,7 +143,12 @@ function dampedSlotMoveV071(u, reg, tx, ty, dt) {
   // Facing also approaches the battalion heading continuously instead of being
   // reassigned by every member update.
   if (u.type !== 'artillery') {
-    const facingTarget = Number.isFinite(reg.facing) ? reg.facing : u.facing;
+    const marchFacing = march.phase === 'deploying' && Number.isFinite(reg.finalFacing)
+      ? reg.finalFacing
+      : march.marchFacing;
+    const facingTarget = Number.isFinite(marchFacing)
+      ? marchFacing
+      : Number.isFinite(reg.facing) ? reg.facing : u.facing;
     const delta = normalizeAngleV063(facingTarget - u.facing);
     const maxTurn = (kind === 'cavalry' ? 5.4 : 4.4) * safeDt;
     u.facing = normalizeAngleV063(u.facing + clampV064(delta, -maxTurn, maxTurn));
