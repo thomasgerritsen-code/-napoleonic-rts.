@@ -7,6 +7,7 @@
     version: 'officer-regiment-mobile-v1',
     officerAsRegimentAnchor: true,
     autoFillMinimumInfantry: 12,
+    autoFillRadius: 320,
     autoAssignNearestDrummer: true,
     preserveExplicitSelection: true,
     mobile3dOfficerTap: true
@@ -17,6 +18,8 @@
   const baseRenderDynamicActions = typeof renderDynamicActions === 'function' ? renderDynamicActions : null;
   const MIN_INFANTRY = 12;
   const MAX_INFANTRY = 36;
+  const AUTO_FILL_RADIUS = CONTRACT.autoFillRadius;
+  const AUTO_FILL_RADIUS_SQ = AUTO_FILL_RADIUS * AUTO_FILL_RADIUS;
 
   function distanceSq(a, b) {
     const dx = (a?.x || 0) - (b?.x || 0);
@@ -32,6 +35,10 @@
     return [...candidates].sort((a, b) => distanceSq(anchor, a) - distanceSq(anchor, b));
   }
 
+  function withinAutoFillRadius(anchor, unit) {
+    return distanceSq(anchor, unit) <= AUTO_FILL_RADIUS_SQ;
+  }
+
   function officerDraft(group, side = 'france') {
     const selected = (group || []).filter(unit => validLoose(unit, side));
     const officers = selected.filter(unit => unit.type === 'officer');
@@ -43,12 +50,17 @@
     const needed = Math.max(0, MIN_INFANTRY - selectedInfantry.length);
     const nearbyInfantry = nearestTo(
       officer,
-      freeUnits(side, 'infantry').filter(unit => !selectedIds.has(unit.id))
+      freeUnits(side, 'infantry').filter(unit =>
+        !selectedIds.has(unit.id) && withinAutoFillRadius(officer, unit)
+      )
     ).slice(0, needed);
     const infantry = [...selectedInfantry, ...nearbyInfantry].slice(0, MAX_INFANTRY);
 
     const selectedDrummer = selected.find(unit => unit.type === 'drummer');
-    const drummer = selectedDrummer || nearestTo(officer, freeUnits(side, 'drummer'))[0] || null;
+    const drummer = selectedDrummer || nearestTo(
+      officer,
+      freeUnits(side, 'drummer').filter(unit => withinAutoFillRadius(officer, unit))
+    )[0] || null;
     const candidates = [...infantry, officer];
     if (drummer) candidates.push(drummer);
 
@@ -86,8 +98,8 @@
           const missingInfantry = Math.max(0, MIN_INFANTRY - draft.eligibility.infantry);
           const needsDrummer = draft.eligibility.drummers < 1;
           const missing = [
-            missingInfantry ? `${missingInfantry} vrije musketier${missingInfantry === 1 ? '' : 's'}` : '',
-            needsDrummer ? '1 vrije drummer' : ''
+            missingInfantry ? `${missingInfantry} nabije vrije musketier${missingInfantry === 1 ? '' : 's'}` : '',
+            needsDrummer ? '1 nabije vrije drummer' : ''
           ].filter(Boolean).join(' en ');
           statusEl.textContent = `Kan nog geen regiment vormen: ${missing || 'onvoldoende vrije manschappen'}.`;
         }
@@ -124,7 +136,7 @@
       button.innerHTML = `Maak regiment<br><small>auto · ${draft.eligibility.infantry}/12 · D${draft.eligibility.drummers}</small>`;
       button.title = ready
         ? 'Vorm rond deze officier automatisch een regiment met minimaal 12 nabijgelegen musketiers en de dichtstbijzijnde vrije drummer.'
-        : 'Er zijn nog niet genoeg vrije musketiers en/of geen vrije drummer beschikbaar.';
+        : `Binnen ${AUTO_FILL_RADIUS} meter zijn nog niet genoeg vrije musketiers en/of geen vrije drummer beschikbaar.`;
     };
   }
 
