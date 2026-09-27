@@ -70,6 +70,22 @@ orderGroupPathV06 = function orderGroupPathV070(reg, x, y, formation = reg.forma
   };
 };
 
+// A direct player order must be able to pull a battalion out of automatic fire
+// contact. Without a short command window the combat scan rebuilds the same lock
+// before the newly ordered march advances even one frame, making retreat orders
+// look accepted in the HUD while the regiment remains stationary.
+const issueMoveWithFacingV067ForV070 = issueMoveWithFacingV06;
+issueMoveWithFacingV06 = function issueMoveWithFacingV070(x, y, finalFacing = null) {
+  const commanded = selectedRegiments().filter(reg => !reg.destroyed);
+  for (const reg of commanded) {
+    reg.manualDisengageUntilV070 = elapsed + 2.5;
+    reg.engagementV069 = null;
+    reg.engagementLockV070 = null;
+  }
+  issueMoveWithFacingV067ForV070(x, y, finalFacing);
+  if (commanded.length) statusEl.textContent = 'Contact wordt verbroken · regiment volgt de marsorder.';
+};
+
 function groupCenterV070(reg) {
   const members = regimentMembers(reg).filter(u => !u.dead && !u.routing);
   if (!members.length) return null;
@@ -125,6 +141,11 @@ refreshEngagementStatesV069 = function refreshEngagementStatesV070() {
   for (const reg of regiments) {
     if (!reg || reg.destroyed || groupKindV06(reg) !== 'infantry' || !reg.marchV063?.v064) {
       if (reg) { reg.engagementV069 = null; reg.engagementLockV070 = null; }
+      continue;
+    }
+    if (Number(reg.manualDisengageUntilV070) > elapsed) {
+      reg.engagementV069 = null;
+      reg.engagementLockV070 = null;
       continue;
     }
     const traffic = reg.crossingTrafficV068;

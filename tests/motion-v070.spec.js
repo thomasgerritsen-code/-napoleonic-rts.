@@ -160,3 +160,29 @@ test('enemy interaction keeps one battalion lock without teleporting the combat 
   await testInfo.attach('v070-stable-bayonet-contact',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
   expect(errors).toEqual([]);
 });
+
+test('explicit retreat order breaks fire contact long enough for the battalion to move', async ({page}) => {
+  const errors=await openV070(page);
+  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
+  const ids=await page.evaluate(()=>{
+    const french=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',1030,1120);
+    const british=window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',1230,1120);
+    window.RTS_SIM.step(.8);
+    return {french,british};
+  });
+  const before=await motion(page,ids.french);
+  expect(before.engagement?.mode).toBe('fire');
+
+  await page.evaluate(id=>{
+    window.__RTS_DEBUG__.selectRegiment(id);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(760,1120,Math.PI);
+    window.RTS_SIM.step(1.2);
+  },ids.french);
+
+  const after=await motion(page,ids.french);
+  expect(after.engagement).toBeNull();
+  expect(after.engagementLockV070).toBeNull();
+  expect(after.centroid.x).toBeLessThan(before.centroid.x-20);
+  await expect(page.locator('#status')).toContainText('Contact wordt verbroken');
+  expect(errors).toEqual([]);
+});
