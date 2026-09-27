@@ -205,6 +205,21 @@ desiredGroupSpeedV064 = function desiredGroupSpeedV070(reg, march, roadMarch) {
   return base;
 };
 
+const setLocomotionTargetsV069ForV070 = setLocomotionTargetsV064;
+setLocomotionTargetsV064 = function setLocomotionTargetsV070(reg, march, roadMarch) {
+  setLocomotionTargetsV069ForV070(reg, march, roadMarch);
+  if (!reg?.engagementV069 || groupKindV06(reg) !== 'infantry') return;
+  const drummer = regimentMembers(reg).find(u => u.id === reg.drummerId && !u.dead && !u.routing);
+  if (!drummer || !Number.isFinite(drummer.targetX) || !Number.isFinite(drummer.targetY)) return;
+  const dx = drummer.targetX - drummer.x;
+  const dy = drummer.targetY - drummer.y;
+  const distance = Math.hypot(dx, dy);
+  const maxTargetStep = 44;
+  if (distance <= maxTargetStep) return;
+  drummer.targetX = drummer.x + dx / distance * maxTargetStep;
+  drummer.targetY = drummer.y + dy / distance * maxTargetStep;
+};
+
 function kinematicEligibleV070(reg) {
   if (!reg || reg.destroyed || !['infantry','cavalry'].includes(groupKindV06(reg))) return false;
   if (reg.marchV063?.v064) return true;
