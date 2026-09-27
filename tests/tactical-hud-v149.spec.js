@@ -78,3 +78,30 @@ test('v149 keeps single-regiment summary compatibility', async ({ page }) => {
   expect(result).toContain('positie ingenomen');
   expect(errors).toEqual([]);
 });
+
+
+test('single-regiment summary exposes active combat instead of idle movement text', async ({ page }) => {
+  const errors = await prepare(page);
+  const summaries = await page.evaluate(() => {
+    gameOver = false;
+    window.__RTS_DEBUG__.setPeaceMode(true);
+    const reg = getRegiment(window.__RTS_DEBUG__.createFreshInfantryRegiment('france', 900, 900));
+    selectWholeRegiment(reg);
+    const api = window.__TACTICAL_HUD_V149__;
+    const summarize = () => api.selectionRegimentSummary([reg], api.selectionTacticalState([reg]));
+
+    reg.engagementV069 = { mode: 'fire', contactDistance: 84, distance: 84, hold: true };
+    const fire = summarize();
+    reg.engagementV069 = { mode: 'fire', frontGap: 0, distance: 120, hold: true };
+    const pointBlankFire = summarize();
+    reg.engagementV069 = { mode: 'bayonet', contactDistance: 18, distance: 18, hold: true };
+    const bayonet = summarize();
+    return { fire, pointBlankFire, bayonet };
+  });
+
+  expect(summaries.fire).toContain('vuurt · doel op 84 m');
+  expect(summaries.fire).not.toContain('positie ingenomen');
+  expect(summaries.pointBlankFire).toContain('vuurt · doel op 0 m');
+  expect(summaries.bayonet).toContain('bajonetgevecht');
+  expect(errors).toEqual([]);
+});
