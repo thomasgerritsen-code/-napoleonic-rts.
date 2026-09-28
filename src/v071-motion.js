@@ -155,7 +155,6 @@ function dampedSlotMoveV071(u, reg, tx, ty, dt) {
 }
 
 if (V071_ACTIVE) {
-
   document.title = `Napoleonic RTS v${V071_VERSION}`;
   const badge = document.querySelector('.version');
   if (badge) badge.textContent = `v${V071_VERSION}`;
