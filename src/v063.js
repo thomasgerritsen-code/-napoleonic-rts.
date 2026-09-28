@@ -315,7 +315,10 @@ function applyFormationTargetsV063(reg, centerX, centerY, offsets, facing, phase
     u.targetX = Math.max(20, Math.min(WORLD.width - 20, centerX + rx));
     u.targetY = Math.max(20, Math.min(WORLD.height - 20, centerY + ry));
     u.formationFacing = reg.facing;
-    if (u.type !== 'artillery') u.facing = reg.facing;
+    // Active v0.6.4+ marches let the follower controller turn soldiers toward
+    // the changing route heading. Reassigning facing here caused a visible
+    // one-frame snap every time the formation targets were refreshed.
+    if (u.type !== 'artillery' && !reg.marchV063?.v064) u.facing = reg.facing;
   }
 }
 
