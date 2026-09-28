@@ -134,3 +134,61 @@ test('formation transition converges without a teleport or internal collision fi
   expect(result.oldStats.teleportViolations).toBe(0);
   expect(errors).toEqual([]);
 });
+
+
+test('soldiers turn progressively with the marching formation instead of keeping the old facing', async ({page}) => {
+  const errors=await openV071(page);
+  const result=await page.evaluate(() => {
+    window.__RTS_DEBUG__.setPeaceMode(true);
+    const start={x:700,y:900};
+    const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',start.x,start.y);
+    const initialFacing=getRegiment(id)?.facing ?? 0;
+    const turnHeading=initialFacing+Math.PI/2;
+    window.__RTS_DEBUG__.selectRegiment(id);
+    window.__RTS_DEBUG__.orderSelectedWithFacing(
+      start.x+Math.cos(turnHeading)*300,
+      start.y+Math.sin(turnHeading)*300,
+      initialFacing*180/Math.PI
+    );
+    const reg=getRegiment(id);
+    reg.marchV063.marchFacing=turnHeading;
+    reg.facing=initialFacing;
+    for(const unit of regimentMembers(reg)) unit.facing=initialFacing;
+
+    const sample=() => ({
+      state:window.__RTS_DEBUG__.motionSystemV071(id),
+      marchFacing:getRegiment(id)?.marchV063?.marchFacing
+    });
+    const initial=sample();
+    const samples=[];
+    for(let i=0;i<15;i++){
+      window.RTS_SIM.step(.05);
+      samples.push(sample());
+    }
+    return {initial,samples};
+  });
+
+  const timeline=[result.initial,...result.samples];
+  const first=timeline[0];
+  const last=timeline[timeline.length-1];
+  const meanFacingError=sample => sample.state.members.reduce((sum,u) =>
+    sum+Math.abs(angleDelta(u.facing,sample.marchFacing)),0)/sample.state.members.length;
+  let maxFacingStep=0;
+  for(let i=1;i<timeline.length;i++){
+    const before=new Map(timeline[i-1].state.members.map(u=>[u.id,u.facing]));
+    for(const unit of timeline[i].state.members){
+      maxFacingStep=Math.max(maxFacingStep,Math.abs(angleDelta(unit.facing,before.get(unit.id))));
+    }
+  }
+
+  expect(meanFacingError(first)).toBeGreaterThan(1.1);
+  expect(Math.hypot(
+    last.state.centroid.x-first.state.centroid.x,
+    last.state.centroid.y-first.state.centroid.y
+  )).toBeGreaterThan(8);
+  expect(meanFacingError(last)).toBeLessThan(.16);
+  expect(meanFacingError(last)).toBeLessThan(meanFacingError(first)-.8);
+  expect(maxFacingStep).toBeGreaterThan(.05);
+  expect(maxFacingStep).toBeLessThan(.24);
+  expect(errors).toEqual([]);
+});
