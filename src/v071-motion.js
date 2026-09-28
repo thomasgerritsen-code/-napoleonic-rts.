@@ -143,12 +143,7 @@ function dampedSlotMoveV071(u, reg, tx, ty, dt) {
   // Facing also approaches the battalion heading continuously instead of being
   // reassigned by every member update.
   if (u.type !== 'artillery') {
-    const marchFacing = march.phase === 'deploying' && Number.isFinite(reg.finalFacing)
-      ? reg.finalFacing
-      : march.marchFacing;
-    const facingTarget = Number.isFinite(marchFacing)
-      ? marchFacing
-      : Number.isFinite(reg.facing) ? reg.facing : u.facing;
+    const facingTarget = Number.isFinite(reg.facing) ? reg.facing : u.facing;
     const delta = normalizeAngleV063(facingTarget - u.facing);
     const maxTurn = (kind === 'cavalry' ? 5.4 : 4.4) * safeDt;
     u.facing = normalizeAngleV063(u.facing + clampV064(delta, -maxTurn, maxTurn));
@@ -160,24 +155,6 @@ function dampedSlotMoveV071(u, reg, tx, ty, dt) {
 }
 
 if (V071_ACTIVE) {
-  // Older formation-target updates also reassigned every member's facing on each
-  // path tick. Preserve the current visual heading so the bounded turn below is
-  // the single authority while marching and during final deployment.
-  const applyFormationTargetsV063ForV071 = applyFormationTargetsV063;
-  applyFormationTargetsV063 = function applyFormationTargetsV071(reg, ...args) {
-    const preserveFacing = !!reg?.marchV063 && groupKindV06(reg) !== 'artillery';
-    const previousFacing = preserveFacing
-      ? new Map(regimentMembers(reg).map(u => [u.id, u.facing]))
-      : null;
-    const result = applyFormationTargetsV063ForV071(reg, ...args);
-    if (previousFacing) {
-      for (const u of regimentMembers(reg)) {
-        const facing = previousFacing.get(u.id);
-        if (u.type !== 'artillery' && Number.isFinite(facing)) u.facing = facing;
-      }
-    }
-    return result;
-  };
 
   document.title = `Napoleonic RTS v${V071_VERSION}`;
   const badge = document.querySelector('.version');
