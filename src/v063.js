@@ -262,7 +262,8 @@ function finalFormationOffsetsV063(reg, mode = reg.formation || 'line') {
   infantry.forEach((u, i) => {
     const rank = Math.floor(i / files), file = i % files;
     const ox = mode === 'column' ? -rank * sx : -rank * 18;
-    const oy = (file - (files - 1) / 2) * sy;
+    const rankCount = Math.min(files, infantry.length - rank * files);
+    const oy = (file - (rankCount - 1) / 2) * sy;
     result.set(u.id, { ox, oy });
   });
   if (officer) result.set(officer.id, { ox: -30, oy: 13 });
