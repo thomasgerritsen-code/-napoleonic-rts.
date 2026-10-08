@@ -52,11 +52,14 @@ test('France wins only when British headquarters and all fighting troops are gon
     units.filter(u => u.side === 'britain' && u.type !== 'worker').forEach(u => { u.dead = true; });
     const workersAlive = livingUnits('britain').filter(u => u.type === 'worker').length;
     __RTS_DEBUG__.tick(0.05);
-    return { over: gameOver, message: messageEl.textContent, workersAlive };
+    return { over: gameOver, message: messageEl.textContent, workersAlive, title: messageEl.querySelector('.battle-result-title')?.textContent, detail: messageEl.querySelector('.battle-result-detail')?.textContent };
   });
   expect(result.workersAlive).toBeGreaterThan(0);
   expect(result.over).toBe(true);
-  expect(result.message).toContain('FRANSE OVERWINNING');
+  expect(result.title).toBe('OVERWINNING!');
+  expect(result.detail).toContain('Britse hoofdgebouw');
+  expect(result.detail).toContain('alle Britse gevechtstroepen');
+  expect(result.message).not.toContain('OBJECTIEFOORWINNING');
 });
 
 test('Britain can also win, and new battle resets the victory state', async ({ page }) => {
@@ -66,7 +69,7 @@ test('Britain can also win, and new battle resets the victory state', async ({ p
     headquarters.hp = 0;
     units.filter(u => u.side === 'france' && u.type !== 'worker').forEach(u => { u.dead = true; });
     __RTS_DEBUG__.tick(0.05);
-    const victory = { over: gameOver, message: messageEl.textContent };
+    const victory = { over: gameOver, message: messageEl.textContent, title: messageEl.querySelector('.battle-result-title')?.textContent, detail: messageEl.querySelector('.battle-result-detail')?.textContent };
     resetGame();
     return {
       victory,
@@ -79,7 +82,8 @@ test('Britain can also win, and new battle resets the victory state', async ({ p
     };
   });
   expect(result.victory.over).toBe(true);
-  expect(result.victory.message).toContain('BRITSE OVERWINNING');
+  expect(result.victory.title).toBe('NEDERLAAG');
+  expect(result.victory.detail).toContain('Franse gevechtstroepen');
   expect(result.afterReset.over).toBe(false);
   expect(result.afterReset.bannerHidden).toBe(true);
   expect(result.afterReset.headquarters).toBe(1);
@@ -107,4 +111,30 @@ test('capture points passing the old score threshold cannot end the battle', asy
   expect(result.score).toBeGreaterThanOrEqual(result.oldTarget);
   expect(result.enemyHeadquartersAlive).toBe(true);
   expect(result.gameOver).toBe(false);
+});
+
+test('mobile victory overlay shows readable winner and reason without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const result = await page.evaluate(() => {
+    const headquarters = buildings.find(b => b.side === 'britain' && b.type === 'towncenter');
+    headquarters.dead = true;
+    units.filter(u => u.side === 'britain' && u.type !== 'worker').forEach(u => { u.dead = true; });
+    __RTS_DEBUG__.tick(.05);
+    const title = messageEl.querySelector('.battle-result-title');
+    const detail = messageEl.querySelector('.battle-result-detail');
+    return {
+      visible: !messageEl.classList.contains('hidden'),
+      title: title?.textContent,
+      detail: detail?.textContent,
+      titleFits: title?.getBoundingClientRect().right <= innerWidth,
+      detailFits: detail?.getBoundingClientRect().right <= innerWidth,
+      detailFontSmaller: parseFloat(getComputedStyle(detail).fontSize) < parseFloat(getComputedStyle(title).fontSize)
+    };
+  });
+  expect(result.visible).toBe(true);
+  expect(result.title).toBe('OVERWINNING!');
+  expect(result.detail).toContain('alle Britse gevechtstroepen');
+  expect(result.titleFits).toBe(true);
+  expect(result.detailFits).toBe(true);
+  expect(result.detailFontSmaller).toBe(true);
 });
