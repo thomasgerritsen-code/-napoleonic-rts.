@@ -18,6 +18,17 @@ function isWorldVisible(x, y, padding = 0) {
 }
 
 // ---------- Victory ----------
+  function showBattleOutcome(title, explanation) {
+    const heading = document.createElement('strong');
+    heading.className = 'battle-result-title';
+    heading.textContent = title;
+    const detail = document.createElement('span');
+    detail.className = 'battle-result-detail';
+    detail.textContent = explanation;
+    messageEl.replaceChildren(heading, detail);
+    messageEl.classList.remove('hidden');
+  }
+
   function checkVictory() {
     if (gameOver) return;
 
@@ -35,10 +46,13 @@ function isWorldVisible(x, y, padding = 0) {
     if (!frenchDefeated && !britishDefeated) return;
 
     gameOver = true;
-    messageEl.textContent = frenchDefeated && britishDefeated
-      ? 'GELIJKSPEL · BEIDE LEGERS VERSLAGEN'
-      : britishDefeated ? 'FRANSE OVERWINNING' : 'BRITSE OVERWINNING';
-    messageEl.classList.remove('hidden');
+    if (frenchDefeated && britishDefeated) {
+      showBattleOutcome('GELIJKSPEL', 'Beide hoofdgebouwen zijn vernietigd en er zijn geen gevechtstroepen meer over.');
+    } else if (britishDefeated) {
+      showBattleOutcome('OVERWINNING!', 'Je hebt het Britse hoofdgebouw vernietigd en alle Britse gevechtstroepen uitgeschakeld.');
+    } else {
+      showBattleOutcome('NEDERLAAG', 'Je hoofdgebouw is vernietigd en alle Franse gevechtstroepen zijn uitgeschakeld.');
+    }
   }
 
   // ---------- Update ----------
