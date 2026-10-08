@@ -203,6 +203,9 @@ test('AI attack stops an active artillery order inside support range and stages 
     gameOver=false;
     messageEl.classList.add('hidden');
     v05PeaceMode=false;
+    activeRegiments('france').forEach(reg=>{reg.destroyed=true;});
+    for(const u of units){if(u.side==='france'&&u.type!=='worker')u.dead=true;}
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('france',900,900);
     window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,820);
     window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,980);
     for(const u of units){
