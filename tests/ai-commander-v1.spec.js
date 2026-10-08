@@ -190,3 +190,58 @@ test('AI Commander retains a near-equal target but switches for a decisive advan
   expect(result.retained).toBe(result.firstId);
   expect(result.switched).toBe(result.secondId);
 });
+
+
+test('AI attack stops an active artillery order inside support range and stages distant guns', async ({ page }) => {
+  const errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/?test=v071',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment && window.__AI_COMMANDER_V1__));
+  await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
+
+  const result=await page.evaluate(()=>{
+    gameOver=false;
+    messageEl.classList.add('hidden');
+    v05PeaceMode=false;
+    activeRegiments('france').forEach(reg=>{reg.destroyed=true;});
+    for(const u of units){if(u.side==='france'&&u.type!=='worker')u.dead=true;}
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('france',900,900);
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,820);
+    window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,980);
+    for(const u of units){
+      if(u.side==='britain'&&u.type!=='worker'){u.morale=100;u.hp=u.maxHp;}
+      if(u.side==='france'&&u.type!=='worker'){u.morale=35;}
+    }
+
+    const target=window.__AI_COMMANDER_V1__.strategicTarget();
+    const near=livingUnits('britain').find(u=>u.type==='artillery');
+    near.x=target.x+300; near.y=target.y;
+    near.targetX=target.x; near.targetY=target.y;
+
+    const far=createUnit('britain','artillery',target.x+700,target.y);
+    far.targetX=target.x; far.targetY=target.y;
+    const oldFarTarget={x:far.targetX,y:far.targetY};
+
+    eval('elapsed=90');
+    window.__AI_COMMANDER_V1__.forceState('ATTACK');
+    window.__AI_COMMANDER_V1__.tick();
+
+    const state=window.__AI_COMMANDER_V1__.state();
+    const snapshot={
+      state:state.state,
+      targetId:state.target?.id,
+      nearStopError:Math.hypot(near.targetX-near.x,near.targetY-near.y),
+      farOrderChanged:Math.hypot(far.targetX-oldFarTarget.x,far.targetY-oldFarTarget.y),
+      farStagingDistance:Math.hypot(far.targetX-state.target.x,far.targetY-state.target.y)
+    };
+    v05PeaceMode=true;
+    return snapshot;
+  });
+
+  expect(result.state).toBe('ATTACK');
+  expect(result.nearStopError).toBeLessThan(0.01);
+  expect(result.farOrderChanged).toBeGreaterThan(100);
+  expect(result.farStagingDistance).toBeGreaterThan(350);
+  expect(result.farStagingDistance).toBeLessThan(430);
+  expect(errors).toEqual([]);
+});
