@@ -265,28 +265,31 @@
       return projected ? { id: officer.id, ...projected } : null;
     };
 
+    // Let the 3D controller receive ALL touch pointers so pinch/pan can arbitrate
+    // gestures. A nearby officer is only claimed as a single-finger tap at release.
+    const activeTouchPointers = new Set();
     canvas.addEventListener('pointerdown', event => {
       if (event.pointerType !== 'touch') return;
+      activeTouchPointers.add(event.pointerId);
+      if (activeTouchPointers.size > 1) claimed.forEach(tap => { tap.multi = true; });
       const officer = nearestOfficer(event.clientX, event.clientY);
       if (!officer) return;
-      claimed.set(event.pointerId, { officerId: officer.id, sx: event.clientX, sy: event.clientY });
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }, true);
-
-    canvas.addEventListener('pointermove', event => {
-      if (event.pointerType !== 'touch' || !claimed.has(event.pointerId)) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      claimed.set(event.pointerId, {
+        officerId: officer.id, sx: event.clientX, sy: event.clientY,
+        multi: activeTouchPointers.size > 1
+      });
     }, true);
 
     canvas.addEventListener('pointerup', event => {
       if (event.pointerType !== 'touch') return;
+      activeTouchPointers.delete(event.pointerId);
       const claim = claimed.get(event.pointerId);
       if (!claim) return;
       claimed.delete(event.pointerId);
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      if (claim.multi) return; // A camera gesture must not select or order troops.
+      // The battlefield controller still gets pointerup to release its pointer;
+      // this marker tells it not to issue a second gameplay action.
+      event.__nrtsOfficerTapHandled = true;
       if (Math.hypot(event.clientX - claim.sx, event.clientY - claim.sy) > TAP_DRAG_PX) return;
       const officer = looseFrenchOfficers().find(unit => unit.id === claim.officerId);
       if (!officer) return;
@@ -297,10 +300,8 @@
     }, true);
 
     canvas.addEventListener('pointercancel', event => {
-      if (!claimed.has(event.pointerId)) return;
+      activeTouchPointers.delete(event.pointerId);
       claimed.delete(event.pointerId);
-      event.preventDefault();
-      event.stopImmediatePropagation();
     }, true);
 
     api.threeDInstalled = true;
