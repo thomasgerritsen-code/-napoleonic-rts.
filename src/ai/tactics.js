@@ -139,7 +139,10 @@ function aiAttack(regs,tc,target){
   if(cav.length){const p=aiOffset(target,d,-35,AI_COMMANDER_V1.flankSide*280);commandLooseFormation(cav,p.x,p.y,'column');cav.forEach(u=>u.chargeTimer=Math.max(u.chargeTimer||0,5));}
   const art=livingUnits('britain').filter(u=>u.type==='artillery'&&!u.routing);
   if(art.length){
-    // Keep guns already in supporting range from advancing into the melee line.
+    // Stop an already-issued advance when a gun has reached useful supporting range.
+    // commandLooseFormation remains the movement-intent boundary; AI never mutates position.
+    const hold=art.filter(u=>Math.hypot(u.x-target.x,u.y-target.y)<=520);
+    hold.forEach(u=>commandLooseFormation([u],u.x,u.y,'line'));
     const reposition=art.filter(u=>Math.hypot(u.x-target.x,u.y-target.y)>520);
     if(reposition.length){const p=aiOffset(target,d,-390,-AI_COMMANDER_V1.flankSide*80);commandLooseFormation(reposition,p.x,p.y,'line');}
   }
