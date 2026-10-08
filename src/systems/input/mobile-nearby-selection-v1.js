@@ -5,6 +5,8 @@
   if (typeof renderDynamicActions !== 'function') return;
 
   const TARGET_INFANTRY = 12;
+  const NEARBY_RADIUS = 320;
+  const NEARBY_RADIUS_SQ = NEARBY_RADIUS * NEARBY_RADIUS;
   const baseRenderDynamicActions = renderDynamicActions;
 
   function validLooseInfantry(unit) {
@@ -37,7 +39,7 @@
     const selectedIds = new Set(group.map(unit => unit.id));
     const anchor = selectionAnchor(group);
     return freeUnits('france', 'infantry')
-      .filter(unit => validLooseInfantry(unit) && !selectedIds.has(unit.id))
+      .filter(unit => validLooseInfantry(unit) && !selectedIds.has(unit.id) && distanceSqToAnchor(unit, anchor) <= NEARBY_RADIUS_SQ)
       .sort((a, b) => distanceSqToAnchor(a, anchor) - distanceSqToAnchor(b, anchor));
   }
 
@@ -72,7 +74,7 @@
     );
     button.title = available
       ? 'Voeg de dichtstbijzijnde vrije musketiers toe aan deze selectie, tot maximaal 12.'
-      : 'Er zijn geen extra vrije musketiers beschikbaar.';
+      : `Er zijn geen extra vrije musketiers binnen ${NEARBY_RADIUS} meter beschikbaar.`;
     actionsEl.prepend(button);
   };
 
@@ -84,6 +86,7 @@
 
   global.__MOBILE_NEARBY_SELECTION_V1__ = Object.freeze({
     targetInfantry: TARGET_INFANTRY,
+    nearbyRadius: NEARBY_RADIUS,
     selectedCount: () => selectedLooseInfantry().length,
     availableCount: () => nearbyCandidates(selectedLooseInfantry()).length,
     selectNearby
