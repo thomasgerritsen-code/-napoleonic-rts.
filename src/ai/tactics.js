@@ -138,7 +138,11 @@ function aiAttack(regs,tc,target){
   const cav=livingUnits('britain').filter(u=>u.type==='cavalry'&&!u.routing);
   if(cav.length){const p=aiOffset(target,d,-35,AI_COMMANDER_V1.flankSide*280);commandLooseFormation(cav,p.x,p.y,'column');cav.forEach(u=>u.chargeTimer=Math.max(u.chargeTimer||0,5));}
   const art=livingUnits('britain').filter(u=>u.type==='artillery'&&!u.routing);
-  if(art.length){const p=aiOffset(target,d,-390,-AI_COMMANDER_V1.flankSide*80);commandLooseFormation(art,p.x,p.y,'line');}
+  if(art.length){
+    // Keep guns already in supporting range from advancing into the melee line.
+    const reposition=art.filter(u=>Math.hypot(u.x-target.x,u.y-target.y)>520);
+    if(reposition.length){const p=aiOffset(target,d,-390,-AI_COMMANDER_V1.flankSide*80);commandLooseFormation(reposition,p.x,p.y,'line');}
+  }
   aiPlan=`Commandant: aanvalsgolf ${Math.max(1,AI_COMMANDER_V1.wave)} · ${reserve?'reserve gehouden':'volle linie'}`;
 }
 function aiFlank(regs,tc,target){
