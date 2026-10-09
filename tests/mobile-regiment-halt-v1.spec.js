@@ -1,5 +1,10 @@
 const { test, expect } = require('@playwright/test');
 
+test.use({
+  hasTouch: true,
+  viewport: { width: 844, height: 390 }
+});
+
 async function bootMobile(page) {
   await page.setViewportSize({ width: 844, height: 390 });
   await page.goto('/?test');
