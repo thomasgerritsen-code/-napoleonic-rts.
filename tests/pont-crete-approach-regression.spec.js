@@ -100,15 +100,18 @@ test('Pont de la Crête: off-center western approach forms a column and clears a
     const goal = crossingPointV068(c, c.length / 2 + 360, -25);
     orderGroupPathV06(reg, goal.x, goal.y, 'line', 0);
     const initialPath = reg.path?.map(p => ({x:p.x,y:p.y})) || [];
+    const approach = window.NRTS_NAVIGATION_V2.bridgeCorridor(c.id,-1).approach;
+    const directApproach = Boolean(initialPath.length && Math.hypot(initialPath[0].x-approach.x,initialPath[0].y-approach.y)<3);
     const initialRouteCrossings = (reg.routeCrossingsV067 || []).map(item => item.id);
     const declaredBridgeCorridors = (reg.navigationV2?.bridgeCorridors || []).map(item => item.id);
-    let formed = false, crossing = false, cleared = false, maxWater = 0;
+    let formed = false, forcedColumn = false, crossing = false, cleared = false, maxWater = 0;
     let farBankAt = null;
     for (let i = 0; i < 3600; i++) {
       window.RTS_SIM.step(.05);
       if (i % 8) continue;
       const info = reg.crossingTrafficV068;
       formed ||= reg.movementPhaseV063 === 'bridge-forming';
+      forcedColumn ||= Boolean(info?.forcedColumn && ['approach','crossing'].includes(info.state));
       crossing ||= info?.state === 'crossing';
       const alive = regimentMembers(reg).filter(u => !u.dead);
       maxWater = Math.max(maxWater, alive.filter(u => waterAtV067(u.x,u.y)).length);
@@ -118,7 +121,7 @@ test('Pont de la Crête: off-center western approach forms a column and clears a
     }
     const alive = regimentMembers(reg).filter(u => !u.dead);
     return {
-      bridge:c.id, start, goal, initialPath, initialRouteCrossings, declaredBridgeCorridors, formed, crossing, cleared, farBankAt, maxWater,
+      bridge:c.id, start, goal, initialPath, directApproach, initialRouteCrossings, declaredBridgeCorridors, formed, forcedColumn, crossing, cleared, farBankAt, maxWater,
       finalBlocked:alive.filter(u => segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY)).length,
       finalWater:alive.filter(u => waterAtV067(u.x,u.y)).length,
       finalCenter:centroid(alive),
@@ -129,7 +132,8 @@ test('Pont de la Crête: off-center western approach forms a column and clears a
   console.log('CRETE_OFF_AXIS_APPROACH', JSON.stringify(result));
   expect(result.initialRouteCrossings).toEqual(['pont-crete']);
   expect(result.declaredBridgeCorridors).toEqual(['pont-crete']);
-  expect(result.formed).toBe(true);
+  expect(result.directApproach).toBe(true);
+  expect(result.forcedColumn).toBe(true);
   expect(result.crossing).toBe(true);
   expect(result.cleared).toBe(true);
   expect(result.maxWater).toBe(0);
