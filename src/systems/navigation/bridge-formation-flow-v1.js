@@ -37,12 +37,16 @@
   }
 
   function compressionBlend(c,march,info){
-    if(info?.entered||['crossing','clearing'].includes(info?.state))return 1;
     const local=crossingLocalV068(c,march.anchorX,march.anchorY);
     const clearance=local.along*info.initialSide-c.length/2;
     const config=global.NRTS_CONFIG?.navigation?.bridge||{};
-    const start=Math.max(1,Number(config.columnFormStartClearance)||90);
-    const full=Math.max(0,Math.min(start-1,Number(config.columnFormFullClearance)||24));
+    // The old 90→24-unit transition starts after the lead files already touch
+    // the bridge. Begin well upstream so a wide line can close into two files
+    // before its members reach the narrow deck. Ignore the early "entered"
+    // signal from a single forward scout; use the authoritative anchor instead.
+    const start=Math.max(1,Number(config.columnFormStartClearance)||260);
+    const full=Math.max(0,Math.min(start-1,Number(config.columnFormFullClearance)||120));
+    if(info?.state==='clearing')return 1;
     if(clearance>=start)return 0;
     if(clearance<=full)return 1;
     const t=(start-clearance)/Math.max(1,start-full);
@@ -58,16 +62,16 @@
 
   const previousForceBridgeColumn=forceBridgeColumnTargetsV068;
   forceBridgeColumnTargetsV068=function forceBridgeColumnTargetsCompactV132(reg,march,info){
-    previousForceBridgeColumn(reg,march,info);
-    if(!reg||reg.destroyed||!march?.v064||!info?.forcedColumn)return;
+    if(!reg||reg.destroyed||!march?.v064||!info?.forcedColumn)
+      return previousForceBridgeColumn(reg,march,info);
     const c=WATER_CROSSINGS_V067.find(item=>item.id===info.crossingId);
-    if(!c)return;
+    if(!c)return previousForceBridgeColumn(reg,march,info);
 
-    // Reservation/steering can start far from a bridge. Do not collapse a field line
-    // at that point. Keep the existing field/road formation until the configured
-    // bridge-mouth transition begins, then blend smoothly into the compact files.
+    // Single owner for bridge slot targets. Calling the older 3/4-file target
+    // writer first, then the two-file writer second, blends two conflicting
+    // columns in the same frame and keeps soldiers between their actual slots.
+    // Apply only this combined field→bridge interpolation once per update.
     const blend=compressionBlend(c,march,info);
-    if(blend<=.001)return;
     const normal=normalOffsets(reg,march);
     const compact=compactOffsets(reg,c);
     const desired=new Map();
@@ -92,7 +96,7 @@
     stats.applications++;
   };
 
-  const api=Object.freeze({version:'bridge-formation-flow-v1',compactColumn:true,progressiveCompression:true,stats:()=>({...stats})});
+  const api=Object.freeze({version:'bridge-formation-flow-v1.1',compactColumn:true,progressiveCompression:true,singleSlotWriter:true,earlyColumnStaging:true,stats:()=>({...stats})});
   global.__BRIDGE_FORMATION_FLOW_V1__=api;
   nrts.subsystems.register('bridge-formation-flow',api,{phase:'v1.3.2',legacyBridge:false,responsibility:'progressively compress bridge and ford traffic into a stable one/two-file column near the crossing before per-member water-safety correction'});
 })(window);

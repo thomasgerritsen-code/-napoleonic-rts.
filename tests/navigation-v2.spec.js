@@ -38,8 +38,8 @@ test('Architecture v2.1 owns road lookup and route planning without legacy v066 
   expect(nav.road).toBe('Grande Chaussée');
   expect(nav.bridge).toBe('Pont de la Chaussée');
   expect(nav.config.bridge.centerlineTolerance).toBeGreaterThan(0);
-  expect(nav.config.bridge.columnFormStartClearance).toBe(90);
-  expect(nav.config.bridge.columnFormFullClearance).toBe(24);
+  expect(nav.config.bridge.columnFormStartClearance).toBe(260);
+  expect(nav.config.bridge.columnFormFullClearance).toBe(120);
   expect(nav.retired).toEqual(expect.arrayContaining(['src/v066-road-index.js','src/v066-route-fixes.js']));
 
   const html=fs.readFileSync(path.join(process.cwd(),'index.html'),'utf8');
@@ -53,14 +53,14 @@ test('Architecture v2.1 owns road lookup and route planning without legacy v066 
   expect(errors).toEqual([]);
 });
 
-test('bridge column stays at normal terrain width until the battalion is close to the bridge mouth', async ({page}) => {
+test('bridge column stays wide outside staging range and forms two files before the deck', async ({page}) => {
   const errors=await openNavigationV2(page);
   const result=await page.evaluate(() => {
     window.__RTS_DEBUG__.setPeaceMode(true);
     const c=WATER_CROSSINGS_V067.find(item=>item.id==='pont-chaussee');
     const side=-1;
-    const far=crossingPointV068(c,side*(c.length/2+140),120);
-    const near=crossingPointV068(c,side*(c.length/2+20),120);
+    const far=crossingPointV068(c,side*(c.length/2+360),120);
+    const near=crossingPointV068(c,side*(c.length/2+100),120);
     const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',far.x,far.y);
     const reg=getRegiment(id);
     window.__RTS_DEBUG__.selectRegiment(id);
@@ -81,9 +81,8 @@ test('bridge column stays at normal terrain width until the battalion is close t
     const roadMarch=roadAtV064(far.x,far.y);
     const normalDesired=roadMarch?marchColumnOffsetsV063(reg):finalFormationOffsetsV063(reg,reg.formation);
     const normalSpan=mapSpan(normalDesired);
-    const bridgeDesired=marchColumnOffsetsV063(reg);
-    for(const offset of bridgeDesired.values()) offset.oy*=window.NRTS_CONFIG.navigation.bridge.columnLateralScale;
-    const bridgeSpan=mapSpan(bridgeDesired);
+    // Compact two-file width is 18 world units on this infantry bridge.
+    const bridgeSpan=18;
 
     for(let i=0;i<120;i++) forceBridgeColumnTargetsV068(reg,march,info);
     const farSpan=slotSpan();
