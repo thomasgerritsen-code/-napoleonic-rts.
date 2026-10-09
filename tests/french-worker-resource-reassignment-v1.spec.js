@@ -15,7 +15,8 @@ async function openGame(page) {
     window.__RTS_DEBUG__?.getState &&
     window.__RTS_DEBUG__?.assignWorkerToNearest &&
     window.__RTS_DEBUG__?.livingResourceIds &&
-    window.__RTS_DEBUG__?.depleteResource
+    window.__RTS_DEBUG__?.depleteResource &&
+    window.__RTS_DEBUG__?.moveWorker
   ));
   return pageErrors;
 }
@@ -90,5 +91,14 @@ test('French worker continues same resource type, gathers, then stops safely whe
   expect(stable.y).toBeCloseTo(settled.y, 5);
   expect(stable.targetX).toBeCloseTo(stable.x, 5);
   expect(stable.targetY).toBeCloseTo(stable.y, 5);
+
+  const moveAccepted = await page.evaluate(({ id, x, y }) => {
+    const accepted = window.__RTS_DEBUG__.moveWorker(id, x + 120, y);
+    window.__RTS_DEBUG__.tick(1);
+    return accepted;
+  }, { id: stable.id, x: stable.x, y: stable.y });
+  const moved = (await state(page)).france.units.find(unit => unit.id === assignments.france.workerId);
+  expect(moveAccepted).toBe(true);
+  expect(Math.hypot(moved.x - stable.x, moved.y - stable.y)).toBeGreaterThan(1);
   expect(errors).toEqual([]);
 });
