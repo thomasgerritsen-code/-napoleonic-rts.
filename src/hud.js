@@ -50,6 +50,11 @@
       ));
     }
 
+    const selectedFrenchRegiments = selectedRegiments().filter(reg => reg.side === 'france' && !reg.destroyed);
+    if (selectedFrenchRegiments.length) {
+      fragment.append(makeDynamicButton('halt', 'Halt<br><small>stop mars</small>'));
+    }
+
     if (group.some(u => u.type === 'infantry' || u.type === 'officer')) fragment.append(makeDynamicButton('bayonet', 'Bajonet<br><small>charge</small>'));
     if (group.some(u => u.type === 'cavalry')) fragment.append(makeDynamicButton('charge', 'Cavalerie<br><small>charge</small>'));
     if (group.some(u => u.type === 'artillery')) {

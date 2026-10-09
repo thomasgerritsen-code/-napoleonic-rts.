@@ -51,6 +51,7 @@
     else if (action === 'train-officer') queuePlayerUnit('officer');
     else if (action === 'train-drummer') queuePlayerUnit('drummer');
     else if (action === 'create-regiment') makePlayerRegiment();
+    else if (action === 'halt') haltSelectedRegiments();
     else if (action === 'bayonet') bayonetCommand();
     else if (action === 'charge') cavalryCharge();
     else if (action === 'artillery-mode') toggleArtillery();
