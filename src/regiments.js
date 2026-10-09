@@ -205,6 +205,53 @@
     });
   }
 
+
+  function haltSelectedRegiments() {
+    const regs = selectedRegiments().filter(reg => reg.side === 'france' && !reg.destroyed);
+    if (!regs.length) return 0;
+
+    for (const reg of regs) {
+      const members = regimentMembers(reg).filter(unit => !unit.dead && !unit.routing);
+      if (!members.length) continue;
+      const center = centroid(members);
+
+      // Cancel every active movement authority without rebuilding or changing formation.
+      reg.path = null;
+      reg.pathIndex = 0;
+      reg.marchV063 = null;
+      reg.finalTarget = { x: center.x, y: center.y };
+      reg.finalFacing = null;
+      reg.targetX = center.x;
+      reg.targetY = center.y;
+      reg.targetFacing = reg.facing;
+      reg.movementPhaseV063 = 'halted';
+      reg.formationTrafficV132 = null;
+      reg.postCrossingReformV1322 = null;
+
+      const crossingId = reg.crossingTrafficV068?.crossingId;
+      if (crossingId && typeof CROSSING_TRAFFIC_V068 !== 'undefined') {
+        const crossing = CROSSING_TRAFFIC_V068.get(crossingId);
+        if (crossing) {
+          crossing.holderIds = (crossing.holderIds || []).filter(id => id !== reg.id);
+          crossing.queue = (crossing.queue || []).filter(id => id !== reg.id);
+        }
+      }
+      reg.crossingTrafficV068 = null;
+
+      for (const unit of members) {
+        unit.targetX = unit.x;
+        unit.targetY = unit.y;
+        unit.arrivedAtTarget = true;
+        if (Number.isFinite(unit.vx)) unit.vx = 0;
+        if (Number.isFinite(unit.vy)) unit.vy = 0;
+      }
+    }
+
+    statusEl.textContent = `${regs.length} regiment${regs.length > 1 ? 'en' : ''} houdt halt.`;
+    updateHud(true);
+    return regs.length;
+  }
+
   function issueMove(x, y) {
     const regs = selectedRegiments();
     const regimentMemberIds = new Set();
