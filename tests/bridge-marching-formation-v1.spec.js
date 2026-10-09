@@ -16,8 +16,10 @@ test('Pont de la Crête forms two marching files before the bridge, maintains th
     for(const reg of regiments)reg.destroyed=true;
     const c=WATER_CROSSINGS_V067.find(x=>x.id==='pont-crete');
     const side=-1,heading=crossingHeadingV068(c,side);
-    const start=crossingPointV068(c,side*(c.length/2+340),-22);
-    const goal=crossingPointV068(c,c.length/2+600,-18);
+    // Actual western off-axis approach from the player's Crete area; both
+    // endpoints are close enough to prefer this bridge rather than Chaussée.
+    const start=crossingPointV068(c,side*(c.length/2+260),110);
+    const goal=crossingPointV068(c,c.length/2+360,-25);
     const members=[];
     for(let i=0;i<24;i++)members.push(createUnit('france','infantry',start.x+(i%12)*12,start.y+Math.floor(i/12)*16));
     members.push(createUnit('france','officer',start.x+35,start.y-22));
