@@ -155,8 +155,16 @@
         const softCombat=u.side!==other.side&&!!(regA?.engagementV069||regB?.engagementV069);
         const bothSettled=u.arrivedAtTarget&&other.arrivedAtTarget;
         const correction=overlap*(softCombat ? 0.10 : bothSettled ? 0.12 : 0.24);
-        u.x-=nx*correction;u.y-=ny*correction;
-        other.x+=nx*correction;other.y+=ny*correction;
+        const stoppedU=u.type==='worker'&&u.resourceExhaustedStop;
+        const stoppedOther=other.type==='worker'&&other.resourceExhaustedStop;
+        if(stoppedU&&!stoppedOther){
+          other.x+=nx*correction*2;other.y+=ny*correction*2;
+        }else if(stoppedOther&&!stoppedU){
+          u.x-=nx*correction*2;u.y-=ny*correction*2;
+        }else{
+          u.x-=nx*correction;u.y-=ny*correction;
+          other.x+=nx*correction;other.y+=ny*correction;
+        }
         if(typeof navStats!=='undefined')navStats.overlapCorrections++;
         stats.overlapCorrections++;
       }
