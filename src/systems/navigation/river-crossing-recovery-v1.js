@@ -47,7 +47,12 @@
   function recoverGroupAnchor(reg,c,info,reason='group-stall'){const march=reg?.marchV063;if(!march?.v064||!Array.isArray(reg.path))return false;const target=safeRecoveryTarget(c,info.initialSide,march.anchorX,march.anchorY,!!info.entered),previous={x:march.anchorX,y:march.anchorY};if(segmentCrossesBlockedWaterV067(previous.x,previous.y,target.x,target.y)||waterAtV067(target.x,target.y)){stats.unsafeRecoveryRejected++;return false;}const remaining=reg.path.slice(Math.max(0,reg.pathIndex||0));reg.path=[target,...remaining.filter((p,i)=>i>0||Math.hypot(p.x-target.x,p.y-target.y)>2)];reg.pathIndex=0;march.marchFacing=Math.atan2(target.y-march.anchorY,target.x-march.anchorX);march.speedV064=Math.max(12,Math.min(Number(march.speedV064)||12,crossingSpeedCapV067(groupKindV06(reg),c)));if(!reg.navigationV2)reg.navigationV2={};reg.navigationV2.bridgeLastRecoveryAt=elapsed;reg.navigationV2.bridgeStallSeconds=0;reg.navigationV2.bridgeRecoveryReason=reason;stats.groupRecoveries++;if(reason==='axis-stall')stats.axisStallRecoveries++;if(c.type==='ford')stats.fordRecoveries++;else stats.bridgeRecoveries++;return true;}
   function sampleRegiment(reg,dt){
     if(!reg||reg.destroyed)return;const members=livingMembers(reg);if(!members.length)return;const center=centroid(members),groupContext=activeCrossing(reg);
-    if(groupContext){
+    // A regiment ordered to wait in a bridge queue has no forward-axis movement
+    // by design. Do not add recovery waypoints or preserve its old stall timer.
+    const queueHold=!!(reg.crossingTrafficV068?.forcedColumn&&
+      ['queued','waiting'].includes(reg.crossingTrafficV068.state));
+    if(queueHold)groupState.delete(reg.id);
+    if(groupContext&&!queueHold){
       const{c,info}=groupContext,progressPoint=groupProgressPoint(reg,center),progress=forwardProgress(c,info,progressPoint.x,progressPoint.y);let gs=groupState.get(reg.id);
       if(!gs||gs.crossingId!==c.id){gs={crossingId:c.id,x:progressPoint.x,y:progressPoint.y,stall:0,lastRecovery:-999,maxProgress:progress,lastProgressAt:elapsed};groupState.set(reg.id,gs);}
       else{
@@ -65,7 +70,7 @@
       const hasTarget=Number.isFinite(u.targetX)&&Number.isFinite(u.targetY),targetDistance=hasTarget?Math.hypot(u.targetX-u.x,u.targetY-u.y):0;
       const targetBlocked=hasTarget&&segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY),prior=unitState.get(u.id),context=unitCrossingContext(reg,u,prior,groupContext);if(!context){unitState.delete(u.id);continue;}const{c,info}=context;let s=prior;
       if(!s||s.crossingId!==c.id){s={crossingId:c.id,x:u.x,y:u.y,stall:0,lastRecovery:-999};unitState.set(u.id,s);}else{const moved=Math.hypot(u.x-s.x,u.y-s.y);s.x=u.x;s.y=u.y;s.stall=moved<=movementEpsilon?s.stall+dt:0;stats.maxUnitStallSeconds=Math.max(stats.maxUnitStallSeconds,s.stall);}
-      const behindAnchor=Math.hypot(u.x-center.x,u.y-center.y)>48,movementDemand=targetDistance>14&&!u.arrivedAtTarget,stalledNearCrossing=movementDemand&&behindAnchor&&s.stall>=unitStallSeconds;
+      const behindAnchor=Math.hypot(u.x-center.x,u.y-center.y)>48,movementDemand=targetDistance>14&&!u.arrivedAtTarget,stalledNearCrossing=!queueHold&&movementDemand&&behindAnchor&&s.stall>=unitStallSeconds;
       if((targetBlocked||stalledNearCrossing)&&elapsed-s.lastRecovery>.55){if(assignUnitRecovery(u,c,info,targetBlocked?'blocked-target':'stalled-follower',!groupContext))s.lastRecovery=elapsed;s.stall=0;}
       if(!movementDemand&&!targetBlocked&&s.stall>unitStallSeconds)s.stall=0;
     }

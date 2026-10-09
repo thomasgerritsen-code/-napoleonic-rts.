@@ -62,6 +62,7 @@ if (window.__RTS_DEBUG__) {
   window.__RTS_DEBUG__.reduceGroupTo=function(id,survivors){const r=regiments.find(r=>r.id===id);if(!r)return false;const members=regimentMembers(r).filter(u=>!['officer','drummer'].includes(u.type)),keep=new Set(members.slice(0,survivors).map(u=>u.id));members.forEach(u=>{if(!keep.has(u.id))u.dead=true;});refreshRegiment(r);updateHud(true);return true;};
   window.__RTS_DEBUG__.killBatteryCrew=function(id,count=1){const r=regiments.find(r=>r.id===id);if(!r)return false;artilleryCrewV06(r).slice(0,count).forEach(u=>u.dead=true);refreshRegiment(r);updateHud(true);return true;};
   window.__RTS_DEBUG__.assignWorkerToNearest=function(side='france',type='wood'){const worker=livingUnits(side).find(u=>u.type==='worker'),resource=nearestResource(type,worker?.x||0,worker?.y||0);if(!worker||!resource)return null;assignWorkerToResource(worker,resource);return{workerId:worker.id,resourceId:resource.id};};
+  window.__RTS_DEBUG__.livingResourceIds=function(type=null){return resources.filter(r=>!r.dead&&r.amount>0&&(!type||r.type===type)).map(r=>r.id);};
   window.__RTS_DEBUG__.depleteResource=function(id,amount=0){const r=resources.find(r=>r.id===id);if(!r)return false;r.amount=amount;if(amount<=0)r.dead=true;return true;};
   window.__RTS_DEBUG__.teleportUnit=function(id,x,y){const u=units.find(u=>u.id===id);if(!u)return false;u.x=x;u.y=y;u.targetX=x;u.targetY=y;rebuildSpatialHash();markExploredV06();return true;};
   window.__RTS_DEBUG__.isExplored=(x,y)=>isExploredV06(x,y);

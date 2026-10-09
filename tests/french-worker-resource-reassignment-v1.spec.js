@@ -14,6 +14,7 @@ async function openGame(page) {
   await page.waitForFunction(() => Boolean(
     window.__RTS_DEBUG__?.getState &&
     window.__RTS_DEBUG__?.assignWorkerToNearest &&
+    window.__RTS_DEBUG__?.livingResourceIds &&
     window.__RTS_DEBUG__?.depleteResource
   ));
   return pageErrors;
@@ -51,25 +52,33 @@ test('French worker continues same resource type, gathers, then stops safely whe
   frenchWorker = snapshot.france.units.find(unit => unit.id === assignments.france.workerId);
   expect(frenchWorker.task).toBe('return');
 
-  const exhaustedCount = await page.evaluate(() => {
-    let count = 0;
-    for (; count < 40; count += 1) {
+  const exhaustion = await page.evaluate(() => {
+    const availableResourceIds = window.__RTS_DEBUG__.livingResourceIds('wood');
+    const exhaustedResourceIds = [];
+    for (let remaining = availableResourceIds.length; remaining > 0; remaining -= 1) {
       const assignment = window.__RTS_DEBUG__.assignWorkerToNearest('france', 'wood');
       if (!assignment) break;
+      if (exhaustedResourceIds.includes(assignment.resourceId)) {
+        throw new Error(`Resource ${assignment.resourceId} was selected twice`);
+      }
       window.__RTS_DEBUG__.depleteResource(assignment.resourceId);
+      exhaustedResourceIds.push(assignment.resourceId);
       window.__RTS_DEBUG__.tick(0.1);
     }
-    return count;
+    return { availableResourceIds, exhaustedResourceIds };
   });
-  expect(exhaustedCount).toBeGreaterThan(0);
-  expect(exhaustedCount).toBeLessThan(40);
+  expect(exhaustion.availableResourceIds.length).toBeGreaterThan(0);
+  expect(exhaustion.exhaustedResourceIds).toHaveLength(exhaustion.availableResourceIds.length);
+  expect(new Set(exhaustion.exhaustedResourceIds).size).toBe(exhaustion.availableResourceIds.length);
 
   snapshot = await state(page);
   frenchWorker = snapshot.france.units.find(unit => unit.id === assignments.france.workerId);
+  britishWorker = snapshot.britain.units.find(unit => unit.id === assignments.britain.workerId);
   expect(frenchWorker.task).toBeNull();
   expect(frenchWorker.resourceTargetId).toBeNull();
   expect(frenchWorker.targetX).toBeCloseTo(frenchWorker.x, 5);
   expect(frenchWorker.targetY).toBeCloseTo(frenchWorker.y, 5);
+  expect(britishWorker.resourceTargetId).toBe(assignments.britain.resourceId);
 
   await page.evaluate(() => window.__RTS_DEBUG__.tick(2));
   const settled = (await state(page)).france.units.find(unit => unit.id === assignments.france.workerId);
