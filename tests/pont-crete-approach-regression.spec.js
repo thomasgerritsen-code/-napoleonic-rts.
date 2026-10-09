@@ -37,6 +37,17 @@ test('Pont de la Crête: queued regiment does not rewrite its bridge route while
     const reg = makeRegiment(c, start);
     const far = crossingPointV068(c, c.length / 2 + 310, 0);
     orderGroupPathV06(reg, far.x, far.y, 'line', 0);
+    // Keep a real, valid queue reservation while deliberately occupying all capacity.
+    // Without it the automatic path planner may pick Pont de la Chaussée instead.
+    const corridor = window.NRTS_NAVIGATION_V2.bridgeCorridor(c.id, -1);
+    reg.path = [corridor.approach, corridor.entry, corridor.exit, corridor.clear, far];
+    reg.pathIndex = 0;
+    reg.routeCrossingsV067 = [{id:c.id,name:c.name,type:c.type,material:c.material}];
+    reg.crossingTrafficV068 = {
+      crossingId:c.id,crossingName:c.name,state:'waiting',queuePosition:1,
+      initialSide:-1,entered:false,forcedColumn:true
+    };
+    state.queue.push(reg.id);
     let sawWaiting = false;
     for (let i = 0; i < 170; i++) {
       window.RTS_SIM.step(.05);
@@ -89,6 +100,8 @@ test('Pont de la Crête: off-center western approach forms a column and clears a
     const goal = crossingPointV068(c, c.length / 2 + 360, -25);
     orderGroupPathV06(reg, goal.x, goal.y, 'line', 0);
     const initialPath = reg.path?.map(p => ({x:p.x,y:p.y})) || [];
+    const initialRouteCrossings = (reg.routeCrossingsV067 || []).map(item => item.id);
+    const declaredBridgeCorridors = (reg.navigationV2?.bridgeCorridors || []).map(item => item.id);
     let formed = false, crossing = false, cleared = false, maxWater = 0;
     let farBankAt = null;
     for (let i = 0; i < 3600; i++) {
@@ -105,7 +118,7 @@ test('Pont de la Crête: off-center western approach forms a column and clears a
     }
     const alive = regimentMembers(reg).filter(u => !u.dead);
     return {
-      bridge:c.id, start, goal, initialPath, formed, crossing, cleared, farBankAt, maxWater,
+      bridge:c.id, start, goal, initialPath, initialRouteCrossings, declaredBridgeCorridors, formed, crossing, cleared, farBankAt, maxWater,
       finalBlocked:alive.filter(u => segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY)).length,
       finalWater:alive.filter(u => waterAtV067(u.x,u.y)).length,
       finalCenter:centroid(alive),
@@ -114,6 +127,8 @@ test('Pont de la Crête: off-center western approach forms a column and clears a
     };
   });
   console.log('CRETE_OFF_AXIS_APPROACH', JSON.stringify(result));
+  expect(result.initialRouteCrossings).toEqual(['pont-crete']);
+  expect(result.declaredBridgeCorridors).toEqual(['pont-crete']);
   expect(result.formed).toBe(true);
   expect(result.crossing).toBe(true);
   expect(result.cleared).toBe(true);
