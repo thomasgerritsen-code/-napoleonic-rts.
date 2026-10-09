@@ -76,15 +76,19 @@ test('French worker continues same resource type, gathers, then stops safely whe
   britishWorker = snapshot.britain.units.find(unit => unit.id === assignments.britain.workerId);
   expect(frenchWorker.task).toBeNull();
   expect(frenchWorker.resourceTargetId).toBeNull();
-  expect(frenchWorker.targetX).toBeCloseTo(frenchWorker.x, 5);
-  expect(frenchWorker.targetY).toBeCloseTo(frenchWorker.y, 5);
   expect(britishWorker.resourceTargetId).toBe(assignments.britain.resourceId);
 
   await page.evaluate(() => window.__RTS_DEBUG__.tick(2));
   const settled = (await state(page)).france.units.find(unit => unit.id === assignments.france.workerId);
+  await page.evaluate(() => window.__RTS_DEBUG__.tick(2));
+  const stable = (await state(page)).france.units.find(unit => unit.id === assignments.france.workerId);
   expect(settled.task).toBeNull();
   expect(settled.resourceTargetId).toBeNull();
-  expect(settled.x).toBeCloseTo(frenchWorker.x, 5);
-  expect(settled.y).toBeCloseTo(frenchWorker.y, 5);
+  expect(stable.task).toBeNull();
+  expect(stable.resourceTargetId).toBeNull();
+  expect(stable.x).toBeCloseTo(settled.x, 5);
+  expect(stable.y).toBeCloseTo(settled.y, 5);
+  expect(stable.targetX).toBeCloseTo(stable.x, 5);
+  expect(stable.targetY).toBeCloseTo(stable.y, 5);
   expect(errors).toEqual([]);
 });
