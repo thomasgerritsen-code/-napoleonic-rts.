@@ -154,6 +154,42 @@
     if(typeof setLocomotionTargetsV064==='function') setLocomotionTargetsV064(reg,march,Boolean(roadNetworkAtV066(march.anchorX,march.anchorY)));
   }
 
+  // A local order straight across a nearby bridge should not be redirected
+  // hundreds of units to an incidental road/ford crossing found by coarse A*.
+  // Keep the existing route unless the intended bridge is materially shorter,
+  // both endpoints are near it, and every replacement leg is water-safe.
+  function localBridgeIntent(start,goal,kind,reg) {
+    const fromSide=bankSign(start),toSide=bankSign(goal);
+    if(!fromSide||!toSide||fromSide===toSide)return null;
+    const crossingScore=c=>Math.hypot(c.x-start.x,c.y-start.y)+
+      Math.hypot(c.x-goal.x,c.y-goal.y)+crossingDelayV067(c,kind)*42;
+    const best=[...WATER_CROSSINGS_V067].sort((a,b)=>crossingScore(a)-crossingScore(b))[0];
+    if(!best||best.type!=='bridge')return null;
+    if(Math.hypot(best.x-start.x,best.y-start.y)>540||
+       Math.hypot(best.x-goal.x,best.y-goal.y)>690)return null;
+
+    const ids=(reg.navigationV2?.bridgeCorridors?.length
+      ? reg.navigationV2.bridgeCorridors : reg.routeCrossingsV067||[]).map(item=>item.id);
+    if(ids.includes(best.id))return null;
+    const chosen=ids.map(id=>WATER_CROSSINGS_V067.find(c=>c.id===id)).filter(Boolean);
+    const chosenScore=chosen.length?Math.min(...chosen.map(crossingScore)):Infinity;
+    if(crossingScore(best)+55>=chosenScore)return null;
+
+    const corridor=global.NRTS_NAVIGATION_V2.bridgeCorridor(best.id,fromSide);
+    if(!corridor)return null;
+    const path=[];
+    if(!appendSafeTail(path,start,corridor.approach))return null;
+    for(const waypoint of [corridor.entry,corridor.exit,corridor.clear])uniquePush(path,waypoint);
+    if(!appendSafeTail(path,corridor.clear,goal))return null;
+    let previous=start;
+    for(const p of path){
+      if(waterAtV067(p.x,p.y)||
+         segmentCrossesBlockedWaterV067(previous.x,previous.y,p.x,p.y))return null;
+      previous=p;
+    }
+    return {crossing:best,initialSide:fromSide,path};
+  }
+
   const orderBeforeResolver=orderGroupPathV06;
   orderGroupPathV06=function orderGroupPathBridgeResolverV2(reg,x,y,formation=reg?.formation,finalFacing=null){
     const members=reg?regimentMembers(reg):[];
@@ -161,9 +197,24 @@
     const goal={x,y};
     orderBeforeResolver(reg,x,y,formation,finalFacing);
     if(!reg||reg.destroyed||!['infantry','cavalry'].includes(groupKindV06(reg))) return;
-    if(reg.navigationV2?.bridgeCorridors?.length) return;
-
     const kind=groupKindV06(reg);
+    const local=localBridgeIntent(start,goal,kind,reg);
+    if(local){
+      reg.path=typeof dedupePathV065==='function'?dedupePathV065(local.path):local.path;
+      reg.pathIndex=0;
+      reg.navigationV2={
+        ...(reg.navigationV2||{}),
+        bridgeCorridors:[{id:local.crossing.id,name:local.crossing.name,type:local.crossing.type,initialSide:local.initialSide}],
+        bridgeStallSeconds:0,bridgeLastRecoveryAt:-999,
+        localBridgeIntent:true
+      };
+      if(typeof routeCrossingsForPathV067==='function')
+        reg.routeCrossingsV067=routeCrossingsForPathV067(start,reg.path);
+      reseed(reg);
+      stats.resolvedSplitCrossings++;
+      return;
+    }
+    if(reg.navigationV2?.bridgeCorridors?.length) return;
     const candidate=routeBridgeCandidate(start,reg.path||[],kind,goal);
     if(!candidate) return;
     const resolved=spliceCorridor(start,reg.path||[],candidate,goal);
