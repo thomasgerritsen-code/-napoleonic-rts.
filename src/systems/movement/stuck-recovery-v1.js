@@ -8,7 +8,7 @@
   const sampleSeconds=cfg.sampleSeconds??.8,triggerSeconds=cfg.triggerSeconds??2.4,minTravel=cfg.minExpectedTravel??8,cooldown=cfg.replanCooldownSeconds??2.8,nudge=cfg.nudgeDistance??18;
   const clearance=avoidCfg.clearance??7,cornerClearance=avoidCfg.cornerClearance??13,waypointArrival=avoidCfg.waypointArrival??7,maxWaypointSeconds=avoidCfg.maxWaypointSeconds??3.2;
   const groupState=new Map(),unitState=new Map(),replanTrace=[];
-  const stats={groupReplans:0,unitNudges:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0,crossingReplansSuppressed:0,crossingChangedReplans:0,formationReplansSuppressed:0,trafficYieldReplansSuppressed:0,nearTargetReplansSuppressed:0,phaseResets:0};
+  const stats={groupReplans:0,unitNudges:0,unsafeNudgesRejected:0,alternativeNudges:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0,crossingReplansSuppressed:0,crossingChangedReplans:0,formationReplansSuppressed:0,trafficYieldReplansSuppressed:0,nearTargetReplansSuppressed:0,phaseResets:0};
 
   function villageObstacles(){const villages=global.VILLAGE_SCENERY_V4||global.__VILLAGE_SCENERY_V4_DATA__||[];return villages.flatMap(v=>v.houses||[]).map(h=>({id:`v:${h.id||`${h.kind}-${h.x}-${h.y}`}`,x:h.x,y:h.y,w:h.w,h:h.h,angle:h.angle||0,kind:'village'}));}
   function gameplayObstacles(){return buildings.filter(b=>!b.dead).map(b=>({id:`g:${b.id}`,x:b.x,y:b.y,w:b.w,h:b.h,angle:0,kind:'gameplay'}));}
@@ -48,7 +48,38 @@
     state.lastRecovery=now;state.stillSeconds=0;state.phase=movementPhase(reg);groupState.set(reg.id,state);stats.groupReplans++;return true;
   }
   function sampleGroups(dt){for(const reg of regiments){if(!activeGroupMove(reg)){if(groupState.has(reg.id)){groupState.delete(reg.id);stats.phaseResets++;}continue;}if(crossingOwnsRecovery(reg)){groupState.delete(reg.id);continue;}if(trafficYieldOwnsRecovery(reg)){groupState.delete(reg.id);stats.trafficYieldReplansSuppressed++;continue;}const c=groupCenter(reg);if(!c)continue;if(nearFinalTarget(reg,c)){groupState.delete(reg.id);stats.nearTargetReplansSuppressed++;continue;}const phase=movementPhase(reg);let s=groupState.get(reg.id);if(!s){s={x:c.x,y:c.y,clock:0,stillSeconds:0,lastRecovery:-Infinity,phase};groupState.set(reg.id,s);continue;}if(s.phase!==phase){s.x=c.x;s.y=c.y;s.clock=0;s.stillSeconds=0;s.phase=phase;stats.phaseResets++;continue;}s.clock+=dt;if(s.clock<sampleSeconds)continue;const travel=Math.hypot(c.x-s.x,c.y-s.y),sampleDt=s.clock;s.clock=0;s.x=c.x;s.y=c.y;stats.samples++;if(travel<minTravel)s.stillSeconds+=sampleDt;else s.stillSeconds=0;if(s.stillSeconds>=triggerSeconds)replanGroup(reg,elapsed);}}
-  function nudgeLooseUnit(u){const dx=(u.targetX??u.x)-u.x,dy=(u.targetY??u.y)-u.y,len=Math.hypot(dx,dy)||1,px=-dy/len,py=dx/len;let nearest=null;for(const o of obstacles()){const d=Math.hypot(u.x-o.x,u.y-o.y);if(!nearest||d<nearest.d)nearest={o,d};}let sign=((u.id||1)%2)?1:-1;if(nearest){const a={x:u.x+px*nudge,y:u.y+py*nudge},b={x:u.x-px*nudge,y:u.y-py*nudge};sign=Math.hypot(a.x-nearest.o.x,a.y-nearest.o.y)>=Math.hypot(b.x-nearest.o.x,b.y-nearest.o.y)?1:-1;}const proposed={x:Math.max(12,Math.min(WORLD.width-12,u.x+px*nudge*sign)),y:Math.max(12,Math.min(WORLD.height-12,u.y+py*nudge*sign))};if(pointClear(proposed,null,2)){u.x=proposed.x;u.y=proposed.y;u.arrivedAtTarget=false;stats.unitNudges++;}}
+  function nudgeLooseUnit(u){
+    const dx=(u.targetX??u.x)-u.x,dy=(u.targetY??u.y)-u.y,len=Math.hypot(dx,dy)||1,px=-dy/len,py=dx/len;
+    let nearest=null;
+    for(const o of obstacles()){const d=Math.hypot(u.x-o.x,u.y-o.y);if(!nearest||d<nearest.d)nearest={o,d};}
+    let sign=((u.id||1)%2)?1:-1;
+    if(nearest){
+      const a={x:u.x+px*nudge,y:u.y+py*nudge},b={x:u.x-px*nudge,y:u.y-py*nudge};
+      sign=Math.hypot(a.x-nearest.o.x,a.y-nearest.o.y)>=Math.hypot(b.x-nearest.o.x,b.y-nearest.o.y)?1:-1;
+    }
+    // First try the usual sidestep, then the opposite lane and a small
+    // forward/backward escape. A free building tile may still be river water:
+    // never teleport a stranded soldier off the legal bridge/ford passage.
+    const offsets=[
+      {x:px*nudge*sign,y:py*nudge*sign},
+      {x:-px*nudge*sign,y:-py*nudge*sign},
+      {x:dx/len*nudge*.75,y:dy/len*nudge*.75},
+      {x:-dx/len*nudge*.75,y:-dy/len*nudge*.75}
+    ];
+    for(let i=0;i<offsets.length;i++){
+      const delta=offsets[i];
+      const proposed={x:Math.max(12,Math.min(WORLD.width-12,u.x+delta.x)),y:Math.max(12,Math.min(WORLD.height-12,u.y+delta.y))};
+      if(!pointClear(proposed,null,2)||waterAtV067(proposed.x,proposed.y)||segmentCrossesBlockedWaterV067(u.x,u.y,proposed.x,proposed.y)){
+        stats.unsafeNudgesRejected++;
+        continue;
+      }
+      if(Math.hypot(proposed.x-u.x,proposed.y-u.y)<1)continue;
+      u.x=proposed.x;u.y=proposed.y;u.arrivedAtTarget=false;
+      stats.unitNudges++;
+      if(i>0)stats.alternativeNudges++;
+      return;
+    }
+  }
   function sampleLoose(dt){for(const u of units){if(u.dead||u.routing||u.regimentId||u.task==='gather'||u.task==='return'||u.task==='build'){unitState.delete(u.id);continue;}const remaining=Math.hypot((u.targetX??u.x)-u.x,(u.targetY??u.y)-u.y);if(remaining<20){unitState.delete(u.id);continue;}let s=unitState.get(u.id);if(!s){s={x:u.x,y:u.y,clock:0,stillSeconds:0,lastRecovery:-Infinity};unitState.set(u.id,s);continue;}s.clock+=dt;if(s.clock<sampleSeconds)continue;const travel=Math.hypot(u.x-s.x,u.y-s.y),sampleDt=s.clock;s.clock=0;s.x=u.x;s.y=u.y;if(travel<Math.max(2,minTravel*.35))s.stillSeconds+=sampleDt;else s.stillSeconds=0;if(s.stillSeconds>=triggerSeconds&&elapsed-s.lastRecovery>=cooldown){nudgeLooseUnit(u);s.lastRecovery=elapsed;s.stillSeconds=0;s.x=u.x;s.y=u.y;}}}
   const previousMoveToward=moveToward;
   moveToward=function moveTowardWithLocalAvoidanceV2(u,tx,ty,dt,speed=TYPES[u.type].speed){if(!u||u.dead||!(dt>0))return previousMoveToward(u,tx,ty,dt,speed);const finalTarget=sanitizedTarget({x:tx,y:ty});let state=u.localAvoidanceV2||null;if(state){const waypointDistance=Math.hypot(u.x-state.x,u.y-state.y),directClear=!firstBlocker({x:u.x,y:u.y},finalTarget,null,clearance);if(directClear||waypointDistance<=waypointArrival||elapsed-(state.startedAt??elapsed)>maxWaypointSeconds){u.localAvoidanceV2=null;state=null;stats.detourResumes++;}}if(!state){const route=localWaypoint({x:u.x,y:u.y},finalTarget,u);if(route.waypoint){state={x:route.waypoint.x,y:route.waypoint.y,blockerId:route.blocker?.id||null,startedAt:elapsed,finalX:finalTarget.x,finalY:finalTarget.y};u.localAvoidanceV2=state;stats.localDetours++;}}if(state){previousMoveToward(u,state.x,state.y,dt,speed);u.arrivedAtTarget=false;return false;}return previousMoveToward(u,finalTarget.x,finalTarget.y,dt,speed);};
