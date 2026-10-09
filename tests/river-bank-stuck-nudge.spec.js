@@ -87,3 +87,46 @@ test('a stalled loose soldier beside the river is nudged along legal ground, nev
   expect(result.afterNudge.alternateUsed).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
+
+test('a loose soldier already trapped in blocked river water is restored to a walkable bank', async ({ page }) => {
+  test.setTimeout(45_000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/?test=movement-coverage', { waitUntil: 'networkidle' });
+  await page.waitForFunction(() => Boolean(window.RTS_SIM && window.__STUCK_RECOVERY_V2__));
+  const result = await page.evaluate(() => {
+    resetGame();
+    v05PeaceMode = true;
+    gameOver = false;
+    for (const u of units) u.dead = true;
+    for (const r of regiments) r.destroyed = true;
+    // Known impassable water away from the authorized bridge/ford geometry.
+    const source = { x: 1475, y: 520 };
+    if (!waterAtV067(source.x, source.y)) return { setup: false };
+    const unit = createUnit('france', 'infantry', source.x, source.y);
+    unit.routing = false;
+    unit.regimentId = null;
+    unit.task = null;
+    unit.targetX = 1300;
+    unit.targetY = 520;
+    unit.arrivedAtTarget = false;
+    const before = window.__STUCK_RECOVERY_V2__.stats().waterRescues;
+    for (let i = 0; i < 5; i++) window.RTS_SIM.step(0.05);
+    const after = window.__STUCK_RECOVERY_V2__.stats().waterRescues;
+    return {
+      setup: true,
+      recoveries: after - before,
+      inWater: waterAtV067(unit.x, unit.y),
+      rescueDistance: Math.hypot(unit.x - source.x, unit.y - source.y),
+      commandStillIntact: unit.targetX === 1300 && unit.targetY === 520
+    };
+  });
+  console.log('RIVER_WATER_STRAGGLER_RESCUE', JSON.stringify(result));
+  expect(result.setup).toBe(true);
+  expect(result.recoveries).toBeGreaterThan(0);
+  expect(result.inWater).toBe(false);
+  expect(result.rescueDistance).toBeGreaterThan(0);
+  expect(result.rescueDistance).toBeLessThan(180);
+  expect(result.commandStillIntact).toBe(true);
+  expect(errors).toEqual([]);
+});
