@@ -35,7 +35,26 @@
     worker.task = 'gather';
     worker.resourceTarget = resource;
     worker.returnResource = resource;
+    worker.preferredResourceType = resource.type;
     worker.targetX = resource.x; worker.targetY = resource.y;
+  }
+
+  function reassignFrenchWorkerToSameResource(worker, exhaustedResource = null) {
+    if (!worker || worker.side !== 'france') return false;
+    const resourceType = worker.preferredResourceType || exhaustedResource?.type || worker.returnResource?.type;
+    const replacement = resourceType
+      ? nearestResource(resourceType, worker.x, worker.y, exhaustedResource)
+      : null;
+    if (replacement) {
+      assignWorkerToResource(worker, replacement);
+      return true;
+    }
+    worker.task = null;
+    worker.resourceTarget = null;
+    worker.returnResource = null;
+    worker.targetX = worker.x;
+    worker.targetY = worker.y;
+    return false;
   }
 
   function autoAssignAIWorkers() {
@@ -59,6 +78,7 @@
     if (u.task === 'gather') {
       const r = u.resourceTarget;
       if (!r || r.dead || r.amount <= 0) {
+        if (u.side === 'france' && reassignFrenchWorkerToSameResource(u, r)) return;
         u.task = null; u.resourceTarget = null;
         if (u.side === 'britain') autoAssignAIWorkers();
         return;
@@ -88,6 +108,7 @@
       if (u.returnResource && !u.returnResource.dead) {
         u.resourceTarget = u.returnResource; u.task = 'gather';
       } else {
+        if (u.side === 'france' && reassignFrenchWorkerToSameResource(u, u.returnResource)) return;
         u.task = null; u.resourceTarget = null;
         if (u.side === 'britain') autoAssignAIWorkers();
       }
