@@ -18,17 +18,18 @@ async function touchTap(page, x, y, pointerId = 1) {
   }
 }
 
-test('phone adds the nearest regiment to the current selection with one action', async ({ page }) => {
+test('phone add action selects only a nearby regiment and never recruits a remote one', async ({ page }) => {
   await page.setViewportSize({ width: 844, height: 390 });
   await page.goto('/?test');
   await page.waitForFunction(() => window.RTS_SIM && window.__MOBILE_REGIMENT_MULTISELECT_V1__);
 
   const regiments = await page.evaluate(() => {
     const first = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', 950, 980);
-    const second = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', 1350, 980);
-    if (!first || !second) return null;
+    const nearby = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', 1170, 980);
+    const remote = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', 1800, 980);
+    if (!first || !nearby || !remote) return null;
     window.__RTS_DEBUG__.selectRegiment(first);
-    return [first, second];
+    return { first, nearby, remote };
   });
   expect(regiments).not.toBeNull();
 
@@ -48,13 +49,19 @@ test('phone adds the nearest regiment to the current selection with one action',
     return {
       selectedRegimentIds: [...new Set(selectedRegimentIds)].sort(),
       helperCount: window.__MOBILE_REGIMENT_MULTISELECT_V1__.selectedCount(),
+      hasAvailableRegiment: window.__MOBILE_REGIMENT_MULTISELECT_V1__.hasAvailableRegiment(),
+      maxAddDistance: window.__MOBILE_REGIMENT_MULTISELECT_V1__.maxAddDistance,
       status: document.getElementById('status').textContent
     };
   });
 
-  expect(result.selectedRegimentIds).toEqual([...regiments].sort());
+  expect(result.selectedRegimentIds).toEqual([regiments.first, regiments.nearby].sort());
+  expect(result.selectedRegimentIds).not.toContain(regiments.remote);
   expect(result.helperCount).toBe(2);
+  expect(result.hasAvailableRegiment).toBe(false);
+  expect(result.maxAddDistance).toBe(320);
   expect(result.status).toContain('2 regimenten geselecteerd');
+  await expect(addButton).toHaveCount(0);
 });
 
 test('phone tap mode adds and removes whole regiments without clearing the last selection', async ({ page }) => {
