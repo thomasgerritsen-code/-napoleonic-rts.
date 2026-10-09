@@ -44,8 +44,8 @@
     // the bridge. Begin well upstream so a wide line can close into two files
     // before its members reach the narrow deck. Ignore the early "entered"
     // signal from a single forward scout; use the authoritative anchor instead.
-    const start=Math.max(260,Number(config.columnFormStartClearance)||0);
-    const full=Math.max(100,Math.min(start-1,Number(config.columnFormFullClearance)||0));
+    const start=Math.max(1,Number(config.columnFormStartClearance)||260);
+    const full=Math.max(0,Math.min(start-1,Number(config.columnFormFullClearance)||120));
     if(info?.state==='clearing')return 1;
     if(clearance>=start)return 0;
     if(clearance<=full)return 1;
