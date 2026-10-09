@@ -18,14 +18,40 @@ function isWorldVisible(x, y, padding = 0) {
 }
 
 // ---------- Victory ----------
+  function showBattleOutcome(title, explanation) {
+    const heading = document.createElement('strong');
+    heading.className = 'battle-result-title';
+    heading.textContent = title;
+    const detail = document.createElement('span');
+    detail.className = 'battle-result-detail';
+    detail.textContent = explanation;
+    messageEl.replaceChildren(heading, detail);
+    messageEl.classList.remove('hidden');
+  }
+
   function checkVictory() {
     if (gameOver) return;
-    const frenchTC = livingBuildings('france').some(b => b.type === 'towncenter');
-    const britishTC = livingBuildings('britain').some(b => b.type === 'towncenter');
-    if (!britishTC) {
-      gameOver = true; messageEl.textContent = 'FRANSE OVERWINNING'; messageEl.classList.remove('hidden');
-    } else if (!frenchTC) {
-      gameOver = true; messageEl.textContent = 'BRITSE OVERWINNING'; messageEl.classList.remove('hidden');
+
+    // A battle is won only after the enemy headquarters AND every fighting unit
+    // are destroyed. Workers are civilians, not troops; routed units still count
+    // until they have actually died or left the battlefield.
+    const defeated = side => {
+      const headquarters = buildings.filter(b => b.side === side && b.type === 'towncenter');
+      return headquarters.length > 0 &&
+        headquarters.every(b => b.dead) &&
+        !livingUnits(side).some(u => u.type !== 'worker');
+    };
+    const frenchDefeated = defeated('france');
+    const britishDefeated = defeated('britain');
+    if (!frenchDefeated && !britishDefeated) return;
+
+    gameOver = true;
+    if (frenchDefeated && britishDefeated) {
+      showBattleOutcome('GELIJKSPEL', 'Beide hoofdgebouwen zijn vernietigd en er zijn geen gevechtstroepen meer over.');
+    } else if (britishDefeated) {
+      showBattleOutcome('OVERWINNING!', 'Je hebt het Britse hoofdgebouw vernietigd en alle Britse gevechtstroepen uitgeschakeld.');
+    } else {
+      showBattleOutcome('NEDERLAAG', 'Je hoofdgebouw is vernietigd en alle Franse gevechtstroepen zijn uitgeschakeld.');
     }
   }
 

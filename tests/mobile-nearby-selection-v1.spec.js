@@ -46,3 +46,50 @@ test('phone can expand one loose musketeer to a nearby 12-man selection', async 
   expect(after.helperCount).toBe(12);
   await expect(nearby).toHaveCount(0);
 });
+
+test('phone nearby selection never pulls distant loose infantry across the battlefield', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto('/?test');
+  await page.waitForFunction(() => window.RTS_SIM && window.__MOBILE_NEARBY_SELECTION_V1__);
+
+  const setup = await page.evaluate(() => {
+    const anchor = units.find(unit =>
+      unit.side === 'france' && unit.type === 'infantry' && !unit.regimentId && !unit.dead
+    );
+    if (!anchor) return null;
+    let offset = 0;
+    for (const unit of units) {
+      if (
+        unit !== anchor && unit.side === 'france' && unit.type === 'infantry' &&
+        !unit.regimentId && !unit.dead
+      ) {
+        unit.x = Math.min(WORLD.width - 80, anchor.x + 700 + offset);
+        unit.y = Math.min(WORLD.height - 80, anchor.y + (offset % 120));
+        unit.targetX = unit.x;
+        unit.targetY = unit.y;
+        offset += 12;
+      }
+    }
+    window.RTS_SIM.dispatch({ type: 'select-point', x: anchor.x, y: anchor.y });
+    return {
+      anchorId: anchor.id,
+      radius: window.__MOBILE_NEARBY_SELECTION_V1__.nearbyRadius,
+      available: window.__MOBILE_NEARBY_SELECTION_V1__.availableCount()
+    };
+  });
+  expect(setup).not.toBeNull();
+  expect(setup.radius).toBe(320);
+  expect(setup.available).toBe(0);
+
+  const nearby = page.locator('#actions [data-action="select-nearby-infantry"]');
+  await expect(nearby).toBeVisible();
+  await expect(nearby).toBeDisabled();
+  await expect(nearby).toHaveAttribute('title', 'Er zijn geen extra vrije musketiers binnen 320 meter beschikbaar.');
+
+  const result = await page.evaluate(() => ({
+    selected: window.RTS_SIM.snapshot().selection.unitIds,
+    changed: window.__MOBILE_NEARBY_SELECTION_V1__.selectNearby()
+  }));
+  expect(result.selected).toEqual([setup.anchorId]);
+  expect(result.changed).toBe(false);
+});
