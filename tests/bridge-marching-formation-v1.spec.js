@@ -85,13 +85,16 @@ test('Pont de la Crête forms two marching files before the bridge, maintains th
   console.log('BRIDGE_MARCHING_FORMATION',JSON.stringify({chosen:result.chosen,before:compact(result.before),deck:compact(result.deck),cleared:result.cleared,regainedLine:result.regainedLine,water:result.water,stats:result.stats}));
   expect(result.chosen).toEqual(['pont-crete']);
   expect(result.before).not.toBeNull();
-  expect(result.before.targetWidthOffsets).toBeLessThanOrEqual(28);
+  // A paper-perfect target is insufficient: troops must actually close
+  // into recognizable marching files before entering the bridge mouth.
+  expect(result.before.targetWidthOffsets).toBeLessThanOrEqual(20);
+  expect(result.before.spanPerp).toBeLessThanOrEqual(65);
   expect(result.before.offsetFrontBack).toBeGreaterThan(125);
   expect(result.deck).not.toBeNull();
   expect(result.deck.inDeck).toBeGreaterThanOrEqual(8);
-  expect(result.deck.targetWidthOffsets).toBeLessThanOrEqual(28);
+  expect(result.deck.targetWidthOffsets).toBeLessThanOrEqual(20);
   expect(result.deck.offsetFrontBack).toBeGreaterThan(125);
-  expect(result.deck.deckSpanPerp).toBeLessThan(70);
+  expect(result.deck.deckSpanPerp).toBeLessThanOrEqual(35);
   expect(result.water).toBe(0);
   expect(result.cleared).toBe(true);
   expect(result.regainedLine).toBe(true);
