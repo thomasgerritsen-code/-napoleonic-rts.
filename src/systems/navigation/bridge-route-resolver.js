@@ -178,9 +178,17 @@
     const corridor=global.NRTS_NAVIGATION_V2.bridgeCorridor(best.id,fromSide);
     if(!corridor)return null;
     const path=[];
-    if(!appendSafeTail(path,start,corridor.approach))return null;
+    // A coarse A* leg can overshoot the entrance and double back, bunching the
+    // regiment outside a bridge that is actually free. Prefer a clear direct
+    // approach; retain obstacle-aware routing if direct movement is obstructed.
+    const safeDirect=(a,b)=>!waterAtV067(b.x,b.y)&&
+      !segmentCrossesBlockedWaterV067(a.x,a.y,b.x,b.y)&&
+      !(global.__STUCK_RECOVERY_V2__?.segmentBlocked?.(a,b));
+    if(safeDirect(start,corridor.approach))uniquePush(path,corridor.approach);
+    else if(!appendSafeTail(path,start,corridor.approach))return null;
     for(const waypoint of [corridor.entry,corridor.exit,corridor.clear])uniquePush(path,waypoint);
-    if(!appendSafeTail(path,corridor.clear,goal))return null;
+    if(safeDirect(corridor.clear,goal))uniquePush(path,goal);
+    else if(!appendSafeTail(path,corridor.clear,goal))return null;
     let previous=start;
     for(const p of path){
       if(waterAtV067(p.x,p.y)||
