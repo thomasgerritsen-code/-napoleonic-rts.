@@ -8,7 +8,7 @@
   const sampleSeconds=cfg.sampleSeconds??.8,triggerSeconds=cfg.triggerSeconds??2.4,minTravel=cfg.minExpectedTravel??8,cooldown=cfg.replanCooldownSeconds??2.8,nudge=cfg.nudgeDistance??18;
   const clearance=avoidCfg.clearance??7,cornerClearance=avoidCfg.cornerClearance??13,waypointArrival=avoidCfg.waypointArrival??7,maxWaypointSeconds=avoidCfg.maxWaypointSeconds??3.2;
   const groupState=new Map(),unitState=new Map(),replanTrace=[];
-  const stats={groupReplans:0,unitNudges:0,unsafeNudgesRejected:0,alternativeNudges:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0,crossingReplansSuppressed:0,crossingChangedReplans:0,formationReplansSuppressed:0,trafficYieldReplansSuppressed:0,nearTargetReplansSuppressed:0,phaseResets:0};
+  const stats={groupReplans:0,unitNudges:0,unsafeNudgesRejected:0,alternativeNudges:0,waterRescues:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0,crossingReplansSuppressed:0,crossingChangedReplans:0,formationReplansSuppressed:0,trafficYieldReplansSuppressed:0,nearTargetReplansSuppressed:0,phaseResets:0};
 
   function villageObstacles(){const villages=global.VILLAGE_SCENERY_V4||global.__VILLAGE_SCENERY_V4_DATA__||[];return villages.flatMap(v=>v.houses||[]).map(h=>({id:`v:${h.id||`${h.kind}-${h.x}-${h.y}`}`,x:h.x,y:h.y,w:h.w,h:h.h,angle:h.angle||0,kind:'village'}));}
   function gameplayObstacles(){return buildings.filter(b=>!b.dead).map(b=>({id:`g:${b.id}`,x:b.x,y:b.y,w:b.w,h:b.h,angle:0,kind:'gameplay'}));}
@@ -80,7 +80,34 @@
       return;
     }
   }
-  function sampleLoose(dt){for(const u of units){if(u.dead||u.routing||u.regimentId||u.task==='gather'||u.task==='return'||u.task==='build'){unitState.delete(u.id);continue;}const remaining=Math.hypot((u.targetX??u.x)-u.x,(u.targetY??u.y)-u.y);if(remaining<20){unitState.delete(u.id);continue;}let s=unitState.get(u.id);if(!s){s={x:u.x,y:u.y,clock:0,stillSeconds:0,lastRecovery:-Infinity};unitState.set(u.id,s);continue;}s.clock+=dt;if(s.clock<sampleSeconds)continue;const travel=Math.hypot(u.x-s.x,u.y-s.y),sampleDt=s.clock;s.clock=0;s.x=u.x;s.y=u.y;if(travel<Math.max(2,minTravel*.35))s.stillSeconds+=sampleDt;else s.stillSeconds=0;if(s.stillSeconds>=triggerSeconds&&elapsed-s.lastRecovery>=cooldown){nudgeLooseUnit(u);s.lastRecovery=elapsed;s.stillSeconds=0;s.x=u.x;s.y=u.y;}}}
+  function rescueLooseFromRiver(u){
+    if(!waterAtV067(u.x,u.y))return false;
+    // This is a last-resort correction for an already invalid position. The
+    // regular movement guard cannot walk out: its first step still hits water.
+    // Choose the nearest unobstructed bank rather than leaving the unit stuck.
+    const originalX=u.x,originalY=u.y;
+    const preferred=bankSideV067(originalX,originalY)>=0?1:-1;
+    let best=null,bestDistance=Infinity;
+    for(const yOffset of [0,-24,24,-48,48]){
+      const y=Math.max(12,Math.min(WORLD.height-12,originalY+yOffset));
+      const riverX=riverCenterXAtYV067(y);
+      for(const side of [preferred,-preferred]){
+        const p={x:riverX+side*(RIVER_NAV_HALF_WIDTH_V067+16),y};
+        const distance=Math.hypot(p.x-originalX,p.y-originalY);
+        if(distance>=bestDistance||!pointClear(p,null,2)||waterAtV067(p.x,p.y))continue;
+        best=p;bestDistance=distance;
+      }
+    }
+    if(!best)return false;
+    u.x=best.x;u.y=best.y;u.arrivedAtTarget=false;
+    u.localAvoidanceV2=null;
+    u.navigationBridgeV2=null;
+    u.waterCrossingIdV067=null;
+    unitState.delete(u.id);
+    stats.waterRescues++;
+    return true;
+  }
+  function sampleLoose(dt){for(const u of units){if(u.dead||u.routing||u.regimentId||u.task==='gather'||u.task==='return'||u.task==='build'){unitState.delete(u.id);continue;}if(rescueLooseFromRiver(u))continue;const remaining=Math.hypot((u.targetX??u.x)-u.x,(u.targetY??u.y)-u.y);if(remaining<20){unitState.delete(u.id);continue;}let s=unitState.get(u.id);if(!s){s={x:u.x,y:u.y,clock:0,stillSeconds:0,lastRecovery:-Infinity};unitState.set(u.id,s);continue;}s.clock+=dt;if(s.clock<sampleSeconds)continue;const travel=Math.hypot(u.x-s.x,u.y-s.y),sampleDt=s.clock;s.clock=0;s.x=u.x;s.y=u.y;if(travel<Math.max(2,minTravel*.35))s.stillSeconds+=sampleDt;else s.stillSeconds=0;if(s.stillSeconds>=triggerSeconds&&elapsed-s.lastRecovery>=cooldown){nudgeLooseUnit(u);s.lastRecovery=elapsed;s.stillSeconds=0;s.x=u.x;s.y=u.y;}}}
   const previousMoveToward=moveToward;
   moveToward=function moveTowardWithLocalAvoidanceV2(u,tx,ty,dt,speed=TYPES[u.type].speed){if(!u||u.dead||!(dt>0))return previousMoveToward(u,tx,ty,dt,speed);const finalTarget=sanitizedTarget({x:tx,y:ty});let state=u.localAvoidanceV2||null;if(state){const waypointDistance=Math.hypot(u.x-state.x,u.y-state.y),directClear=!firstBlocker({x:u.x,y:u.y},finalTarget,null,clearance);if(directClear||waypointDistance<=waypointArrival||elapsed-(state.startedAt??elapsed)>maxWaypointSeconds){u.localAvoidanceV2=null;state=null;stats.detourResumes++;}}if(!state){const route=localWaypoint({x:u.x,y:u.y},finalTarget,u);if(route.waypoint){state={x:route.waypoint.x,y:route.waypoint.y,blockerId:route.blocker?.id||null,startedAt:elapsed,finalX:finalTarget.x,finalY:finalTarget.y};u.localAvoidanceV2=state;stats.localDetours++;}}if(state){previousMoveToward(u,state.x,state.y,dt,speed);u.arrivedAtTarget=false;return false;}return previousMoveToward(u,finalTarget.x,finalTarget.y,dt,speed);};
   const previousUpdate=update;
