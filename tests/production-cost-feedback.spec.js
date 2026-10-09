@@ -8,11 +8,49 @@ async function openGame(page) {
   return errors;
 }
 
-async function createAndSelectBarracks(page) {
-  const id = await page.evaluate(() => window.__RTS_DEBUG__.createCompletedBuilding('france', 'barracks', 900, 800));
+async function createAndSelectBuilding(page, type, x, y) {
+  const id = await page.evaluate(
+    ({ buildingType, buildingX, buildingY }) => window.__RTS_DEBUG__.createCompletedBuilding('france', buildingType, buildingX, buildingY),
+    { buildingType: type, buildingX: x, buildingY: y }
+  );
   await page.evaluate(buildingId => window.__RTS_DEBUG__.selectBuildingById(buildingId), id);
   return id;
 }
+
+async function createAndSelectBarracks(page) {
+  return createAndSelectBuilding(page, 'barracks', 900, 800);
+}
+
+test('worker production exposes its cost and safely blocks a food shortage', async ({ page }) => {
+  const errors = await openGame(page);
+  const towncenterId = await createAndSelectBuilding(page, 'towncenter', 820, 760);
+  const worker = page.locator('[data-action="train-worker"]');
+
+  await expect(worker).toContainText('50 🍞');
+  await expect(worker).toContainText('1 👥');
+  await expect(worker).toHaveAttribute('data-cost-food', '50');
+  await expect(worker).toBeEnabled();
+
+  await page.evaluate(() => window.__RTS_DEBUG__.grantResources('france', -10000, 0));
+  await expect(worker).toBeDisabled();
+  await expect(worker).toHaveAttribute('data-shortage', 'food');
+  await expect(worker).toContainText('⚠ 50 🍞');
+
+  const beforeBlocked = await page.evaluate(id => {
+    const state = window.__RTS_DEBUG__.getState();
+    const building = state.france.buildings.find(item => item.id === id);
+    return { food: state.france.food, wood: state.france.wood, queue: building.queue.length };
+  }, towncenterId);
+  await worker.evaluate(button => button.click());
+  const afterBlocked = await page.evaluate(id => {
+    const state = window.__RTS_DEBUG__.getState();
+    const building = state.france.buildings.find(item => item.id === id);
+    return { food: state.france.food, wood: state.france.wood, queue: building.queue.length };
+  }, towncenterId);
+
+  expect(afterBlocked).toEqual(beforeBlocked);
+  expect(errors).toEqual([]);
+});
 
 test('production buttons expose live food and wood shortages without charging blocked actions', async ({ page }) => {
   const errors = await openGame(page);
