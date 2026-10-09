@@ -287,6 +287,9 @@ jobs:
         with:
           enablement: true
 
+      - name: Stamp unique published build version
+        run: node scripts/stamp-deployment.js
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
         with:
