@@ -12,13 +12,52 @@
     selected.forEach(u => typeCounts[u.type] = (typeCounts[u.type] || 0) + 1);
     const typePart = Object.entries(typeCounts).sort().map(([k,v]) => `${k}:${v}`).join(',');
     const regPart = [...new Set(selected.map(u => u.regimentId).filter(Boolean))].sort().join(',');
-    return `${buildingPart}|${typePart}|${regPart}`;
+    const economyPart = `${Math.floor(economies.france.food)}:${Math.floor(economies.france.wood)}:${populationUsed('france')}:${economies.france.popCap}`;
+    return `${buildingPart}|${typePart}|${regPart}|economy:${economyPart}`;
   }
 
   function makeDynamicButton(action, html, disabled = false) {
     const b = document.createElement('button');
     b.type = 'button'; b.dataset.action = action; b.dataset.dynamic = '1'; b.innerHTML = html; b.disabled = disabled;
     return b;
+  }
+
+  function trainingAvailability(type) {
+    const info = TRAINING[type];
+    const economy = economies.france;
+    const popRequired = TYPES[type]?.pop || 0;
+    const shortages = [];
+    if ((info.cost.food || 0) > economy.food) shortages.push('food');
+    if ((info.cost.wood || 0) > economy.wood) shortages.push('wood');
+    if (populationUsed('france') + popRequired > economy.popCap) shortages.push('population');
+    const reasons = [];
+    if (shortages.includes('food')) reasons.push(`${Math.ceil((info.cost.food || 0) - economy.food)} eten`);
+    if (shortages.includes('wood')) reasons.push(`${Math.ceil((info.cost.wood || 0) - economy.wood)} hout`);
+    if (shortages.includes('population')) reasons.push(`${popRequired} populatieruimte`);
+    return { info, popRequired, shortages, reasons };
+  }
+
+  function makeTrainingButton(action, type, label) {
+    const availability = trainingAvailability(type);
+    const token = (amount, symbol, key) => amount
+      ? `${availability.shortages.includes(key) ? '⚠ ' : ''}${amount} ${symbol}`
+      : null;
+    const costs = [
+      token(availability.info.cost.food, '🍞', 'food'),
+      token(availability.info.cost.wood, '🪵', 'wood'),
+      token(availability.popRequired, '👥', 'population')
+    ].filter(Boolean).join(' · ');
+    const button = makeDynamicButton(action, `${label}<br><small>${costs}</small>`, availability.shortages.length > 0);
+    button.dataset.shortage = availability.shortages.join(',');
+    button.dataset.costFood = String(availability.info.cost.food || 0);
+    button.dataset.costWood = String(availability.info.cost.wood || 0);
+    button.dataset.costPopulation = String(availability.popRequired);
+    const reason = availability.reasons.length
+      ? `Niet beschikbaar: ${availability.reasons.join(' en ')} tekort.`
+      : 'Beschikbaar.';
+    button.title = reason;
+    button.setAttribute('aria-label', `${label}. Kosten: ${costs.replaceAll('⚠ ', '')}. ${reason}`);
+    return button;
   }
 
   function renderDynamicActions(force = false) {
@@ -30,12 +69,12 @@
 
     if (selectedBuilding?.complete && selectedBuilding.side === 'france') {
       if (selectedBuilding.type === 'towncenter') {
-        fragment.append(makeDynamicButton('train-worker', 'Boer<br><small>50 🍞</small>'));
+        fragment.append(makeTrainingButton('train-worker', 'worker', 'Boer'));
       }
       if (selectedBuilding.type === 'barracks') {
-        fragment.append(makeDynamicButton('train-infantry', 'Musketier<br><small>80 🍞 · 20 🪵</small>'));
-        fragment.append(makeDynamicButton('train-officer', 'Officier<br><small>160 🍞 · 60 🪵</small>'));
-        fragment.append(makeDynamicButton('train-drummer', 'Drummer<br><small>90 🍞 · 20 🪵</small>'));
+        fragment.append(makeTrainingButton('train-infantry', 'infantry', 'Musketier'));
+        fragment.append(makeTrainingButton('train-officer', 'officer', 'Officier'));
+        fragment.append(makeTrainingButton('train-drummer', 'drummer', 'Drummer'));
       }
     }
 
