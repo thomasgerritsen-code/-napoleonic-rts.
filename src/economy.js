@@ -32,11 +32,22 @@
 
   function assignWorkerToResource(worker, resource) {
     if (!worker || !resource) return;
+    worker.resourceExhaustedStop = false;
     worker.task = 'gather';
     worker.resourceTarget = resource;
     worker.returnResource = resource;
     worker.preferredResourceType = resource.type;
     worker.targetX = resource.x; worker.targetY = resource.y;
+  }
+
+  function stopWorkerAtCurrentPosition(worker) {
+    worker.task = null;
+    worker.resourceTarget = null;
+    worker.returnResource = null;
+    worker.resourceExhaustedStop = true;
+    worker.targetX = worker.x;
+    worker.targetY = worker.y;
+    worker.arrivedAtTarget = true;
   }
 
   function reassignFrenchWorkerToSameResource(worker, exhaustedResource = null) {
@@ -49,11 +60,7 @@
       assignWorkerToResource(worker, replacement);
       return true;
     }
-    worker.task = null;
-    worker.resourceTarget = null;
-    worker.returnResource = null;
-    worker.targetX = worker.x;
-    worker.targetY = worker.y;
+    stopWorkerAtCurrentPosition(worker);
     return false;
   }
 
@@ -67,6 +74,15 @@
 
   function updateWorker(u, dt) {
     if (!u.task) {
+      if (u.resourceExhaustedStop) {
+        // Collision separation may have adjusted the worker after the resource
+        // update. Keep an exhausted worker anchored at that safe position
+        // instead of making it walk back toward a stale pre-separation target.
+        u.targetX = u.x;
+        u.targetY = u.y;
+        u.arrivedAtTarget = true;
+        return;
+      }
       moveToward(u, u.targetX, u.targetY, dt);
       if (u.side === 'britain') {
         const preferred = economies.britain.wood < economies.britain.food ? 'wood' : 'food';
