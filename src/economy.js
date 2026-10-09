@@ -32,10 +32,36 @@
 
   function assignWorkerToResource(worker, resource) {
     if (!worker || !resource) return;
+    worker.resourceExhaustedStop = false;
     worker.task = 'gather';
     worker.resourceTarget = resource;
     worker.returnResource = resource;
+    worker.preferredResourceType = resource.type;
     worker.targetX = resource.x; worker.targetY = resource.y;
+  }
+
+  function stopWorkerAtCurrentPosition(worker) {
+    worker.task = null;
+    worker.resourceTarget = null;
+    worker.returnResource = null;
+    worker.resourceExhaustedStop = true;
+    worker.targetX = worker.x;
+    worker.targetY = worker.y;
+    worker.arrivedAtTarget = true;
+  }
+
+  function reassignFrenchWorkerToSameResource(worker, exhaustedResource = null) {
+    if (!worker || worker.side !== 'france') return false;
+    const resourceType = worker.preferredResourceType || exhaustedResource?.type || worker.returnResource?.type;
+    const replacement = resourceType
+      ? nearestResource(resourceType, worker.x, worker.y, exhaustedResource)
+      : null;
+    if (replacement) {
+      assignWorkerToResource(worker, replacement);
+      return true;
+    }
+    stopWorkerAtCurrentPosition(worker);
+    return false;
   }
 
   function autoAssignAIWorkers() {
@@ -48,6 +74,15 @@
 
   function updateWorker(u, dt) {
     if (!u.task) {
+      if (u.resourceExhaustedStop) {
+        // Collision separation may have adjusted the worker after the resource
+        // update. Keep an exhausted worker anchored at that safe position
+        // instead of making it walk back toward a stale pre-separation target.
+        u.targetX = u.x;
+        u.targetY = u.y;
+        u.arrivedAtTarget = true;
+        return;
+      }
       moveToward(u, u.targetX, u.targetY, dt);
       if (u.side === 'britain') {
         const preferred = economies.britain.wood < economies.britain.food ? 'wood' : 'food';
@@ -59,6 +94,7 @@
     if (u.task === 'gather') {
       const r = u.resourceTarget;
       if (!r || r.dead || r.amount <= 0) {
+        if (u.side === 'france' && reassignFrenchWorkerToSameResource(u, r)) return;
         u.task = null; u.resourceTarget = null;
         if (u.side === 'britain') autoAssignAIWorkers();
         return;
@@ -88,6 +124,7 @@
       if (u.returnResource && !u.returnResource.dead) {
         u.resourceTarget = u.returnResource; u.task = 'gather';
       } else {
+        if (u.side === 'france' && reassignFrenchWorkerToSameResource(u, u.returnResource)) return;
         u.task = null; u.resourceTarget = null;
         if (u.side === 'britain') autoAssignAIWorkers();
       }
