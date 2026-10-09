@@ -199,6 +199,7 @@
     const rows = Math.ceil(n / cols), sx = 18, sy = 19;
     group.forEach((u, i) => {
       const col = i % cols, row = Math.floor(i / cols);
+      u.resourceExhaustedStop = false;
       u.targetX = x + (col - (cols - 1) / 2) * sx;
       u.targetY = y + (row - (rows - 1) / 2) * sy;
       u.task = null;
