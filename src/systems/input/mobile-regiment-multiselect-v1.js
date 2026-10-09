@@ -5,6 +5,7 @@
   if (typeof renderDynamicActions !== 'function') return;
 
   const baseRenderDynamicActions = renderDynamicActions;
+  const MAX_ADD_REGIMENT_DISTANCE = 320;
   let tapSelectionMode = false;
 
   function selectedFrenchRegiments() {
@@ -31,7 +32,7 @@
         nearestDistance = distance;
       }
     }
-    return nearest;
+    return nearestDistance <= MAX_ADD_REGIMENT_DISTANCE ? nearest : null;
   }
 
   function addNearestRegiment() {
@@ -90,7 +91,7 @@
       'add-nearest-regiment',
       `Voeg regiment toe<br><small>${selected.length} geselecteerd</small>`
     );
-    add.title = 'Voeg het dichtstbijzijnde andere regiment toe aan de huidige selectie.';
+    add.title = `Voeg het dichtstbijzijnde andere regiment binnen ${MAX_ADD_REGIMENT_DISTANCE} wereldunits toe.`;
     actionsEl.prepend(add);
   };
 
@@ -112,6 +113,7 @@
 
   global.__MOBILE_REGIMENT_MULTISELECT_V1__ = Object.freeze({
     selectedCount: () => selectedFrenchRegiments().length,
+    maxAddDistance: MAX_ADD_REGIMENT_DISTANCE,
     hasAvailableRegiment: () => Boolean(nearestUnselectedRegiment(selectedFrenchRegiments())),
     addNearestRegiment,
     tapSelectionActive: () => tapSelectionMode,
