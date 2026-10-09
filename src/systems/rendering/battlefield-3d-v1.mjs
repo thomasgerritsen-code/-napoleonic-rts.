@@ -498,6 +498,9 @@ canvas.addEventListener('pointerup', event => {
   touchPointers.delete(event.pointerId);
   if (touchPointers.size < 2) touchGesture = null;
   if (!touchPointers.size) suppressTouchTap = false;
+  // The officer tap handler selected the officer; release the pointer without
+  // interpreting that same tap as a battlefield move/selection.
+  if (event.__nrtsOfficerTapHandled) return;
   if (wasMulti) return;
   if (point.moved) {
     const start = groundPointFromEvent({ clientX: point.sx, clientY: point.sy });
