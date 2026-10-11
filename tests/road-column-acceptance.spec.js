@@ -64,7 +64,11 @@ test('browser: fastest-road route keeps four files on road and compact bridge', 
       }
 
       const onRoad = roadAtV064(m.anchorX, m.anchorY);
-      if (onRoad) {
+      // Tactical combat deliberately suspends marching formation even while the
+      // anchor is geometrically above a road. It is not a road-mode drop; this
+      // acceptance only measures uninterrupted travel while the route owns motion.
+      const tacticalOverride = m.phase === 'combat-halt' || m.locomotionV064 === 'combat-formation';
+      if (onRoad && !tacticalOverride) {
         roadSamples++;
         if (m.locomotionV064 === 'road-march') {
           roadModeSamples++;
