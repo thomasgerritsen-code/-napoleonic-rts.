@@ -110,3 +110,144 @@ test('browser: fastest-road route keeps four files on road and compact bridge', 
   expect(result.unsafe).toBe(0);
   expect(errors).toEqual([]);
 });
+
+
+test('browser: a halt/resume order and a sustained road exit preserve correct formations', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {
+    let seed = 22051996;
+    Math.random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  });
+  await page.goto('/?test=road-halt-exit-acceptance', { waitUntil: 'networkidle' });
+  await page.waitForFunction(() => Boolean(
+    window.RTS_SIM && window.__RTS_DEBUG__?.setPeaceMode && window.__BRIDGE_FORMATION_FLOW_V1__
+  ));
+
+  const result = await page.evaluate(() => {
+    window.__RTS_DEBUG__.setPeaceMode(true);
+    gameOver = false;
+    for (const unit of units) unit.dead = true;
+    for (const regiment of regiments) regiment.destroyed = true;
+    const road = ROAD_NETWORK_V066.find(item => item.id === 'grande-chaussee');
+    if (!road || road.points.length < 4) return { error: 'Missing road geometry' };
+    const start = road.points[1], destination = road.points[road.points.length - 2];
+    const id = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', start.x, start.y);
+    const reg = getRegiment(id);
+    if (!reg) return { error: 'Could not create infantry regiment' };
+    const infantry = regimentMembers(reg).filter(unit => unit.type === 'infantry' && !unit.dead);
+    orderGroupPathV06(reg, destination.x, destination.y, 'line', null);
+    let roadBeforeHalt = 0;
+    for (let i = 0; i < 100; i++) {
+      window.RTS_SIM.step(.05);
+      const march = reg.marchV063;
+      if (march?.locomotionV064 === 'road-march' && roadAtV064(march.anchorX, march.anchorY)) roadBeforeHalt++;
+    }
+
+    selectWholeRegiment(reg);
+    const halted = haltSelectedRegiments();
+    const stoppedPositions = infantry.map(unit => ({ x: unit.x, y: unit.y }));
+    let maxHaltDrift = 0;
+    for (let i = 0; i < 40; i++) {
+      window.RTS_SIM.step(.05);
+      infantry.forEach((unit, index) => {
+        maxHaltDrift = Math.max(maxHaltDrift, Math.hypot(
+          unit.x - stoppedPositions[index].x, unit.y - stoppedPositions[index].y
+        ));
+      });
+    }
+    const remainedHalted = reg.marchV063 === null && reg.path === null &&
+      reg.movementPhaseV063 === 'halted';
+
+    orderGroupPathV06(reg, destination.x, destination.y, 'line', null);
+    let roadAfterResume = 0, resumeFourFiles = 0;
+    for (let i = 0; i < 80; i++) {
+      window.RTS_SIM.step(.05);
+      const march = reg.marchV063;
+      if (!march) break;
+      if (roadAtV064(march.anchorX, march.anchorY) && march.locomotionV064 === 'road-march') {
+        roadAfterResume++;
+        const offsets = march.slotOffsetsV064 || new Map();
+        const slots = infantry.map(unit => offsets.get(unit.id)).filter(Boolean);
+        if (slots.length === infantry.length && new Set(
+          slots.map(slot => Math.round(slot.oy * 1000) / 1000)
+        ).size === 4) resumeFourFiles++;
+      }
+    }
+
+    const march = reg.marchV063;
+    if (!march) return { error: 'March ended before field exit', halted, roadBeforeHalt, roadAfterResume };
+    const fieldStart = { x: march.anchorX, y: march.anchorY };
+    let fieldTarget = null;
+    // Choose a genuinely dry, off-road destination and approach, rather than
+    // hard-coding map coordinates that may change with future battlefield art.
+    for (const radius of [280, 320, 360]) {
+      for (let i = 0; i < 24 && !fieldTarget; i++) {
+        const angle = i * Math.PI / 12;
+        const x = fieldStart.x + Math.cos(angle) * radius;
+        const y = fieldStart.y + Math.sin(angle) * radius;
+        if (x < 90 || y < 90 || x > WORLD.width - 90 || y > WORLD.height - 90) continue;
+        const samples = Array.from({ length: 12 }, (_, n) => {
+          const fraction = (n + 1) / 12;
+          return {
+            x: fieldStart.x + (x - fieldStart.x) * fraction,
+            y: fieldStart.y + (y - fieldStart.y) * fraction,
+            fraction
+          };
+        });
+        if (samples.some(p => waterAtV067(p.x, p.y))) continue;
+        if (samples.filter(p => p.fraction >= .5).some(p => roadAtV064(p.x, p.y))) continue;
+        fieldTarget = { x, y };
+        break;
+      }
+      if (fieldTarget) break;
+    }
+    if (!fieldTarget) return { error: 'No safe extended off-road route', halted, roadBeforeHalt, roadAfterResume };
+
+    orderGroupPathV06(reg, fieldTarget.x, fieldTarget.y, 'line', null);
+    let sustainedExit = false, widenedToLine = false, fieldTravel = 0, unsafe = 0;
+    let fieldModeSamples = 0;
+    for (let i = 0; i < 900; i++) {
+      window.RTS_SIM.step(.05);
+      const moving = reg.marchV063;
+      unsafe += infantry.filter(unit => waterAtV067(unit.x, unit.y)).length;
+      if (!moving) break;
+      fieldTravel = Math.max(fieldTravel, Math.hypot(
+        moving.anchorX - fieldStart.x, moving.anchorY - fieldStart.y
+      ));
+      if (roadAtV064(moving.anchorX, moving.anchorY)) continue;
+      if (moving.locomotionV064 === 'field-formation') fieldModeSamples++;
+      if (Number.isFinite(moving.roadLastSeenAtV064) &&
+          elapsed - moving.roadLastSeenAtV064 >= 1.6 &&
+          moving.locomotionV064 === 'field-formation') {
+        sustainedExit = true;
+        const offsets = moving.slotOffsetsV064 || new Map();
+        const slots = infantry.map(unit => offsets.get(unit.id)).filter(Boolean);
+        if (slots.length === infantry.length) {
+          const sideways = slots.map(slot => slot.oy);
+          widenedToLine ||= Math.max(...sideways) - Math.min(...sideways) > 70;
+        }
+      }
+      if (sustainedExit && widenedToLine && fieldModeSamples >= 20) break;
+    }
+    return { halted, remainedHalted, maxHaltDrift, roadBeforeHalt, roadAfterResume,
+      resumeFourFiles, infantry: infantry.length, fieldTarget, fieldTravel,
+      fieldModeSamples, sustainedExit, widenedToLine, unsafe };
+  });
+
+  console.log('ROAD_HALT_EXIT_ACCEPTANCE', JSON.stringify(result));
+  expect(result.error).toBeUndefined();
+  expect(result.halted).toBe(1);
+  expect(result.remainedHalted).toBe(true);
+  expect(result.maxHaltDrift).toBeLessThanOrEqual(8);
+  expect(result.roadBeforeHalt).toBeGreaterThan(5);
+  expect(result.roadAfterResume).toBeGreaterThan(5);
+  expect(result.resumeFourFiles).toBeGreaterThan(5);
+  expect(result.sustainedExit).toBe(true);
+  expect(result.fieldModeSamples).toBeGreaterThan(20);
+  expect(result.widenedToLine).toBe(true);
+  expect(result.fieldTravel).toBeGreaterThan(90);
+  expect(result.unsafe).toBe(0);
+  expect(errors).toEqual([]);
+});
