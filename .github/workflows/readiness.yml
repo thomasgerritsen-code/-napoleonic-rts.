@@ -1,0 +1,220 @@
+name: RTS readiness signals
+
+on:
+  workflow_run:
+    workflows: ["Test and deploy to GitHub Pages"]
+    types: [completed]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  ci-ready:
+    name: Publish exact-SHA CI_READY
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all five gates and publish CI_READY
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const linked = run.pull_requests?.[0];
+            if (!linked) {
+              core.notice('No pull request is linked to this workflow run.');
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: linked.number,
+            });
+            if (pr.state !== 'open' || pr.draft) {
+              core.notice('Pull request is not an open review-ready candidate.');
+              return;
+            }
+            if (pr.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.notice('Readiness signals are limited to same-repository branches.');
+              return;
+            }
+            if (pr.head.sha !== run.head_sha) {
+              core.notice('Workflow head is stale; no readiness signal published.');
+              return;
+            }
+
+            const required = [
+              'Fast headless gate',
+              'Focused Chromium gate',
+              'Game health 520-unit gate',
+              'Movement coverage gate',
+              'Deterministic Golden Battle gate',
+            ];
+            const jobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRun,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              },
+            );
+            const missing = required.filter((name) =>
+              !jobs.some((job) => job.name === name && job.conclusion === 'success'),
+            );
+            if (missing.length) {
+              core.setFailed(`Required gates are not all successful: ${missing.join(', ')}`);
+              return;
+            }
+
+            const marker = `<!-- rts-readiness:CI_READY:${pr.head.sha}:${pr.base.sha} -->`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            if (comments.some((comment) => comment.body?.includes(marker))) {
+              core.notice('CI_READY already exists for this exact head and base.');
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: [
+                marker,
+                `CI_READY — exact head \`${pr.head.sha}\`; base \`${pr.base.sha}\`.`,
+                '',
+                `All five required gates succeeded in [workflow run #${run.run_number}](${run.html_url}).`,
+                'This is an event-driven QA handoff only; it is not QA approval and grants no merge authority.',
+              ].join('\n'),
+            });
+
+  merge-ready:
+    name: Publish guarded MERGE_READY
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      (github.event.action == 'created' || github.event.action == 'edited')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate QA_PASS, head, base and five gates
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const comment = context.payload.comment;
+            const body = comment.body || '';
+            const trusted = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+            if (!trusted.has(comment.author_association)) {
+              core.notice('QA signal author is not a trusted repository participant.');
+              return;
+            }
+            if (!/RTS QA:\s*(?:\*\*)?QA_PASS(?:\*\*)?/i.test(body)) {
+              core.notice('Comment is not an RTS QA_PASS signal.');
+              return;
+            }
+            if (/QA_BLOCKED|FIX_REQUIRED|POST_MERGE_REGRESSION/i.test(body)) {
+              core.notice('Blocking status is present; MERGE_READY is forbidden.');
+              return;
+            }
+
+            const pullNumber = context.payload.issue.number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullNumber,
+            });
+            if (pr.state !== 'open' || pr.draft) {
+              core.notice('Pull request is not an open review-ready candidate.');
+              return;
+            }
+            if (pr.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.notice('Readiness signals are limited to same-repository branches.');
+              return;
+            }
+            if (!body.includes(pr.head.sha) || !body.includes(pr.base.sha)) {
+              core.notice('QA_PASS does not name the exact current head and base.');
+              return;
+            }
+
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: pr.head.sha,
+                event: 'pull_request',
+                status: 'completed',
+                per_page: 100,
+              },
+            );
+            const run = runs.find((candidate) =>
+              candidate.name === 'Test and deploy to GitHub Pages' &&
+              candidate.conclusion === 'success' &&
+              candidate.head_sha === pr.head.sha,
+            );
+            if (!run) {
+              core.notice('No successful five-gate workflow exists for the exact head.');
+              return;
+            }
+
+            const required = [
+              'Fast headless gate',
+              'Focused Chromium gate',
+              'Game health 520-unit gate',
+              'Movement coverage gate',
+              'Deterministic Golden Battle gate',
+            ];
+            const jobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRun,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              },
+            );
+            const missing = required.filter((name) =>
+              !jobs.some((job) => job.name === name && job.conclusion === 'success'),
+            );
+            if (missing.length) {
+              core.notice(`Required gates are not all successful: ${missing.join(', ')}`);
+              return;
+            }
+
+            const marker = `<!-- rts-readiness:MERGE_READY:${pr.head.sha}:${pr.base.sha} -->`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            if (comments.some((entry) => entry.body?.includes(marker))) {
+              core.notice('MERGE_READY already exists for this exact head and base.');
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: [
+                marker,
+                `MERGE_READY — exact head \`${pr.head.sha}\`; base \`${pr.base.sha}\`.`,
+                '',
+                `Five required gates are green in [workflow run #${run.run_number}](${run.html_url}) and the trusted QA_PASS comment names this exact head and base.`,
+                'Integrator remains the only merger and must still verify reviews, threads, branch protection, mergeability, unchanged SHA/base and absence of regressions.',
+              ].join('\n'),
+            });
