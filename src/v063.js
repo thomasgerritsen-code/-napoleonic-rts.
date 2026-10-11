@@ -289,7 +289,7 @@ function marchColumnOffsetsV063(reg) {
   const infantry = members.filter(u => u.type === 'infantry');
   const officer = members.find(u => u.id === reg.officerId);
   const drummer = members.find(u => u.id === reg.drummerId);
-  const files = infantry.length >= 20 ? 4 : 3;
+  const files = Math.min(4, Math.max(1, infantry.length));
   infantry.forEach((u, i) => {
     const rank = Math.floor(i / files), file = i % files;
     result.set(u.id, { ox: -rank * 20, oy: (file - (files - 1) / 2) * 18 });
