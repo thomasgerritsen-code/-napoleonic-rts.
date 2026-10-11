@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test('road columns stay within four files, compress for a bridge, and reform without water or stalls', async ({ page }) => {
+test('road and bridge columns stay four files, compact safely, and reform without stalls', async ({ page }) => {
   test.setTimeout(120_000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -98,10 +98,12 @@ test('road columns stay within four files, compress for a bridge, and reform wit
       const info = regiment.crossingTrafficV068;
       if (info?.state === 'crossing' && onDeck.length >= 8) {
         const offsets = regiment.marchV063?.slotOffsetsV064 || new Map();
-        const sideways = [...offsets.values()].map(offset => offset.oy);
-        const along = [...offsets.values()].map(offset => offset.ox);
+        const infantryOffsets = roadInfantry.map(unit => offsets.get(unit.id)).filter(Boolean);
+        const sideways = infantryOffsets.map(offset => offset.oy);
+        const along = infantryOffsets.map(offset => offset.ox);
         const sample = {
           inDeck: onDeck.length,
+          files: new Set(sideways.map(value => Math.round(value * 1000) / 1000)).size,
           targetSpan: sideways.length ? Math.max(...sideways) - Math.min(...sideways) : Infinity,
           depth: along.length ? Math.max(...along) - Math.min(...along) : 0
         };
@@ -135,7 +137,7 @@ test('road columns stay within four files, compress for a bridge, and reform wit
   });
 
   expect(result.widthCases).toEqual([
-    { count: 12, files: 3 },
+    { count: 12, files: 4 },
     { count: 20, files: 4 },
     { count: 36, files: 4 }
   ]);
@@ -152,8 +154,10 @@ test('road columns stay within four files, compress for a bridge, and reform wit
   expect(result.chosen).toEqual(['pont-crete']);
   expect(result.bridge).not.toBeNull();
   expect(result.bridge.inDeck).toBeGreaterThanOrEqual(8);
-  expect(result.bridge.targetSpan).toBeLessThanOrEqual(20);
-  expect(result.bridge.depth).toBeGreaterThan(125);
+  expect(result.bridge.files).toBe(4);
+  expect(result.bridge.targetSpan).toBeGreaterThanOrEqual(42);
+  expect(result.bridge.targetSpan).toBeLessThan(54);
+  expect(result.bridge.depth).toBeGreaterThan(90);
   expect(result.waterEntries).toBe(0);
   expect(result.cleared).toBe(true);
   expect(result.reformed).toBe(true);

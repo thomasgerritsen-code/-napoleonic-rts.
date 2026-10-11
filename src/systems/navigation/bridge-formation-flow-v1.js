@@ -1,11 +1,11 @@
 'use strict';
-// ---------- v1.3.2: narrow bridge/ford formations before follower water-safety ----------
+// ---------- v1.3.3: four-file compact bridge formations before follower water-safety ----------
 (function installBridgeFormationFlowV1(global){
   const nrts=global.NRTS;
   if(!nrts)throw new Error('NRTS runtime must load before bridge formation flow.');
   if(typeof forceBridgeColumnTargetsV068!=='function')throw new Error('Bridge traffic must load before bridge formation flow.');
 
-  const stats={applications:0,singleFile:0,twoFile:0};
+  const stats={applications:0,singleFile:0,twoFile:0,fourFile:0};
 
   function compactOffsets(reg,c){
     const members=regimentMembers(reg).filter(u=>u&&!u.dead);
@@ -14,12 +14,22 @@
     if(!members.length||kind==='artillery')return result;
 
     const radius=kind==='cavalry'?9:7;
-    const usable=Math.max(14,c.width-2*(radius+9));
-    const desiredFiles=kind==='cavalry'?1:(usable>=31?2:1);
-    const lateralGap=desiredFiles===1?0:Math.min(18,usable*.55);
+    const edgeClearance=radius+9;
+    const usableCenterSpan=Math.max(0,c.width-2*edgeClearance);
+    const lineMembers=members.filter(u=>u.type===(kind==='cavalry'?'cavalry':'infantry'));
+    // Infantry remains four files across every current bridge. The lateral gap is
+    // slightly tighter than the 18-unit road column, but never below one diameter.
+    // This derives the legal spacing from the deck width and soldier radius instead
+    // of silently dropping to the legacy one/two-file bridge column.
+    const desiredFiles=kind==='cavalry'
+      ?Math.min(2,Math.max(1,lineMembers.length))
+      :Math.min(4,Math.max(1,lineMembers.length));
+    const minimumGap=radius*2;
+    const preferredGap=kind==='cavalry'?24:15;
+    const maximumGap=desiredFiles>1?usableCenterSpan/(desiredFiles-1):0;
+    const lateralGap=desiredFiles===1?0:Math.max(minimumGap,Math.min(preferredGap,maximumGap));
     const forwardGap=kind==='cavalry'?30:19;
 
-    const lineMembers=members.filter(u=>u.type===(kind==='cavalry'?'cavalry':'infantry'));
     lineMembers.forEach((u,i)=>{
       const rank=Math.floor(i/desiredFiles);
       const file=i%desiredFiles;
@@ -32,7 +42,9 @@
     if(drummer)result.set(drummer.id,{ox:forwardGap*.8,oy:desiredFiles===1?0:-lateralGap*.5});
     for(const u of members)if(!result.has(u.id))result.set(u.id,{ox:-forwardGap,oy:0});
 
-    if(desiredFiles===1)stats.singleFile++;else stats.twoFile++;
+    if(desiredFiles===1)stats.singleFile++;
+    else if(desiredFiles===2)stats.twoFile++;
+    else if(desiredFiles===4)stats.fourFile++;
     return result;
   }
 
@@ -96,7 +108,7 @@
     stats.applications++;
   };
 
-  const api=Object.freeze({version:'bridge-formation-flow-v1.1',compactColumn:true,progressiveCompression:true,singleSlotWriter:true,earlyColumnStaging:true,stats:()=>({...stats})});
+  const api=Object.freeze({version:'bridge-formation-flow-v1.2',compactColumn:true,fourFileBridge:true,widthAwareSpacing:true,progressiveCompression:true,singleSlotWriter:true,earlyColumnStaging:true,stats:()=>({...stats})});
   global.__BRIDGE_FORMATION_FLOW_V1__=api;
-  nrts.subsystems.register('bridge-formation-flow',api,{phase:'v1.3.2',legacyBridge:false,responsibility:'progressively compress bridge and ford traffic into a stable one/two-file column near the crossing before per-member water-safety correction'});
+  nrts.subsystems.register('bridge-formation-flow',api,{phase:'v1.3.3',legacyBridge:false,responsibility:'retain four infantry files with width-aware compact spacing across bridges before per-member water-safety correction'});
 })(window);

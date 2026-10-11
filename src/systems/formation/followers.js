@@ -64,6 +64,41 @@ function waterSafeFollowerTargetV071(u, tx, ty) {
   return {x:safe.x,y:safe.y,guarded:true};
 }
 
+function waterSafeFollowerStepV071(u, dx, dy) {
+  const memory = u?.bridgeLastCrossingV1;
+  if (!memory || !(Math.abs(dx) > 0 || Math.abs(dy) > 0)) return {dx,dy,guarded:false};
+  const nextX = u.x + dx, nextY = u.y + dy;
+  if (!waterAtV067(nextX,nextY) && !segmentCrossesBlockedWaterV067(u.x,u.y,nextX,nextY)) {
+    return {dx,dy,guarded:false};
+  }
+  const c = WATER_CROSSINGS_V067.find(item => item.id === memory.crossingId);
+  if (!c) return {dx:0,dy:0,guarded:true};
+  const direction = -memory.initialSide;
+  const local = crossingLocalArchitectureV2(c,u.x,u.y);
+  const radius = Number(TYPES[u.type]?.radius)||7;
+  const safeHalf = Math.max(8,c.width/2-radius-8);
+  const centeredPerp = Math.max(-safeHalf*.2,Math.min(safeHalf*.2,local.perp));
+  const stepLength = Math.hypot(dx,dy);
+  const maxAlong = c.length/2+90;
+  for (const advance of [Math.max(6,stepLength*2),6,3,0]) {
+    const along = Math.max(-maxAlong,Math.min(maxAlong,local.along+direction*advance));
+    for (const perp of [centeredPerp,0]) {
+      const target = crossingPointArchitectureV2(c,along,perp);
+      const distance = Math.hypot(target.x-u.x,target.y-u.y);
+      if (!(distance > .001)) continue;
+      const scale = Math.min(1,stepLength/distance);
+      const safeDx = (target.x-u.x)*scale, safeDy = (target.y-u.y)*scale;
+      const x = u.x+safeDx, y = u.y+safeDy;
+      if (!waterAtV067(x,y) && !segmentCrossesBlockedWaterV067(u.x,u.y,x,y)) {
+        u.bridgeFollowerSafetyV1={crossingId:c.id,correctedAt:elapsed,motionGuard:true,stepGuard:true};
+        return {dx:safeDx,dy:safeDy,guarded:true};
+      }
+    }
+  }
+  u.bridgeFollowerSafetyV1={crossingId:c.id,correctedAt:elapsed,motionGuard:true,stepGuard:true};
+  return {dx:0,dy:0,guarded:true};
+}
+
 function dampedSlotMoveV071(u, reg, tx, ty, dt) {
   const cfg = window.NRTS_CONFIG?.formation?.followers || {};
   const movementCfg = window.NRTS_CONFIG?.movement || {};
@@ -115,6 +150,13 @@ function dampedSlotMoveV071(u, reg, tx, ty, dt) {
   const bounded = clampMagnitudeV071(dx, dy, maxSpeed * safeDt);
   dx = bounded.x;
   dy = bounded.y;
+
+  // A safe slot can still be approached through water when the damped follower
+  // carries lateral velocity into a bridge mouth. Guard the actual next step,
+  // not only the requested slot, and steer it back into the usable deck lane.
+  const safeStep = waterSafeFollowerStepV071(u,dx,dy);
+  dx = safeStep.dx;
+  dy = safeStep.dy;
 
   const oldVx = state.vx;
   const oldVy = state.vy;

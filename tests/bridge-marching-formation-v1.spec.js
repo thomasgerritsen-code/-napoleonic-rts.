@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test('Pont de la Crête forms two marching files before the bridge, maintains them across the deck, then reforms line', async ({page}) => {
+test('Pont de la Crête keeps four compact files across the deck, then reforms line', async ({page}) => {
   test.setTimeout(120_000);
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
@@ -42,8 +42,10 @@ test('Pont de la Crête forms two marching files before the bridge, maintains th
       const perpValues=active.map(u=>u.perp);
       const targetPerpValues=active.map(u=>u.targetPerp);
       const offsets=reg.marchV063?.slotOffsetsV064||new Map();
-      const alongOffsets=[...offsets.values()].map(x=>x.ox);
-      const sidewaysOffsets=[...offsets.values()].map(x=>x.oy);
+      const infantryOffsets=active.map(u=>offsets.get(u.id)).filter(Boolean);
+      const alongOffsets=infantryOffsets.map(x=>x.ox);
+      const sidewaysOffsets=infantryOffsets.map(x=>x.oy);
+      const offsetFiles=new Set(sidewaysOffsets.map(value=>Math.round(value*1000)/1000)).size;
       return{label,at:+elapsed.toFixed(2),
         phase:reg.movementPhaseV063,traffic:reg.crossingTrafficV068?.state||null,
         anchor:reg.marchV063?crossingLocalV068(c,reg.marchV063.anchorX,reg.marchV063.anchorY):null,
@@ -51,6 +53,7 @@ test('Pont de la Crête forms two marching files before the bridge, maintains th
         spanPerp:Math.max(...perpValues)-Math.min(...perpValues),
         targetSpanPerp:Math.max(...targetPerpValues)-Math.min(...targetPerpValues),
         targetWidthOffsets:Math.max(...sidewaysOffsets)-Math.min(...sidewaysOffsets),
+        offsetFiles,
         offsetFrontBack:Math.max(...alongOffsets)-Math.min(...alongOffsets),
         deckSpanPerp:inDeck.length?Math.max(...inDeck.map(u=>u.perp))-Math.min(...inDeck.map(u=>u.perp)):null,
         water:local.filter(u=>u.water).length,
@@ -81,20 +84,25 @@ test('Pont de la Crête forms two marching files before the bridge, maintains th
   });
   const compact=(p)=>p&&{phase:p.phase,traffic:p.traffic,at:p.at,anchor:p.anchor,inDeck:p.inDeck,
     spanPerp:p.spanPerp,targetSpanPerp:p.targetSpanPerp,targetWidthOffsets:p.targetWidthOffsets,
-    offsetFrontBack:p.offsetFrontBack,deckSpanPerp:p.deckSpanPerp,water:p.water};
+    offsetFiles:p.offsetFiles,offsetFrontBack:p.offsetFrontBack,deckSpanPerp:p.deckSpanPerp,water:p.water};
   console.log('BRIDGE_MARCHING_FORMATION',JSON.stringify({chosen:result.chosen,before:compact(result.before),deck:compact(result.deck),cleared:result.cleared,regainedLine:result.regainedLine,water:result.water,stats:result.stats}));
   expect(result.chosen).toEqual(['pont-crete']);
   expect(result.before).not.toBeNull();
-  // A paper-perfect target is insufficient: troops must actually close
-  // into recognizable marching files before entering the bridge mouth.
-  expect(result.before.targetWidthOffsets).toBeLessThanOrEqual(20);
-  expect(result.before.spanPerp).toBeLessThanOrEqual(65);
-  expect(result.before.offsetFrontBack).toBeGreaterThan(125);
+  // Targets and actual troops must retain four files, with tighter spacing
+  // than the normal 54-unit road-column span.
+  // During the smooth field-to-bridge blend individual slots are intentionally
+  // distinct; the formation envelope must already be compact before the mouth.
+  expect(result.before.targetWidthOffsets).toBeGreaterThanOrEqual(42);
+  expect(result.before.targetWidthOffsets).toBeLessThan(54);
+  expect(result.before.spanPerp).toBeLessThanOrEqual(75);
+  expect(result.before.offsetFrontBack).toBeGreaterThan(90);
   expect(result.deck).not.toBeNull();
   expect(result.deck.inDeck).toBeGreaterThanOrEqual(8);
-  expect(result.deck.targetWidthOffsets).toBeLessThanOrEqual(20);
-  expect(result.deck.offsetFrontBack).toBeGreaterThan(125);
-  expect(result.deck.deckSpanPerp).toBeLessThanOrEqual(35);
+  expect(result.deck.offsetFiles).toBe(4);
+  expect(result.deck.targetWidthOffsets).toBeGreaterThanOrEqual(42);
+  expect(result.deck.targetWidthOffsets).toBeLessThan(54);
+  expect(result.deck.offsetFrontBack).toBeGreaterThan(90);
+  expect(result.deck.deckSpanPerp).toBeLessThanOrEqual(75);
   expect(result.water).toBe(0);
   expect(result.cleared).toBe(true);
   expect(result.regainedLine).toBe(true);
