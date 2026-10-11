@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify all five gates and publish CI_READY
+      - name: Verify exact PR, head, base and all five gates
         uses: actions/github-script@v8
         with:
           script: |
@@ -47,8 +47,13 @@ jobs:
               core.notice('Readiness signals are limited to same-repository branches.');
               return;
             }
-            if (pr.head.sha !== run.head_sha) {
-              core.notice('Workflow head is stale; no readiness signal published.');
+            const exactRunTarget =
+              linked.number === pr.number &&
+              linked.head?.sha === pr.head.sha &&
+              linked.base?.sha === pr.base.sha &&
+              run.head_sha === pr.head.sha;
+            if (!exactRunTarget) {
+              core.notice('Workflow run does not match the exact current PR, head and base.');
               return;
             }
 
@@ -110,7 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Validate QA_PASS, head, base and five gates
+      - name: Validate QA_PASS, exact run target and five gates
         uses: actions/github-script@v8
         with:
           script: |
@@ -160,13 +165,21 @@ jobs:
                 per_page: 100,
               },
             );
-            const run = runs.find((candidate) =>
-              candidate.name === 'Test and deploy to GitHub Pages' &&
-              candidate.conclusion === 'success' &&
-              candidate.head_sha === pr.head.sha,
-            );
+            const run = runs.find((candidate) => {
+              const linked = candidate.pull_requests?.find((entry) =>
+                entry.number === pr.number &&
+                entry.head?.sha === pr.head.sha &&
+                entry.base?.sha === pr.base.sha,
+              );
+              return (
+                candidate.name === 'Test and deploy to GitHub Pages' &&
+                candidate.conclusion === 'success' &&
+                candidate.head_sha === pr.head.sha &&
+                Boolean(linked)
+              );
+            });
             if (!run) {
-              core.notice('No successful five-gate workflow exists for the exact head.');
+              core.notice('No successful five-gate run matches the exact PR, head and base.');
               return;
             }
 
