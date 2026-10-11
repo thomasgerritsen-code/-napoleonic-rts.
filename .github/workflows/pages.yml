@@ -65,6 +65,14 @@ jobs:
           echo "Focused Playwright set: $TEST_FILES"
           echo "test_files=$TEST_FILES" >> "$GITHUB_OUTPUT"
 
+      - name: Restore npm download cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
       - name: Install test dependencies
         run: npm install --no-audit --no-fund
 
@@ -101,6 +109,14 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
+
+      - name: Restore npm download cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
       - name: Install test dependencies
         run: npm install --no-audit --no-fund
@@ -147,6 +163,14 @@ jobs:
         with:
           node-version: lts/*
 
+      - name: Restore npm download cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
       - name: Install test dependencies
         run: npm install --no-audit --no-fund
 
@@ -191,6 +215,14 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
+
+      - name: Restore npm download cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
       - name: Install test dependencies
         run: npm install --no-audit --no-fund
@@ -246,6 +278,14 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
+
+      - name: Restore npm download cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
       - name: Install test dependencies
         run: npm install --no-audit --no-fund
