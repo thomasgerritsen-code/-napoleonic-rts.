@@ -229,7 +229,7 @@ test('browser: a halt/resume order and a sustained road exit preserve correct fo
           widenedToLine ||= Math.max(...sideways) - Math.min(...sideways) > 70;
         }
       }
-      if (sustainedExit && widenedToLine && fieldModeSamples >= 20) break;
+      if (sustainedExit && widenedToLine && fieldModeSamples >= 24) break;
     }
     return { halted, remainedHalted, maxHaltDrift, roadBeforeHalt, roadAfterResume,
       resumeFourFiles, infantry: infantry.length, fieldTarget, fieldTravel,
