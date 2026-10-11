@@ -26,6 +26,7 @@ test('browser: four-file road marching survives turns and transient off-road sam
     const fourFiles = [...ranks.values()].filter(row => row.length === 4)
       .every(row => new Set(row).size === 4);
     let roadSamples = 0, interruptions = 0, roadModeSamples = 0, bridgeSamples = 0;
+    const transitions = [];
     let unsafe = 0;
     for (let i = 0; i < 600; i++) {
       window.RTS_SIM.step(.05);
@@ -35,19 +36,22 @@ test('browser: four-file road marching survives turns and transient off-road sam
       if (onRoad) {
         roadSamples++;
         if (m.locomotionV064 === 'road-march') roadModeSamples++;
-        else interruptions++;
+        else {
+          interruptions++;
+          if (transitions.length < 8) transitions.push({ step:i, phase:m.phase, locomotion:m.locomotionV064, anchorX:m.anchorX, anchorY:m.anchorY, lastRoad:m.roadLastSeenAtV064, elapsed });
+        }
       }
       if (reg.crossingTrafficV068?.forcedColumn) bridgeSamples++;
       unsafe += members.filter(u => waterAtV067(u.x, u.y)).length;
     }
     return { infantry: members.length, ranks: ranks.size, fourFiles, roadSamples,
-      roadModeSamples, interruptions, bridgeSamples, unsafe, phase: march.phase };
+      roadModeSamples, interruptions, bridgeSamples, unsafe, phase: march.phase, transitions };
   });
   expect(result.error).toBeUndefined();
   expect(result.infantry).toBeGreaterThanOrEqual(12);
   expect(result.fourFiles).toBe(true);
   expect(result.roadSamples).toBeGreaterThan(0);
-  expect(result.interruptions).toBe(0);
+  expect(result.interruptions, JSON.stringify(result, null, 2)).toBe(0);
   expect(result.unsafe).toBe(0);
   expect(errors).toEqual([]);
 });
