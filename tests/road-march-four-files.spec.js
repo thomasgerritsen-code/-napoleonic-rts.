@@ -41,6 +41,27 @@ test('road columns stay within four files, compress for a bridge, and reform wit
       regiment.destroyed = true;
     }
 
+    const loose = [];
+    for (let i = 0; i < 17; i++) {
+      loose.push(createUnit('france', 'infantry', 220 + (i % 4) * 18, 220 + Math.floor(i / 4) * 20));
+    }
+    const looseStart = centroid(loose);
+    commandLooseFormation(loose, 620, 420, 'column');
+    const looseTargets = loose.map(unit => ({ x: unit.targetX, y: unit.targetY }));
+    const looseColumn = {
+      files: new Set(looseTargets.map(target => Math.round(target.x * 1000) / 1000)).size,
+      rows: new Set(looseTargets.map(target => Math.round(target.y * 1000) / 1000)).size,
+      finiteTargets: looseTargets.every(target => Number.isFinite(target.x) && Number.isFinite(target.y)),
+      dryTargets: looseTargets.every(target => !waterAtV067(target.x, target.y)),
+      tasksCleared: loose.every(unit => unit.task === null),
+      exhaustionReset: loose.every(unit => unit.resourceExhaustedStop === false),
+      centroidTravel: 0
+    };
+    for (let step = 0; step < 240; step++) window.RTS_SIM.step(0.05);
+    const looseEnd = centroid(loose);
+    looseColumn.centroidTravel = Math.hypot(looseEnd.x - looseStart.x, looseEnd.y - looseStart.y);
+    for (const unit of loose) unit.dead = true;
+
     const crossing = WATER_CROSSINGS_V067.find(item => item.id === 'pont-crete');
     const side = -1;
     const heading = crossingHeadingV068(crossing, side);
@@ -99,6 +120,7 @@ test('road columns stay within four files, compress for a bridge, and reform wit
     const restoredSideways = roadInfantry.map(unit => restored.get(unit.id).oy);
     return {
       widthCases,
+      looseColumn,
       roadFiles,
       chosen: (regiment.routeCrossingsV067 || []).map(item => item.id),
       bridge,
@@ -117,6 +139,15 @@ test('road columns stay within four files, compress for a bridge, and reform wit
     { count: 20, files: 4 },
     { count: 36, files: 4 }
   ]);
+  expect(result.looseColumn).toMatchObject({
+    files: 4,
+    rows: 5,
+    finiteTargets: true,
+    dryTargets: true,
+    tasksCleared: true,
+    exhaustionReset: true
+  });
+  expect(result.looseColumn.centroidTravel).toBeGreaterThan(25);
   expect(result.roadFiles).toBe(4);
   expect(result.chosen).toEqual(['pont-crete']);
   expect(result.bridge).not.toBeNull();
