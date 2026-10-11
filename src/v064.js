@@ -97,6 +97,17 @@ function setLocomotionTargetsV064(reg, march, roadMarch) {
   for (const u of regimentMembers(reg)) u.marchingV064 = roadMarch;
 }
 
+// Hold the road-column authority across short gaps between road tiles or
+// waypoint corners. A single off-road sample must not redeploy the regiment.
+function stableRoadMarchV064(march, onRoad) {
+  if (onRoad) {
+    march.roadLastSeenAtV064 = elapsed;
+    return true;
+  }
+  return Number.isFinite(march.roadLastSeenAtV064) &&
+    elapsed - march.roadLastSeenAtV064 < 1.5;
+}
+
 function updateRoadBlendV064(march, roadMarch) {
   if (!Number.isFinite(march.roadBlendV064)) march.roadBlendV064 = roadMarch ? 1 : 0;
   const target = roadMarch ? 1 : 0;
@@ -213,7 +224,7 @@ updateGroupPathsV06 = function updateGroupPathsV064() {
       isLastWaypoint = reg.pathIndex >= path.length - 1;
     }
 
-    const roadMarch = roadAtV064(march.anchorX, march.anchorY);
+    const roadMarch = stableRoadMarchV064(march, roadAtV064(march.anchorX, march.anchorY));
     updateRoadBlendV064(march, roadMarch);
 
     const desiredHeading = Math.atan2(dy, dx);
