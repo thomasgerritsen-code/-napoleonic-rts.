@@ -53,7 +53,7 @@ test('Architecture v2.1 owns road lookup and route planning without legacy v066 
   expect(errors).toEqual([]);
 });
 
-test('bridge column stays wide outside staging range and forms two files before the deck', async ({page}) => {
+test('bridge column stays wide outside staging range and forms four compact files before the deck', async ({page}) => {
   const errors=await openNavigationV2(page);
   const result=await page.evaluate(() => {
     window.__RTS_DEBUG__.setPeaceMode(true);
@@ -81,8 +81,8 @@ test('bridge column stays wide outside staging range and forms two files before 
     const roadMarch=roadAtV064(far.x,far.y);
     const normalDesired=roadMarch?marchColumnOffsetsV063(reg):finalFormationOffsetsV063(reg,reg.formation);
     const normalSpan=mapSpan(normalDesired);
-    // Compact two-file width is 18 world units on this infantry bridge.
-    const bridgeSpan=18;
+    // Four infantry files fit Pont de la Chaussée with 15-unit lateral spacing.
+    const bridgeSpan=45;
 
     for(let i=0;i<120;i++) forceBridgeColumnTargetsV068(reg,march,info);
     const farSpan=slotSpan();
@@ -97,6 +97,7 @@ test('bridge column stays wide outside staging range and forms two files before 
   expect(result.farSpan).toBeGreaterThanOrEqual(result.normalSpan*0.90);
   expect(result.nearSpan).toBeLessThan(result.farSpan*0.85);
   expect(result.nearSpan).toBeLessThanOrEqual(result.bridgeSpan*1.12);
+  expect(result.nearSpan).toBeGreaterThanOrEqual(result.bridgeSpan*0.93);
   expect(result.config.columnFormStartClearance).toBeGreaterThan(result.config.columnFormFullClearance);
   expect(errors).toEqual([]);
 });

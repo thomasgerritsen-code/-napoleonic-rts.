@@ -14,6 +14,9 @@ test('browser: fastest-road route keeps four files on road and compact bridge', 
   ));
   const result = await page.evaluate(() => {
     window.__RTS_DEBUG__.setPeaceMode(true);
+    gameOver = false;
+    for (const unit of units) unit.dead = true;
+    for (const regiment of regiments) regiment.destroyed = true;
     const road = ROAD_NETWORK_V066.find(r => r.id === 'grande-chaussee');
     if (!road || road.points.length < 4) return { error: 'Missing expected road geometry' };
     const a = road.points[1], b = road.points[road.points.length - 2];
