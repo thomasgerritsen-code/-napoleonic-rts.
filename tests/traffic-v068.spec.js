@@ -80,3 +80,62 @@ test('two battalions integrate with the production bridge queue and reform after
   await testInfo.attach('bridge-queue', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
+
+
+test('reissuing a bridge holder order retains physical deck exclusion until soldiers clear', async ({ page }) => {
+  const errors = await openGame(page);
+  const result = await page.evaluate(() => {
+    resetGame();
+    v05PeaceMode = true;
+    gameOver = false;
+    for (const unit of units) unit.dead = true;
+    for (const reg of regiments) reg.destroyed = true;
+
+    const c = WATER_CROSSINGS_V067.find(crossing => crossing.id === 'pont-chaussee');
+    const state = CROSSING_TRAFFIC_V068.get(c.id);
+    const west = crossingPointV068(c, -(c.length / 2 + 370), 0);
+    const east = crossingPointV068(c, c.length / 2 + 370, 0);
+    const holderId = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', west.x, west.y);
+    const queuedId = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', east.x, east.y);
+    const holder = getRegiment(holderId);
+    const queued = getRegiment(queuedId);
+    // The waiting group must own an actual march so production eligibility
+    // permits it to receive the lane after the deck has cleared.
+    orderGroupPathV06(queued, west.x, west.y, 'line', null);
+    const scout = regimentMembers(holder).find(unit => unit.type === 'infantry');
+    const deck = crossingPointV068(c, 0, 0);
+    scout.x = deck.x;
+    scout.y = deck.y;
+
+    // Stage a current holder and an opposite-bank waiting regiment. The
+    // reissued order then exercises the production cancellation hook.
+    state.holderIds = [holderId];
+    state.queue = [queuedId];
+    holder.crossingTrafficV068 = {
+      crossingId: c.id, crossingName: c.name, state: 'crossing',
+      queuePosition: 0, initialSide: -1, entered: true, forcedColumn: true
+    };
+    queued.crossingTrafficV068 = {
+      crossingId: c.id, crossingName: c.name, state: 'waiting',
+      queuePosition: 1, initialSide: 1, entered: false, forcedColumn: true
+    };
+    orderGroupPathV06(holder, east.x, east.y, 'line', null);
+    const releasedHolder = !state.holderIds.includes(holderId);
+    promoteTrafficQueuesV068();
+    const blocked = state.queue.includes(queuedId) && !state.holderIds.includes(queuedId);
+    const occupied = groupTouchesCrossingV068(holder, c);
+
+    scout.x = west.x;
+    scout.y = west.y;
+    promoteTrafficQueuesV068();
+    return { releasedHolder, blocked, occupied,
+      promotedAfterExit: state.holderIds.includes(queuedId),
+      waitingState: queued.crossingTrafficV068?.state || null };
+  });
+  expect(result.releasedHolder).toBe(true);
+  expect(result.occupied).toBe(true);
+  expect(result.blocked).toBe(true);
+  expect(result.promotedAfterExit).toBe(true);
+  expect(result.waitingState).toBe('approach');
+  expect(errors).toEqual([]);
+});
