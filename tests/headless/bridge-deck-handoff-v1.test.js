@@ -26,6 +26,7 @@ function harness() {
   const context = vm.createContext({
     regiments, CROSSING_TRAFFIC_V068: new Map([[crossing.id, state]]), elapsed: 10,
     getRegiment: id => regiments.find(reg => reg.id === id),
+    formalTrafficEligibleV068: reg => !!reg?.marchV063?.v064 && !reg.destroyed,
     regimentMembers: reg => reg.members,
     groupKindV06: () => 'infantry',
     crossingLocalV068: (c, x, y) => ({ along: x - c.x, perp: y - c.y })
