@@ -99,6 +99,9 @@ test('reissuing a bridge holder order retains physical deck exclusion until sold
     const queuedId = window.__RTS_DEBUG__.createFreshInfantryRegiment('france', east.x, east.y);
     const holder = getRegiment(holderId);
     const queued = getRegiment(queuedId);
+    // The waiting group must own an actual march so production eligibility
+    // permits it to receive the lane after the deck has cleared.
+    orderGroupPathV06(queued, west.x, west.y, 'line', null);
     const scout = regimentMembers(holder).find(unit => unit.type === 'infantry');
     const deck = crossingPointV068(c, 0, 0);
     scout.x = deck.x;
