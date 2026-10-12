@@ -150,9 +150,26 @@ function registerTrafficV068(reg, c) {
   state.queue.push(reg.id);
 }
 
+// Changing a march order releases the logical holder immediately, but its
+// soldiers can still physically occupy the deck. Do not admit the next group
+// through that unreserved traffic until the existing soldiers clear it.
+function bridgeDeckOccupiedByOtherV068(state, nextId) {
+  const c = state.crossing;
+  return regiments.some(reg => {
+    if (!reg || reg.destroyed || reg.id === nextId || state.holderIds.includes(reg.id)) return false;
+    return regimentMembers(reg).some(u => {
+      if (u.dead) return false;
+      const local = crossingLocalV068(c, u.x, u.y);
+      return Math.abs(local.along) <= c.length / 2 + 16 &&
+        Math.abs(local.perp) <= c.width / 2 + 16;
+    });
+  });
+}
+
 function promoteTrafficQueuesV068() {
   for (const state of CROSSING_TRAFFIC_V068.values()) {
     while (state.holderIds.length < state.capacity && state.queue.length) {
+      if (bridgeDeckOccupiedByOtherV068(state, state.queue[0])) break;
       const id = state.queue.shift();
       const reg = getRegiment(id) || regiments.find(r => r.id === id);
       if (!formalTrafficEligibleV068(reg)) continue;
