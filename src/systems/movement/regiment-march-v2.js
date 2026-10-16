@@ -187,12 +187,17 @@
     const state=stateByReg.get(reg);
     if(!state||state.phase==='field'||!Number.isFinite(state.slotP80) ||
        elapsed-state.lastUpdatedAt>0.35)return base;
+    // Never punish normal march acceleration with an assembly speed cap:
+    // old 8-unit limits made an otherwise valid 46-60 unit road/field move
+    // look frozen for the first second. The follower solver handles joining
+    // the ranks while advancing. Only a genuinely stranded bridge tail can
+    // slow the *shared* anchor, not ordinary turning or line-to-column change.
+    const bridge=!!state.bridgeId;
     const lag=state.slotP80;
-    const cap=state.phase==='forming'
-      ?(lag>25?8:22)
-      : lag>95?10 : lag>55?20 : lag>32?30 : base;
+    const cap=bridge && lag>115?Math.min(base,17)
+      :bridge && lag>78?Math.min(base,30):base;
     if(cap<base)stats.paceFrames++;
-    return Math.min(base,cap);
+    return cap;
   };
   global.__REGIMENT_MARCH_V251__=Object.freeze({
     version:'regiment-column-v2.0',oneSlotAuthority:true,
