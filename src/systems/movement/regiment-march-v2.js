@@ -125,9 +125,21 @@
         p={x:center.x-Math.sin(center.heading)*slot.side,
            y:center.y+Math.cos(center.heading)*slot.side};
       }
+      // Hand the formation over smoothly instead of instantly relocating
+      // rank destinations. During road assembly the existing proven movement
+      // solver owns the starting positions; gradually blend to this one
+      // route-following controller after the first few seconds. A bridge
+      // always uses the full centreline target, with its own safety checks.
+      const handoff=bridge?1:clamp((elapsed-state.startedAt-3.8)/2.6,0,1);
+      if(handoff<1){
+        const px=Number.isFinite(u.targetX)?u.targetX:u.x;
+        const py=Number.isFinite(u.targetY)?u.targetY:u.y;
+        p={x:px+(p.x-px)*handoff,y:py+(p.y-py)*handoff};
+      }
       if(!isSafe(u,p,bridge)){stats.unsafeSlots++;continue;}
       u.targetX=p.x;u.targetY=p.y;
-      u.formationFacing=bridge?crossingHeadingV068(bridge,state.bridgeSide):trailPoint(state,march,slot.back).heading;
+      if(handoff>.75)u.formationFacing=bridge?
+        crossingHeadingV068(bridge,state.bridgeSide):trailPoint(state,march,slot.back).heading;
       u.arrivedAtTarget=false;
       u.marchingV064=true;
       stats.assignedSlots++;
@@ -164,7 +176,7 @@
     // motion targets for the first two seconds while the ranks converge,
     // then v2 assumes sole target ownership for bends and later crossings.
     // A bridge already forming its four narrow files is never delayed.
-    if(!bridge && state.phase==='forming' && elapsed-state.startedAt<2.25){
+    if(!bridge && state.phase==='forming' && elapsed-state.startedAt<3.8){
       stats.formationFrames++;
       return;
     }
