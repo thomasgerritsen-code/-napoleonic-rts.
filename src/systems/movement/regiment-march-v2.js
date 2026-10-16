@@ -145,7 +145,7 @@
     const members=live(reg);
     if(!members.length)return;
     let state=stateByReg.get(reg);
-    if(!state){state={phase:'forming',startedAt:elapsed,points:[],lastRoadAt:elapsed,
+    if(!state){state={phase:'forming',startedAt:elapsed,points:[],lastRoadAt:-Infinity,
       bridgeId:null,bridgeSide:null,laneOffsets:new Map()};stateByReg.set(reg,state);}
     const bridge=activeBridge(reg,march,state,members);
     const onRoad=roadAnchor(march);
