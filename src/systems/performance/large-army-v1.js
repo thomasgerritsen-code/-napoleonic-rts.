@@ -65,17 +65,34 @@
     }
   }
 
+  // Regiment IDs restart at 1 every battle. Cached references to a previous
+  // battle are invalid even if a newly created group reuses the same ID.
+  nrts.events.on('game:reset', () => {
+    regimentById.clear();
+    membersByRegiment.clear();
+    combatGrid.france.clear();
+    combatGrid.britain.clear();
+    livingUnitCount = 0;
+  });
+
   getRegiment = function getRegimentCached(id) {
     const reg = regimentById.get(id);
-    if (reg && !reg.destroyed) return reg;
+    // Guard commands executed between two simulation ticks after a reset.
+    if (reg && !reg.destroyed && regiments.includes(reg)) return reg;
     return getRegimentBeforePerformanceV12(id);
   };
 
   regimentMembers = function regimentMembersCached(reg) {
     if (!reg || reg.destroyed) return [];
+    // Frame indexes are snapshots, never authoritative for a newly formed or
+    // modified group. Fall back to live units until the next frame rebuild.
+    if (regimentById.get(reg.id) !== reg) return regimentMembersBeforePerformanceV12(reg);
     const members = membersByRegiment.get(reg.id);
-    if (!members) return regimentMembersBeforePerformanceV12(reg);
-    return members.filter(unit => !unit.dead);
+    if (!members || members.length !== reg.memberIds.length ||
+        members.some(unit => unit.dead || unit.regimentId !== reg.id || !reg.memberIds.includes(unit.id))) {
+      return regimentMembersBeforePerformanceV12(reg);
+    }
+    return members;
   };
 
   nearestEnemyEntity = function nearestEnemyEntitySpatial(unit, maxRange) {
