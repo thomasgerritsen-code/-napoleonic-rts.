@@ -296,7 +296,16 @@ function updateHolderStateV068(reg, march, info, c) {
   forceBridgeColumnTargetsV068(reg, march, info);
 
   const currentSide = Math.sign(bankSideV067(march.anchorX, march.anchorY));
-  const clearedOppositeBank = info.entered && currentSide && currentSide !== info.initialSide && distance >= CROSSING_RELEASE_DISTANCE_V068 && !touches;
+  // The anchor is not the regiment. Retain the four-file column and crossing
+  // ownership until the *last living follower*, including officer and drummer,
+  // is on dry ground beyond the opposite portal.
+  const direction=-info.initialSide;
+  const tailClear=regimentMembers(reg).filter(u=>u&&!u.dead&&!u.routing).every(u=>{
+    const local=crossingLocalV068(c,u.x,u.y);
+    return local.along*direction>c.length/2+24&&!waterAtV067(u.x,u.y);
+  });
+  const clearedOppositeBank = info.entered && currentSide && currentSide !== info.initialSide &&
+    distance >= CROSSING_RELEASE_DISTANCE_V068 && !touches && tailClear;
   if (!clearedOppositeBank) return;
 
   const state = CROSSING_TRAFFIC_V068.get(c.id);
