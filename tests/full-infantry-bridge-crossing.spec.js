@@ -103,3 +103,81 @@ test('a full infantry regiment including all 36 soldiers, officer and drummer cr
   expect(pageErrors).toEqual([]);
   function bridgeFarEdge(){return 1500+135+34;}
 });
+
+test('full player infantry formation crosses a real long route from the west camp',async({page})=>{
+  test.setTimeout(160_000);
+  const errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>{
+    let seed=27182;Math.random=()=>{seed=seed*16807%2147483647;return(seed-1)/2147483646;};
+  });
+  await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.RTS_SIM&&window.__RTS_DEBUG__?.setPeaceMode));
+  const result=await page.evaluate(()=>{
+    resetGame();v05PeaceMode=true;gameOver=false;
+    // Keep actual buildings, terrain and the normal camp; only suppress enemy fire.
+    for(const u of units)if(u.side==='britain')u.dead=true;
+    for(const reg of regiments)if(reg.side==='britain')reg.destroyed=true;
+    const origin={x:725,y:1020},destination={x:2200,y:1040};
+    const made=[];
+    for(let i=0;i<36;i++)made.push(createUnit('france','infantry',origin.x+(i%6)*19,origin.y+Math.floor(i/6)*19));
+    made.push(createUnit('france','officer',origin.x+56,origin.y-30));
+    made.push(createUnit('france','drummer',origin.x+34,origin.y-30));
+    const reg=createRegiment('france',made);
+    if(!reg)return {error:'regiment formation failed'};
+    // Use the same selected-regiment move command as an actual player.
+    selectWholeRegiment(reg);
+    issueMoveWithFacingV06(destination.x,destination.y,0);
+    const path=(reg.path||[]).map(p=>({x:p.x,y:p.y}));
+    const routeCrossings=(reg.routeCrossingsV067||[]).map(c=>c.id);
+    let maxWater=0,maxBlocked=0,maxSeparationOnBridge=0;
+    let sawCrossing=false,sawAllAhead=false,completeAt=null,finalOrder=null;
+    const snapshots=[];
+    for(let i=0;i<6800;i++){
+      window.RTS_SIM.step(.05);
+      if(i%12)continue;
+      const living=made.filter(u=>!u.dead);
+      const center=centroid(living);
+      const traffic=reg.crossingTrafficV068;
+      const onDeck=living.filter(u=>WATER_CROSSINGS_V067.some(c=>c.type==='bridge'&&crossingPassageContainsV067(c,u.x,u.y)));
+      const onWater=living.filter(u=>waterAtV067(u.x,u.y));
+      const blocked=living.filter(u=>segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY));
+      maxWater=Math.max(maxWater,onWater.length);maxBlocked=Math.max(maxBlocked,blocked.length);
+      sawCrossing||=onDeck.length>0;
+      if(onDeck.length>0){
+        maxSeparationOnBridge=Math.max(maxSeparationOnBridge,...living.map(u=>Math.hypot(u.x-center.x,u.y-center.y)));
+      }
+      const allAhead=living.length===38&&living.every(u=>u.x>1740);
+      sawAllAhead ||= allAhead;
+      if(i%480===0)snapshots.push({t:+elapsed.toFixed(1),phase:reg.movementPhaseV063,
+        crossing:traffic?.crossingId||null,state:traffic?.state||null,
+        alive:living.length,left:living.filter(u=>u.x<1650).length,
+        onDeck:onDeck.length,water:onWater.length,blocked:blocked.length,
+        anchor:reg.marchV063?{x:+reg.marchV063.anchorX.toFixed(1),y:+reg.marchV063.anchorY.toFixed(1)}:null,
+        minX:+Math.min(...living.map(u=>u.x)).toFixed(1),
+        maxX:+Math.max(...living.map(u=>u.x)).toFixed(1)
+      });
+      if(allAhead&&reg.movementPhaseV063==='formed'&&!reg.path){
+        completeAt=elapsed;finalOrder=reg.formation;break;
+      }
+    }
+    const center=centroid(made.filter(u=>!u.dead));
+    const maxFinalSpread=Math.max(...made.filter(u=>!u.dead).map(u=>Math.hypot(u.x-center.x,u.y-center.y)));
+    return {pathLength:path.length,routeCrossings,maxWater,maxBlocked,maxSeparationOnBridge,
+      sawCrossing,sawAllAhead,completeAt,finalOrder,maxFinalSpread,snapshots,
+      final:made.map(u=>({id:u.id,type:u.type,dead:u.dead,x:+u.x.toFixed(1),y:+u.y.toFixed(1)})),
+      phase:reg.movementPhaseV063,traffic:reg.crossingTrafficV068?.state||null};
+  });
+  console.log('FULL_INFANTRY_PLAYER_ROUTE',JSON.stringify({...result,final:result.final?.filter(u=>u.x<1740)}));
+  expect(result.error).toBeUndefined();
+  expect(result.pathLength).toBeGreaterThan(1);
+  expect(result.routeCrossings.length).toBeGreaterThan(0);
+  expect(result.sawCrossing).toBe(true);
+  expect(result.maxWater).toBe(0);
+  expect(result.maxBlocked).toBe(0);
+  expect(result.completeAt,JSON.stringify(result.snapshots)).not.toBeNull();
+  expect(result.maxFinalSpread).toBeLessThan(240);
+  expect(result.finalOrder).toBe('line');
+  expect(result.final.filter(u=>u.dead)).toEqual([]);
+  expect(errors).toEqual([]);
+});
