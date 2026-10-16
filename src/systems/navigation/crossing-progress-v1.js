@@ -28,6 +28,14 @@
     // bridge mouth while still requiring substantial positive-axis progress.
     return Math.max(48,Math.min(c.length/2-24,c.length*.24));
   }
+  function everyFollowerCleared(reg,c,info){
+    const direction=-info.initialSide;
+    const members=regimentMembers(reg).filter(u=>u&&!u.dead&&!u.routing);
+    return members.length>0 && members.every(u=>{
+      const local=crossingLocalV068(c,u.x,u.y);
+      return local.along*direction>c.length/2+24&&!waterAtV067(u.x,u.y);
+    });
+  }
   function release(reg,c,info,touches,reason){
     const state=CROSSING_TRAFFIC_V068.get(c.id);
     if(state)state.holderIds=state.holderIds.filter(id=>id!==reg.id);
@@ -71,7 +79,7 @@
     const forwardProgress=local.along*direction;
     const touches=groupTouchesCrossingV068(reg,c);
 
-    if(forwardProgress>=normalReleaseThreshold(c)){
+    if(forwardProgress>=normalReleaseThreshold(c) && everyFollowerCleared(reg,c,info)){
       release(reg,c,info,touches,'normal-axis');
       return;
     }
@@ -88,7 +96,8 @@
     }
 
     const axisStalled=elapsed-tracked.lastAdvanceAt>=1.15;
-    if(tracked.maxProgress>=safeFallbackThreshold(c)&&axisStalled){
+    if(tracked.maxProgress>=safeFallbackThreshold(c)&&axisStalled &&
+       everyFollowerCleared(reg,c,info)){
       release(reg,c,info,touches,'axis-stall');
     }
   };
