@@ -77,3 +77,42 @@ test('gun with two escorts shares bridge reservation with an opposing battery', 
   expect(result.cleared).toHaveLength(2);
   expect(errors).toEqual([]);
 });
+
+test('artillery angled bridge approach continues along the selected crossing route', async ({page}) => {
+  test.setTimeout(90_000);
+  const errors=[];
+  page.on('pageerror', e=>errors.push(e.message));
+  await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.RTS_SIM && window.NRTS_NAVIGATION_V2?.active));
+  const result=await page.evaluate(()=>{
+    resetGame();v05PeaceMode=true;gameOver=false;
+    for(const u of units)u.dead=true;
+    for(const reg of regiments)reg.destroyed=true;
+    const c=WATER_CROSSINGS_V067.find(c=>c.id==='pont-chaussee');
+    const start=crossingPointV068(c,-(c.length/2+210),18);
+    const destination=crossingPointV068(c,c.length/2+210,-6.3);
+    const gun=createUnit('france','artillery',start.x,start.y);
+    const crew=[createUnit('france','infantry',start.x-25,start.y-14),
+      createUnit('france','infantry',start.x-25,start.y+14)];
+    const reg=createArtilleryBatteryV06('france',gun,crew);
+    orderGroupPathV06(reg,destination.x,destination.y,'column',c.angle);
+    const initial={x:gun.x,y:gun.y,path:(reg.path||[]).slice(0,8),routeCrossings:reg.routeCrossingsV067};
+    const snapshots=[];
+    for(let i=0;i<250;i++){
+      window.RTS_SIM.step(.05);
+      if([0,15,50,100,200,249].includes(i))snapshots.push({
+        t:+elapsed.toFixed(2),x:+gun.x.toFixed(2),y:+gun.y.toFixed(2),
+        targetX:+gun.targetX.toFixed(2),targetY:+gun.targetY.toFixed(2),
+        pathIndex:reg.pathIndex,holderIds:CROSSING_TRAFFIC_V068.get(c.id).holderIds.slice(),
+        traffic:reg.crossingTrafficV068?.state||null,hold:reg.artilleryBridgeHoldV068||false,
+        crewApproach:reg.crewApproachV1?.active,crewDist:crew.map(u=>+Math.hypot(u.x-gun.x,u.y-gun.y).toFixed(1))
+      });
+    }
+    return {initial,snapshots,moved:Math.hypot(gun.x-start.x,gun.y-start.y),
+      water:regimentMembers(reg).filter(u=>waterAtV067(u.x,u.y)).length};
+  });
+  console.log('ARTILLERY_ANGLED_DIAGNOSTIC',JSON.stringify(result));
+  expect(result.moved).toBeGreaterThan(70);
+  expect(result.water).toBe(0);
+  expect(errors).toEqual([]);
+});
