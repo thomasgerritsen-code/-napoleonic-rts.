@@ -33,7 +33,8 @@
     const members=regimentMembers(reg).filter(u=>u&&!u.dead&&!u.routing);
     return members.length>0 && members.every(u=>{
       const local=crossingLocalV068(c,u.x,u.y);
-      return local.along*direction>c.length/2+24&&!waterAtV067(u.x,u.y);
+      return local.along*direction>c.length/2+24 &&
+      (typeof waterAtV067!=='function'||!waterAtV067(u.x,u.y));
     });
   }
   function release(reg,c,info,touches,reason){
