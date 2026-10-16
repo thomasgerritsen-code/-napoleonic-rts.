@@ -103,7 +103,21 @@ test('map traversal matrix covers every crossing, both directions and unit class
       const target = crossingPointV068(c, -side * distance, -lateral * 0.35);
       const reg = makeGroup(kind, start.x, start.y);
       if (!reg) return { crossing: c.id, side, kind, formation, completed: false, reason: 'group-create-failed' };
+      const preCommandSnapshot=kind==='artillery' ? {
+        destroyed:reg.destroyed,
+        memberIds:reg.memberIds.slice(),crewIds:reg.crewIds?.slice(),
+        currentMemberIds:regimentMembers(reg).map(u=>u.id),
+        gun:artilleryForGroupV06(reg)?.id??null,
+        regCount:regiments.length,unitsAlive:units.filter(u=>!u.dead).map(u=>({id:u.id,type:u.type,regimentId:u.regimentId}))
+      } : null;
       orderGroupPathV06(reg, target.x, target.y, formation, c.angle + (side < 0 ? 0 : Math.PI));
+      const commandSnapshot=kind==='artillery' ? (()=>{
+        const gun=artilleryForGroupV06(reg);
+        return {regimentId:reg.id,crew:artilleryCrewV06(reg).length,
+          crewApproach:reg.crewApproachV1?.active??null,
+          cannon:gun?{x:gun.x,y:gun.y,targetX:gun.targetX,targetY:gun.targetY,dead:gun.dead}:null,
+          pathLength:reg.path?.length||0};
+      })() : null;
 
       let last = center(reg);
       let lastProgressAt = elapsed;
@@ -167,7 +181,22 @@ test('map traversal matrix covers every crossing, both directions and unit class
         postReleaseGuards: (afterFollower.postReleaseGuards || 0) - (beforeFollower.postReleaseGuards || 0),
         waterUnits,
         blockedTargets,
-        health: window.__GAME_HEALTH__.sample()
+        health: window.__GAME_HEALTH__.sample(),
+        ...(kind === 'artillery' && !completed ? {
+          artilleryDebug: (() => {
+            const gun=artilleryForGroupV06(reg);
+            return {
+              preCommandSnapshot,commandSnapshot,
+              cannon:gun?{x:gun.x,y:gun.y,targetX:gun.targetX,targetY:gun.targetY,arrived:gun.arrivedAtTarget}:null,
+              crewApproach:reg.crewApproachV1?.active ?? null,
+              traffic:reg.crossingTrafficV068,
+              artilleryHold:!!reg.artilleryBridgeHoldV068,
+              pathIndex:reg.pathIndex,
+              pathHead:(reg.path||[]).slice(reg.pathIndex||0,(reg.pathIndex||0)+3),
+              crossingIds:(reg.routeCrossingsV067||[]).map(c=>c.id)
+            };
+          })()
+        } : {})
       };
     }
 
