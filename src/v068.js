@@ -353,11 +353,13 @@ function updateArtilleryBridgeTrafficV068(reg,info,c){
 
 // A paused battery must not let the old artillery waypoint updater replace
 // its safe waiting target before the bridge reservation is granted.
-const updateArtilleryPathBeforeTrafficV068=updateArtilleryPathV063;
-updateArtilleryPathV063=function updateArtilleryPathQueuedV068(reg){
-  if(reg?.artilleryBridgeHoldV068 && reg.crossingTrafficV068?.state==='waiting')return;
-  updateArtilleryPathBeforeTrafficV068(reg);
-};
+if(typeof updateArtilleryPathV063==='function'){
+  const updateArtilleryPathBeforeTrafficV068=updateArtilleryPathV063;
+  updateArtilleryPathV063=function updateArtilleryPathQueuedV068(reg){
+    if(reg?.artilleryBridgeHoldV068 && reg.crossingTrafficV068?.state==='waiting')return;
+    updateArtilleryPathBeforeTrafficV068(reg);
+  };
+}
 
 function enforceCrossingTrafficV068() {
   for (const reg of regiments) {
