@@ -61,7 +61,10 @@
     const bridge=!!reg.crossingTrafficV068?.forcedColumn;
     if(!roadMarch||bridge){
       for(const u of regimentMembers(reg))u.roadTangentV133=null;
-      if(!roadMarch && march.roadTrailV133){
+      // The bridge owns member targets. A previously recorded road trail must
+      // never reconnect its two banks with a straight segment across water.
+      // Rebuild the four-file road trail from the far bank after handoff.
+      if(march.roadTrailV133){
         march.roadTrailV133=null;
         stats.fieldReleases++;
       }
@@ -80,12 +83,17 @@
       march.locomotionV064==='combat-formation';
     if(trailLength<165 || inCombat){
       for(const u of regimentMembers(reg))u.roadTangentV133=null;
+      if(inCombat)march.roadTrailV133=null; // combat may turn or retreat
       return;
     }
-    const facing=march.marchFacing;
-    if(trail.points.length>2&&Math.abs(Math.atan2(
-      Math.sin(facing-Math.atan2(trail.points[0].y-trail.points[1].y,trail.points[0].x-trail.points[1].x)),
-      Math.cos(facing-trail.points[trail.points.length-1].heading)))>.15)stats.curvedFrames++;
+    const front=trail.points[0],next=trail.points[1];
+    const rear=trail.points[trail.points.length-1],prev=trail.points[trail.points.length-2];
+    if(next&&prev){
+      const frontHeading=Math.atan2(front.y-next.y,front.x-next.x);
+      const rearHeading=Math.atan2(prev.y-rear.y,prev.x-rear.x);
+      const turn=Math.atan2(Math.sin(frontHeading-rearHeading),Math.cos(frontHeading-rearHeading));
+      if(Math.abs(turn)>.055)stats.curvedFrames++;
+    }
     for(const u of regimentMembers(reg)){
       if(u.dead||u.routing)continue;
       const offset=offsets.get(u.id);
@@ -109,7 +117,7 @@
     stats.roadFrames++;
   };
   global.__FOUR_FILE_ROAD_TRAIL_V133__=Object.freeze({
-    version:'road-trail-v1',
+    version:'road-trail-v1.1',
     fourFileColumn:true,
     rankFollowing:true,
     retainsBridgeAuthority:true,
