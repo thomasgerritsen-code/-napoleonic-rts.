@@ -116,6 +116,10 @@
     }
     stats.roadFrames++;
   };
+  // Distinct visible release marker so a cached/older deployment is obvious.
+  const badge=document.querySelector('.version');
+  if(badge)badge.textContent='v0.7.1 · Wegmars 248';
+  document.title='Napoleonic RTS · Wegmars 248';
   global.__FOUR_FILE_ROAD_TRAIL_V133__=Object.freeze({
     version:'road-trail-v1.1',
     fourFileColumn:true,
