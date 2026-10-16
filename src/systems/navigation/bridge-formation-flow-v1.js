@@ -56,8 +56,11 @@
     // the bridge. Begin well upstream so a wide line can close into two files
     // before its members reach the narrow deck. Ignore the early "entered"
     // signal from a single forward scout; use the authoritative anchor instead.
-    const start=Math.max(1,Number(config.columnFormStartClearance)||260);
-    const full=Math.max(0,Math.min(start-1,Number(config.columnFormFullClearance)||120));
+    // Build the actual four-file column while still well before the bridge.
+    // The former full-compression point (120 px from the portal) left newly
+    // formed player battalions visibly scattered beside the stone crossing.
+    const start=Math.max(350,Number(config.columnFormStartClearance)||260);
+    const full=Math.min(start-1,Math.max(220,Number(config.columnFormFullClearance)||120));
     if(info?.state==='clearing')return 1;
     if(clearance>=start)return 0;
     if(clearance<=full)return 1;
@@ -94,7 +97,18 @@
       desired.set(id,{ox:a.ox+(b.ox-a.ox)*blend,oy:a.oy+(b.oy-a.oy)*blend});
     }
 
-    const rate=info.state==='waiting'?4.4:3.8;
+    // When a player issues a new order right in front of a bridge, start with
+    // four *assigned* files immediately, but let soldiers walk into their slots
+    // physically. Never teleport their actual positions.
+    const local=crossingLocalV068(c,march.anchorX,march.anchorY);
+    const clearance=local.along*info.initialSide-c.length/2;
+    if(groupKindV06(reg)==='infantry' && info.state==='approach' && !info.entered
+      && blend>=.999 && clearance>52 && march.bridgeStageCrossingV249!==c.id){
+      march.slotOffsetsV064=new Map(desired);
+      march.bridgeStageCrossingV249=c.id;
+      march.bridgeStageStartedAtV249=elapsed;
+    }
+    const rate=info.state==='waiting'?6.2:5.7;
     const offsets=blendFormationOffsetsV064(reg,march,desired,rate);
     const bridgeFacing=crossingHeadingV068(c,info.initialSide);
     const facingDelta=normalizeAngleV063(bridgeFacing-march.marchFacing);
@@ -108,7 +122,27 @@
     stats.applications++;
   };
 
-  const api=Object.freeze({version:'bridge-formation-flow-v1.2',compactColumn:true,fourFileBridge:true,widthAwareSpacing:true,progressiveCompression:true,singleSlotWriter:true,earlyColumnStaging:true,stats:()=>({...stats})});
+  const previousDesiredSpeed=desiredGroupSpeedV064;
+  desiredGroupSpeedV064=function desiredGroupSpeedBridgeStagingV249(reg,march,roadMarch){
+    const speed=previousDesiredSpeed(reg,march,roadMarch);
+    const info=reg?.crossingTrafficV068;
+    if(groupKindV06(reg)!=='infantry' || !march?.v064 || !info ||
+       info.state!=='approach' || info.entered || !Number.isFinite(march.bridgeStageStartedAtV249) ||
+       march.bridgeStageCrossingV249!==info.crossingId) return speed;
+    const c=WATER_CROSSINGS_V067.find(item=>item.id===info.crossingId);
+    if(!c)return speed;
+    const local=crossingLocalV068(c,march.anchorX,march.anchorY);
+    const clearance=local.along*info.initialSide-c.length/2;
+    if(clearance<=52 || clearance>230 || elapsed-march.bridgeStageStartedAtV249>1.35)return speed;
+    const members=regimentMembers(reg).filter(u=>!u.dead && u.type==='infantry');
+    if(!members.length)return speed;
+    const outOfFile=members.filter(u=>Math.hypot(u.x-u.targetX,u.y-u.targetY)>18).length;
+    // Slow the lead rank until all four files are visually assembled.
+    // The timer bounds the wait so an obstructed soldier cannot jam the lane.
+    return outOfFile>members.length*.2?Math.min(speed,5):speed;
+  };
+
+  const api=Object.freeze({version:'bridge-formation-flow-v1.3',compactColumn:true,fourFileBridge:true,widthAwareSpacing:true,progressiveCompression:true,singleSlotWriter:true,earlyColumnStaging:true,stats:()=>({...stats})});
   global.__BRIDGE_FORMATION_FLOW_V1__=api;
   nrts.subsystems.register('bridge-formation-flow',api,{phase:'v1.3.3',legacyBridge:false,responsibility:'retain four infantry files with width-aware compact spacing across bridges before per-member water-safety correction'});
 })(window);

@@ -204,12 +204,21 @@ function isWorldVisible(x, y, padding = 0) {
       if (!members.length) continue;
       const c = centroid(members);
       if (!isWorldVisible(c.x, c.y, 70)) continue;
+      // The stored formation is the end-of-march preference ('Linie'), not
+      // the formation soldiers are CURRENTLY walking in. Show the live mode.
+      const march=reg.marchV063;
+      const traffic=reg.crossingTrafficV068;
+      const fourFileColumn=groupKindV06(reg)==='infantry' && march?.v064 &&
+        (traffic?.forcedColumn || march.locomotionV064==='road-march');
+      const mode=fourFileColumn
+        ? (traffic?.state==='waiting' ? 'Wacht 4 breed' : 'Mars 4 breed')
+        : formationLabel(reg.formation);
       ctx.fillStyle = 'rgba(20,20,15,.72)';
-      ctx.fillRect(c.x - 48, c.y - 40, 96, 16);
+      ctx.fillRect(c.x - 61, c.y - 40, 122, 16);
       ctx.fillStyle = COLORS.regiment;
       ctx.font = '11px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${reg.side === 'france' ? '🇫🇷' : '🇬🇧'} R${reg.id} · ${formationLabel(reg.formation)}`, c.x, c.y - 28);
+      ctx.fillText(`${reg.side === 'france' ? '🇫🇷' : '🇬🇧'} R${reg.id} · ${mode}`, c.x, c.y - 28);
     }
     ctx.textAlign = 'start';
   }
