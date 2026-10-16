@@ -28,6 +28,7 @@ test('Cossacks-style infantry column follows road bends four abreast without bre
     const plan=reg.routePlanV065;
     const roadRoute=(reg.path||[]).map(p=>({x:p.x,y:p.y}));
     let roadFrames=0,targetOnRoad=0,totalTargets=0,unsafe=0,maxAngleDifference=0,allRanks=0;
+    let realOnRoad=0,realTotal=0,meanErrorTotal=0,maxError=0,realColumnFrames=0,realSamples=[];
     let postRoadFrame=0,fieldFrames=0,completed=false,turnSamples=[],modeBreaks=0;
     for(let i=0;i<3600;i++){
       window.RTS_SIM.step(.05);
@@ -43,6 +44,20 @@ test('Cossacks-style infantry column follows road bends four abreast without bre
         for(const u of behind){
           totalTargets++;
           if(roadNetworkAtV066(u.targetX,u.targetY))targetOnRoad++;
+        }
+        if(behind.length===36) {
+          let frameErrors=0,frameOnRoad=0;
+          for(const u of behind) {
+            const err=Math.hypot(u.x-u.targetX,u.y-u.targetY);
+            meanErrorTotal+=err;maxError=Math.max(maxError,err);
+            frameErrors+=err;realTotal++;
+            if(roadNetworkAtV066(u.x,u.y)){realOnRoad++;frameOnRoad++;}
+          }
+          if(frameErrors/36<22 && frameOnRoad>=34)realColumnFrames++;
+          if(i%200===0&&realSamples.length<16)
+            realSamples.push({time:+elapsed.toFixed(1),frameMeanError:+(frameErrors/36).toFixed(1),
+              onRoad:frameOnRoad,anchor:{x:+march.anchorX.toFixed(1),y:+march.anchorY.toFixed(1)},
+              first:behind.slice(0,4).map(u=>({x:+u.x.toFixed(1),y:+u.y.toFixed(1),tx:+u.targetX.toFixed(1),ty:+u.targetY.toFixed(1)}))});
         }
         const angles=behind.map(u=>u.roadTangentV133);
         if(angles.length){
@@ -60,6 +75,8 @@ test('Cossacks-style infantry column follows road bends four abreast without bre
     return{plan,roadRoute,completed,roadFrames,targetOnRoad,totalTargets,
       onRoadTargetShare:totalTargets?targetOnRoad/totalTargets:0,
       allRanks,unsafe,maxAngleDifference,turnSamples,modeBreaks,fieldFrames,
+      realOnRoadShare:realTotal?realOnRoad/realTotal:0,meanPhysicalSlotError:realTotal?meanErrorTotal/realTotal:0,
+      maxPhysicalSlotError:maxError,realColumnFrames,realSamples,
       trailStats:window.__FOUR_FILE_ROAD_TRAIL_V133__.stats(),
       final:members.map(u=>({id:u.id,dead:u.dead,x:u.x,y:u.y})),
       phase:reg.movementPhaseV063};
