@@ -167,7 +167,21 @@ test('map traversal matrix covers every crossing, both directions and unit class
         postReleaseGuards: (afterFollower.postReleaseGuards || 0) - (beforeFollower.postReleaseGuards || 0),
         waterUnits,
         blockedTargets,
-        health: window.__GAME_HEALTH__.sample()
+        health: window.__GAME_HEALTH__.sample(),
+        ...(kind === 'artillery' && !completed ? {
+          artilleryDebug: (() => {
+            const gun=artilleryForGroupV06(reg);
+            return {
+              cannon:gun?{x:gun.x,y:gun.y,targetX:gun.targetX,targetY:gun.targetY,arrived:gun.arrivedAtTarget}:null,
+              crewApproach:reg.crewApproachV1?.active ?? null,
+              traffic:reg.crossingTrafficV068,
+              artilleryHold:!!reg.artilleryBridgeHoldV068,
+              pathIndex:reg.pathIndex,
+              pathHead:(reg.path||[]).slice(reg.pathIndex||0,(reg.pathIndex||0)+3),
+              crossingIds:(reg.routeCrossingsV067||[]).map(c=>c.id)
+            };
+          })()
+        } : {})
       };
     }
 
