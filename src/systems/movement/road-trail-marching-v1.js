@@ -69,6 +69,19 @@
     }
     const offsets=marchColumnOffsetsV063(reg);
     const trail=record(march);
+    // Formation comes first: do not interfere with the initial acceleration
+    // or pull soldiers backwards before the anchor has covered a full column.
+    // Also return ownership to the tactical system when combat interrupts march.
+    const trailLength=trail.points.slice(1).reduce((sum,p,i)=>{
+      const before=trail.points[i];
+      return sum+Math.hypot(p.x-before.x,p.y-before.y);
+    },0);
+    const inCombat=!!reg.engagementV069 || march.phase==='combat-halt' ||
+      march.locomotionV064==='combat-formation';
+    if(trailLength<165 || inCombat){
+      for(const u of regimentMembers(reg))u.roadTangentV133=null;
+      return;
+    }
     const facing=march.marchFacing;
     if(trail.points.length>2&&Math.abs(Math.atan2(
       Math.sin(facing-Math.atan2(trail.points[0].y-trail.points[1].y,trail.points[0].x-trail.points[1].x)),
