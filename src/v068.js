@@ -30,14 +30,23 @@ function crossingPointV068(c, along, perp = 0) {
 }
 
 function groupAnchorV068(reg) {
+  if (groupKindV06(reg) === 'artillery') {
+    const cannon=artilleryForGroupV06(reg);
+    if(cannon)return {x:cannon.x,y:cannon.y};
+  }
   if (reg?.marchV063) return { x:reg.marchV063.anchorX, y:reg.marchV063.anchorY };
   const members = reg ? regimentMembers(reg) : [];
   return members.length ? centroid(members) : null;
 }
 
 function formalTrafficEligibleV068(reg) {
-  if (!reg || reg.destroyed || !reg.marchV063?.v064) return false;
-  return ['infantry','cavalry'].includes(groupKindV06(reg));
+  if(!reg || reg.destroyed)return false;
+  if(groupKindV06(reg)==='artillery') {
+    // Artillery follows the original cannon waypoint movement, not marchV063.
+    // Only an actively moving and fully escorted gun can reserve a bridge.
+    return !!reg.path && !!artilleryForGroupV06(reg) && artilleryCrewV06(reg).length===2;
+  }
+  return !!reg.marchV063?.v064 && ['infantry','cavalry'].includes(groupKindV06(reg));
 }
 
 function trafficInitialSideV068(reg, c) {
@@ -107,6 +116,7 @@ function nextTrafficCrossingV068(reg) {
 
 function cancelTrafficForRegV068(reg) {
   if (!reg) return;
+  reg.artilleryBridgeHoldV068=false;
   for (const state of CROSSING_TRAFFIC_V068.values()) {
     state.holderIds = state.holderIds.filter(id => id !== reg.id);
     state.queue = state.queue.filter(id => id !== reg.id);
@@ -175,6 +185,11 @@ function promoteTrafficQueuesV068() {
       if (!formalTrafficEligibleV068(reg)) continue;
       state.holderIds.push(id);
       const old = reg.crossingTrafficV068 || {};
+      if(groupKindV06(reg)==='artillery' && reg.artilleryBridgeHoldV068){
+        reg.artilleryBridgeHoldV068=false;
+        // Restore the current waypoint after the waiting gun was stopped.
+        setGroupWaypointV06(reg);
+      }
       reg.crossingTrafficV068 = {
         ...old,
         crossingId:state.crossing.id,
@@ -300,16 +315,65 @@ function updateHolderStateV068(reg, march, info, c) {
   };
 }
 
+// Artillery retains its cannon-led waypoint controller. The whole battery is
+// one traffic participant; its two escorts remain attached to the moving gun.
+function updateArtilleryBridgeTrafficV068(reg,info,c){
+  const gun=artilleryForGroupV06(reg);
+  if(!gun)return;
+  if(info.state==='waiting'){
+    const hold=queueHoldPointV068(c,info.initialSide,info.queuePosition||1);
+    const local=crossingLocalV068(c,gun.x,gun.y);
+    const stopAlong=Math.abs(crossingLocalV068(c,hold.x,hold.y).along);
+    if(reg.artilleryBridgeHoldV068 || local.along*info.initialSide<=stopAlong+85){
+      reg.artilleryBridgeHoldV068=true;
+      // Change only the cannon's target: movement stays continuous, and the
+      // existing artillery-crew synchronizer keeps both guards with the gun.
+      arrangeRegiment(reg,hold.x,hold.y,'line');
+    }
+    return;
+  }
+  if(info.state==='clearing')return;
+  const members=regimentMembers(reg).filter(u=>!u.dead);
+  if(!members.length)return;
+  if(groupTouchesCrossingV068(reg,c))info.entered=true;
+  info.state=info.entered?'crossing':'approach';
+  if(!info.entered)return;
+  const direction=-info.initialSide;
+  const clear=members.every(u=>{
+    const local=crossingLocalV068(c,u.x,u.y);
+    return local.along*direction>c.length/2+30 && !waterAtV067(u.x,u.y);
+  });
+  if(!clear)return;
+  const state=CROSSING_TRAFFIC_V068.get(c.id);
+  if(state)state.holderIds=state.holderIds.filter(id=>id!==reg.id);
+  if(!reg.crossingClearedV068)reg.crossingClearedV068=new Set();
+  reg.crossingClearedV068.add(c.id);
+  reg.crossingTrafficV068={...info,state:'clearing',queuePosition:0,forcedColumn:false,clearUntil:elapsed+.9};
+}
+
+// A paused battery must not let the old artillery waypoint updater replace
+// its safe waiting target before the bridge reservation is granted.
+const updateArtilleryPathBeforeTrafficV068=updateArtilleryPathV063;
+updateArtilleryPathV063=function updateArtilleryPathQueuedV068(reg){
+  if(reg?.artilleryBridgeHoldV068 && reg.crossingTrafficV068?.state==='waiting')return;
+  updateArtilleryPathBeforeTrafficV068(reg);
+};
+
 function enforceCrossingTrafficV068() {
   for (const reg of regiments) {
-    const march = reg.marchV063;
-    const info = reg.crossingTrafficV068;
-    if (!march?.v064 || !info?.forcedColumn) continue;
-    const c = WATER_CROSSINGS_V067.find(item => item.id === info.crossingId);
-    if (!c) continue;
-    if (info.state === 'waiting') clampWaitingRegimentV068(reg, march, info, c);
-    else if (info.state !== 'clearing') updateHolderStateV068(reg, march, info, c);
-    else forceBridgeColumnTargetsV068(reg, march, info);
+    const info=reg.crossingTrafficV068;
+    if(!info?.forcedColumn)continue;
+    const c=WATER_CROSSINGS_V067.find(item=>item.id===info.crossingId);
+    if(!c)continue;
+    if(groupKindV06(reg)==='artillery'){
+      updateArtilleryBridgeTrafficV068(reg,info,c);
+      continue;
+    }
+    const march=reg.marchV063;
+    if(!march?.v064)continue;
+    if(info.state==='waiting')clampWaitingRegimentV068(reg,march,info,c);
+    else if(info.state!=='clearing')updateHolderStateV068(reg,march,info,c);
+    else forceBridgeColumnTargetsV068(reg,march,info);
   }
   promoteTrafficQueuesV068();
 }
