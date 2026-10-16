@@ -37,6 +37,7 @@ test('normal player-made regiment obeys road march rather than only synthetic te
     const path=(reg.path||[]).map(p=>({x:p.x,y:p.y}));
     const infantry=regimentMembers(reg).filter(u=>u.type==='infantry');
     let roadFrames=0,fourFileFrames=0,inside=0,total=0,unsafe=0,maxSpread=0;
+    let realSlotError=0,realSlotCount=0,cohesiveFrames=0;
     const positions=[],timeline=[];
     let firstArrival=null,orderChanges=0,lastTarget=JSON.stringify(reg.finalTarget),minLiving=infantry.length;
     for(let i=0;i<3800;i++){
@@ -60,6 +61,9 @@ test('normal player-made regiment obeys road march rather than only synthetic te
       maxSpread=Math.max(maxSpread,spread);
       const slots=infantry.map(u=>marchColumnOffsetsV063(reg).get(u.id)).filter(Boolean);
       if(slots.length===infantry.length && new Set(slots.map(s=>s.oy)).size===4)fourFileFrames++;
+      const frameError=infantry.reduce((sum,u)=>sum+Math.hypot(u.x-u.targetX,u.y-u.targetY),0)/infantry.length;
+      if(frameError<22)cohesiveFrames++;
+      realSlotError+=frameError;realSlotCount++;
       for(const u of infantry){
         total++;
         if(roadNetworkAtV066(u.x,u.y))inside++;
@@ -74,6 +78,7 @@ test('normal player-made regiment obeys road march rather than only synthetic te
     return{origin:start,head:reg.id,infantry:infantry.length,planned,routeRoads,path:path.slice(0,24),
       timeline:timeline.slice(0,23),firstArrival,orderChanges,minLiving,finalTarget:reg.finalTarget,
       roadFrames,fourFileFrames,onRoadShare:total?inside/total:0,unsafe,maxSpread,
+      meanActualSlotError:realSlotCount?realSlotError/realSlotCount:0,cohesiveFrames,
       ended:!reg.marchV063,mode:document.documentElement.dataset.renderMode,
       positions,
       finalPositions:infantry.map(u=>({x:+u.x.toFixed(1),y:+u.y.toFixed(1)}))
@@ -88,6 +93,8 @@ test('normal player-made regiment obeys road march rather than only synthetic te
   expect(results.fourFileFrames).toBeGreaterThan(40);
   expect(results.minLiving).toBe(results.infantry);
   expect(results.onRoadShare).toBeGreaterThan(.90);
+  expect(results.cohesiveFrames).toBeGreaterThan(70);
+  expect(results.meanActualSlotError).toBeLessThan(20);
   expect(results.onRoadShare).toBeGreaterThan(.70);
   expect(results.unsafe).toBe(0);
   expect(errors).toEqual([]);
