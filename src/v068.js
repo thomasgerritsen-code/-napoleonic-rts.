@@ -302,7 +302,8 @@ function updateHolderStateV068(reg, march, info, c) {
   const direction=-info.initialSide;
   const tailClear=regimentMembers(reg).filter(u=>u&&!u.dead&&!u.routing).every(u=>{
     const local=crossingLocalV068(c,u.x,u.y);
-    return local.along*direction>c.length/2+24&&!waterAtV067(u.x,u.y);
+    return local.along*direction>c.length/2+24 &&
+      (typeof waterAtV067!=='function'||!waterAtV067(u.x,u.y));
   });
   const clearedOppositeBank = info.entered && currentSide && currentSide !== info.initialSide &&
     distance >= CROSSING_RELEASE_DISTANCE_V068 && !touches && tailClear;
