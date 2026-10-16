@@ -10,7 +10,7 @@ async function openGame(page) {
   return errors;
 }
 
-test('a bridge lane never releases while an actual infantry member is still on the entry bank',async({page})=>{
+test('a released bridge reservation retains safe follower guidance for a soldier on the entry bank',async({page})=>{
   const errors=await openGame(page);
   const result=await page.evaluate(()=>{
     resetGame();v05PeaceMode=true;gameOver=false;
@@ -40,16 +40,19 @@ test('a bridge lane never releases while an actual infantry member is still on t
     };
     state.queue=[];state.holderIds=[reg.id];
     updateHolderStateV068(reg,reg.marchV063,reg.crossingTrafficV068,c);
-    const heldWithStraggler=state.holderIds.includes(reg.id) &&
-      reg.crossingTrafficV068?.state!=='clearing' &&
-      !reg.crossingClearedV068?.has(c.id);
+    // Deadlock-avoidance is allowed to release the logical lane while a
+    // straggler remains behind. That soldier MUST retain physical guidance
+    // to the correct crossing until he personally reaches dry far-side ground.
+    const followerRememberedCrossing=straggler.bridgeLastCrossingV1?.crossingId===c.id;
+    const followerTargetIsSafe=!segmentCrossesBlockedWaterV067(
+      straggler.x,straggler.y,straggler.targetX,straggler.targetY);
     const phaseBefore=reg.movementPhaseV063;
     // Only then physically move the final rear soldier across the far portal
     // to prove the reservation has a finite and correct release condition.
     const far=crossingPointV068(c,c.length/2+95,15);
     straggler.x=far.x;straggler.y=far.y;
     updateHolderStateV068(reg,reg.marchV063,reg.crossingTrafficV068,c);
-    return{heldWithStraggler,phaseBefore,releasedAfterEveryMember:
+    return{followerRememberedCrossing,followerTargetIsSafe,phaseBefore,releasedAfterEveryMember:
       !state.holderIds.includes(reg.id) &&
       reg.crossingTrafficV068?.state==='clearing',
       living:members.length,stragglerType:straggler.type};
@@ -57,7 +60,8 @@ test('a bridge lane never releases while an actual infantry member is still on t
   console.log('BRIDGE_TAIL_RELEASE_250',JSON.stringify(result));
   expect(result.living).toBeGreaterThanOrEqual(14);
   expect(result.stragglerType).toBe('infantry');
-  expect(result.heldWithStraggler).toBe(true);
+  expect(result.followerRememberedCrossing).toBe(true);
+  expect(result.followerTargetIsSafe).toBe(true);
   expect(result.releasedAfterEveryMember).toBe(true);
   expect(errors).toEqual([]);
 });
@@ -82,6 +86,7 @@ test('real screenshot scenario: a displaced rear soldier catches up before the f
     issueMoveWithFacingV06(2040,c.y,null);
     let displaced=false,earlyRelease=false,firstCrossing=null,allArrived=false,
       releasedAt=null,stagedFourFiles=false,maxWater=0,minDeckMembers=0,tailLagMax=0;
+    let physicallyAlignedDeckFrames=0,maxDeckInfantry=0;
     const samples=[];
     for(let i=0;i<3600;i++){
       window.RTS_SIM.step(.05);
@@ -108,6 +113,22 @@ test('real screenshot scenario: a displaced rear soldier catches up before the f
       const deck=members.filter(u=>crossingPassageContainsV067(c,u.x,u.y)).length;
       if(deck>0)firstCrossing ??= elapsed;
       minDeckMembers=Math.max(minDeckMembers,deck);
+      const onDeckInfantry=members.filter(u=>u.type==='infantry' &&
+        crossingPassageContainsV067(c,u.x,u.y));
+      maxDeckInfantry=Math.max(maxDeckInfantry,onDeckInfantry.length);
+      if(onDeckInfantry.length>=8){
+        const laneOffsets=[-22.5,-7.5,7.5,22.5];
+        const aligned=onDeckInfantry.filter(u=>{
+          const perp=crossingLocalV068(c,u.x,u.y).perp;
+          return laneOffsets.some(lane=>Math.abs(perp-lane)<=8);
+        }).length;
+        const lanes=new Set(onDeckInfantry.map(u=>{
+          const perp=crossingLocalV068(c,u.x,u.y).perp;
+          return laneOffsets.reduce((best,lane,i)=>
+            Math.abs(perp-lane)<Math.abs(perp-laneOffsets[best])?i:best,0);
+        }));
+        if(aligned>=8 && lanes.size===4)physicallyAlignedDeckFrames++;
+      }
       maxWater=Math.max(maxWater,members.filter(u=>waterAtV067(u.x,u.y)).length);
       if(i%200===0 && samples.length<30)samples.push({
         t:+elapsed.toFixed(1),state:info?.state||null,
@@ -120,7 +141,7 @@ test('real screenshot scenario: a displaced rear soldier catches up before the f
       }
     }
     return{displaced,earlyRelease,firstCrossing,allArrived,releasedAt,
-      stagedFourFiles,maxWater,minDeckMembers,samples,
+      stagedFourFiles,maxWater,minDeckMembers,physicallyAlignedDeckFrames,maxDeckInfantry,samples,
       final:members.map(u=>({x:u.x,y:u.y,dead:u.dead,type:u.type})),
       stats:window.__COLUMN_COHESION_V250__.stats()};
   });
@@ -128,6 +149,8 @@ test('real screenshot scenario: a displaced rear soldier catches up before the f
   expect(result.error).toBeUndefined();
   expect(result.displaced).toBe(true);
   expect(result.stagedFourFiles).toBe(true);
+  expect(result.maxDeckInfantry).toBeGreaterThanOrEqual(8);
+  expect(result.physicallyAlignedDeckFrames).toBeGreaterThan(0);
   expect(result.firstCrossing).not.toBeNull();
   expect(result.earlyRelease).toBe(false);
   expect(result.releasedAt).not.toBeNull();
