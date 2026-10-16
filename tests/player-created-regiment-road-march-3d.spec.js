@@ -8,6 +8,10 @@ test('normal player-made regiment obeys road march rather than only synthetic te
   await page.waitForFunction(()=>Boolean(window.RTS_SIM && window.__OFFICER_REGIMENT_MOBILE_V1__ &&
     window.__FOUR_FILE_ROAD_TRAIL_V133__ && window.__BATTLEFIELD_3D_V1__?.enabled?.()));
   const before=await page.evaluate(()=>{
+    // Isolate a player's march from legitimate enemy combat and routing.
+    // Golden Battle separately checks engagement and morale.
+    for(const u of units)if(u.side==='britain')u.dead=true;
+    for(const reg of regiments)if(reg.side==='britain')reg.destroyed=true;
     const officer=freeUnits('france','officer')[0];
     if(!officer)return{error:'No free officer'};
     selectedUnits.clear();
@@ -34,11 +38,12 @@ test('normal player-made regiment obeys road march rather than only synthetic te
     const infantry=regimentMembers(reg).filter(u=>u.type==='infantry');
     let roadFrames=0,fourFileFrames=0,inside=0,total=0,unsafe=0,maxSpread=0;
     const positions=[],timeline=[];
-    let firstArrival=null,orderChanges=0,lastTarget=JSON.stringify(reg.finalTarget);
+    let firstArrival=null,orderChanges=0,lastTarget=JSON.stringify(reg.finalTarget),minLiving=infantry.length;
     for(let i=0;i<3800;i++){
       window.RTS_SIM.step(.05);
       const changed=JSON.stringify(reg.finalTarget);
       if(changed!==lastTarget){orderChanges++;lastTarget=changed;}
+      minLiving=Math.min(minLiving,infantry.filter(u=>!u.dead).length);
       if(i%100===0)timeline.push({t:+elapsed.toFixed(1),phase:reg.movementPhaseV063,
         anchor:reg.marchV063?{x:+reg.marchV063.anchorX.toFixed(1),y:+reg.marchV063.anchorY.toFixed(1)}:null,
         centroid:centroid(infantry),finalTarget:reg.finalTarget,routeChoice:reg.routePlanV065?.choice,
@@ -67,7 +72,7 @@ test('normal player-made regiment obeys road march rather than only synthetic te
       });
     }
     return{origin:start,head:reg.id,infantry:infantry.length,planned,routeRoads,path:path.slice(0,24),
-      timeline:timeline.slice(0,23),firstArrival,orderChanges,finalTarget:reg.finalTarget,
+      timeline:timeline.slice(0,23),firstArrival,orderChanges,minLiving,finalTarget:reg.finalTarget,
       roadFrames,fourFileFrames,onRoadShare:total?inside/total:0,unsafe,maxSpread,
       ended:!reg.marchV063,mode:document.documentElement.dataset.renderMode,
       positions,
@@ -81,6 +86,8 @@ test('normal player-made regiment obeys road march rather than only synthetic te
   expect(results.firstArrival,JSON.stringify(results.timeline)).not.toBeNull();
   expect(results.orderChanges,JSON.stringify(results.timeline)).toBe(0);
   expect(results.fourFileFrames).toBeGreaterThan(40);
+  expect(results.minLiving).toBe(results.infantry);
+  expect(results.onRoadShare).toBeGreaterThan(.90);
   expect(results.onRoadShare).toBeGreaterThan(.70);
   expect(results.unsafe).toBe(0);
   expect(errors).toEqual([]);
