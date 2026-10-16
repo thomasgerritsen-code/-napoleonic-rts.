@@ -33,10 +33,19 @@ test('normal player-made regiment obeys road march rather than only synthetic te
     const path=(reg.path||[]).map(p=>({x:p.x,y:p.y}));
     const infantry=regimentMembers(reg).filter(u=>u.type==='infantry');
     let roadFrames=0,fourFileFrames=0,inside=0,total=0,unsafe=0,maxSpread=0;
-    const positions=[];
+    const positions=[],timeline=[];
+    let firstArrival=null,orderChanges=0,lastTarget=JSON.stringify(reg.finalTarget);
     for(let i=0;i<3800;i++){
       window.RTS_SIM.step(.05);
+      const changed=JSON.stringify(reg.finalTarget);
+      if(changed!==lastTarget){orderChanges++;lastTarget=changed;}
+      if(i%100===0)timeline.push({t:+elapsed.toFixed(1),phase:reg.movementPhaseV063,
+        anchor:reg.marchV063?{x:+reg.marchV063.anchorX.toFixed(1),y:+reg.marchV063.anchorY.toFixed(1)}:null,
+        centroid:centroid(infantry),finalTarget:reg.finalTarget,routeChoice:reg.routePlanV065?.choice,
+        pathIndex:reg.pathIndex,pathLength:reg.path?.length||0,alive:infantry.filter(u=>!u.dead).length,
+        engagement:reg.engagementV069?.mode||null});
       const march=reg.marchV063;
+      if(!march && firstArrival===null)firstArrival=elapsed;
       if(!march)break;
       if(march.locomotionV064!=='road-march'||!roadAtV064(march.anchorX,march.anchorY)||
          reg.crossingTrafficV068?.forcedColumn)continue;
@@ -58,6 +67,7 @@ test('normal player-made regiment obeys road march rather than only synthetic te
       });
     }
     return{origin:start,head:reg.id,infantry:infantry.length,planned,routeRoads,path:path.slice(0,24),
+      timeline:timeline.slice(0,23),firstArrival,orderChanges,finalTarget:reg.finalTarget,
       roadFrames,fourFileFrames,onRoadShare:total?inside/total:0,unsafe,maxSpread,
       ended:!reg.marchV063,mode:document.documentElement.dataset.renderMode,
       positions,
@@ -68,6 +78,8 @@ test('normal player-made regiment obeys road march rather than only synthetic te
   expect(results.error).toBeUndefined();
   expect(results.infantry).toBe(12);
   expect(results.roadFrames).toBeGreaterThan(40);
+  expect(results.firstArrival,JSON.stringify(results.timeline)).not.toBeNull();
+  expect(results.orderChanges,JSON.stringify(results.timeline)).toBe(0);
   expect(results.fourFileFrames).toBeGreaterThan(40);
   expect(results.onRoadShare).toBeGreaterThan(.70);
   expect(results.unsafe).toBe(0);
