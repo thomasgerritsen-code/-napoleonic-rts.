@@ -116,3 +116,49 @@ test('artillery angled bridge approach continues along the selected crossing rou
   expect(result.water).toBe(0);
   expect(errors).toEqual([]);
 });
+
+test('artillery group membership cache never reuses soldiers from an earlier battle', async ({ page }) => {
+  const errors=[];
+  page.on('pageerror', e=>errors.push(e.message));
+  await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.RTS_SIM && window.__LARGE_ARMY_PERFORMANCE_V1__));
+  const result=await page.evaluate(()=>{
+    function createBattle(){
+      resetGame();v05PeaceMode=true;gameOver=false;
+      for(const u of units)u.dead=true;
+      for(const reg of regiments)reg.destroyed=true;
+      const c=WATER_CROSSINGS_V067.find(c=>c.id==='pont-chaussee');
+      const start=crossingPointV068(c,-(c.length/2+210),18);
+      const destination=crossingPointV068(c,c.length/2+210,0);
+      const gun=createUnit('france','artillery',start.x,start.y);
+      const crew=[createUnit('france','infantry',start.x-25,start.y-14),
+                  createUnit('france','infantry',start.x-25,start.y+14)];
+      const reg=createArtilleryBatteryV06('france',gun,crew);
+      const foundBefore=regimentMembers(reg).map(u=>u.id);
+      orderGroupPathV06(reg,destination.x,destination.y,'column',0);
+      const foundAfter=regimentMembers(reg).map(u=>u.id);
+      const commanded=artilleryForGroupV06(reg);
+      const assignedDistance=Math.hypot(gun.targetX-gun.x,gun.targetY-gun.y);
+      return {reg,gun,memberIds:[gun.id,...crew.map(u=>u.id)],
+        foundBefore,foundAfter,commandedId:commanded?.id??null,assignedDistance};
+    }
+    const first=createBattle();
+    window.RTS_SIM.step(.05); // repopulate previous battle's performance indexes
+    const second=createBattle();
+    let traveled=0;
+    const start={x:second.gun.x,y:second.gun.y};
+    for(let i=0;i<60;i++)window.RTS_SIM.step(.05);
+    traveled=Math.hypot(second.gun.x-start.x,second.gun.y-start.y);
+    return {first:{expected:first.memberIds,before:first.foundBefore,after:first.foundAfter,gun:first.commandedId,assignedDistance:first.assignedDistance},
+      second:{expected:second.memberIds,before:second.foundBefore,after:second.foundAfter,gun:second.commandedId,assignedDistance:second.assignedDistance,traveled}};
+  });
+  console.log('ARTILLERY_RESET_CACHE',JSON.stringify(result));
+  for(const sample of [result.first,result.second]){
+    expect(sample.before).toEqual(sample.expected);
+    expect(sample.after).toEqual(sample.expected);
+    expect(sample.gun).toBe(sample.expected[0]);
+    expect(sample.assignedDistance).toBeGreaterThan(20);
+  }
+  expect(result.second.traveled).toBeGreaterThan(10);
+  expect(errors).toEqual([]);
+});
