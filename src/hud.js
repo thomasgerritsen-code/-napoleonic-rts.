@@ -182,7 +182,13 @@
 
   function regimentOrderLabel(reg) {
     const order = regimentOrderState(reg);
-    const formation = formationLabel(reg.formation || 'line');
+    const march=reg.marchV063;
+    const traffic=reg.crossingTrafficV068;
+    const roadColumn=groupKindV06(reg)==='infantry' && march?.v064 &&
+      (traffic?.forcedColumn || march.locomotionV064==='road-march');
+    const formation=roadColumn
+      ? (traffic?.state==='waiting' ? 'Marscolonne 4 breed · wacht' : 'Marscolonne 4 breed')
+      : formationLabel(reg.formation || 'line');
     const reform = regimentReformLabel(reg);
     if (!order.moving) return `${formation} · ${reform || 'positie ingenomen'}`;
     return `${formation} · ${reform ? `${reform} · ` : ''}marcheert · ${Math.max(1, Math.round(order.distance))} m te gaan`;
