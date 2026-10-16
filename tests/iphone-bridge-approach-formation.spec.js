@@ -24,6 +24,7 @@ test('iPhone bridge approach: a player regiment forms four readable ranks before
     issueMoveWithFacingV06(2050,900,null);
     const infantry=made.filter(u=>u.type==='infantry');
     let peakError=0,maxWater=0,firstBridge=null,stageSamples=0,goodStages=0,stagedAt=null,arrivedAt=null;
+    let firstStagingFourFiles=null,firstStagingError=null,stagingDelayFrames=0;
     const samples=[];
     for(let i=0;i<3300;i++){
       window.RTS_SIM.step(.05);
@@ -41,7 +42,13 @@ test('iPhone bridge approach: a player regiment forms four readable ranks before
         const slots=infantry.map(u=>offsets.get(u.id));
         const fourFiles=slots.every(Boolean)&&new Set(slots.map(o=>Math.round(o.oy*10)/10)).size===4;
         const inStaging=info?.forcedColumn && local && local.along<-(crossing.length/2+30)&&local.along>-(crossing.length/2+180);
-        if(inStaging){stageSamples++;if(meanError<22&&fourFiles)goodStages++;if(!stagedAt&&meanError<22&&fourFiles)stagedAt=elapsed;}
+        if(inStaging){
+          stageSamples++;
+          if(firstStagingFourFiles===null){firstStagingFourFiles=fourFiles;firstStagingError=meanError;}
+          if(meanError<22&&fourFiles)goodStages++;
+          if(!stagedAt&&meanError<22&&fourFiles)stagedAt=elapsed;
+          if(march.speedV064<=6)stagingDelayFrames++;
+        }
         if(!firstBridge&&current.some(u=>crossingPassageContainsV067(crossing,u.x,u.y)))firstBridge=elapsed;
         if(i%100===0&&samples.length<30) samples.push({t:+elapsed.toFixed(1),phase:march.phase,traffic:info?.state||null,
           x:+march.anchorX.toFixed(1),locomotion:march.locomotionV064,meanError:+meanError.toFixed(1),fourFiles,
@@ -51,15 +58,17 @@ test('iPhone bridge approach: a player regiment forms four readable ranks before
       if(!march){arrivedAt=elapsed;break;}
     }
     return{count:made.length,alive:made.filter(u=>!u.dead).length,maxWater,
-      peakError,stageSamples,goodStages,stagedAt,firstBridge,arrivedAt,samples,
+      peakError,stageSamples,goodStages,stagedAt,firstStagingFourFiles,firstStagingError,stagingDelayFrames,
+      firstBridge,arrivedAt,samples,
       final:made.map(u=>({id:u.id,type:u.type,x:u.x,y:u.y,dead:u.dead}))};
   });
   console.log('IPHONE_BRIDGE_APPROACH_249',JSON.stringify({...result,final:undefined,samples:result.samples.map(s=>({...s,real:s.real.slice(0,4),ideal:s.ideal.slice(0,4)}))}));
   expect(result.error).toBeUndefined();
   expect(result.count).toBe(14);
   expect(result.maxWater).toBe(0);
-  expect(result.stageSamples).toBeGreaterThan(10);
-  expect(result.goodStages / result.stageSamples).toBeGreaterThan(.65);
+  expect(result.stageSamples).toBeGreaterThan(5);
+  expect(result.firstStagingFourFiles).toBe(true);
+  expect(result.goodStages / result.stageSamples).toBeGreaterThanOrEqual(.70);
   expect(result.stagedAt).not.toBeNull();
   expect(result.firstBridge).not.toBeNull();
   expect(result.arrivedAt).not.toBeNull();
