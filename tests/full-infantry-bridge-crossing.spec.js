@@ -130,7 +130,7 @@ test('full player infantry formation crosses a real long route from the west cam
     issueMoveWithFacingV06(destination.x,destination.y,0);
     const path=(reg.path||[]).map(p=>({x:p.x,y:p.y}));
     const routeCrossings=(reg.routeCrossingsV067||[]).map(c=>c.id);
-    let maxWater=0,maxBlocked=0,maxSeparationOnBridge=0;
+    let maxWater=0,maxBlocked=0,maxSeparationOnBridge=0,worstSpread=null;
     let sawCrossing=false,sawAllAhead=false,completeAt=null,finalOrder=null;
     const snapshots=[];
     for(let i=0;i<6800;i++){
@@ -145,7 +145,16 @@ test('full player infantry formation crosses a real long route from the west cam
       maxWater=Math.max(maxWater,onWater.length);maxBlocked=Math.max(maxBlocked,blocked.length);
       sawCrossing||=onDeck.length>0;
       if(onDeck.length>0){
-        maxSeparationOnBridge=Math.max(maxSeparationOnBridge,...living.map(u=>Math.hypot(u.x-center.x,u.y-center.y)));
+        for(const u of living){
+          const spread=Math.hypot(u.x-center.x,u.y-center.y);
+          if(spread>maxSeparationOnBridge){
+            maxSeparationOnBridge=spread;
+            worstSpread={t:+elapsed.toFixed(1),id:u.id,type:u.type,unit:{x:+u.x.toFixed(1),y:+u.y.toFixed(1),tx:+u.targetX.toFixed(1),ty:+u.targetY.toFixed(1)},
+              center:{x:+center.x.toFixed(1),y:+center.y.toFixed(1)},
+              anchor:reg.marchV063?{x:+reg.marchV063.anchorX.toFixed(1),y:+reg.marchV063.anchorY.toFixed(1)}:null,
+              state:traffic?.state||null,deck:onDeck.length,behind:living.filter(s=>s.x<1330).length};
+          }
+        }
       }
       const allAhead=living.length===38&&living.every(u=>u.x>1740);
       sawAllAhead ||= allAhead;
@@ -164,7 +173,7 @@ test('full player infantry formation crosses a real long route from the west cam
     const center=centroid(made.filter(u=>!u.dead));
     const maxFinalSpread=Math.max(...made.filter(u=>!u.dead).map(u=>Math.hypot(u.x-center.x,u.y-center.y)));
     return {pathLength:path.length,routeCrossings,maxWater,maxBlocked,maxSeparationOnBridge,
-      sawCrossing,sawAllAhead,completeAt,finalOrder,maxFinalSpread,snapshots,
+      sawCrossing,sawAllAhead,completeAt,finalOrder,maxFinalSpread,worstSpread,snapshots,
       final:made.map(u=>({id:u.id,type:u.type,dead:u.dead,x:+u.x.toFixed(1),y:+u.y.toFixed(1)})),
       phase:reg.movementPhaseV063,traffic:reg.crossingTrafficV068?.state||null};
   });
@@ -177,6 +186,7 @@ test('full player infantry formation crosses a real long route from the west cam
   expect(result.maxBlocked).toBe(0);
   expect(result.completeAt,JSON.stringify(result.snapshots)).not.toBeNull();
   expect(result.maxFinalSpread).toBeLessThan(240);
+  expect(result.maxSeparationOnBridge,JSON.stringify(result.worstSpread)).toBeLessThan(310);
   expect(result.finalOrder).toBe('line');
   expect(result.final.filter(u=>u.dead)).toEqual([]);
   expect(errors).toEqual([]);
