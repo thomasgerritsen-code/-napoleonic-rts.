@@ -11,11 +11,12 @@
   function record(march){
     const point={x:march.anchorX,y:march.anchorY};
     let trail=march.roadTrailV133;
-    if(!trail){trail={points:[point],lastHeading:march.marchFacing};march.roadTrailV133=trail;return trail;}
+    if(!trail){trail={points:[point,{...point}],lastHeading:march.marchFacing};march.roadTrailV133=trail;return trail;}
     const points=trail.points;
-    const head=points[0];
-    if(Math.hypot(head.x-point.x,head.y-point.y)>=SAMPLE_SPACING)points.unshift(point);
-    else points[0]=point;
+    const latest=points[0],lastFixed=points[1];
+    if(Math.hypot(lastFixed.x-point.x,lastFixed.y-point.y)>=SAMPLE_SPACING)
+      points.splice(1,0,{...latest});
+    points[0]=point;
     let total=0,keep=points.length;
     for(let i=1;i<points.length;i++){
       total+=Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y);
@@ -70,7 +71,7 @@
     const trail=record(march);
     const facing=march.marchFacing;
     if(trail.points.length>2&&Math.abs(Math.atan2(
-      Math.sin(facing-trail.points[trail.points.length-1].heading),
+      Math.sin(facing-Math.atan2(trail.points[0].y-trail.points[1].y,trail.points[0].x-trail.points[1].x)),
       Math.cos(facing-trail.points[trail.points.length-1].heading)))>.15)stats.curvedFrames++;
     for(const u of regimentMembers(reg)){
       if(u.dead||u.routing)continue;
