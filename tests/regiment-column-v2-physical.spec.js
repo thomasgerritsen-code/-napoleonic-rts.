@@ -12,7 +12,7 @@ test('Cossacks column v2: actual players physically march in four bridge lanes, 
     for(const u of units)u.dead=true;
     for(const r of regiments)r.destroyed=true;
     const crossing=WATER_CROSSINGS_V067.find(c=>c.id==='pont-chaussee');
-    const start=crossingPointV068(c,-crossing.length/2-230,40);
+    const start=crossingPointV068(crossing,-crossing.length/2-230,40);
     const members=[];
     for(let i=0;i<12;i++)
       members.push(createUnit('france','infantry',start.x+(i%6)*22,start.y+(Math.floor(i/6)-.5)*22));
@@ -21,7 +21,7 @@ test('Cossacks column v2: actual players physically march in four bridge lanes, 
     const reg=createRegiment('france',members);
     if(!reg)return{error:'regiment was not created'};
     selectWholeRegiment(reg);
-    const end=crossingPointV068(c,crossing.length/2+500,0);
+    const end=crossingPointV068(crossing,crossing.length/2+500,0);
     issueMoveWithFacingV06(end.x,end.y,0);
     let deckFrames=0,alignedFrames=0,alignedSoldierTotal=0,deckSoldierTotal=0;
     let maxWater=0,allCrossedAt=null,allFormedAt=null,maxPhysicalSpread=0;
