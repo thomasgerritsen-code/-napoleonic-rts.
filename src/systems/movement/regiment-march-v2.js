@@ -159,6 +159,15 @@
     if(state.phase==='field'){state.phase='forming';state.startedAt=elapsed;state.points.length=0;stats.phaseTransitions++;}
     if(march.phase==='combat-halt'||reg.engagementV069)return;
     record(state,march);
+    // Handoff without a physical start-up brake: the proven slot follower
+    // starts each road march using the actual soldier positions. Keep those
+    // motion targets for the first two seconds while the ranks converge,
+    // then v2 assumes sole target ownership for bends and later crossings.
+    // A bridge already forming its four narrow files is never delayed.
+    if(!bridge && state.phase==='forming' && elapsed-state.startedAt<2.25){
+      stats.formationFrames++;
+      return;
+    }
     columnSlots(reg,march,state,members,bridge);
     const errors=members.map(u=>distance(u,{x:u.targetX,y:u.targetY})).sort((a,b)=>a-b);
     const p80=errors[Math.floor((errors.length-1)*.8)]||0;
