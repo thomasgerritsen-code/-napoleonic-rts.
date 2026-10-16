@@ -6,17 +6,6 @@ document.title = `Napoleonic RTS v${V068_VERSION}`;
 const v068VersionBadge = document.querySelector('.version');
 if (v068VersionBadge) v068VersionBadge.textContent = `v${V068_VERSION}`;
 
-// Artillery batteries must contain exactly their own living gun and escorts.
-// Some legacy group adapters can include dead or adjacent ID slots after
-// consecutive battle resets. Do not let those stale members suppress the gun
-// target or grant a bridge to a phantom battery.
-const regimentMembersBeforeArtilleryV068 = regimentMembers;
-regimentMembers = function regimentMembersWithArtilleryOwnershipV068(reg) {
-  if (!reg || groupKindV06(reg) !== 'artillery') return regimentMembersBeforeArtilleryV068(reg);
-  const ids = new Set(reg.memberIds || []);
-  return units.filter(u => !u.dead && u.regimentId === reg.id && ids.has(u.id));
-};
-
 const CROSSING_APPROACH_RADIUS_V068 = 470;
 const CROSSING_HOLD_DISTANCE_V068 = 190;
 const CROSSING_QUEUE_GAP_V068 = 155;
