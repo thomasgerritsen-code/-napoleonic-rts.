@@ -103,6 +103,13 @@ test('map traversal matrix covers every crossing, both directions and unit class
       const target = crossingPointV068(c, -side * distance, -lateral * 0.35);
       const reg = makeGroup(kind, start.x, start.y);
       if (!reg) return { crossing: c.id, side, kind, formation, completed: false, reason: 'group-create-failed' };
+      const preCommandSnapshot=kind==='artillery' ? {
+        destroyed:reg.destroyed,
+        memberIds:reg.memberIds.slice(),crewIds:reg.crewIds?.slice(),
+        currentMemberIds:regimentMembers(reg).map(u=>u.id),
+        gun:artilleryForGroupV06(reg)?.id??null,
+        regCount:regiments.length,unitsAlive:units.filter(u=>!u.dead).map(u=>({id:u.id,type:u.type,regimentId:u.regimentId}))
+      } : null;
       orderGroupPathV06(reg, target.x, target.y, formation, c.angle + (side < 0 ? 0 : Math.PI));
       const commandSnapshot=kind==='artillery' ? (()=>{
         const gun=artilleryForGroupV06(reg);
@@ -179,7 +186,7 @@ test('map traversal matrix covers every crossing, both directions and unit class
           artilleryDebug: (() => {
             const gun=artilleryForGroupV06(reg);
             return {
-              commandSnapshot,
+              preCommandSnapshot,commandSnapshot,
               cannon:gun?{x:gun.x,y:gun.y,targetX:gun.targetX,targetY:gun.targetY,arrived:gun.arrivedAtTarget}:null,
               crewApproach:reg.crewApproachV1?.active ?? null,
               traffic:reg.crossingTrafficV068,
