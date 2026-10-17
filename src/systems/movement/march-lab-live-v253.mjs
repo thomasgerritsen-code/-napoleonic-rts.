@@ -160,6 +160,16 @@ function syncRegiment(reg,dt,physical){
   const anchor={x:march.anchorX,y:march.anchorY};
   state.progress=projection(state.model,anchor,state.progress);
   state.model.distance=state.progress;
+  // The final 260 world units are a structured return to the game's native
+  // deployment solver. If the independent column keeps positioning its rear
+  // ranks right up to the last waypoint, the anchor can enter 'deploying'
+  // while the visible centroid stays >200 units back and never finishes.
+  // Hand off BEFORE deployment, only on the route's final leg.
+  const finalLeg=reg.pathIndex>=Math.max(0,reg.path.length-2);
+  if(!bridge && finalLeg && state.model.length-state.progress<260){
+    state.phase='handoff';
+    return;
+  }
   // Preserve the battle-tested start-up solver until the battalion has had
   // time to assemble. This applies to BOTH target assignment and physical
   // movement; overriding targets from t=0 caused a 50% speed regression.
