@@ -204,17 +204,30 @@ function syncRegiment(reg,dt,physical){
     state.phase='handoff';
     return;
   }
-  // Assign four-file slots immediately on entering a road, rather than
-  // leaving a 4.1-second gap where the old system scatters the regiment.
-  // Only the physical catch-up is blended; safety/navigation stay native.
+  // Keep native acceleration and traffic control during the first two
+  // seconds. It already assembles road files and preserves full travel speed.
+  // Only then blend into the persistent travelled-track controller.
+  if(!bridge && elapsed-state.phaseSince<2.05){
+    state.phase='forming';return;
+  }
+  // A temporary friendly passing lane takes priority over maintaining a
+  // rigid four-file column; otherwise two battalions physically overlap.
+  if(!bridge && reg.formationTrafficV132?.until>elapsed){
+    state.phase='passing';return;
+  }
   const positions=geometry(reg,state,march,bridge,members);
+  const handoff=bridge?1:clamp((elapsed-state.phaseSince-2.05)/1.45,0,1);
   if(bridge){metrics.bridgeFrames++;state.phase='bridge';}
   else{metrics.roadFrames++;if(state.phase==='waiting')state.phase='forming';}
   if(!physical){
     for(const u of members){
       const p=positions.get(u.id);
       if(!p||!safeMove(u,p,bridge))continue;
-      u.targetX=p.x;u.targetY=p.y;u.formationFacing=p.angle;
+      const fromX=num(u.targetX)?u.targetX:u.x;
+      const fromY=num(u.targetY)?u.targetY:u.y;
+      u.targetX=fromX+(p.x-fromX)*handoff;
+      u.targetY=fromY+(p.y-fromY)*handoff;
+      if(handoff>.5)u.formationFacing=p.angle;
       u.marchingV064=true;u.arrivedAtTarget=false;
     }
     return;
@@ -228,8 +241,7 @@ function syncRegiment(reg,dt,physical){
   // Marchlab geometry gradually assumes *physical* ownership only after
   // the regiment has assembled, rather than dragging soldiers backwards
   // during the first seconds of a normal move.
-  const weight=bridge?clamp((age+0.15)/1.05,0.15,1):
-    clamp((age+0.3)/1.65,0.18,1);
+  const weight=bridge?clamp((age+0.15)/1.05,0.15,1):handoff;
   const cap=Math.max(0.5,Math.min(10,dt*145)); // bounded, never teleport
   for(const u of members){
     const p=positions.get(u.id);
@@ -242,10 +254,12 @@ function syncRegiment(reg,dt,physical){
         u.x=x;u.y=y;metrics.physicalMoves++;
       }
     }
-    u.targetX=p.x;u.targetY=p.y;
+    const fromX=num(u.targetX)?u.targetX:u.x;
+    const fromY=num(u.targetY)?u.targetY:u.y;
+    u.targetX=fromX+(p.x-fromX)*handoff;
+    u.targetY=fromY+(p.y-fromY)*handoff;
     u.marchingV064=true;
-    u.formationFacing=p.angle;
-    u.roadTangentV133=p.angle;
+    if(handoff>.5){u.formationFacing=p.angle;u.roadTangentV133=p.angle;}
   }
   state.phase=bridge?'bridge':weight>=.99?'marching':'forming';
 }
