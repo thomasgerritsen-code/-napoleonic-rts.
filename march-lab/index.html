@@ -1,0 +1,46 @@
+<!doctype html><html lang="nl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Marslab — Napoleonic RTS</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;color:#f1efe8;background:#121a16}
+*{box-sizing:border-box}body{margin:0}main{max-width:1240px;padding:16px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:12px}
+h1{margin:3px 0;font-size:clamp(22px,4vw,30px)}p{color:#c6d2c4;font-size:14px;line-height:1.5;margin:6px 0}
+.kicker{color:#bdceaa;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.version{border:1px solid #586b57;color:#d4e6c6;padding:6px 9px;border-radius:8px;white-space:nowrap;font-size:12px}
+.stage{position:relative;border:1px solid #51674b;border-radius:16px;overflow:hidden;background:#819564}
+canvas{display:block;width:100%;height:min(66svh,620px);touch-action:pan-y}
+.hud{position:absolute;top:10px;left:10px;display:flex;flex-wrap:wrap;gap:7px}
+.hud span{background:#17231ad9;color:#e4ecdb;border:1px solid #4a6042;border-radius:7px;padding:6px 9px;font-size:12px;font-weight:700}
+.controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:12px 0}
+button,select{font:inherit;color:#f2f5ed;background:#314638;border:1px solid #6b8064;border-radius:10px;min-height:44px;padding:9px 14px;cursor:pointer}
+button.primary{background:#c3d39c;color:#192b18;border-color:#c3d39c;font-weight:800}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #ecdba0;outline-offset:2px}
+.setting{min-height:44px;border:1px solid #4c604f;border-radius:10px;padding:6px 10px;display:flex;align-items:center;gap:7px;font-size:13px}
+input[type=range]{width:100px;accent-color:#c3d39c}
+.footer{display:flex;justify-content:space-between;gap:9px;flex-wrap:wrap;font-size:12px;color:#b9c7b8}
+a{color:#d0edb4}
+@media(max-width:650px){main{padding:10px 7px 15px}header{padding:0 5px}
+canvas{height:62svh;min-height:390px}.version{font-size:10px}
+button{flex:1 1 auto}.hud span{font-size:11px}}
+</style></head><body><main>
+<header><div><div class="kicker">Napoleonic RTS · zelfstandige proefopstelling</div>
+<h1>Marslab: één regiment, één weg</h1>
+<p>36 soldaten, vier breed. Iedere rij volgt dezelfde bochten en brug.</p></div>
+<span class="version">Prototype A · YUKA 0.7.8</span></header>
+<div class="stage">
+<canvas id="scene" aria-label="Interactieve marscolonne op wegen en brug"></canvas>
+<div class="hud"><span>Formatie: 4 breed</span><span id="phase">Wacht op marsbevel</span><span id="count">36 soldaten</span></div>
+</div>
+<div class="controls">
+<button id="toggle" class="primary">▶ Start mars</button><button id="reset">↺ Opnieuw</button>
+<label class="setting">Snelheid <input id="speed" type="range" min="30" max="140" step="10" value="90"><output id="speedOut">90</output></label>
+<label class="setting">Regiment <select id="size"><option value="12">12 man</option><option value="24">24 man</option><option value="36" selected>36 man</option><option value="48">48 man</option></select></label>
+<label class="setting"><input id="routeToggle" type="checkbox" checked> Middenlijn tonen</label>
+</div>
+<div class="footer">
+<span id="engineStatus">YUKA-routevolging wordt geladen…</span>
+<span>Open source: <a href="https://github.com/Mugen87/yuka" target="_blank" rel="noreferrer">YUKA (MIT)</a></span>
+</div>
+<p>Dit draait geheel los van de bestaande bewegingscode. We vervangen die pas als de mars hier zichtbaar klopt, ook op iPhone.</p>
+</main><script type="module" src="./march.js"></script></body></html>
