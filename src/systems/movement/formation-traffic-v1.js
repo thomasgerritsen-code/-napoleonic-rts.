@@ -73,10 +73,6 @@
     if(!(base>0)||!reg||reg.destroyed||!march?.v064||groupKindV06(reg)==='artillery')return base;
     const info=bridgeInfo(reg);
     if(info?.state==='waiting'||info?.state==='queued')return base;
-    // On roads the active physical four-file controller already owns
-    // convergence: avoid a second slowdown based on stale field slots.
-    if(!info?.forcedColumn && (roadMarch||march.locomotionV064==='road-march') &&
-       global.__MARCH_LAB_LIVE_V253__?.owns(reg))return base;
 
     const c=cohesion(reg);
     const orderAge=Math.max(0,elapsed-(reg.formationTrafficOrderedAtV132??march.phaseStartedAt??elapsed));
