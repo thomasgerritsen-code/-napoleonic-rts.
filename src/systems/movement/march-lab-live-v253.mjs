@@ -31,7 +31,10 @@ function newPlan(reg,march){
     // navigation/formation controller until the new physical follower has a
     // dedicated obstacle-aware handoff. This is a known/visible fallback, not
     // pretending Marchlab already supports every map corner.
-    if(model.length>3500){
+    // Stage v253 on local/regional (<=1.8k) routes. Extended multi-road
+    // marches still need a follow-the-head replan and obstacle-safe handoff;
+    // keep their existing stable controller until that is implemented.
+    if(model.length>1800){
       unsupported.add(reg);metrics.longRouteFallbacks++;
       return null;
     }
