@@ -10,7 +10,7 @@ const controllers = new WeakMap();
 const stats = {orders:0,roadFrames:0,bridgeFrames:0,physicalMoves:0,
   skippedUnsafe:0,invalidRoutes:0,longRouteOrders:0,longRouteFallbacks:0,
   preservedReplans:0,formationHandovers:0,fieldFrames:0,trailResets:0,
-  singleAuthorityFrames:0,blockedWaterSteps:0};
+  singleAuthorityFrames:0,blockedWaterSteps:0,waterCorrections:0};
 const finite = Number.isFinite;
 const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
 const distance = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -49,7 +49,9 @@ function startController(reg,previous=null) {
     bridgeSide:preserve?previous.bridgeSide:null,
     rankIds:preserve?previous.rankIds:infantry(reg).map(u=>u.id),
     staffIds:preserve?previous.staffIds:living(reg).filter(u=>u.type!=='infantry').map(u=>u.id),
-    desired:new Map(),distance:preserve?previous.distance:0};
+    desired:new Map(),distance:preserve?previous.distance:0,
+    lastSafe:preserve?previous.lastSafe:new Map(living(reg).filter(u=>!waterAtV067(u.x,u.y))
+      .map(u=>[u.id,{x:u.x,y:u.y}]))};
   controllers.set(reg,state);
   stats.orders++;
   if(plan.length>1800)stats.longRouteOrders++;
@@ -275,12 +277,32 @@ moveToward=function moveTowardRoadColumnV257(u,...args){
   }
   return originalMove(u,...args);
 };
+function guardPhysicalWater(state,reg){
+  // Independent legacy field/bridge handoff code may update a soldier on the
+  // frame the new controller yields. Keep the last valid (normally <=1 step
+  // old) physical location; never expose a soldier in blocked river water.
+  for(const u of living(reg)){
+    if(waterAtV067(u.x,u.y)){
+      const previous=state.lastSafe.get(u.id);
+      if(previous&&!waterAtV067(previous.x,previous.y)){
+        u.x=previous.x;u.y=previous.y;
+        if(finite(u.vx))u.vx=0;
+        if(finite(u.vy))u.vy=0;
+        u.arrivedAtTarget=false;
+        stats.waterCorrections++;
+      }
+    }else state.lastSafe.set(u.id,{x:u.x,y:u.y});
+  }
+}
 const originalUpdate=update;
 update=function updateRoadColumnV257(dt){
   const result=originalUpdate(dt);
   for(const reg of regiments){
     const s=controllers.get(reg);
-    if(s&&controlled(reg))advanceSoldiers(reg,s,dt);
+    if(!s||reg.destroyed)continue;
+    guardPhysicalWater(s,reg);
+    if(controlled(reg))advanceSoldiers(reg,s,dt);
+    guardPhysicalWater(s,reg);
   }
   return result;
 };
