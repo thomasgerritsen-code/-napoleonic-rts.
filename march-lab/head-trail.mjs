@@ -20,6 +20,8 @@ export class HeadTrail {
     if(!this.points.length) {this.reset(x,y,heading);return;}
     const previous=this.points[0];
     const delta=Math.hypot(x-previous.x,y-previous.y);
+    // Target and physical passes can both record during one simulation frame.
+    if(delta<.001)return;
     if(delta>this.jump){this.reset(x,y,heading);return;}
     // Compare with the last *fixed* point, not just the previous frame.
     // Otherwise a slow leader moving <spacing each tick erases its history.
