@@ -1,0 +1,41 @@
+const {test,expect}=require('@playwright/test');
+test('new independent march lab physically marches in four files across one bridge on an iPhone screen',async({page})=>{
+  const errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/march-lab/',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>Boolean(window.marchLab?.model?.soldiers));
+  await expect(page.locator('#phase')).toContainText('Wacht');
+  await page.locator('#toggle').click();
+  await page.waitForTimeout(500);
+  const started=await page.evaluate(()=>({s:window.marchLab.model.distance,moving:window.marchLab.running}));
+  expect(started.moving).toBe(true);
+  expect(started.s).toBeGreaterThan(5);
+  await page.locator('#toggle').click();
+  const before=await page.evaluate(()=>window.marchLab.model.distance);
+  await page.waitForTimeout(180);
+  expect(await page.evaluate(()=>window.marchLab.model.distance)).toBeCloseTo(before,3);
+  const result=await page.evaluate(()=>{
+    const model=window.marchLab.model;
+    model.reset();model.advance(550);
+    const soldiers=model.soldiers();
+    const onBridge=soldiers.filter(u=>u.x>=650&&u.x<=757);
+    const files=new Set(onBridge.map(u=>u.file));
+    const allSafe=onBridge.every(u=>u.y>307&&u.y<392);
+    const angles=new Set(soldiers.map(u=>Math.round(u.angle*100)/100));
+    model.advance(2000);
+    const everyoneAcross=model.soldiers().every(u=>u.x>770);
+    return{count:soldiers.length,deck:onBridge.length,files:files.size,allSafe,
+      angleCount:angles.size,everyoneAcross};
+  });
+  console.log('INDEPENDENT_MARCH_LAB',result);
+  expect(result.count).toBe(36);
+  expect(result.deck).toBeGreaterThanOrEqual(8);
+  expect(result.files).toBe(4);
+  expect(result.allSafe).toBe(true);
+  expect(result.angleCount).toBeGreaterThan(1);
+  expect(result.everyoneAcross).toBe(true);
+  await page.locator('#size').selectOption('48');
+  await expect(page.locator('#count')).toContainText('48');
+  expect(errors).toEqual([]);
+});
