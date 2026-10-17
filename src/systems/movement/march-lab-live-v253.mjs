@@ -1,5 +1,5 @@
-import { Path } from '../../../vendor/yuka/Path.js';
-import { Vector3 } from '../../../vendor/yuka/Vector3.js';
+import { Path } from '../../../vendor/yuka/Path.mjs';
+import { Vector3 } from '../../../vendor/yuka/Vector3.mjs';
 
 // RTS v257: single physical road/bridge column authority.
 // YUKA Path (MIT, vendor/yuka/LICENSE) is the battle-tested waypoint/history
