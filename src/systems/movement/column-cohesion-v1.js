@@ -11,6 +11,10 @@
     if(!(base>0)||!reg||reg.destroyed||!march?.v064||
        groupKindV06(reg)!=='infantry'||reg.engagementV069 ||
        march.phase==='combat-halt')return base;
+    // v257 is the sole physical owner of road/bridge infantry columns. Its
+    // actual soldier speeds are bounded and water-guarded, so legacy slot-error
+    // throttling would slow the shared anchor almost to a standstill.
+    if(global.__ROAD_COLUMN_V257__?.owns(reg))return base;
     const info=reg.crossingTrafficV068;
     const bridge=info?.forcedColumn && info.state!=='waiting' &&
       info.state!=='queued' && info.state!=='clearing';
