@@ -102,7 +102,7 @@
 
     let cols, sx = 18, sy = 19;
     if (mode === 'line') cols = Math.min(18, infantry.length);
-    else if (mode === 'column') { cols = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(infantry.length) / 1.5))); sx = 19; sy = 18; }
+    else if (mode === 'column') { cols = Math.min(4, infantry.length); sx = 19; sy = 18; }
     else cols = Math.max(4, Math.ceil(Math.sqrt(infantry.length)));
 
     const rows = Math.max(1, Math.ceil(infantry.length / cols));
