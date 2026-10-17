@@ -97,6 +97,10 @@ function geometry(reg,state,march,bridge,members){
     state.model.count=currentInfantry.length;
   }
   const fileGap=bridge?15:18,rankGap=bridge?19:20;
+  // The RTS anchor is the battalion's *centre*, not the lead soldier.
+  // Center the road column on that anchor; positioning every rank behind
+  // the anchor made the visible centroid lose half a column on departure.
+  const halfDepth=Math.max(0,Math.ceil(state.rankIds.length/4)-1)*rankGap*.5;
   const positions=new Map();
   const info=reg.crossingTrafficV068;
   const direction=bridge?-(info?.initialSide??state.bridgeSide):0;
@@ -112,8 +116,9 @@ function geometry(reg,state,march,bridge,members){
     }else{
       // Every rank samples the actual *travelled* leader path. No independent
       // wayfinding, no Catmull-Rom short-cut through a river on sharp bends.
-      const center=state.trail.sample(rank*rankGap)||
-        state.model.positionAt(state.progress-rank*rankGap);
+      const back=rank*rankGap-halfDepth;
+      const center=state.trail.sample(back)||
+        state.model.positionAt(state.progress-back);
       p={x:center.x-Math.sin(center.angle)*side,y:center.y+Math.cos(center.angle)*side,angle:center.angle};
     }
     positions.set(id,p);
@@ -129,8 +134,9 @@ function geometry(reg,state,march,bridge,members){
       p=crossingPointV068(bridge,local.along-direction*commandBack,side);
       p.angle=crossingHeadingV068(bridge,state.bridgeSide);
     }else{
-      const center=state.trail.sample(commandBack)||
-        state.model.positionAt(state.progress-commandBack);
+      const back=commandBack-halfDepth;
+      const center=state.trail.sample(back)||
+        state.model.positionAt(state.progress-back);
       p={x:center.x-Math.sin(center.angle)*side,y:center.y+Math.cos(center.angle)*side,angle:center.angle};
     }
     positions.set(id,p);
