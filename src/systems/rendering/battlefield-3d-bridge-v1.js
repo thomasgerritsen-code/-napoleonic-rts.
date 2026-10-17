@@ -159,10 +159,45 @@
       }
     }
 
+    // Build real, selected infantry-file trails for rendering. The renderer
+    // does not invent a four-file diagram: it joins the physical locations
+    // of soldiers in each file of an active road/bridge column.
+    const columnGuides = [];
+    if (selectionIds.length && typeof regiments !== 'undefined') {
+      const selected = new Set(selectionIds);
+      for (const reg of regiments) {
+        if (reg.destroyed || reg.side !== 'france') continue;
+        const members = regimentMembers(reg).filter(unit => !unit.dead && !unit.routing);
+        if (!members.some(unit => selected.has(unit.id))) continue;
+        const state = global.__MARCH_LAB_LIVE_V253__?.state(reg);
+        if (!state || !['marching','bridge','forming'].includes(state.phase)) continue;
+        if (!reg.marchV063 || !['road-march','bridge-column'].includes(reg.marchV063.locomotionV064)) continue;
+        const foot = members.filter(unit => unit.type === 'infantry');
+        if (foot.length < 8) continue;
+        const files = [[],[],[],[]];
+        for (let i = 0; i < foot.length; i++) {
+          files[i % 4].push({x:foot[i].x,y:foot[i].y});
+        }
+        // No ground guide while men are still scattered on the approach.
+        const heading = reg.marchV063.marchFacing || 0;
+        const sin = Math.sin(heading),cos = Math.cos(heading);
+        const aligned = Array.from({length:Math.floor(foot.length/4)},(_,rank)=>{
+          const row=foot.slice(rank*4,rank*4+4);
+          const forward=row.map(u=>u.x*cos+u.y*sin);
+          const sideways=row.map(u=>-u.x*sin+u.y*cos);
+          return Math.max(...forward)-Math.min(...forward)<14 &&
+            Math.max(...sideways)-Math.min(...sideways)>30;
+        });
+        if (aligned.filter(Boolean).length < Math.max(2,Math.ceil(aligned.length*.65)))continue;
+        columnGuides.push({regimentId:reg.id,side:reg.side,files});
+        break; // Only one selected regiment receives visual guides.
+      }
+    }
     return {
       elapsed: typeof elapsed === 'number' ? elapsed : 0,
       units: liveUnits,
       buildings: liveBuildings,
+      columnGuides,
       selection: {
         unitIds: selectionIds,
         buildingId: typeof selectedBuilding !== 'undefined' && selectedBuilding ? selectedBuilding.id : null
