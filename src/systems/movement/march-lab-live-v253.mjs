@@ -1,13 +1,14 @@
 import {ColumnModel} from '../../../march-lab/column-core.mjs';
+import {HeadTrail} from '../../../march-lab/head-trail.mjs';
 
 // Production bridge for the *same* tested arc-length formation geometry used
 // by /march-lab/. Route planning, traffic permits and combat stay in RTS.
 // Unlike the old target-only wrappers, a marching regiment's visible soldier
 // coordinates are also brought into its own four-file arc-length positions.
 const registry=new WeakMap();
-const unsupported=new WeakSet();
 const metrics={orders:0,roadFrames:0,bridgeFrames:0,physicalMoves:0,skippedUnsafe:0,
-  invalidRoutes:0,formationHandovers:0,fieldFrames:0,longRouteFallbacks:0};
+  invalidRoutes:0,formationHandovers:0,fieldFrames:0,longRouteFallbacks:0,
+  longRouteOrders:0,preservedReplans:0,trailResets:0};
 const num=v=>Number.isFinite(v);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
@@ -17,7 +18,7 @@ const phaseActive=reg=>!!(reg?.marchV063?.v064&&reg.path&&!reg.destroyed&&
   groupKindV06(reg)==='infantry'&&!reg.engagementV069 &&
   reg.marchV063.phase!=='combat-halt'&&reg.marchV063.phase!=='deploying');
 
-function newPlan(reg,march){
+function newPlan(reg,march,previous=null){
   const waypoints=[{x:march.anchorX,y:march.anchorY}];
   for(const p of reg.path||[]){
     if(num(p.x)&&num(p.y)&&dist(p,waypoints[waypoints.length-1])>1)
@@ -26,21 +27,22 @@ function newPlan(reg,march){
   if(waypoints.length<2)return null;
   try{
     const model=new ColumnModel(waypoints,{count:Math.max(1,infantry(reg).length),fileGap:18,rankGap:20,curveDetail:8});
-    // Stage the rollout: multi-road, cross-map expeditions include village
-    // obstacles and multiple route re-plans. Preserve their proven legacy
-    // navigation/formation controller until the new physical follower has a
-    // dedicated obstacle-aware handoff. This is a known/visible fallback, not
-    // pretending Marchlab already supports every map corner.
-    // Stage v253 on local/regional (<=1.8k) routes. Extended multi-road
-    // marches still need a follow-the-head replan and obstacle-safe handoff;
-    // keep their existing stable controller until that is implemented.
-    if(model.length>1800){
-      unsupported.add(reg);metrics.longRouteFallbacks++;
-      return null;
-    }
-    const state={march,path:reg.path,model,segment:0,phase:'forming',phaseSince:elapsed,
-      lastRoadAt:-Infinity,bridgeId:null,bridgeSide:null,progress:0,arrived:false,
-      rankIds:infantry(reg).map(u=>u.id),commandIds:live(reg).filter(u=>u.type!=='infantry').map(u=>u.id)};
+    // The old 1800-unit fallback silently switched long marches to another
+    // formation solver. The actual head trail works at every route length.
+    if(model.length>1800)metrics.longRouteOrders++;
+    const preserve=previous?.march===march;
+    const trail=preserve?previous.trail:new HeadTrail({limit:720});
+    if(!preserve)trail.reset(march.anchorX,march.anchorY,march.marchFacing);
+    else metrics.preservedReplans++;
+    const state={march,path:reg.path,model,trail,segment:0,
+      phase:preserve?previous.phase:'forming',
+      phaseSince:preserve?previous.phaseSince:elapsed,
+      lastRoadAt:preserve?previous.lastRoadAt:-Infinity,
+      bridgeId:preserve?previous.bridgeId:null,
+      bridgeSide:preserve?previous.bridgeSide:null,
+      progress:0,arrived:false,
+      rankIds:preserve?previous.rankIds:infantry(reg).map(u=>u.id),
+      commandIds:preserve?previous.commandIds:live(reg).filter(u=>u.type!=='infantry').map(u=>u.id)};
     registry.set(reg,state);metrics.orders++;
     return state;
   }catch(_error){metrics.invalidRoutes++;return null;}
@@ -95,6 +97,10 @@ function geometry(reg,state,march,bridge,members){
     state.model.count=currentInfantry.length;
   }
   const fileGap=bridge?15:18,rankGap=bridge?19:20;
+  // The RTS anchor is the battalion's *centre*, not the lead soldier.
+  // Center the road column on that anchor; positioning every rank behind
+  // the anchor made the visible centroid lose half a column on departure.
+  const halfDepth=Math.max(0,Math.ceil(state.rankIds.length/4)-1)*rankGap*.5;
   const positions=new Map();
   const info=reg.crossingTrafficV068;
   const direction=bridge?-(info?.initialSide??state.bridgeSide):0;
@@ -108,7 +114,11 @@ function geometry(reg,state,march,bridge,members){
       p=crossingPointV068(bridge,along,side);
       p.angle=crossingHeadingV068(bridge,state.bridgeSide);
     }else{
-      const center=state.model.positionAt(state.progress-rank*rankGap);
+      // Every rank samples the actual *travelled* leader path. No independent
+      // wayfinding, no Catmull-Rom short-cut through a river on sharp bends.
+      const back=rank*rankGap-halfDepth;
+      const center=state.trail.sample(back)||
+        state.model.positionAt(state.progress-back);
       p={x:center.x-Math.sin(center.angle)*side,y:center.y+Math.cos(center.angle)*side,angle:center.angle};
     }
     positions.set(id,p);
@@ -124,7 +134,9 @@ function geometry(reg,state,march,bridge,members){
       p=crossingPointV068(bridge,local.along-direction*commandBack,side);
       p.angle=crossingHeadingV068(bridge,state.bridgeSide);
     }else{
-      const center=state.model.positionAt(state.progress-commandBack);
+      const back=commandBack-halfDepth;
+      const center=state.trail.sample(back)||
+        state.model.positionAt(state.progress-back);
       p={x:center.x-Math.sin(center.angle)*side,y:center.y+Math.cos(center.angle)*side,angle:center.angle};
     }
     positions.set(id,p);
@@ -142,7 +154,6 @@ function safeMove(u,p,bridge){
   return true;
 }
 function syncRegiment(reg,dt,physical){
-  if(unsupported.has(reg))return;
   if(!phaseActive(reg)){
     // The group's final *line deployment* is still part of the same order.
     // Keep the old v251 target writer disabled until the deployment has
@@ -155,7 +166,7 @@ function syncRegiment(reg,dt,physical){
   const march=reg.marchV063;
   let state=registry.get(reg);
   if(!state||state.march!==march||state.path!==reg.path)
-    state=newPlan(reg,march);
+    state=newPlan(reg,march,state);
   if(!state)return;
   const members=live(reg);
   if(!members.length)return;
@@ -164,43 +175,59 @@ function syncRegiment(reg,dt,physical){
     march.locomotionV064==='road-march';
   if(onRoad)state.lastRoadAt=elapsed;
   const road=onRoad||elapsed-state.lastRoadAt<1.35;
-  if(!road&&!bridge){state.phase='field';metrics.fieldFrames++;return;}
+  if(!road&&!bridge){
+    if(state.phase!=='field'){state.trail.reset(march.anchorX,march.anchorY,march.marchFacing);metrics.trailResets++;}
+    state.phase='field';metrics.fieldFrames++;return;
+  }
   if(reg.crossingTrafficV068?.state==='waiting'){
     // Waiting batteries/regiments may not enter before acquiring the lane.
     state.phase='waiting';return;
   }
   const wasField=state.phase==='field';
-  if(wasField){state.phase='forming';state.phaseSince=elapsed;metrics.formationHandovers++;}
+  if(wasField){
+    state.phase='forming';state.phaseSince=elapsed;
+    state.trail.reset(march.anchorX,march.anchorY,march.marchFacing);
+    metrics.formationHandovers++;
+  }
+  // Follow the road actually traversed by the formation anchor. On bridges
+  // the existing traffic authority supplies the exact narrow deck centreline.
+  if(!bridge)state.trail.record(march.anchorX,march.anchorY,march.marchFacing);
   const anchor={x:march.anchorX,y:march.anchorY};
   state.progress=projection(state.model,anchor,state.progress);
   state.model.distance=state.progress;
-  // The final 260 world units are a structured return to the game's native
-  // deployment solver. If the independent column keeps positioning its rear
-  // ranks right up to the last waypoint, the anchor can enter 'deploying'
-  // while the visible centroid stays >200 units back and never finishes.
-  // Hand off BEFORE deployment, only on the route's final leg.
+  // Hand over to tactical deployment only at the actual destination, with
+  // enough room for the full column to close. The old constant 260-unit
+  // handoff visibly broke columns well before the road ended.
   const finalLeg=reg.pathIndex>=Math.max(0,reg.path.length-2);
-  if(!bridge && finalLeg && state.model.length-state.progress<260){
+  const deploymentLead=Math.max(105,Math.ceil(state.rankIds.length/4)*20+48);
+  if(!bridge && finalLeg && state.model.length-state.progress<deploymentLead){
     state.phase='handoff';
     return;
   }
-  // Preserve the battle-tested start-up solver until the battalion has had
-  // time to assemble. This applies to BOTH target assignment and physical
-  // movement; overriding targets from t=0 caused a 50% speed regression.
-  // When the bridge traffic explicitly owns the route, use the narrow
-  // shared crossing column immediately (the bridge test verifies this).
-  if(!bridge && elapsed-state.phaseSince<4.1){
-    state.phase='forming';
-    return;
+  // Keep native acceleration and traffic control during the first two
+  // seconds. It already assembles road files and preserves full travel speed.
+  // Only then blend into the persistent travelled-track controller.
+  if(!bridge && elapsed-state.phaseSince<2.05){
+    state.phase='forming';return;
+  }
+  // A temporary friendly passing lane takes priority over maintaining a
+  // rigid four-file column; otherwise two battalions physically overlap.
+  if(!bridge && reg.formationTrafficV132?.until>elapsed){
+    state.phase='passing';return;
   }
   const positions=geometry(reg,state,march,bridge,members);
+  const handoff=bridge?1:clamp((elapsed-state.phaseSince-2.05)/1.45,0,1);
   if(bridge){metrics.bridgeFrames++;state.phase='bridge';}
   else{metrics.roadFrames++;if(state.phase==='waiting')state.phase='forming';}
   if(!physical){
     for(const u of members){
       const p=positions.get(u.id);
       if(!p||!safeMove(u,p,bridge))continue;
-      u.targetX=p.x;u.targetY=p.y;u.formationFacing=p.angle;
+      const fromX=num(u.targetX)?u.targetX:u.x;
+      const fromY=num(u.targetY)?u.targetY:u.y;
+      u.targetX=fromX+(p.x-fromX)*handoff;
+      u.targetY=fromY+(p.y-fromY)*handoff;
+      if(handoff>.5)u.formationFacing=p.angle;
       u.marchingV064=true;u.arrivedAtTarget=false;
     }
     return;
@@ -214,7 +241,7 @@ function syncRegiment(reg,dt,physical){
   // Marchlab geometry gradually assumes *physical* ownership only after
   // the regiment has assembled, rather than dragging soldiers backwards
   // during the first seconds of a normal move.
-  const weight=bridge?clamp((age-0.8)/0.9,0,1):clamp((age-4.0)/2.5,0,1);
+  const weight=bridge?clamp((age+0.15)/1.05,0.15,1):handoff;
   const cap=Math.max(0.5,Math.min(10,dt*145)); // bounded, never teleport
   for(const u of members){
     const p=positions.get(u.id);
@@ -227,16 +254,17 @@ function syncRegiment(reg,dt,physical){
         u.x=x;u.y=y;metrics.physicalMoves++;
       }
     }
-    u.targetX=p.x;u.targetY=p.y;
+    const fromX=num(u.targetX)?u.targetX:u.x;
+    const fromY=num(u.targetY)?u.targetY:u.y;
+    u.targetX=fromX+(p.x-fromX)*handoff;
+    u.targetY=fromY+(p.y-fromY)*handoff;
     u.marchingV064=true;
-    u.formationFacing=p.angle;
-    u.roadTangentV133=p.angle;
+    if(handoff>.5){u.formationFacing=p.angle;u.roadTangentV133=p.angle;}
   }
   state.phase=bridge?'bridge':weight>=.99?'marching':'forming';
 }
 const originalOrder=orderGroupPathV06;
 orderGroupPathV06=function orderWithMarchLab(reg,...args){
-  unsupported.delete(reg);
   registry.delete(reg);
   const result=originalOrder(reg,...args);
   if(phaseActive(reg))newPlan(reg,reg.marchV063);
@@ -258,15 +286,17 @@ update=function updateWithMarchLab(dt){
   return value;
 };
 window.__MARCH_LAB_LIVE_V253__=Object.freeze({
-  version:'253.1',usingMarchLabCore:true,owns:reg=>registry.has(reg),
+  version:'254.0',usingMarchLabCore:true,owns:reg=>registry.has(reg),
   state:reg=>{
     const s=registry.get(reg);
     return s?{phase:s.phase,progress:s.progress,files:4,bridgeId:s.bridgeId,
-      length:s.model.length,positions:geometry(reg,s,reg.marchV063,null,live(reg)).size}:null;
+      length:s.model.length,trailPoints:s.trail.points.length,
+      trailLength:s.trail.length,
+      positions:geometry(reg,s,reg.marchV063,null,live(reg)).size}:null;
   },
   metrics:()=>({...metrics})
 });
 NRTS.subsystems.register('march-lab-live-v253',window.__MARCH_LAB_LIVE_V253__,{
   phase:'production-formation',legacyBridge:false,
-  responsibility:'shared arc-length four-file marching with physical soldier placement from standalone Marchlab'
+  responsibility:'one continuous four-file physical column following actual road travelled at any route length'
 });
