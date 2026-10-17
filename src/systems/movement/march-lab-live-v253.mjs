@@ -169,7 +169,11 @@ function syncRegiment(reg,dt,physical){
   // Blend in from current positions on initial formation, then the exact
   // Marchlab model becomes authoritative for each soldier on the route.
   const age=elapsed-state.phaseSince;
-  const weight=bridge?clamp(age/1.1,0,1):clamp(age/2.0,0,1);
+  // Keep the proven initial acceleration/slot smoothing. The independent
+  // Marchlab geometry gradually assumes *physical* ownership only after
+  // the regiment has assembled, rather than dragging soldiers backwards
+  // during the first seconds of a normal move.
+  const weight=bridge?clamp((age-0.8)/0.9,0,1):clamp((age-4.0)/2.5,0,1);
   const cap=Math.max(0.5,Math.min(10,dt*145)); // bounded, never teleport
   for(const u of members){
     const p=positions.get(u.id);
