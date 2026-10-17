@@ -152,6 +152,15 @@ function syncRegiment(reg,dt,physical){
   const anchor={x:march.anchorX,y:march.anchorY};
   state.progress=projection(state.model,anchor,state.progress);
   state.model.distance=state.progress;
+  // Preserve the battle-tested start-up solver until the battalion has had
+  // time to assemble. This applies to BOTH target assignment and physical
+  // movement; overriding targets from t=0 caused a 50% speed regression.
+  // When the bridge traffic explicitly owns the route, use the narrow
+  // shared crossing column immediately (the bridge test verifies this).
+  if(!bridge && elapsed-state.phaseSince<4.1){
+    state.phase='forming';
+    return;
+  }
   const positions=geometry(reg,state,march,bridge,members);
   if(bridge){metrics.bridgeFrames++;state.phase='bridge';}
   else{metrics.roadFrames++;if(state.phase==='waiting')state.phase='forming';}
