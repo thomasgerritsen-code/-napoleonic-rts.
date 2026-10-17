@@ -319,12 +319,24 @@ test('representative whole-map road routes complete without hard stalls', async 
         moved:Number.isFinite(finalCenter.x)?+Math.hypot(finalCenter.x-initial.x,finalCenter.y-initial.y).toFixed(1):0,
         remaining:Number.isFinite(finalCenter.x)?+Math.hypot(finalCenter.x-target.x,finalCenter.y-target.y).toFixed(1):null,
         phase:reg.movementPhaseV063||reg.marchV063?.phase||'idle',
-        crossingState:state
+        crossingState:state,
+        ...(hardStall?{diagnostic:{
+          elapsed,finalGoal:target,
+          anchor:reg.marchV063?{x:reg.marchV063.anchorX,y:reg.marchV063.anchorY,
+            phase:reg.marchV063.phase,phaseStartedAt:reg.marchV063.phaseStartedAt,
+            finalX:reg.marchV063.finalX,finalY:reg.marchV063.finalY}:null,
+          model:window.__MARCH_LAB_LIVE_V253__?.state(reg),
+          members:finalMembers.map(u=>({id:u.id,type:u.type,
+            x:+u.x.toFixed(1),y:+u.y.toFixed(1),
+            tx:+u.targetX.toFixed(1),ty:+u.targetY.toFixed(1),
+            arrived:u.arrivedAtTarget,marching:u.marchingV064}))
+        }}:{})
       });
     }
     return results;
   });
 
+  if(sweep.some(x=>x.hardStall||!x.completed))console.log('MARCH_LAB_LONG_ROUTE_DIAGNOSTIC',JSON.stringify(sweep.filter(x=>x.hardStall||!x.completed)));
   expect(sweep).toHaveLength(8);
   expect(sweep.filter(r => !r.completed)).toEqual([]);
   expect(sweep.filter(r => r.hardStall)).toEqual([]);
