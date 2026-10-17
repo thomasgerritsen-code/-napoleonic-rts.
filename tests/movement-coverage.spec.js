@@ -232,6 +232,7 @@ test('map traversal matrix covers every crossing, both directions and unit class
   });
 
   writeReport(report);
+  if(report.failures)console.log('MARCH_LAB_COVERAGE_FAILURE_DETAILS',JSON.stringify(report.results.filter(x=>!x.completed||x.hardStall||x.waterUnits||x.blockedTargets||x.health?.errors?.length)));
   expect(report.crossings).toBeGreaterThanOrEqual(4);
   expect(report.routesTested).toBeGreaterThanOrEqual(20);
   expect(report.routesCompleted).toBe(report.routesTested);
@@ -286,6 +287,11 @@ test('representative whole-map road routes complete without hard stalls', async 
       let hardStall = false;
       let completed = false;
       for (let step = 0; step < 4800; step++) {
+        // This is a movement-only benchmark with both real armies cleared
+        // and just one artificial test regiment. The normal victory system
+        // may conclude such a match before a long route completes.
+        // Keep the test simulation running; do not change game win rules.
+        gameOver = false;
         window.RTS_SIM.step(.05);
         if (step % 10) continue;
         living = regimentMembers(reg).filter(u => !u.dead);
@@ -318,12 +324,26 @@ test('representative whole-map road routes complete without hard stalls', async 
         moved:Number.isFinite(finalCenter.x)?+Math.hypot(finalCenter.x-initial.x,finalCenter.y-initial.y).toFixed(1):0,
         remaining:Number.isFinite(finalCenter.x)?+Math.hypot(finalCenter.x-target.x,finalCenter.y-target.y).toFixed(1):null,
         phase:reg.movementPhaseV063||reg.marchV063?.phase||'idle',
-        crossingState:state
+        crossingState:state,
+        ...(hardStall?{diagnostic:{
+          elapsed,gameOver,gameWon:typeof gameWon!=='undefined'?gameWon:null,
+          victory:typeof victory!=='undefined'?victory:null,
+          finalGoal:target,
+          anchor:reg.marchV063?{x:reg.marchV063.anchorX,y:reg.marchV063.anchorY,
+            phase:reg.marchV063.phase,phaseStartedAt:reg.marchV063.phaseStartedAt,
+            finalX:reg.marchV063.finalX,finalY:reg.marchV063.finalY}:null,
+          model:window.__MARCH_LAB_LIVE_V253__?.state(reg),
+          members:finalMembers.map(u=>({id:u.id,type:u.type,
+            x:+u.x.toFixed(1),y:+u.y.toFixed(1),
+            tx:+u.targetX.toFixed(1),ty:+u.targetY.toFixed(1),
+            arrived:u.arrivedAtTarget,marching:u.marchingV064}))
+        }}:{})
       });
     }
     return results;
   });
 
+  if(sweep.some(x=>x.hardStall||!x.completed))console.log('MARCH_LAB_LONG_ROUTE_DIAGNOSTIC',JSON.stringify(sweep.filter(x=>x.hardStall||!x.completed)));
   expect(sweep).toHaveLength(8);
   expect(sweep.filter(r => !r.completed)).toEqual([]);
   expect(sweep.filter(r => r.hardStall)).toEqual([]);
