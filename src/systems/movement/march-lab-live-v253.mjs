@@ -42,6 +42,8 @@ function startController(reg,previous=null) {
   if(!preserve)travel.add(new Vector3(march.anchorX,0,march.anchorY));
   const state={march,sourcePath:reg.path,plan:plan.path,routeLength:plan.length,
     travel,phase:preserve?previous.phase:'forming',active:false,
+    startedAt:preserve?previous.startedAt:elapsed,
+    bridgeProgress:preserve?previous.bridgeProgress:null,
     lastRoadAt:preserve?previous.lastRoadAt:-Infinity,
     bridgeId:preserve?previous.bridgeId:null,
     bridgeSide:preserve?previous.bridgeSide:null,
@@ -58,17 +60,38 @@ function bridgeFor(reg,state) {
   const info=reg.crossingTrafficV068;
   if(info?.forcedColumn && info.state!=='waiting' && info.state!=='queued'){
     const b=WATER_CROSSINGS_V067.find(x=>x.id===info.crossingId);
-    if(b){state.bridgeId=b.id;state.bridgeSide=info.initialSide;return b;}
+    if(b){if(state.bridgeId!==b.id)state.bridgeProgress=null;
+      state.bridgeId=b.id;state.bridgeSide=info.initialSide;return b;}
   }
   if(!state.bridgeId)return null;
   const b=WATER_CROSSINGS_V067.find(x=>x.id===state.bridgeId);
-  if(!b){state.bridgeId=null;return null;}
+  if(!b){state.bridgeId=null;state.bridgeProgress=null;return null;}
   const direction=-(state.bridgeSide||1);
   if(living(reg).every(u=>{
     const local=crossingLocalV068(b,u.x,u.y);
     return local.along*direction>b.length/2+35&&!waterAtV067(u.x,u.y);
-  })){state.bridgeId=null;return null;}
+  })){state.bridgeId=null;state.bridgeProgress=null;return null;}
   return b;
+}
+// Legacy traffic may release its holder while the tail is still on deck.
+// A later navigation replan must not make the bridge leader run backwards.
+function stabilizeBridgeAnchor(state,march,bridge){
+  if(!finite(state.bridgeSide))return;
+  const dir=-state.bridgeSide;
+  const local=crossingLocalV068(bridge,march.anchorX,march.anchorY);
+  let along=local.along*dir;
+  const half=bridge.length/2;
+  if(state.bridgeProgress===null&&(along< -half-35||along>half+85))return;
+  if(state.bridgeProgress===null)state.bridgeProgress=along;
+  const dt=typeof formationDtV063==='number'?clamp(formationDtV063,.001,.05):.05;
+  const minimum=state.bridgeProgress+dt*35;
+  const maximum=state.bridgeProgress+dt*150;
+  along=clamp(Math.max(along,minimum),state.bridgeProgress,maximum);
+  state.bridgeProgress=along;
+  const p=crossingPointV068(bridge,along*dir,0);
+  march.anchorX=p.x;
+  march.anchorY=p.y;
+  march.marchFacing=crossingHeadingV068(bridge,state.bridgeSide);
 }
 function recordLeader(state,march){
   // YUKA.Path stores the actual route already travelled: no corner shortcut.
@@ -173,6 +196,7 @@ function refresh(reg){
     s=startController(reg,s);
   if(!s)return;
   const people=living(reg),bridge=bridgeFor(reg,s);
+  if(bridge)stabilizeBridgeAnchor(s,march,bridge);
   const onRoad=Boolean(bridge||march.locomotionV064==='road-march'||
     (typeof roadAtV064==='function'&&roadAtV064(march.anchorX,march.anchorY)));
   if(onRoad)s.lastRoadAt=elapsed;
@@ -213,7 +237,8 @@ function advanceSoldiers(reg,s,dt){
     // One and only one source of physical infantry movement. The group anchor
     // supplies the normal pace; individual ranks catch up without teleporting.
     const normal=Number(TYPES[u.type]?.speed)||70;
-    const speed=clamp(normal*2.60,130,149);
+    const age=Math.max(0,elapsed-s.startedAt);
+    const speed=age<.95?clamp(normal*2.95,150,168):clamp(normal*2.60,130,149);
     const step=Math.min(d,speed*Math.max(0,Math.min(dt,0.1)));
     if(step<=0)continue;
     const x=u.x+dx/d*step,y=u.y+dy/d*step;
