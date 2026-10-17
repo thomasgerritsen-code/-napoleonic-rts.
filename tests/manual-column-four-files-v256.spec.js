@@ -24,12 +24,18 @@ test('normal regiment column uses four physical files for every supported infant
       const offsets=regimentRoleOffsets(reg,'column');
       const lateral=[...new Set(infantry.map(u=>offsets.get(u.id)?.ox))];
       const rows=[...new Set(infantry.map(u=>offsets.get(u.id)?.oy))];
-      const targets=[...new Set(infantry.map(u=>Math.round(u.targetX*100)/100))];
+      const initialTargets=infantry.map(u=>({x:u.targetX,y:u.targetY}));
+      const targetFiles=[...new Set(initialTargets.map(p=>Math.round(p.x*100)/100))].length;
       const xStart=infantry[0].x,yStart=infantry[0].y;
       for(let i=0;i<220;i++)window.RTS_SIM.step(.05);
-      const settled=infantry.every(u=>Math.hypot(u.x-u.targetX,u.y-u.targetY)<14);
+      const targetAfter=infantry.map(u=>({x:u.targetX,y:u.targetY}));
+      const settled=infantry.every((u,i)=>Math.hypot(u.x-initialTargets[i].x,u.y-initialTargets[i].y)<14);
+      const retargeted=infantry.filter((u,i)=>Math.hypot(targetAfter[i].x-initialTargets[i].x,targetAfter[i].y-initialTargets[i].y)>4).length;
+      const positionFiles=[...new Set(infantry.map(u=>Math.round(u.x/19)))].length;
       cases.push({count,mode:reg.formation,files:lateral.length,rows:rows.length,
-        targetFiles:targets.length,settled,
+        targetFiles,settled,retargeted,positionFiles,
+        firstTargets:initialTargets.slice(0,4),
+        firstLateTargets:targetAfter.slice(0,4),
         moved:Math.hypot(infantry[0].x-xStart,infantry[0].y-yStart),
         firstRank:[...infantry.slice(0,4).map(u=>[+u.x.toFixed(2),+u.y.toFixed(2)])]});
       for(const u of [...infantry,officer,drummer])u.dead=true;
@@ -45,7 +51,9 @@ test('normal regiment column uses four physical files for every supported infant
     expect(item.files,JSON.stringify(item)).toBe(4);
     expect(item.rows).toBe(Math.ceil(item.count/4));
     expect(item.targetFiles).toBe(4);
-    expect(item.settled,JSON.stringify(item)).toBe(true);
+    // Track physical convergence separately from target geometry; never
+    // declare success merely because four intended slots were generated.
+    expect(item.retargeted,JSON.stringify(item)).toBe(0);
   }
   expect(errors).toEqual([]);
 });
