@@ -129,7 +129,15 @@ function safeMove(u,p,bridge){
   return true;
 }
 function syncRegiment(reg,dt,physical){
-  if(!phaseActive(reg)){registry.delete(reg);return;}
+  if(!phaseActive(reg)){
+    // The group's final *line deployment* is still part of the same order.
+    // Keep the old v251 target writer disabled until the deployment has
+    // actually finished; otherwise it can seize targets again and freeze
+    // a long route 200 px from its destination.
+    if(reg?.marchV063?.phase==='deploying'&&registry.has(reg))return;
+    registry.delete(reg);
+    return;
+  }
   const march=reg.marchV063;
   let state=registry.get(reg);
   if(!state||state.march!==march||state.path!==reg.path)
