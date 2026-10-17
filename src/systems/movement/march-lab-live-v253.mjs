@@ -199,15 +199,20 @@ function syncRegiment(reg,dt,physical){
   // enough room for the full column to close. The old constant 260-unit
   // handoff visibly broke columns well before the road ended.
   const finalLeg=reg.pathIndex>=Math.max(0,reg.path.length-2);
-  const deploymentLead=Math.max(105,Math.ceil(state.rankIds.length/4)*20+48);
-  if(!bridge && finalLeg && state.model.length-state.progress<deploymentLead){
+  // Keep the visible road files until the anchor is nearly at its destination.
+  // Early handoffs could leave short road marches in a loose tactical line
+  // long before the unit actually reached the end of the road.
+  const goal=reg.finalTarget||reg.path[reg.path.length-1];
+  const atGoal=goal && dist(anchor,goal)<44;
+  if(!bridge && finalLeg && atGoal){
     state.phase='handoff';
     return;
   }
-  // Keep native acceleration and traffic control during the first two
-  // seconds. It already assembles road files and preserves full travel speed.
-  // Only then blend into the persistent travelled-track controller.
-  if(!bridge && elapsed-state.phaseSince<2.05){
+  // Let the native solver accelerate normally through its first second.
+  // Then progressively take sole ownership of visible four-file positions.
+  // Two seconds of startup followed by a further delay could hide the entire
+  // column on short road sections.
+  if(!bridge && elapsed-state.phaseSince<1.0){
     state.phase='forming';return;
   }
   // A temporary friendly passing lane takes priority over maintaining a
@@ -216,7 +221,7 @@ function syncRegiment(reg,dt,physical){
     state.phase='passing';return;
   }
   const positions=geometry(reg,state,march,bridge,members);
-  const handoff=bridge?1:clamp((elapsed-state.phaseSince-2.05)/1.45,0,1);
+  const handoff=bridge?1:clamp((elapsed-state.phaseSince-1.0)/1.65,0,1);
   if(bridge){metrics.bridgeFrames++;state.phase='bridge';}
   else{metrics.roadFrames++;if(state.phase==='waiting')state.phase='forming';}
   if(!physical){
@@ -286,7 +291,7 @@ update=function updateWithMarchLab(dt){
   return value;
 };
 window.__MARCH_LAB_LIVE_V253__=Object.freeze({
-  version:'254.0',usingMarchLabCore:true,owns:reg=>registry.has(reg),
+  version:'255.0',usingMarchLabCore:true,owns:reg=>registry.has(reg),
   state:reg=>{
     const s=registry.get(reg);
     return s?{phase:s.phase,progress:s.progress,files:4,bridgeId:s.bridgeId,
