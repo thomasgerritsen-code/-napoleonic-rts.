@@ -15,10 +15,6 @@
     const bridge=info?.forcedColumn && info.state!=='waiting' &&
       info.state!=='queued' && info.state!=='clearing';
     const road=!bridge && (roadMarch||march.locomotionV064==='road-march');
-    // The v254 physical follower owns road-column convergence and moves
-    // members toward their slots each frame. Reapplying the legacy p90 road
-    // throttle here artificially brakes the whole battalion on departure.
-    if(road && global.__MARCH_LAB_LIVE_V253__?.owns(reg))return base;
     if(!bridge&&!road)return base;
     const members=regimentMembers(reg).filter(u=>u&&!u.dead&&!u.routing);
     const infantry=members.filter(u=>u.type==='infantry');
