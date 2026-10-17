@@ -5,7 +5,7 @@ test('live RTS retains one column controller across long routes and route replan
   const errors=[];page.on('pageerror',err=>errors.push(err.message));
   await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>Boolean(window.RTS_SIM&&
-    window.__MARCH_LAB_LIVE_V253__?.version==='255.0'));
+    window.__ROAD_COLUMN_V257__?.version==='257.0'));
   const result=await page.evaluate(()=>{
     resetGame();v05PeaceMode=true;gameOver=false;
     for(const u of units)u.dead=true;
