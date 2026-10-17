@@ -213,7 +213,7 @@ function advanceSoldiers(reg,s,dt){
     // One and only one source of physical infantry movement. The group anchor
     // supplies the normal pace; individual ranks catch up without teleporting.
     const normal=Number(TYPES[u.type]?.speed)||70;
-    const speed=clamp(normal*2.45,125,168);
+    const speed=clamp(normal*2.60,130,149);
     const step=Math.min(d,speed*Math.max(0,Math.min(dt,0.1)));
     if(step<=0)continue;
     const x=u.x+dx/d*step,y=u.y+dy/d*step;
