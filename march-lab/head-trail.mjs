@@ -21,13 +21,13 @@ export class HeadTrail {
     const previous=this.points[0];
     const delta=Math.hypot(x-previous.x,y-previous.y);
     if(delta>this.jump){this.reset(x,y,heading);return;}
-    if(delta>=this.spacing) {
-      // Keep the prior head point when enough distance has been travelled;
-      // short per-frame movements still update the present end of the track.
+    // Compare with the last *fixed* point, not just the previous frame.
+    // Otherwise a slow leader moving <spacing each tick erases its history.
+    const fixed=this.points[1];
+    if(!fixed || Math.hypot(x-fixed.x,y-fixed.y)>=this.spacing)
       this.points.unshift({x,y});
-    }else {
+    else
       this.points[0]={x,y};
-    }
     if(delta>.01) this.heading=Math.atan2(y-previous.y,x-previous.x);
     else if(Number.isFinite(heading)&&this.points.length===1)this.heading=heading;
     let length=0,keep=this.points.length;
