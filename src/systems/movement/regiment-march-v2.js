@@ -151,6 +151,7 @@
     if(!bridge)march.locomotionV064='road-march';
   }
   function updateRegiment(reg){
+    if(global.__MARCH_LAB_LIVE_V253__?.owns(reg))return;
     if(!reg||reg.destroyed||groupKindV06(reg)!=='infantry')return;
     const march=reg.marchV063;
     if(!march?.v064||!reg.path)return;
@@ -204,6 +205,7 @@
   const previousSpeed=desiredGroupSpeedV064;
   desiredGroupSpeedV064=function speedRegimentMarchV251(reg,march,road){
     const base=previousSpeed(reg,march,road);
+    if(global.__MARCH_LAB_LIVE_V253__?.owns(reg))return base;
     if(!(base>0)||!reg||!march)return base;
     const state=stateByReg.get(reg);
     if(!state||state.phase==='field'||!Number.isFinite(state.slotP80) ||
