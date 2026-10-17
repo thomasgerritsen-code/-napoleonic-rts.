@@ -321,7 +321,9 @@ test('representative whole-map road routes complete without hard stalls', async 
         phase:reg.movementPhaseV063||reg.marchV063?.phase||'idle',
         crossingState:state,
         ...(hardStall?{diagnostic:{
-          elapsed,finalGoal:target,
+          elapsed,gameOver,gameWon:typeof gameWon!=='undefined'?gameWon:null,
+          victory:typeof victory!=='undefined'?victory:null,
+          finalGoal:target,
           anchor:reg.marchV063?{x:reg.marchV063.anchorX,y:reg.marchV063.anchorY,
             phase:reg.marchV063.phase,phaseStartedAt:reg.marchV063.phaseStartedAt,
             finalX:reg.marchV063.finalX,finalY:reg.marchV063.finalY}:null,
