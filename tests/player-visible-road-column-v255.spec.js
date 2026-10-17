@@ -52,6 +52,8 @@ test('DIAGNOSTIC: visible physical files after forming regiment via real player 
   });
   console.log('PLAYER_VISIBLE_COLUMN_V255',JSON.stringify(result));
   expect(result.error).toBeUndefined();
+  expect(result.roadSamples).toBeGreaterThanOrEqual(5);
+  expect(result.physicalVisibleShare).toBeGreaterThan(.90);
   expect(result.threeD).toBe(true);
   expect(result.rendered).toBe(true);
   expect(errors).toEqual([]);
