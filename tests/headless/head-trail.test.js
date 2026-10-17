@@ -17,7 +17,7 @@ test('four fixed files follow the leader around both corners of a long winding r
   assert.ok(t.length>=650);
   const laneGap=18,rankGap=20;
   const files=[];
-  for(let rank=0;rank<16;rank++){
+  for(let rank=0;rank<32;rank++){
     const center=t.sample(rank*rankGap);
     const row=Array.from({length:4},(_,file)=>{
       const side=(file-1.5)*laneGap;
@@ -28,7 +28,8 @@ test('four fixed files follow the leader around both corners of a long winding r
       assert.ok(Math.abs(Math.hypot(row[f].x-row[f-1].x,row[f].y-row[f-1].y)-laneGap)<1e-6);
     files.push(row);
   }
-  assert.ok(Math.abs(files[0][0].angle-files[15][0].angle)<.01);
+  // Front rank follows the last straight; rear ranks must still turn.
+  assert.ok(Math.abs(files[0][0].angle-files[29][0].angle)>1.2);
   assert.ok(Math.abs(files[0][0].x-files[15][0].x)>200);
 });
 test('head trail survives arbitrarily long marches without resetting at 1800 units',async()=>{
