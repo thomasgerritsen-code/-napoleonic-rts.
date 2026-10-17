@@ -5,7 +5,7 @@ test('real RTS uses shared Marchlab ColumnModel for physical four-file bridge ma
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.setViewportSize({width:390,height:844});
   await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>Boolean(window.RTS_SIM&&window.__MARCH_LAB_LIVE_V253__?.usingMarchLabCore));
+  await page.waitForFunction(()=>Boolean(window.RTS_SIM&&window.__ROAD_COLUMN_V257__?.singleAuthority));
   const result=await page.evaluate(()=>{
     resetGame();v05PeaceMode=true;gameOver=false;
     for(const u of units)u.dead=true;
