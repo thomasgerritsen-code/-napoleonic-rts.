@@ -213,7 +213,7 @@ function advanceSoldiers(reg,s,dt){
     // One and only one source of physical infantry movement. The group anchor
     // supplies the normal pace; individual ranks catch up without teleporting.
     const normal=Number(TYPES[u.type]?.speed)||70;
-    const speed=clamp(normal*1.65,80,135);
+    const speed=clamp(normal*2.10,112,168);
     const step=Math.min(d,speed*Math.max(0,Math.min(dt,0.1)));
     if(step<=0)continue;
     const x=u.x+dx/d*step,y=u.y+dy/d*step;
@@ -223,7 +223,7 @@ function advanceSoldiers(reg,s,dt){
     }
     u.x=x;u.y=y;stats.physicalMoves++;
     const facingDelta=Math.atan2(Math.sin(p.angle-u.facing),Math.cos(p.angle-u.facing));
-    u.facing+=clamp(facingDelta,-dt*5,dt*5);
+    u.facing+=clamp(facingDelta,-dt*4.4,dt*4.4);
   }
   stats.singleAuthorityFrames++;
 }
