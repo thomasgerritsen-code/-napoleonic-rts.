@@ -5,8 +5,9 @@ import {ColumnModel} from '../../../march-lab/column-core.mjs';
 // Unlike the old target-only wrappers, a marching regiment's visible soldier
 // coordinates are also brought into its own four-file arc-length positions.
 const registry=new WeakMap();
+const unsupported=new WeakSet();
 const metrics={orders:0,roadFrames:0,bridgeFrames:0,physicalMoves:0,skippedUnsafe:0,
-  invalidRoutes:0,formationHandovers:0,fieldFrames:0};
+  invalidRoutes:0,formationHandovers:0,fieldFrames:0,longRouteFallbacks:0};
 const num=v=>Number.isFinite(v);
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
@@ -25,6 +26,15 @@ function newPlan(reg,march){
   if(waypoints.length<2)return null;
   try{
     const model=new ColumnModel(waypoints,{count:Math.max(1,infantry(reg).length),fileGap:18,rankGap:20,curveDetail:8});
+    // Stage the rollout: multi-road, cross-map expeditions include village
+    // obstacles and multiple route re-plans. Preserve their proven legacy
+    // navigation/formation controller until the new physical follower has a
+    // dedicated obstacle-aware handoff. This is a known/visible fallback, not
+    // pretending Marchlab already supports every map corner.
+    if(model.length>3500){
+      unsupported.add(reg);metrics.longRouteFallbacks++;
+      return null;
+    }
     const state={march,path:reg.path,model,segment:0,phase:'forming',phaseSince:elapsed,
       lastRoadAt:-Infinity,bridgeId:null,bridgeSide:null,progress:0,arrived:false,
       rankIds:infantry(reg).map(u=>u.id),commandIds:live(reg).filter(u=>u.type!=='infantry').map(u=>u.id)};
@@ -129,6 +139,7 @@ function safeMove(u,p,bridge){
   return true;
 }
 function syncRegiment(reg,dt,physical){
+  if(unsupported.has(reg))return;
   if(!phaseActive(reg)){
     // The group's final *line deployment* is still part of the same order.
     // Keep the old v251 target writer disabled until the deployment has
@@ -222,6 +233,7 @@ function syncRegiment(reg,dt,physical){
 }
 const originalOrder=orderGroupPathV06;
 orderGroupPathV06=function orderWithMarchLab(reg,...args){
+  unsupported.delete(reg);
   registry.delete(reg);
   const result=originalOrder(reg,...args);
   if(phaseActive(reg))newPlan(reg,reg.marchV063);
