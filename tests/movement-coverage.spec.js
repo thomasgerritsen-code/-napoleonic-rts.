@@ -232,6 +232,7 @@ test('map traversal matrix covers every crossing, both directions and unit class
   });
 
   writeReport(report);
+  if(report.failures)console.log('MARCH_LAB_COVERAGE_FAILURE_DETAILS',JSON.stringify(report.results.filter(x=>!x.completed||x.hardStall||x.waterUnits||x.blockedTargets||x.health?.errors?.length)));
   expect(report.crossings).toBeGreaterThanOrEqual(4);
   expect(report.routesTested).toBeGreaterThanOrEqual(20);
   expect(report.routesCompleted).toBe(report.routesTested);
