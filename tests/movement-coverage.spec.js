@@ -287,6 +287,11 @@ test('representative whole-map road routes complete without hard stalls', async 
       let hardStall = false;
       let completed = false;
       for (let step = 0; step < 4800; step++) {
+        // This is a movement-only benchmark with both real armies cleared
+        // and just one artificial test regiment. The normal victory system
+        // may conclude such a match before a long route completes.
+        // Keep the test simulation running; do not change game win rules.
+        gameOver = false;
         window.RTS_SIM.step(.05);
         if (step % 10) continue;
         living = regimentMembers(reg).filter(u => !u.dead);
