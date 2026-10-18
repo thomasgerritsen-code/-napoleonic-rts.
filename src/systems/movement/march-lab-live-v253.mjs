@@ -11,7 +11,7 @@ const stats = {orders:0,roadFrames:0,bridgeFrames:0,physicalMoves:0,
   skippedUnsafe:0,invalidRoutes:0,longRouteOrders:0,longRouteFallbacks:0,
   preservedReplans:0,formationHandovers:0,fieldFrames:0,trailResets:0,
   singleAuthorityFrames:0,blockedWaterSteps:0,waterCorrections:0,
-  staleBridgeWaypointsSkipped:0,bridgeAnchorCaps:0};
+  staleBridgeWaypointsSkipped:0,bridgeAnchorCaps:0,bridgeLaneRecoverySteps:0};
 const finite = Number.isFinite;
 const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
 const distance = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -45,6 +45,7 @@ function startController(reg,previous=null) {
     travel,phase:preserve?previous.phase:'forming',active:false,
     startedAt:preserve?previous.startedAt:elapsed,
     bridgeProgress:preserve?previous.bridgeProgress:null,
+    laneOverrides:preserve?previous.laneOverrides:new Map(),
     lastRoadAt:preserve?previous.lastRoadAt:-Infinity,
     bridgeId:preserve?previous.bridgeId:null,
     bridgeSide:preserve?previous.bridgeSide:null,
@@ -68,12 +69,12 @@ function bridgeFor(reg,state) {
   }
   if(!state.bridgeId)return null;
   const b=WATER_CROSSINGS_V067.find(x=>x.id===state.bridgeId);
-  if(!b){state.bridgeId=null;state.bridgeProgress=null;return null;}
+  if(!b){state.bridgeId=null;state.bridgeProgress=null;state.laneOverrides.clear();return null;}
   const direction=-(state.bridgeSide||1);
   if(living(reg).every(u=>{
     const local=crossingLocalV068(b,u.x,u.y);
     return local.along*direction>b.length/2+35&&!waterAtV067(u.x,u.y);
-  })){state.bridgeId=null;state.bridgeProgress=null;return null;}
+  })){state.bridgeId=null;state.bridgeProgress=null;state.laneOverrides.clear();return null;}
   return b;
 }
 // Legacy traffic may release its holder while the tail is still on deck.
@@ -191,10 +192,11 @@ function targets(reg,state,march,bridge,people){
   }
   for(let i=0;i<kept.length;i++){
     const row=Math.floor(i/4),file=i%4;
-    result.set(kept[i],point(row*gap-half,(file-1.5)*fileGap));
+    const lane=state.laneOverrides.get(kept[i]);
+    result.set(kept[i],point(row*gap-half,lane??(file-1.5)*fileGap));
   }
   const staff=state.staffIds.filter(id=>people.some(u=>u.id===id));
-  staff.forEach((id,i)=>result.set(id,point((rows+0.4)*gap-half,(i-.5)*fileGap)));
+  staff.forEach((id,i)=>result.set(id,point((rows+0.4)*gap-half,state.laneOverrides.get(id)??(i-.5)*fileGap)));
   return result;
 }
 function slotIsSafe(p,bridge){
@@ -275,7 +277,35 @@ function advanceSoldiers(reg,s,dt){
     const x=u.x+dx/d*step,y=u.y+dy/d*step;
     if(waterAtV067(x,y)||segmentCrossesBlockedWaterV067(u.x,u.y,x,y)){
       stats.blockedWaterSteps++;
+      if(bridge&&finite(s.bridgeSide)){
+        const local=crossingLocalV068(bridge,u.x,u.y);
+        const direction=-s.bridgeSide;
+        // At a curved bridge mouth the outer file sometimes encounters a
+        // narrow wedge of blocked river water *outside* the legal deck.
+        // Slide inward by at most one physical step, not through the water.
+        // Retain the temporary lane for the remainder of the crossing so
+        // the ordinary formation solver cannot immediately pull it back.
+        const signed=local.along*direction;
+        if(signed<bridge.length/2+32&&Math.abs(local.perp)>1){
+          const inward=Math.min(Math.abs(local.perp),Math.min(step,4.2));
+          const newLane=local.perp-Math.sign(local.perp)*inward;
+          const safe=crossingPointV068(bridge,local.along,newLane);
+          if(!waterAtV067(safe.x,safe.y)&&
+              !segmentCrossesBlockedWaterV067(u.x,u.y,safe.x,safe.y)){
+            u.x=safe.x;u.y=safe.y;u.arrivedAtTarget=false;
+            s.laneOverrides.set(u.id,newLane);
+            stats.bridgeLaneRecoverySteps++;
+            stats.physicalMoves++;
+            continue;
+          }
+        }
+      }
       continue;
+    }
+    if(bridge&&s.laneOverrides.has(u.id)){
+      const local=crossingLocalV068(bridge,x,y);
+      if(local.along*(-s.bridgeSide)>bridge.length/2+42)
+        s.laneOverrides.delete(u.id);
     }
     u.x=x;u.y=y;stats.physicalMoves++;
     const facingDelta=Math.atan2(Math.sin(p.angle-u.facing),Math.cos(p.angle-u.facing));
