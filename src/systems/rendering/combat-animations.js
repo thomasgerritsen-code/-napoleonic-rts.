@@ -27,10 +27,12 @@
       previous.x+=(x-previous.x)/weight;previous.y+=(y-previous.y)/weight;
       previous.facing+=(Math.atan2(Math.sin(facing-previous.facing),Math.cos(facing-previous.facing)))/weight;
       previous.count=count;previous.lastShot=elapsed;
-      previous.life=Math.min(5.2,Math.max(previous.life,elapsed-previous.born+3.55));
+      previous.life=Math.min(8.2,Math.max(previous.life,elapsed-previous.born+6.1));
       return;
     }
-    const event={kind,x,y,facing,born:elapsed,lastShot:elapsed,count:1,life:kind==='artillery'?4.4:3.55,seed:((unit.id||1)*2654435761)>>>0};
+    const event={kind,x,y,facing,born:elapsed,lastShot:elapsed,count:1,
+      life:kind==='artillery'?7.1:6.1,seed:((unit.id||1)*2654435761)>>>0,
+      driftX:0,driftY:0,driftAt:elapsed};
     smokeEvents.push(event);if(regimentKey)lastVolleyByRegiment.set(regimentKey,event);
     if(smokeEvents.length>MAX_SMOKE_EVENTS)smokeEvents.splice(0,smokeEvents.length-MAX_SMOKE_EVENTS);
   }
@@ -55,7 +57,11 @@
     ctx.save();ctx.translate(u.x,u.y);ctx.rotate(u.facing||0);
     if(u.attackMode==='bayonet'&&u.type==='infantry'){ctx.strokeStyle='#b9bcc0';ctx.lineWidth=1.05;ctx.beginPath();ctx.moveTo(15,-1);ctx.lineTo(21,-1);ctx.stroke();}
     if(u.type==='cavalry'&&(u.chargeTimer||0)>0){ctx.strokeStyle='#d2d0c8';ctx.lineWidth=1.35;ctx.beginPath();ctx.moveTo(1,-5);ctx.lineTo(17,-8);ctx.stroke();}
-    if(a?.kind==='musket-fire'&&a.age<.12){const f=1-a.age/.12;ctx.fillStyle=`rgba(255,220,126,${.85*f})`;ctx.beginPath();ctx.moveTo(16,-1);ctx.lineTo(23,-4);ctx.lineTo(21,-1);ctx.lineTo(23,2);ctx.closePath();ctx.fill();}
+    if(a?.kind==='musket-fire'&&a.age<.11){
+      const f=1-a.age/.11;
+      ctx.fillStyle=`rgba(255,222,131,${.92*f})`;
+      ctx.beginPath();ctx.moveTo(21,2);ctx.lineTo(30,-1);ctx.lineTo(27,2);ctx.lineTo(30,5);ctx.closePath();ctx.fill();
+    }
     if(a?.kind==='musket-fire'&&a.age>.34&&a.age<a.duration*.86){const p=(a.age-.34)/Math.max(.1,a.duration*.86-.34),ram=8+Math.sin(p*Math.PI)*7;ctx.strokeStyle='#a68c65';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(4,1);ctx.lineTo(ram,-7);ctx.stroke();}
     if(a?.kind==='artillery-fire'&&a.age<.18){ctx.fillStyle='rgba(255,212,112,.8)';ctx.beginPath();ctx.arc(15,-2,4.5*(1-a.age/.18),0,Math.PI*2);ctx.fill();}
     if(a?.kind==='cavalry-strike'){const swing=Math.sin(a.t*Math.PI)*.7;ctx.rotate(-swing);ctx.strokeStyle='#d4d1c7';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(0,-6);ctx.lineTo(15,-9);ctx.stroke();}
@@ -65,18 +71,51 @@
   drawUnit=function drawUnitCombatAnimationsV1(u){if(u.dead)return;const a=active(u),offset=visualOffset(u,a);if(Math.abs(offset)>.01){const ox=u.x,oy=u.y;u.x+=Math.cos(u.facing||0)*offset;u.y+=Math.sin(u.facing||0)*offset;baseDrawUnit(u);u.x=ox;u.y=oy;}else baseDrawUnit(u);drawCombatOverlay(u,a);};
   function seededOffset(seed,index){const n=(Math.imul((seed^(index*374761393))>>>0,668265263)>>>0)/4294967295;return n*2-1;}
 
+  // Integrate displacement since the previous frame: changing wind direction
+  // bends the smoke's trajectory instead of teleporting existing smoke.
+  function advanceSmoke(e){
+    const dt=Math.max(0,Math.min(e.life,elapsed-(e.driftAt??elapsed)));
+    e.driftAt=elapsed;
+    const w=global.__MAP_AMBIENT_MOTION_V1__?.currentWind?.()||{x:.72,y:-.28,strength:1};
+    const windSpeed=25*Math.max(0,Math.min(2.5,w.strength||0));
+    e.driftX=(e.driftX||0)+w.x*windSpeed*dt;
+    e.driftY=(e.driftY||0)+w.y*windSpeed*dt;
+  }
+  function smokeSnapshot(){
+    return smokeEvents.filter(e=>elapsed-e.born<e.life).map(e=>{
+      advanceSmoke(e);
+      return{kind:e.kind,count:e.count,born:e.born,life:e.life,
+        origin:{x:e.x,y:e.y},center:{x:e.x+e.driftX,y:e.y+e.driftY},
+        drift:{x:e.driftX,y:e.driftY}};
+    });
+  }
+
   function drawSmoke(){
     if(!smokeEvents.length)return;
-    ctx.save();ctx.fillStyle='#d2cfc2';
+    ctx.save();ctx.fillStyle='#d9d5c9';
     for(let i=smokeEvents.length-1;i>=0;i--){
-      const e=smokeEvents[i],age=elapsed-e.born;if(age>=e.life){smokeEvents.splice(i,1);continue;}
-      const t=Math.max(0,Math.min(1,age/e.life)),fade=Math.pow(1-t,1.45),artillery=e.kind==='artillery';
-      const lobeCount=artillery?7:Math.min(9,3+Math.ceil(e.count/6));
-      const forward=(artillery?24:10)*t,spread=(artillery?28:18)*(0.35+t*.9)+Math.min(24,e.count*.52),baseRadius=(artillery?9:5.5)+(artillery?24:15)*t+Math.min(10,e.count*.24);
+      const e=smokeEvents[i],age=elapsed-e.born;
+      if(age>=e.life){smokeEvents.splice(i,1);continue;}
+      advanceSmoke(e);
+      const t=Math.max(0,Math.min(1,age/e.life));
+      // Powder smoke is dense at the muzzle, spreads across the formation,
+      // and gradually thins. Wind moves the *entire* cloud, not just a halo.
+      const fade=Math.pow(1-t,.92),artillery=e.kind==='artillery';
+      const lobeCount=artillery?14:Math.min(13,6+Math.ceil(e.count/5));
+      const forward=(artillery?31:13)*Math.min(1,age*.9);
+      const spread=(artillery?32:23)*(.32+t*1.35)+Math.min(33,e.count*.78);
+      const baseRadius=(artillery?11:7)+(artillery?29:20)*Math.pow(t,.78)+Math.min(13,e.count*.28);
       const fx=Math.cos(e.facing),fy=Math.sin(e.facing),px=-fy,py=fx;
+      const cx=e.x+e.driftX,cy=e.y+e.driftY;
+      if(!isWorldVisible(cx,cy,110+spread+baseRadius))continue;
       for(let l=0;l<lobeCount;l++){
-        const lateral=seededOffset(e.seed,l)*spread,along=forward+seededOffset(e.seed^0x9e3779b9,l)*spread*.36,radius=baseRadius*(.72+(seededOffset(e.seed^0x85ebca6b,l)+1)*.18);
-        ctx.globalAlpha=fade*(artillery?.17:.115)*(1-Math.min(.45,l*.04));ctx.beginPath();ctx.arc(e.x+fx*along+px*lateral,e.y+fy*along+py*lateral,radius,0,Math.PI*2);ctx.fill();
+        const lateral=seededOffset(e.seed,l)*spread;
+        const along=forward+seededOffset(e.seed^0x9e3779b9,l)*spread*.44;
+        const radius=baseRadius*(.68+(seededOffset(e.seed^0x85ebca6b,l)+1)*.23);
+        ctx.globalAlpha=fade*(artillery?.27:.22)*(1-Math.min(.46,l*.027));
+        ctx.beginPath();
+        ctx.arc(cx+fx*along+px*lateral,cy+fy*along+py*lateral,radius,0,Math.PI*2);
+        ctx.fill();
       }
     }
     ctx.restore();
@@ -86,7 +125,7 @@
   drawParticles=function drawParticlesCombatAnimationsV1(){baseDrawParticles();drawSmoke();drawFalls();};
 
   function smokeStats(){let musketClouds=0,artilleryClouds=0,maxPooledShots=0,persistentVolleyClouds=0;for(const e of smokeEvents){if(e.kind==='artillery')artilleryClouds+=1;else{musketClouds+=1;if(e.count>=8&&elapsed-e.born>=.35)persistentVolleyClouds+=1;}maxPooledShots=Math.max(maxPooledShots,e.count||1);}return {active:smokeEvents.length,musketClouds,artilleryClouds,maxPooledShots,persistentVolleyClouds,cap:MAX_SMOKE_EVENTS};}
-  const api=Object.freeze({version:'combat-animations-v1.3',eventCount:()=>visualEvents.length,animationFor:u=>active(u),smokeStats,features:Object.freeze(['musket-fire','reload','bayonet','cavalry-charge','artillery-recoil','hit-reaction','death-fall','pooled-volley-smoke','persistent-smoke-line','artillery-smoke','batched-smoke-canvas-state'])});
+  const api=Object.freeze({version:'combat-animations-v1.3',eventCount:()=>visualEvents.length,animationFor:u=>active(u),smokeStats,smokeSnapshot,features:Object.freeze(['musket-fire','reload','bayonet','cavalry-charge','artillery-recoil','hit-reaction','death-fall','pooled-volley-smoke','persistent-smoke-line','artillery-smoke','batched-smoke-canvas-state','wind-advected-dense-powder-smoke'])});
   nrts.subsystems.register('combat-animations',api,{phase:'architecture-v2',legacyBridge:false,responsibility:'visual-only combat event animation and pooled black-powder smoke synchronized to simulation fire and damage events'});
   global.__COMBAT_ANIMATIONS_V1__=api;
 })(window);
