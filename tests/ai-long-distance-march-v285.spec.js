@@ -23,7 +23,7 @@ test('v285 a distant British army stays in four-file march instead of attacking 
     eval('elapsed=100');
     window.__AI_COMMANDER_V1__.forceState('ADVANCE');
     eval('elapsed+=20');
-    window.__AI_COMMANDER_V1__.tick();
+    aiMilitaryOrder(); // exercise the actual ordered AI wrapper, including order discipline
     const state=window.__AI_COMMANDER_V1__.state();
     const regs=ids.map(id=>getRegiment(id));
     const destinations=regs.map(r=>({
@@ -35,6 +35,7 @@ test('v285 a distant British army stays in four-file march instead of attacking 
     v05PeaceMode=true;
     return{state:state.state,destinations,world:{width:WORLD.width,height:WORLD.height},aiPlan};
   });
+  console.log('V285_LONG_MARCH',JSON.stringify(result));
   expect(errors).toEqual([]);
   expect(result.world.width).toBeGreaterThanOrEqual(8000);
   expect(result.state).toBe('ADVANCE');
