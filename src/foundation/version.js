@@ -1,6 +1,6 @@
 'use strict';
 (function initRtsVersion(root) {
-  const VERSION = '1.3.31';
+  const VERSION = '1.3.32';
   const deployment = root.RTS_DEPLOYMENT_INFO;
   const published = deployment &&
     /^[0-9a-f]{40}$/i.test(deployment.commit) &&
