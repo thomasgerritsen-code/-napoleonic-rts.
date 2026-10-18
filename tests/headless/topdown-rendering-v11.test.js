@@ -31,12 +31,15 @@ test('standing infantry stays compact instead of using a prone head-to-foot grou
   assert.doesNotMatch(source, /arc\(9\.55\*scale/);
 });
 
-test('v1.1.2 uses a larger rearward head and a compact shorter musket', () => {
+test('compact top-down head and a distinct carried/shouldered firing musket', () => {
   const source = read('src/systems/rendering/characters.js');
   assert.match(source, /enlargedRearwardHead:true/);
   assert.match(source, /arc\(2\.15\*scale,0,2\.85\*scale/);
   assert.match(source, /ellipse\(3\.05\*scale,0,2\.6\*scale,3\.35\*scale/);
-  assert.match(source, /Slightly shorter musket keeps the weapon distinct/);
+  assert.match(source, /function musketPose\(u\)/);
+  assert.match(source, /phase:'fire'/);
+  assert.match(source, /phase:'reload'/);
+  assert.match(source, /const barrel=pose\.shoulder\*7/);
   assert.doesNotMatch(source, /lineTo\(9\.3\*scale,6\.2\*scale\)/);
 });
 

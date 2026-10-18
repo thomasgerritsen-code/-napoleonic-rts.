@@ -46,6 +46,20 @@
     return .65+Math.min(.5,speed/100);
   }
 
+  function musketPose(u){
+    const anim=global.__COMBAT_ANIMATIONS_V1__?.animationFor(u);
+    if(anim?.kind!=='musket-fire')return{phase:'carry',shoulder:0,recoil:0,ramrod:0};
+    const age=anim.age;
+    // Live-fire event begins at the exact real projectile discharge.
+    if(age<.15)return{phase:'fire',shoulder:1,recoil:Math.sin(age/.15*Math.PI),ramrod:0};
+    if(age<.39)return{phase:'lower',shoulder:1-(age-.15)/.24,recoil:0,ramrod:0};
+    const reloadFraction=Math.max(0,Math.min(1,(age-.39)/Math.max(.08,anim.duration-.39)));
+    if(reloadFraction<.73){
+      return{phase:'reload',shoulder:.15,recoil:0,ramrod:reloadFraction/.73};
+    }
+    return{phase:'ready',shoulder:(reloadFraction-.73)/.27,recoil:0,ramrod:0};
+  }
+  
   // Orthographic standing silhouette. A standing person must stay compact in plan view:
   // shoulders dominate, the enlarged head overlaps the torso and only the feet peek out
   // behind it. Long head-to-foot stacking reads as a prone/crawling body and is avoided.
@@ -93,9 +107,29 @@
     ctx.fillStyle=opts.plume||p.plume;ctx.beginPath();ctx.arc(4.75*scale,-1.7*scale,1.05*scale,0,Math.PI*2);ctx.fill();
 
     if(opts.musket!==false){
-      // Slightly shorter musket keeps the weapon distinct without lengthening the body.
-      ctx.strokeStyle='#493322';ctx.lineWidth=1.35*scale;ctx.beginPath();ctx.moveTo(-3.7*scale,6.05*scale);ctx.lineTo(5.8*scale,6.05*scale);ctx.stroke();
-      ctx.strokeStyle='#97948c';ctx.lineWidth=.8*scale;ctx.beginPath();ctx.moveTo(4.9*scale,6.05*scale);ctx.lineTo(8.0*scale,6.05*scale);ctx.stroke();
+      // Articulated musket: shoulder the weapon for the shot, absorb recoil,
+      // lower it for cartridge work, ram the charge, and return to carry.
+      // These are render-only transforms; no combat timing or physics change.
+      const pose=musketPose(u);
+      const y=(6.05-3.75*pose.shoulder)*scale;
+      const recoil=(pose.recoil*2.8)*scale;
+      const barrel=pose.shoulder*7;
+      ctx.lineCap='round';
+      ctx.strokeStyle='#493322';ctx.lineWidth=1.6*scale;
+      ctx.beginPath();ctx.moveTo((-4.5-recoil)*scale,y);ctx.lineTo((7+barrel-recoil)*scale,y);ctx.stroke();
+      ctx.strokeStyle='#a9aaa5';ctx.lineWidth=1.05*scale;
+      ctx.beginPath();ctx.moveTo((5+barrel-recoil)*scale,y);ctx.lineTo((9.7+barrel-recoil)*scale,y);ctx.stroke();
+      // Hands shift with the musket instead of staying attached to a static gun.
+      if(pose.shoulder>.08){
+        ctx.strokeStyle='#cda585';ctx.lineWidth=1.55*scale;
+        ctx.beginPath();ctx.moveTo(-.5*scale,-3.7*scale);ctx.lineTo((3+barrel*.33)*scale,y);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(1.3*scale,4.6*scale);ctx.lineTo((6+barrel*.52)*scale,y);ctx.stroke();
+      }
+      if(pose.ramrod>0){
+        ctx.strokeStyle='#b5b2a6';ctx.lineWidth=.85*scale;
+        const reach=4+Math.sin(pose.ramrod*Math.PI)*6;
+        ctx.beginPath();ctx.moveTo((reach-2)*scale,y-4*scale);ctx.lineTo((reach+7)*scale,y-4*scale);ctx.stroke();
+      }
     }
   }
 
@@ -178,7 +212,8 @@
     enlargedRearwardHead:true,
     cavalryRiderHead:true,
     napoleonicUniforms:true,
-    version:'character-visuals-v2.2'
+    musketPose,
+    version:'character-visuals-v2.3'
   });
   if(nrts.subsystems.has('character-renderer')){
     global.__CHARACTER_VISUALS_V2__=api;
