@@ -48,7 +48,7 @@
 
   function musketPose(u){
     const anim=global.__COMBAT_ANIMATIONS_V1__?.animationFor(u);
-    if(anim?.kind!=='musket-fire')return{phase:'carry',shoulder:0,recoil:0,ramrod:0};
+    if(anim?.kind!=='musket-fire')return global.__TOPDOWN_VOLLEY_V271__?.preFirePose(u)||{phase:'carry',shoulder:0,recoil:0,ramrod:0};
     const age=anim.age;
     // Live-fire event begins at the exact real projectile discharge.
     if(age<.15)return{phase:'fire',shoulder:1,recoil:Math.sin(age/.15*Math.PI),ramrod:0};
@@ -156,7 +156,15 @@
 
   function drawCavalry(u,state){
     const p=palette(u),gallop=['moving','marching','charging','routing'].includes(state);
-    const stride=gallop?Math.sin(phase(u,state==='charging'?2.7:1.9))*1.55:0;
+    const speed=global.__TOPDOWN_MARCH_V262__?.speedFor(u)||0;
+    const charge=state==='charging';
+    const momentum=global.__CAVALRY_ARTILLERY_V1__?.momentum?.(u)||0;
+    // Hoof rhythm rises from walk to canter/charge, but a horse that has
+    // stopped in front of a bridge does not keep galloping in place.
+    const physicallyMoving=speed>2.5;
+    const cadence=1.45+Math.min(1.7,speed/130)+(charge?.45:0);
+    const stride=physicallyMoving&&gallop?
+      Math.sin(phase(u,cadence))*(1.15+Math.min(1.15,speed/135)+momentum*.25):0;
     const horse=u.side==='france'?'#5a4434':'#49392f';
     // Horse body, neck, head and tail all lie along +X/-X in true plan view.
     ctx.fillStyle=horse;ctx.beginPath();ctx.ellipse(-1,0,12.4,5.8,0,0,Math.PI*2);ctx.fill();

@@ -8,6 +8,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { stampDeployment } = require('../../scripts/stamp-deployment');
 
+const semanticVersion = require('../../package.json').version;
 const versionSource = fs.readFileSync(path.resolve(__dirname, '../../src/foundation/version.js'), 'utf8');
 
 function runVersion(deployment) {
@@ -27,21 +28,21 @@ function runVersion(deployment) {
 
 test('local build retains the package version without inventing a published build', () => {
   const { document, window, badge, app } = runVersion(null);
-  assert.equal(document.title, 'Napoleonic RTS v1.3.22');
-  assert.equal(badge.textContent, 'v1.3.22');
+  assert.equal(document.title, `Napoleonic RTS v${semanticVersion}`);
+  assert.equal(badge.textContent, `v${semanticVersion}`);
   assert.equal(window.RTS_VERSION_INFO.buildNumber, null);
-  assert.equal(window.RTS_VERSION, '1.3.22');
+  assert.equal(window.RTS_VERSION, semanticVersion);
   assert.equal(app.style.visibility, 'visible');
 });
 
 test('published build displays a unique version and commit tooltip without changing semantic version', () => {
   const sha = 'a'.repeat(40);
   const { document, window, badge } = runVersion({ commit: sha, runNumber: 209, deployedAt: '2026-10-09T12:00:00.000Z' });
-  assert.equal(document.title, 'Napoleonic RTS v1.3.22-b209');
-  assert.equal(badge.textContent, 'v1.3.22-b209');
+  assert.equal(document.title, `Napoleonic RTS v${semanticVersion}-b209`);
+  assert.equal(badge.textContent, `v${semanticVersion}-b209`);
   assert.match(badge.title, /build #209.*commit aaaaaaa/);
-  assert.equal(window.RTS_VERSION_INFO.release, '1.3.22-b209');
-  assert.equal(window.RTS_VERSION, '1.3.22');
+  assert.equal(window.RTS_VERSION_INFO.release, `${semanticVersion}-b209`);
+  assert.equal(window.RTS_VERSION, semanticVersion);
 });
 
 test('publishing stamps unique, cache-busted identifiers on successive deployments', t => {

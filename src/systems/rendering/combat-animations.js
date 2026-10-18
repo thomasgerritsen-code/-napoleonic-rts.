@@ -49,9 +49,9 @@
   };
 
   applyDamage=function applyDamageCombatAnimationsV1(victim,damage,shock=8){
-    const alive=Boolean(victim&&victim.kind==='unit'&&!victim.dead),snapshot=alive?{x:victim.x,y:victim.y,facing:victim.facing||0,side:victim.side,type:victim.type}:null;
+    const alive=Boolean(victim&&victim.kind==='unit'&&!victim.dead),snapshot=alive?{id:victim.id,x:victim.x,y:victim.y,facing:victim.facing||0,side:victim.side,type:victim.type}:null;
     const result=baseApplyDamage(victim,damage,shock);
-    if(snapshot&&victim.dead)visualEvents.push({...snapshot,kind:'fall',born:elapsed,life:3.2});else if(alive&&victim.recentHit>0)mark(victim,'hit-reaction',.34);
+    if(snapshot&&victim.dead){visualEvents.push({...snapshot,kind:'fall',born:elapsed,life:3.2});if(visualEvents.length>160)visualEvents.shift();}else if(alive&&victim.recentHit>0)mark(victim,'hit-reaction',.34);
     return result;
   };
 
@@ -239,7 +239,7 @@
     }
     ctx.restore();
   }
-  function drawFalls(){for(let i=visualEvents.length-1;i>=0;i--){const e=visualEvents[i],age=elapsed-e.born;if(age>=e.life){visualEvents.splice(i,1);continue;}const t=Math.min(1,age/.42),alpha=Math.min(.72,(e.life-age)*.7);ctx.save();ctx.globalAlpha=alpha;ctx.translate(e.x,e.y);ctx.rotate(e.facing+t*Math.PI*.42);ctx.fillStyle=e.side==='france'?'#244d9a':'#a5322f';if(e.type==='cavalry'){ctx.fillStyle='#564334';ctx.beginPath();ctx.ellipse(0,2,11,5.2,.25,0,Math.PI*2);ctx.fill();}ctx.fillStyle=e.side==='france'?'#244d9a':'#a5322f';ctx.beginPath();ctx.ellipse(0,0,5,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d1a784';ctx.beginPath();ctx.arc(0,-7,2.5,0,Math.PI*2);ctx.fill();ctx.restore();}}
+  function drawFalls(){if(global.__TOPDOWN_CASUALTIES_V272__&&!global.__BATTLEFIELD_3D_V1__?.enabled?.())return global.__TOPDOWN_CASUALTIES_V272__.drawFallen(visualEvents,elapsed);for(let i=visualEvents.length-1;i>=0;i--){const e=visualEvents[i],age=elapsed-e.born;if(age>=e.life){visualEvents.splice(i,1);continue;}const t=Math.min(1,age/.42),alpha=Math.min(.72,(e.life-age)*.7);ctx.save();ctx.globalAlpha=alpha;ctx.translate(e.x,e.y);ctx.rotate(e.facing+t*Math.PI*.42);ctx.fillStyle=e.side==='france'?'#244d9a':'#a5322f';if(e.type==='cavalry'){ctx.fillStyle='#564334';ctx.beginPath();ctx.ellipse(0,2,11,5.2,.25,0,Math.PI*2);ctx.fill();}ctx.fillStyle=e.side==='france'?'#244d9a':'#a5322f';ctx.beginPath();ctx.ellipse(0,0,5,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d1a784';ctx.beginPath();ctx.arc(0,-7,2.5,0,Math.PI*2);ctx.fill();ctx.restore();}}
   drawParticles=function drawParticlesCombatAnimationsV1(){baseDrawParticles();drawSmoke();drawFalls();};
 
   function smokeStats(){let musketClouds=0,artilleryClouds=0,maxPooledShots=0,persistentVolleyClouds=0;for(const e of smokeEvents){if(e.kind==='artillery')artilleryClouds+=1;else{musketClouds+=1;if(e.count>=8&&elapsed-e.born>=.35)persistentVolleyClouds+=1;}maxPooledShots=Math.max(maxPooledShots,e.count||1);}return {active:smokeEvents.length,musketClouds,artilleryClouds,maxPooledShots,persistentVolleyClouds,cap:MAX_SMOKE_EVENTS};}

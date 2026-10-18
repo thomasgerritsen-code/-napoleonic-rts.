@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="theme-color" content="#111713" />
-  <title>Napoleonic RTS v1.3.22</title>
+  <title>Napoleonic RTS v1.3.23</title>
   <link rel="stylesheet" href="style.css?build=194victory" />
   <link rel="stylesheet" href="v05.css" />
   <link rel="stylesheet" href="v06.css" />
@@ -21,7 +21,7 @@
 <div id="app">
   <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
   <header class="hud topbar">
-    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v1.3.22</span></div>
+    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v1.3.23</span></div>
     <div class="resources"><span>🇫🇷 🍞 <strong id="food">0</strong></span><span>🪵 <strong id="wood">0</strong></span><span>👥 <strong id="population">0/0</strong></span></div>
     <div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button>
   </header>
@@ -111,14 +111,19 @@
 <script src="src/systems/rendering/map-realism.js?build=roadclear2"></script>
 <script src="src/systems/rendering/map-ambient-motion.js?build=268a"></script>
 <script src="src/systems/rendering/natural-resources-v1.js?build=roadclear2"></script>
-<script src="src/systems/rendering/characters.js?build=267a"></script>
+<script src="src/systems/rendering/characters.js?build=275a"></script>
 <script src="src/systems/rendering/regiment-visual-hierarchy-v1.js?build=150a"></script>
-<script src="src/systems/rendering/artillery-topdown-v1.js?build=111a"></script>
-<script src="src/systems/rendering/combat-animations.js?build=270a"></script>
+<script src="src/systems/rendering/artillery-topdown-v1.js?build=275a"></script>
+<script src="src/systems/rendering/combat-animations.js?build=275a"></script>
 <script src="src/systems/audio/topdown-sound-v265.js?build=266a"></script>
 <script src="src/systems/rendering/topdown-march-v262.js?build=266a"></script>
 <script src="src/systems/rendering/topdown-effects-v264.js?build=266a"></script>
 <script src="src/systems/rendering/topdown-wind-control-v267.js?build=268a"></script>
+<script src="src/systems/rendering/topdown-volley-v271.js?build=275a"></script>
+<script src="src/systems/rendering/topdown-casualties-v272.js?build=275a"></script>
+<script src="src/systems/rendering/topdown-gun-crew-v273.js?build=275a"></script>
+<script src="src/systems/rendering/topdown-morale-v274.js?build=275a"></script>
+<script src="src/systems/rendering/topdown-cavalry-v275.js?build=275a"></script>
 <script src="src/foundation/legacy-simulation-adapter.js?build=110a"></script>
 <script src="src/systems/artillery/crew-approach-v1.js?build=restore1"></script>
 <script src="src/systems/movement/stuck-recovery-v1.js?build=avoid3"></script>
