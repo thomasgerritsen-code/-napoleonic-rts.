@@ -51,7 +51,12 @@ test('Village V7 enlarges structures, expands the map and routes units around ro
   expect(result.battlefield.version).toBe('battlefield-expansion-v7');
   expect(result.battlefield.width).toBeGreaterThanOrEqual(4300);
   expect(result.battlefield.height).toBeGreaterThanOrEqual(2500);
-  expect(result.battlefield.roadCount).toBeLessThan(result.battlefield.originalRoadCount);
+  // v283 deliberately adds an interlinked postal road hierarchy. We still
+  // omit the decorative legacy parallels, but there are now more working roads
+  // than in the small 4300×2500 baseline.
+  expect(result.battlefield.roadCount).toBeGreaterThan(result.battlefield.originalRoadCount);
+  expect(result.battlefield.removedRoadCount).toBeGreaterThan(0);
+  expect(result.battlefield.historicalRoadCount).toBeGreaterThanOrEqual(22);
   expect(result.battlefield.sparserRoadNetwork).toBe(true);
   expect(result.activeRoadIds).not.toContain('chemin-de-la-crete-ouest');
   expect(result.activeRoadIds).not.toContain('voie-du-verger');
