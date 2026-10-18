@@ -31,6 +31,7 @@ function fixture(){
     __BATTLEFIELD_3D_V1__:{enabled:()=>is3D},
     __COMBAT_ANIMATIONS_V1__:{animationFor:u=>{
       const event=u.combatVisualV1;
+      if(!event)return null;
       const age=context.elapsed-event.started;
       return event.kind==='musket-fire'&&age<event.duration?
         {kind:'musket-fire',age,duration:event.duration}:null;
