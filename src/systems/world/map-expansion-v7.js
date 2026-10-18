@@ -34,7 +34,7 @@
       [650,60],[710,450],[740,1000],[950,1430],[970,1920],
       [1100,2540],[1350,3050],[1510,3900],[1740,4580],[1700,4920]]),
     historicRoad('eastern-post','Route impériale de l’Est','chaussee',68,[
-      [2250,80],[1950,900],[2060,1430],[2150,1920],[2360,2540],
+      [2650,80],[2500,460],[2400,900],[1950,900],[2300,900],[2350,1180],[2350,1430],[2060,1430],[2150,1920],[2360,2540],
       [2670,3050],[2900,3900],[3140,4580],[3300,4920]]),
 
     // A separate legally navigable segment crosses each bridge or ford.
@@ -86,7 +86,7 @@
     // Dirt tracks end at real farmland or border settlements, not mid-field
     // halfway along the long main road.
     historicRoad('camp-francais','Chemin du Camp français','track',26,[
-      [740,1000],[760,1100],[640,1120]]),
+      [740,1000],[625,1010],[640,1120]]),
     historicRoad('camp-britannique','Chemin du Camp britannique','track',26,[
       [7380,4190],[7240,4290]]),
     historicRoad('rural-verger','Chemin vicinal du Verger','track',26,[
@@ -211,11 +211,12 @@
   }
 
   const api=Object.freeze({
-    version:'battlefield-expansion-v7-road-system-v283',
+    version:'battlefield-expansion-v7',
     width:WORLD.width,
     height:WORLD.height,
     roadCount:roads.length,
     historicalRoadCount:strategicRoads.length,
+    roadSystemVersion:'283',
     relayVillageCount:postalRelays.length,
     historicalHierarchy:true,
     crossMapConnectivity:true,
