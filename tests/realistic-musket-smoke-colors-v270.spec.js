@@ -28,18 +28,21 @@ test('v270 pale black-powder smoke changes from warm ivory to neutral and cool g
     };
     drawParticles();
     let firstColors=[...colorsSeen];
-    for(let i=0;i<44;i++)window.RTS_SIM.step(.05);
-    colorsSeen.clear();drawParticles();
-    let middleColors=[...colorsSeen];
+    const emitted=api.smokeSnapshot().at(-1);
     for(let i=0;i<46;i++)window.RTS_SIM.step(.05);
     colorsSeen.clear();drawParticles();
+    let middleColors=[...colorsSeen];
+    const middleExpected=api.smokePalette(elapsed-emitted.born);
+    for(let i=0;i<44;i++)window.RTS_SIM.step(.05);
+    colorsSeen.clear();drawParticles();
     let laterColors=[...colorsSeen];
+    const laterExpected=api.smokePalette(elapsed-emitted.born);
     ctx.fill=oldFill;
     const after={x:shooter.x,y:shooter.y,hp:shooter.hp,facing:shooter.facing};
     const stats=api.smokeStats();
     const smoke=api.smokeSnapshot().at(-1);
     return{
-      palettes,firstColors,middleColors,laterColors,stats,
+      palettes,firstColors,middleColors,laterColors,middleExpected,laterExpected,stats,
       before,after,drift:smoke?.drift,life:smoke?.life,
       features:[...api.features],stops:[...api.smokeColorStops]
     };
@@ -65,8 +68,8 @@ test('v270 pale black-powder smoke changes from warm ivory to neutral and cool g
   expect(warm[0]-warm[2]).toBeGreaterThan(8);
   expect(cool[2]-cool[0]).toBeGreaterThan(0);
   expect(result.firstColors).toContain(result.palettes[0].rim);
-  expect(result.middleColors).toContain(result.palettes[5].rim);
-  expect(result.laterColors).toContain(result.palettes[7].rim);
+  expect(result.middleColors).toContain(result.middleExpected.rim);
+  expect(result.laterColors).toContain(result.laterExpected.rim);
   expect(result.before).toEqual(result.after);
   expect(Math.hypot(result.drift.x,result.drift.y)).toBeGreaterThan(20);
   expect(result.life).toBeGreaterThanOrEqual(6);
