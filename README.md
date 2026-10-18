@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.34
+# Napoleonic RTS — v1.3.35
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,10 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.35 — impactbewuste CI (update 287)
+
+Tijdens pull requests draait altijd de snelle headless-codecheck; de gerichte browser-, brug/bewegings-, 520-eenheden- en Golden Battle-gates draaien alleen wanneer de gewijzigde code daar aanleiding toe geeft. Bij onbekende of risicovolle wijzigingen draait uit voorzorg alles. **Elke push naar `main` en iedere handmatige releasecontrole voert ongewijzigd de vijf volledige veiligheidschecks uit voordat GitHub Pages mag publiceren.** De classifier wordt apart getest op versie-only, documenten, kaart, AI, performance en release-scenario's. Zie `docs/ci-impact-v287.md`.
 
 ## v1.3.34 — testopschoning (update 286)
 

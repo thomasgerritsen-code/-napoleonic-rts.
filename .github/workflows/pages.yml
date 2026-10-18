@@ -17,6 +17,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  impact:
+    name: CI impact selection
+    runs-on: ubuntu-latest
+    outputs:
+      focused: ${{ steps.classify.outputs.focused }}
+      movement: ${{ steps.classify.outputs.movement }}
+      health: ${{ steps.classify.outputs.health }}
+      golden: ${{ steps.classify.outputs.golden }}
+    steps:
+      - name: Checkout complete history for safe diff
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Classify affected game systems
+        id: classify
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_HEAD_BRANCH: ${{ github.head_ref }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ "$CI_EVENT" = "pull_request" ] && [ -n "$CI_BASE_SHA" ] && [ -n "$CI_HEAD_SHA" ]; then
+            if ! CHANGED_FILES="$(git diff --name-only "$CI_BASE_SHA" "$CI_HEAD_SHA")"; then
+              CHANGED_FILES=""
+            fi
+          else
+            CHANGED_FILES=""
+          fi
+          printf '%s\n' "$CHANGED_FILES" | node scripts/ci-impact.js
+
   fast:
     name: Fast headless gate
     runs-on: ubuntu-latest
@@ -34,6 +65,8 @@ jobs:
         run: npm run test:fast
 
   focused:
+    needs: impact
+    if: ${{ needs.impact.outputs.focused == 'true' }}
     name: Focused Chromium gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -98,6 +131,8 @@ jobs:
           retention-days: 14
 
   health:
+    needs: impact
+    if: ${{ needs.impact.outputs.health == 'true' }}
     name: Game health 520-unit gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -151,6 +186,8 @@ jobs:
           retention-days: 14
 
   movement:
+    needs: impact
+    if: ${{ needs.impact.outputs.movement == 'true' }}
     name: Movement coverage gate
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -206,6 +243,8 @@ jobs:
           retention-days: 14
 
   golden:
+    needs: impact
+    if: ${{ needs.impact.outputs.golden == 'true' }}
     name: Deterministic Golden Battle gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -315,7 +354,7 @@ jobs:
   deploy:
     name: Deploy GitHub Pages
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    needs: [fast, focused, health, movement, golden]
+    needs: [impact, fast, focused, health, movement, golden]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
