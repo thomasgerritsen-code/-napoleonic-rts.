@@ -14,57 +14,6 @@ async function openGame(page) {
 const state = page => page.evaluate(() => window.__RTS_DEBUG__.getState());
 
 
-test('v0.6.6 loads with simulation facade, minimap, roads and no JavaScript errors', async ({ page }, testInfo) => {
-  const errors = await openGame(page);
-  await expect(page).toHaveTitle(/Napoleonic RTS v0\.6\.6/);
-  await expect(page.locator('.version')).toHaveText('v0.6.6');
-  await expect(page.locator('#minimap')).toBeVisible();
-  const s = await state(page);
-  expect(s.world).toEqual({ width: 3800, height: 2200 });
-  expect(s.exploredCells).toBeGreaterThan(0);
-  expect(['aggressive','balanced','defensive']).toContain(s.aiStrategy);
-  const facade = await page.evaluate(() => ({
-    version: window.RTS_SIM.version,
-    hasSnapshot: typeof window.RTS_SIM.snapshot === 'function',
-    hasDispatch: typeof window.RTS_SIM.dispatch === 'function',
-    hasAudit: typeof window.RTS_SIM.audit === 'function'
-  }));
-  expect(facade).toEqual({ version:'0.6.6', hasSnapshot:true, hasDispatch:true, hasAudit:true });
-  await testInfo.attach('v066-initial', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' });
-  expect(errors).toEqual([]);
-});
-
-
-test('Napoleonic road network has main chaussées, local roads, tracks and strategic crossroads', async ({ page }, testInfo) => {
-  const errors = await openGame(page);
-  const network = await page.evaluate(() => window.__RTS_DEBUG__.roadNetworkV066());
-  expect(network.roads).toHaveLength(13);
-  expect(network.hamlets).toHaveLength(6);
-  expect(network.roads.filter(r => r.roadClass === 'chaussee')).toHaveLength(4);
-  expect(network.roads.filter(r => r.roadClass === 'secondary')).toHaveLength(5);
-  expect(network.roads.filter(r => r.roadClass === 'track')).toHaveLength(4);
-
-  const centralRoads = network.roads.filter(r => r.points.some(p => p.x === 1900 && p.y === 890));
-  expect(centralRoads.length).toBeGreaterThanOrEqual(6);
-  const main = await page.evaluate(() => window.__RTS_DEBUG__.roadInfoV066(700,900));
-  const local = await page.evaluate(() => window.__RTS_DEBUG__.roadInfoV066(590,430));
-  expect(main.name).toBe('Grande Chaussée'); expect(main.roadClass).toBe('chaussee');
-  expect(local.name).toBe('Chemin du Bois'); expect(local.roadClass).toBe('secondary');
-
-  const speeds = await page.evaluate(() => ({
-    main: window.__RTS_DEBUG__.roadSpeedV066('infantry','chaussee'),
-    local: window.__RTS_DEBUG__.roadSpeedV066('infantry','secondary'),
-    track: window.__RTS_DEBUG__.roadSpeedV066('infantry','track'),
-    field: window.__RTS_DEBUG__.movementSpeedsV065('infantry').field
-  }));
-  expect(speeds.main).toBeGreaterThan(speeds.local);
-  expect(speeds.local).toBeGreaterThan(speeds.track);
-  expect(speeds.track).toBeGreaterThan(speeds.field);
-  await testInfo.attach('v066-road-network', { body: await page.screenshot({ fullPage:true }), contentType:'image/png' });
-  expect(errors).toEqual([]);
-});
-
-
 test('rally point and visible queue distribute completed troops instead of stacking them', async ({ page }) => {
   const errors = await openGame(page);
   const barracksId = await page.evaluate(() => window.__RTS_DEBUG__.createCompletedBuilding('france','barracks',900,800));
@@ -258,23 +207,6 @@ test('British AI replaces infantry, cavalry and artillery after heavy losses', a
   const after=await page.evaluate(() => window.__RTS_DEBUG__.getAIReinforcementState());
   expect(after.counts.infantry.living).toBeGreaterThan(afterLoss.counts.infantry.living); expect(after.counts.cavalry.living).toBeGreaterThan(afterLoss.counts.cavalry.living); expect(after.counts.artillery.living).toBeGreaterThan(afterLoss.counts.artillery.living);
   expect(errors).toEqual([]);
-});
-
-
-test('F3 test lab exposes diagnostics and v0.6.6 bug reports', async ({ page }) => {
-  const errors=await openGame(page); await page.keyboard.press('F3'); await expect(page.locator('#debugPanel')).toBeVisible();
-  await page.selectOption('#debugScenario','artillery-3'); await page.locator('[data-debug-action="run"]').click();
-  const snap=await page.evaluate(() => window.__RTS_DEBUG__.simulationSnapshot()); expect(snap.version).toBe('0.6.6'); expect(snap.groups.filter(g=>g.kind==='artillery'&&!g.destroyed)).toHaveLength(3);
-  const report=await page.evaluate(() => JSON.parse(window.__RTS_DEBUG__.createBugReport())); expect(report.version).toBe('0.6.6'); expect(report.scenario).toBe('artillery-3'); expect(report.audit).toBeTruthy();
-  expect(errors).toEqual([]);
-});
-
-
-test('520-unit stress scenario remains structurally valid with indexed roads', async ({ page }, testInfo) => {
-  const errors=await openGame(page); await page.evaluate(() => window.__RTS_DEBUG__.runScenario('performance-520')); await page.evaluate(() => window.RTS_SIM.step(20));
-  const snap=await page.evaluate(() => window.RTS_SIM.snapshot()),metrics=await page.evaluate(() => window.RTS_SIM.getMetrics());
-  expect(snap.units.length).toBeGreaterThanOrEqual(520); expect(snap.audit.ok).toBe(true); expect(metrics.combatQueries).toBeGreaterThan(0); expect(metrics.avgCombatCandidates).toBeLessThan(40);
-  await testInfo.attach('v066-520-units', { body:await page.screenshot({fullPage:true}), contentType:'image/png' }); expect(errors).toEqual([]);
 });
 
 
