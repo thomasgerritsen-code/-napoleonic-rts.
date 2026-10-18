@@ -168,56 +168,59 @@ test('v271-275 are 2D display layers and 3D engine stays in control when enabled
   expect(errors).toEqual([]);
 });
 
-test('v275 deployed eight-plus-musket square actually reduces 2D cavalry charge damage but never affects 3D',async({page})=>{
+test('v275 infantry square retains the real existing mounted-charge counter, while new charge art stays 2D only',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>!!window.__TOPDOWN_CAVALRY_V275__&&!!window.__BATTLEFIELD_3D_V1__);
-  const r=await page.evaluate(()=>{
+  await page.waitForFunction(()=>!!window.__TOPDOWN_CAVALRY_V275__&&!!window.__CAVALRY_ARTILLERY_V1__&&!!window.__BATTLEFIELD_3D_V1__);
+  const result=await page.evaluate(()=>{
     resetGame();v05PeaceMode=true;gameOver=false;
     for(const u of units)u.dead=true;
     for(const r of regiments)r.destroyed=true;
-    const cav=window.__TOPDOWN_CAVALRY_V275__;
-    const reg={id:275888,side:'britain',kind:'infantry',formation:'square',
+    const cavalry=window.__TOPDOWN_CAVALRY_V275__;
+    const regiment={id:275888,side:'britain',kind:'infantry',formation:'square',
       memberIds:[],facing:0,destroyed:false,morale:100};
-    regiments.push(reg);
-    const defenders=[];
+    regiments.push(regiment);
+    const infantry=[];
     for(let i=0;i<10;i++){
       const u=createUnit('britain','infantry',camera.x+50+(i%4)*9,camera.y+70+Math.floor(i/4)*9);
-      u.regimentId=reg.id;reg.memberIds.push(u.id);u.hp=900;
-      defenders.push(u);
+      u.regimentId=regiment.id;regiment.memberIds.push(u.id);u.hp=900;
+      infantry.push(u);
     }
-    const target=defenders[0],attacker=createUnit('france','cavalry',camera.x,camera.y+80);
-    attacker.chargeTimer=5;attacker.reload=0;attacker.chargeMomentumV1=.7;
-    const was=Math.random,previousHp=target.hp;
+    const victim=infantry[0];
+    const horse=createUnit('france','cavalry',camera.x,camera.y+80);
+    const baseHP=900;
+    const originalRandom=Math.random;
     Math.random=()=>.5;
+    function strike(mode,view3D){
+      regiment.formation=mode;
+      victim.hp=baseHP;
+      horse.chargeTimer=5;horse.chargeMomentumV1=.7;horse.reload=0;
+      window.__BATTLEFIELD_3D_V1__.setEnabled(view3D);
+      fire(horse,victim);
+      return baseHP-victim.hp;
+    }
+    const protection=strike('square',false);
+    const unprotected=strike('line',false);
+    const squareIn3D=strike('square',true);
+    Math.random=originalRandom;
     window.__BATTLEFIELD_3D_V1__.setEnabled(false);
-    const protectedNow=cav.defendedSquare(attacker,target);
-    fire(attacker,target);
-    const reduced=previousHp-target.hp;
-    const protectedCount=cav.stats().squaresProtected;
-    reg.formation='line';target.hp=previousHp;attacker.reload=0;
-    fire(attacker,target);
-    const open=previousHp-target.hp;
-    reg.formation='square';target.hp=previousHp;attacker.reload=0;
-    window.__BATTLEFIELD_3D_V1__.setEnabled(true);
-    const protected3d=cav.defendedSquare(attacker,target);
-    fire(attacker,target);
-    const in3d=previousHp-target.hp;
-    Math.random=was;
-    window.__BATTLEFIELD_3D_V1__.setEnabled(false);
-    return{protectedNow,protected3d,reduced,open,in3d,protectedCount,
-      liveFireName:fire.name,liveFireSource:fire.toString().slice(0,190),
-      attackerCharge:attacker.chargeTimer,
-      after:cav.stats().squaresProtected};
+    drawRegimentMarkers();
+    return{
+      protection,unprotected,squareIn3D,
+      multiplier:cavalry.existingSquareDefence,
+      originalMultiplier:window.__CAVALRY_ARTILLERY_V1__.chargeVsSquare,
+      defensiveArtwork:cavalry.stats().squares,
+      physicalPositions:infantry.map(u=>({x:u.x,y:u.y})),
+      fireOwner:fire.name
+    };
   });
-  console.log('V275_SQUARE_COUNTERCHARGE',JSON.stringify(r));
+  console.log('V275_GENUINE_SQUARE',JSON.stringify(result));
   expect(errors).toEqual([]);
-  expect(r.protectedNow).toBe(true);
-  expect(r.protected3d).toBe(false);
-  expect(r.reduced).toBeGreaterThan(0);
-  expect(r.open).toBeGreaterThan(r.reduced*2);
-  expect(r.reduced/r.open).toBeCloseTo(.35,3);
-  expect(r.in3d).toBeCloseTo(r.open,3);
-  expect(r.protectedCount).toBeGreaterThan(0);
-  expect(r.after).toBe(r.protectedCount);
+  expect(result.multiplier).toBeCloseTo(.35,6);
+  expect(result.originalMultiplier).toBeCloseTo(.35,6);
+  expect(result.protection).toBeGreaterThan(0);
+  expect(result.unprotected).toBeGreaterThan(result.protection*2);
+  expect(result.protection/result.unprotected).toBeCloseTo(.35,4);
+  expect(result.squareIn3D).toBeCloseTo(result.protection,4);
+  expect(result.defensiveArtwork).toBeGreaterThan(0);
 });
