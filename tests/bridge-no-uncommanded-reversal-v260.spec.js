@@ -71,14 +71,19 @@ test('v260 real player move: completed bridge crossing never loops back without 
               return {id:u.id,type:u.type,along:+(l.along*dir).toFixed(0),
                 lateral:+l.perp.toFixed(0),targetProgress:+(to.along*dir).toFixed(0),
                 targetLateral:+to.perp.toFixed(0),
-                blocked:segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY)};
+                blocked:segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY),
+                dead:u.dead,routing:u.routing,water:waterAtV067(u.x,u.y),
+                nextWater:waterAtV067(u.x+Math.cos(c.angle)*dir*5,u.y+Math.sin(c.angle)*dir*5),
+                nextBlocked:segmentCrossesBlockedWaterV067(u.x,u.y,u.x+Math.cos(c.angle)*dir*5,u.y+Math.sin(c.angle)*dir*5)};
+
             })()});
       }
       const progress=members.map(u=>crossingLocalV068(c,u.x,u.y).along*dir);
       runs.push({crossId,side,count,extra,selected,commanded,onceBeyond,clearedAll,returnedToDeck,
         returnedAfterClear,firstBeyond,firstClear,retreatFromMax:+retreatFromMax.toFixed(1),
         minFinal:+Math.min(...progress).toFixed(1),water,samples,
-        marchActive:!!reg.marchV063?.v064});
+        marchActive:!!reg.marchV063?.v064,
+        stats:window.__ROAD_COLUMN_V257__.metrics()});
     }
     return runs;
   });
