@@ -1,6 +1,6 @@
 # 2D Battle Pack v271–275
 
-Five independent **Canvas2D** improvements. They reuse existing combat, morale, charge, square and bridge authorities. They do **not** replace marching/navigation, projectile ballistics, hit points, reload duration, morale shock thresholds, or the 3D renderer.
+Five independent **Canvas2D** improvements. They reuse existing combat, morale, charge, square and bridge authorities. They do **not** replace marching/navigation, projectile ballistics, reload duration, morale shock thresholds, or the 3D renderer. The one gameplay extension is explicit, 2D-only anti-cavalry protection for an already deployed eight-plus-infantry square.
 
 | ID | Feature | Visible effect | Authority / integration |
 |---|---|---|---|
@@ -8,10 +8,10 @@ Five independent **Canvas2D** improvements. They reuse existing combat, morale, 
 | v272 | Casualties | 3 distinct fallen-soldier silhouettes, fallen musket, hit flinch | Current `applyDamage` and `combatVisualV1`; fixed 160-event history and 130-draw limit |
 | v273 | Artillery crew | Carriage visual recoil, crew sponge/charge/ram/ready motions | Cannon's real shot/reload value; artillery compound positions untouched |
 | v274 | Morale and panic | Shakiness under low morale, visible panic and rout markers | Existing `moraleShock`, `routeUnit`, `reg.morale`; never issues orders |
-| v275 | Cavalry and square | Real speed-driven gallop, momentum accents, bounded hoof dust and visible infantry square | Existing `chargeMomentumV1`, `chargeVsSquare=.35`; does not change road routing or auto-form squares |
+| v275 | Cavalry and square | Real speed-driven gallop, momentum accents, bounded hoof dust and visible infantry square | Existing charge momentum when available; deployed square now really reduces incoming cavalry melee damage to 35% in 2D only; does not change road routing or auto-form squares |
 
 ### Historical/gameplay limitations
-This is deliberately a **presentation-first** update. A real synchronized musket firing-line animation should not secretly modify hit probability or the AI's movement. The existing game already permits genuine cavalry charges, routs after morale collapse, and square defence. The new features make those behaviours readable in the 2D battlefield and provide incremental art improvements without introducing a second combat authority.
+This is deliberately a **presentation-first** update. A real synchronized musket firing-line animation should not secretly modify hit probability or the AI's movement. The existing game already permits genuine cavalry charges and routs after morale collapse. A deployed infantry square now also **actually reduces** incoming cavalry melee damage in 2D (35%); the 3D game's combat is unchanged. The new features make those behaviours readable in the 2D battlefield and provide incremental art improvements without introducing a second combat authority.
 
 The artillery loading cycle is a stylised two-gunner presentation, not a full six- to twelve-person authentic gun crew. A future major artillery realism simulation could assign distinct animated roles and align actual reloading with their completion, but that is outside this low-risk visual update.
 
