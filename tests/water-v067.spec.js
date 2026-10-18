@@ -100,10 +100,9 @@ test('F3 test lab and bug reports expose the active runtime version', async ({ p
 
 test('v282 distant camps and legacy bridges are physically spread across the enlarged map',async({page})=>{
  const pageErrors=await openGame(page);
- // Inspect a fresh, peaceful match; background battle startup can move/destroy
- // town centers before the first assertion on slower CI machines.
- await page.evaluate(()=>{resetGame();window.__RTS_DEBUG__.setPeaceMode(true);});
+ // Reset and inspect in one browser execution with no interleaving game ticks.
  const inspect=()=>page.evaluate(()=>{
+   resetGame();window.__RTS_DEBUG__.setPeaceMode(true);
    const france=buildings.find(b=>b.side==='france'&&b.type==='towncenter'&&!b.dead);
    const britain=buildings.find(b=>b.side==='britain'&&b.type==='towncenter'&&!b.dead);
    const troops=units.filter(u=>u.side==='britain'&&!u.dead);
@@ -137,7 +136,7 @@ test('v282 distant camps and legacy bridges are physically spread across the enl
    expect(by['pont-fermes']-by['pont-crete']).toBeGreaterThanOrEqual(1000);
    expect(by['pont-grands-bois']-by['pont-fermes']).toBeGreaterThanOrEqual(500);
    expect(d.crossings.every(c=>c.onDeck)).toBe(true);
-   if(retry===0)await page.evaluate(()=>resetGame());
+   // Each invocation of inspect() resets the game.
  }
  expect(pageErrors).toEqual([]);
 });
