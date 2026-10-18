@@ -74,9 +74,13 @@
   // Integrate displacement since the previous frame: changing wind direction
   // bends the smoke's trajectory instead of teleporting existing smoke.
   function advanceSmoke(e){
-    const dt=Math.max(0,Math.min(e.life,elapsed-(e.driftAt??elapsed)));
+    const prev=e.driftAt??elapsed;
+    const dt=Math.max(0,Math.min(e.life,elapsed-prev));
     e.driftAt=elapsed;
-    const w=global.__MAP_AMBIENT_MOTION_V1__?.currentWind?.()||{x:.72,y:-.28,strength:1};
+    // Midpoint integration follows gradual direction changes even when a
+    // frame is delayed, without teleporting old smoke or touching gameplay.
+    const w=global.__MAP_AMBIENT_MOTION_V1__?.currentWind?.(prev+dt*.5)||
+      {x:.72,y:-.28,strength:1};
     const windSpeed=25*Math.max(0,Math.min(2.5,w.strength||0));
     e.driftX=(e.driftX||0)+w.x*windSpeed*dt;
     e.driftY=(e.driftY||0)+w.y*windSpeed*dt;

@@ -6,14 +6,17 @@
 
   const baseDrawTerrain=drawTerrain;
   const baseDrawParticles=drawParticles;
-  const wind={x:.72,y:-.28,strength:1};
-  function currentWind(){return {...wind};}
-  function setWindDirection(degrees){
-    if(!Number.isFinite(degrees))return currentWind();
-    const rad=degrees*Math.PI/180;
-    wind.x=Math.cos(rad);
-    wind.y=Math.sin(rad);
-    return currentWind();
+  // v268: autonomous, gently wandering 2D wind. All phases depend on the
+  // simulation clock rather than wall time or Math.random, so smoke movement
+  // and golden-battle replays remain deterministic. No manual direction setter.
+  const initialAngle=Math.atan2(-.28,.72);
+  function currentWind(atSeconds=elapsed){
+    const t=Number.isFinite(atSeconds)?Math.max(0,atSeconds):0;
+    const angle=initialAngle+
+      .84*Math.sin(t/39)+
+      .38*(Math.sin(t/96+.6)-Math.sin(.6))+
+      .16*(Math.sin(t/21+1.25)-Math.sin(1.25));
+    return {x:Math.cos(angle),y:Math.sin(angle),strength:1};
   }
 
   function clock(){return performance.now()/1000;}
@@ -86,7 +89,7 @@
 
   drawParticles=function drawParticlesAmbientMotionV1(){
     baseDrawParticles();
-    const t=clock(),b=visibleBounds(45);
+    const t=clock(),b=visibleBounds(45),wind=currentWind();
     ctx.save();
     for(const p of particles){
       if(p.dead||!Number.isFinite(p.life)||!Number.isFinite(p.maxLife)||p.maxLife<=0||!pointVisible(b,p.x,p.y,30))continue;
@@ -105,7 +108,7 @@
     version:'map-ambient-motion-v1.3.2',
     get wind(){return Object.freeze(currentWind());},
     currentWind,
-    setWindDirection,
+    automaticWind:true,
     visualOnly:true,
     viewportCulling:true,
     baseTerrainDraw:baseDrawTerrain,
