@@ -24,6 +24,7 @@ test('v260 Pont Crête reverse square movement finishes after tail and does not 
     wp:wp?crossingLocalV068(c,wp.x,wp.y):null,goalLocal,
     min:+Math.min(...progress).toFixed(1),max:+Math.max(...progress).toFixed(1),
     state:s,traffic:reg.crossingTrafficV068?.state||null,phase:m?.phase||null,
+    worst:(()=>{const u=members.reduce((w,u)=>crossingLocalV068(c,u.x,u.y).along*dir<crossingLocalV068(c,w.x,w.y).along*dir?u:w,members[0]);const q=crossingLocalV068(c,u.x,u.y);const p=crossingLocalV068(c,u.targetX,u.targetY);const delta=5*dir;const next=crossingPointV068(c,q.along+delta,q.perp);return {id:u.id,type:u.type,progress:q.along*dir,perp:q.perp,targetProgress:p.along*dir,targetPerp:p.perp,water:waterAtV067(u.x,u.y),nextWater:waterAtV067(next.x,next.y),nextBlocked:segmentCrossesBlockedWaterV067(u.x,u.y,next.x,next.y),targetBlocked:segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY),routing:u.routing};})(),
     skipped:window.__ROAD_COLUMN_V257__.metrics().staleBridgeWaypointsSkipped,
     caps:window.__ROAD_COLUMN_V257__.metrics().bridgeAnchorCaps});
   if(members.every(u=>crossingLocalV068(c,u.x,u.y).along*dir>c.length/2+24)||
