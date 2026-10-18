@@ -38,8 +38,8 @@ test('Architecture v2.1 owns road lookup and route planning without legacy v066 
   expect(nav.road).toBe('Grande Chaussée');
   expect(nav.bridge).toBe('Pont de la Chaussée');
   expect(nav.config.bridge.centerlineTolerance).toBeGreaterThan(0);
-  expect(nav.config.bridge.columnFormStartClearance).toBe(260);
-  expect(nav.config.bridge.columnFormFullClearance).toBe(120);
+  expect(nav.config.bridge.columnFormStartClearance).toBe(110);
+  expect(nav.config.bridge.columnFormFullClearance).toBe(12);
   expect(nav.retired).toEqual(expect.arrayContaining(['src/v066-road-index.js','src/v066-route-fixes.js']));
 
   const html=fs.readFileSync(path.join(process.cwd(),'index.html'),'utf8');
@@ -60,7 +60,8 @@ test('bridge column stays wide outside staging range and forms four compact file
     const c=WATER_CROSSINGS_V067.find(item=>item.id==='pont-chaussee');
     const side=-1;
     const far=crossingPointV068(c,side*(c.length/2+360),120);
-    const near=crossingPointV068(c,side*(c.length/2+100),120);
+    const mid=crossingPointV068(c,side*(c.length/2+180),120);
+    const near=crossingPointV068(c,side*(c.length/2+10),120);
     const id=window.__RTS_DEBUG__.createFreshInfantryRegiment('france',far.x,far.y);
     const reg=getRegiment(id);
     window.__RTS_DEBUG__.selectRegiment(id);
@@ -87,14 +88,19 @@ test('bridge column stays wide outside staging range and forms four compact file
     for(let i=0;i<120;i++) forceBridgeColumnTargetsV068(reg,march,info);
     const farSpan=slotSpan();
 
+    march.anchorX=mid.x; march.anchorY=mid.y;
+    for(let i=0;i<120;i++) forceBridgeColumnTargetsV068(reg,march,info);
+    const midSpan=slotSpan();
+
     march.anchorX=near.x; march.anchorY=near.y;
     for(let i=0;i<120;i++) forceBridgeColumnTargetsV068(reg,march,info);
     const nearSpan=slotSpan();
 
-    return {farSpan,nearSpan,normalSpan,bridgeSpan,roadMarch,config:window.NRTS_CONFIG.navigation.bridge};
+    return {farSpan,midSpan,nearSpan,normalSpan,bridgeSpan,roadMarch,config:window.NRTS_CONFIG.navigation.bridge};
   });
 
   expect(result.farSpan).toBeGreaterThanOrEqual(result.normalSpan*0.90);
+  expect(result.midSpan).toBeGreaterThanOrEqual(result.farSpan*0.95);
   expect(result.nearSpan).toBeLessThan(result.farSpan*0.85);
   expect(result.nearSpan).toBeLessThanOrEqual(result.bridgeSpan*1.12);
   expect(result.nearSpan).toBeGreaterThanOrEqual(result.bridgeSpan*0.93);
