@@ -209,7 +209,10 @@
     const start=members.length?centroid(members):{x:reg?.targetX??x,y:reg?.targetY??y};
     const goal={x,y};
     orderBeforeResolver(reg,x,y,formation,finalFacing);
-    if(!reg||reg.destroyed||!['infantry','cavalry'].includes(groupKindV06(reg))) return;
+    // Artillery needs the same local bridge-intent correction. Without the
+    // deleted Colline ford, its coarse route can detour to the Chaussée bridge
+    // instead of using the nearby Crête crossing and never complete its march.
+    if(!reg||reg.destroyed||!['infantry','cavalry','artillery'].includes(groupKindV06(reg))) return;
     const kind=groupKindV06(reg);
     const local=localBridgeIntent(start,goal,kind,reg);
     if(local){
@@ -224,9 +227,17 @@
       if(typeof routeCrossingsForPathV067==='function')
         reg.routeCrossingsV067=routeCrossingsForPathV067(start,reg.path);
       reseed(reg);
+      // Artillery uses rigid per-unit targets rather than the infantry march
+      // anchor. Once a local bridge corridor replaces its initial A* path,
+      // retarget the cannon and crew at the NEW first waypoint, otherwise
+      // they settle at the stale old target while pathIndex remains zero.
+      if(kind==='artillery'&&typeof setGroupWaypointV06==='function')setGroupWaypointV06(reg);
       stats.resolvedSplitCrossings++;
       return;
     }
+    // Keep legacy long-distance artillery routing unchanged; only local
+    // unambiguous bridge corrections above are required for gun batteries.
+    if(kind==='artillery') return;
     if(reg.navigationV2?.bridgeCorridors?.length) return;
     const candidate=routeBridgeCandidate(start,reg.path||[],kind,goal);
     if(!candidate) return;

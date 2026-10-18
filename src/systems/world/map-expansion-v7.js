@@ -43,8 +43,6 @@
       [740,1000],[1150,900],[1350,900],[1500,900],[1650,900],[1950,900]]),
     historicRoad('crete-bridge','Route départementale de la Crête','secondary',46,[
       [950,1430],[1280,1430],[1510,1430],[1740,1430],[2060,1430]]),
-    historicRoad('colline-ford','Chemin du Gué de la Colline','track',28,[
-      [970,1920],[1330,1920],[1530,1920],[1730,1920],[2150,1920]]),
     historicRoad('fermes-bridge','Route des Fermes','secondary',46,[
       [1100,2540],[1400,2540],[1645,2540],[1900,2540],[2360,2540]]),
     historicRoad('grands-bois-bridge','Chaussée des Grands Bois','chaussee',64,[
