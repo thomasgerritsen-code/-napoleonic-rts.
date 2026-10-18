@@ -4,7 +4,7 @@
 (function installTopdownCavalryV275(root){
   if(!root.NRTS)return;
   const trails=[],motion=new Map(),MAX_DUST=140;
-  const stats={galloping:0,dustEmitted:0,dustDrawn:0,squares:0,squaresProtected:0};
+  const stats={galloping:0,dustEmitted:0,dustDrawn:0,squares:0};
   const enabled=()=>!root.__BATTLEFIELD_3D_V1__?.enabled?.();
   function chargeFor(u){
     return u?.type==='cavalry'&&!u.dead&&!u.routing&&(u.chargeTimer||0)>0;
@@ -26,35 +26,6 @@
     }
     prev.x=u.x;prev.y=u.y;prev.t=now;
   }
-  // Unlike an ornamental square marker, a deployed infantry square
-  // actually blunts an incoming mounted charge. The reduction is limited to
-  // this single synchronous melee hit and only while the 2D view is active.
-  // It never changes pathfinding, soldier positions or 3D combat.
-  const squareMultiplier=.35;
-  function defendedSquare(attacker,enemy){
-    if(!enabled()||!chargeFor(attacker)||!enemy||enemy.dead||
-        enemy.kind!=='unit'||!enemy.regimentId||enemy.side===attacker.side)return false;
-    const reg=getRegiment(enemy.regimentId);
-    if(!reg||reg.destroyed||reg.formation!=='square'||
-      groupKindV06(reg)!=='infantry'||reg.crossingTrafficV068?.forcedColumn)return false;
-    return regimentMembers(reg).filter(u=>u.type==='infantry'&&!u.dead&&!u.routing).length>=8;
-  }
-  const priorFire=fire;
-  fire=function fireSquareCounterchargeV275(attacker,enemy){
-    if(!defendedSquare(attacker,enemy))return priorFire.apply(this,arguments);
-    // Historical baseline fire and the live v06 combat wrappers read
-    // TYPES.cavalry.damage synchronously, so reducing it for this ONE
-    // charge reaches the original damage calculation. Always restore it
-    // afterwards, including when a wrapper throws.
-    const original=TYPES.cavalry.damage;
-    TYPES.cavalry.damage=original*squareMultiplier;
-    try{
-      const result=priorFire.apply(this,arguments);
-      stats.squaresProtected++;
-      return result;
-    }finally{TYPES.cavalry.damage=original;}
-  };
-
   const baseDraw=drawUnit;
   drawUnit=function drawTopdownChargeV275(u){
     if(!u||u.dead||!enabled())return baseDraw(u);
@@ -119,14 +90,13 @@
     trails.length=0;motion.clear();return oldReset.apply(this,arguments);
   };
   const api=Object.freeze({
-    version:'275.0',projection:'Canvas2D',chargeFor,defendedSquare,
-    existingSquareDefence:squareMultiplier,
-    squareDefenceOnly2D:true,
+    version:'275.0',projection:'Canvas2D',visualOnly:true,chargeFor,
+    get existingSquareDefence(){return root.__CAVALRY_ARTILLERY_V1__?.chargeVsSquare??.35;},
     stats:()=>({...stats,dustCount:trails.length,maxDust:MAX_DUST})
   });
   root.__TOPDOWN_CAVALRY_V275__=api;
   root.NRTS.subsystems.register('topdown-cavalry-v275',api,{
     phase:'2d-only',legacyBridge:false,
-    responsibility:'momentum-synced charge art, hoof dust and real 2D-only cavalry damage mitigation by deployed infantry squares'
+    responsibility:'momentum-linked charge art, bounded hoof dust and existing defensive-square visibility without touching the real combat authority'
   });
 })(window);
