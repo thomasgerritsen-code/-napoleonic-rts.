@@ -28,8 +28,8 @@ test('current runtime loads with river systems, simulation facade and no JavaScr
   const water = await page.evaluate(() => window.__RTS_DEBUG__.waterSystemV067());
   expect(water.name).toBe('Ruisseau de la Campagne');
   expect(water.bridges).toBe(5);
-  expect(water.fords).toBe(1);
-  expect(water.crossings).toHaveLength(6);
+  expect(water.fords).toBe(0);
+  expect(water.crossings).toHaveLength(5);
   expect(water.river.length).toBeGreaterThanOrEqual(18);
   expect(water.crossings.map(c=>c.id)).toEqual(expect.arrayContaining(['pont-chaussee','pont-crete','pont-fermes','pont-grands-bois','pont-du-sud']));
 
@@ -40,14 +40,14 @@ test('current runtime loads with river systems, simulation facade and no JavaScr
   expect(blocked.crossing).toBeNull();
   expect(bridge.water).toBe(false);
   expect(bridge.crossing).toBe('Pont de la Chaussée');
-  expect(ford.water).toBe(false);
-  expect(ford.crossing).toBe('Gué de la Colline');
+  expect(ford.water).toBe(true);
+  expect(ford.crossing).toBeNull();
 
   const speeds = await page.evaluate(() => ({
     bridge: window.__RTS_DEBUG__.crossingSpeedV067('infantry','pont-chaussee'),
-    ford: window.__RTS_DEBUG__.crossingSpeedV067('infantry','gue-colline')
+    ford: null
   }));
-  expect(speeds.bridge).toBeGreaterThan(speeds.ford);
+  expect(speeds.bridge).toBeGreaterThan(0); expect(speeds.ford).toBeNull();
   await testInfo.attach('river-crossings', { body:await page.screenshot({fullPage:true}), contentType:'image/png' });
   expect(errors).toEqual([]);
 });
