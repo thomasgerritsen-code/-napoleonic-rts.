@@ -52,15 +52,12 @@
     const local=crossingLocalV068(c,march.anchorX,march.anchorY);
     const clearance=local.along*info.initialSide-c.length/2;
     const config=global.NRTS_CONFIG?.navigation?.bridge||{};
-    // The old 90→24-unit transition starts after the lead files already touch
-    // the bridge. Begin well upstream so a wide line can close into two files
-    // before its members reach the narrow deck. Ignore the early "entered"
-    // signal from a single forward scout; use the authoritative anchor instead.
-    // Build the actual four-file column while still well before the bridge.
-    // The former full-compression point (120 px from the portal) left newly
-    // formed player battalions visibly scattered beside the stone crossing.
-    const start=Math.max(350,Number(config.columnFormStartClearance)||260);
-    const full=Math.min(start-1,Math.max(220,Number(config.columnFormFullClearance)||120));
+    // Keep full-width road files until the final ~110 world units before
+    // the bridge portal. A ~100-unit smooth transition is ample for the
+    // 4.5-unit outer-file adjustment without compressing hundreds of units
+    // too early. Use exactly the same thresholds as the physical v261 owner.
+    const start=Math.max(70,Number(config.columnFormStartClearance)||110);
+    const full=Math.max(0,Math.min(start-10,Number(config.columnFormFullClearance)??12));
     if(info?.state==='clearing')return 1;
     if(clearance>=start)return 0;
     if(clearance<=full)return 1;
@@ -133,7 +130,7 @@
     if(!c)return speed;
     const local=crossingLocalV068(c,march.anchorX,march.anchorY);
     const clearance=local.along*info.initialSide-c.length/2;
-    if(clearance<=52 || clearance>230 || elapsed-march.bridgeStageStartedAtV249>1.35)return speed;
+    if(clearance<=12 || clearance>110 || elapsed-march.bridgeStageStartedAtV249>1.35)return speed;
     const members=regimentMembers(reg).filter(u=>!u.dead && u.type==='infantry');
     if(!members.length)return speed;
     const outOfFile=members.filter(u=>Math.hypot(u.x-u.targetX,u.y-u.targetY)>18).length;

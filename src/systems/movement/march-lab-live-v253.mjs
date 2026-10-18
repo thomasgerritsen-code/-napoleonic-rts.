@@ -173,16 +173,27 @@ function targets(reg,state,march,bridge,people){
   for(const u of foot)if(!kept.includes(u.id))kept.push(u.id);
   state.rankIds=kept;
   const rows=Math.ceil(kept.length/4);
-  const gap=bridge?19:20;
-  const fileGap=bridge?15:18;
+  const info=reg.crossingTrafficV068;
+  const initialSide=info?.initialSide??state.bridgeSide;
+  const start=Math.max(70,Number(window.NRTS_CONFIG?.navigation?.bridge?.columnFormStartClearance)||110);
+  const full=Math.max(0,Math.min(start-10,Number(window.NRTS_CONFIG?.navigation?.bridge?.columnFormFullClearance)??12));
+  const bridgeLocal=bridge?crossingLocalV068(bridge,march.anchorX,march.anchorY):null;
+  const clearance=bridgeLocal&&finite(initialSide)?bridgeLocal.along*initialSide-bridge.length/2:Infinity;
+  const raw=clamp((start-clearance)/Math.max(1,start-full),0,1);
+  const narrowing=raw*raw*(3-2*raw);
+  // Do not force early approach ranks onto the bridge centreline while they
+  // are still marching four-wide on the road. Start the narrow deck geometry
+  // only inside the final bridge approach zone.
+  const useDeckSlots=Boolean(bridge&&narrowing>0);
+  const gap=20-narrowing;
+  const fileGap=18-3*narrowing;
   const half=(rows-1)*gap/2;
   const result=new Map();
-  const info=reg.crossingTrafficV068;
-  const direction=bridge?-(info?.initialSide??state.bridgeSide??-1):0;
-  const local=bridge?crossingLocalV068(bridge,march.anchorX,march.anchorY):null;
+  const direction=useDeckSlots?-initialSide:0;
+  const local=useDeckSlots?bridgeLocal:null;
   function point(back,side){
     let base;
-    if(bridge && direction){
+    if(useDeckSlots && direction){
       base=crossingPointV068(bridge,local.along-direction*back,side);
       return{x:base.x,y:base.y,angle:crossingHeadingV068(bridge,state.bridgeSide)};
     }
