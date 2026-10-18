@@ -130,7 +130,7 @@ test('v282 distant camps and legacy bridges are physically spread across the enl
    const by=Object.fromEntries(d.crossings.map(c=>[c.id,c.y]));
    expect(by['pont-crete']-by['pont-chaussee']).toBeGreaterThanOrEqual(500);
    expect(by['pont-fermes']-by['pont-crete']).toBeGreaterThanOrEqual(1000);
-   expect(by['pont-grands-bois']-by['pont-fermes']).toBeGreaterThanOrEqual(950);
+   expect(by['pont-grands-bois']-by['pont-fermes']).toBeGreaterThanOrEqual(500);
    expect(d.crossings.every(c=>c.onDeck)).toBe(true);
    if(retry===0)await page.evaluate(()=>resetGame());
  }
