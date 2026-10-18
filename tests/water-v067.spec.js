@@ -33,9 +33,9 @@ test('current runtime loads with river systems, simulation facade and no JavaScr
   expect(water.river.length).toBeGreaterThanOrEqual(18);
   expect(water.crossings.map(c=>c.id)).toEqual(expect.arrayContaining(['pont-chaussee','pont-crete','pont-fermes','pont-grands-bois','pont-du-sud']));
 
-  const blocked = await page.evaluate(() => window.__RTS_DEBUG__.waterInfoV067(1475,520));
+  const blocked = await page.evaluate(() => window.__RTS_DEBUG__.waterInfoV067(1475,strategicLatitudeV282(520)));
   const bridge = await page.evaluate(() => window.__RTS_DEBUG__.waterInfoV067(1500,900));
-  const ford = await page.evaluate(() => window.__RTS_DEBUG__.waterInfoV067(1530,1280));
+  const ford = await page.evaluate(() => window.__RTS_DEBUG__.waterInfoV067(1530,strategicLatitudeV282(1280)));
   expect(blocked.water).toBe(true);
   expect(blocked.crossing).toBeNull();
   expect(bridge.water).toBe(false);
@@ -96,4 +96,43 @@ test('F3 test lab and bug reports expose the active runtime version', async ({ p
   expect(result.report.scenario).toBe('artillery-3');
   expect(result.report.audit).toBeTruthy();
   expect(errors).toEqual([]);
+});
+
+test('v282 distant camps and legacy bridges are physically spread across the enlarged map',async({page})=>{
+ const pageErrors=await openGame(page);
+ const inspect=()=>page.evaluate(()=>{
+   const france=buildings.find(b=>b.side==='france'&&b.type==='towncenter'&&!b.dead);
+   const britain=buildings.find(b=>b.side==='britain'&&b.type==='towncenter'&&!b.dead);
+   const troops=units.filter(u=>u.side==='britain'&&!u.dead);
+   const radius=Math.max(...troops.map(u=>Math.hypot(u.x-britain.x,u.y-britain.y)));
+   const berries=resources.filter(r=>r.type==='food'&&!r.dead&&Math.hypot(r.x-britain.x,r.y-britain.y)<650);
+   const wood=resources.filter(r=>r.type==='wood'&&!r.dead&&Math.hypot(r.x-britain.x,r.y-britain.y)<650);
+   const crossings=WATER_CROSSINGS_V067.filter(c=>c.type==='bridge')
+      .map(c=>({id:c.id,x:c.x,y:c.y,onDeck:!waterAtV067(c.x,c.y)}));
+   return{world:{width:WORLD.width,height:WORLD.height},france:{x:france.x,y:france.y},
+     britain:{x:britain.x,y:britain.y},troops:troops.length,radius,berries:berries.length,wood:wood.length,
+     crossings,onWater:troops.filter(u=>waterAtV067(u.x,u.y)).length};
+ });
+ for(let retry=0;retry<2;retry++){
+   const d=await inspect();
+   expect(d.world.width).toBeGreaterThanOrEqual(8000);
+   expect(d.world.height).toBeGreaterThanOrEqual(5000);
+   expect(d.france.x).toBeLessThan(d.world.width*.20);
+   expect(d.france.y).toBeLessThan(d.world.height*.25);
+   expect(d.britain.x).toBeGreaterThan(d.world.width*.85);
+   expect(d.britain.y).toBeGreaterThan(d.world.height*.75);
+   expect(Math.hypot(d.britain.x-d.france.x,d.britain.y-d.france.y)).toBeGreaterThan(7500);
+   expect(d.troops).toBeGreaterThanOrEqual(12);
+   expect(d.radius).toBeLessThan(570);
+   expect(d.berries).toBeGreaterThan(0);
+   expect(d.wood).toBeGreaterThan(0);
+   expect(d.onWater).toBe(0);
+   const by=Object.fromEntries(d.crossings.map(c=>[c.id,c.y]));
+   expect(by['pont-crete']-by['pont-chaussee']).toBeGreaterThanOrEqual(500);
+   expect(by['pont-fermes']-by['pont-crete']).toBeGreaterThanOrEqual(1000);
+   expect(by['pont-grands-bois']-by['pont-fermes']).toBeGreaterThanOrEqual(500);
+   expect(d.crossings.every(c=>c.onDeck)).toBe(true);
+   if(retry===0)await page.evaluate(()=>resetGame());
+ }
+ expect(pageErrors).toEqual([]);
 });

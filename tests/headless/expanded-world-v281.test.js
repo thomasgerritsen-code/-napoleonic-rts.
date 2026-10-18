@@ -16,7 +16,7 @@ test('v281 playable map expands by at least 3.5x original world area',()=>{
 });
 
 test('v281 bridges are distant, traverse a continued river and have actual connecting roads',()=>{
- const match=riverSource.match(/const WATER_CROSSINGS_V067 = Object\.freeze\((\[[\s\S]*?\])\);/);
+ const match=riverSource.match(/const WATER_CROSSINGS_V067 = Object\.freeze\((\[[\s\S]*?\])(?:\.map\([\s\S]*?\))?\);/);
  assert(match,'missing crossing geometry array');
  const crossings=vm.runInNewContext(match[1],{});
  const northern=crossings.find(c=>c.id==='pont-grands-bois');
