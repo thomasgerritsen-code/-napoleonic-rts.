@@ -27,10 +27,11 @@ test('current runtime loads with river systems, simulation facade and no JavaScr
   expect(facade).toEqual({ version:runtimeVersion, hasSnapshot:true, hasDispatch:true, hasAudit:true });
   const water = await page.evaluate(() => window.__RTS_DEBUG__.waterSystemV067());
   expect(water.name).toBe('Ruisseau de la Campagne');
-  expect(water.bridges).toBe(3);
+  expect(water.bridges).toBe(5);
   expect(water.fords).toBe(1);
-  expect(water.crossings).toHaveLength(4);
-  expect(water.river.length).toBeGreaterThanOrEqual(10);
+  expect(water.crossings).toHaveLength(6);
+  expect(water.river.length).toBeGreaterThanOrEqual(18);
+  expect(water.crossings.map(c=>c.id)).toEqual(expect.arrayContaining(['pont-chaussee','pont-crete','pont-fermes','pont-grands-bois','pont-du-sud']));
 
   const blocked = await page.evaluate(() => window.__RTS_DEBUG__.waterInfoV067(1475,520));
   const bridge = await page.evaluate(() => window.__RTS_DEBUG__.waterInfoV067(1500,900));
