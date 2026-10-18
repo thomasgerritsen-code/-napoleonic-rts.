@@ -186,16 +186,19 @@ test('AI Commander retains a near-equal target but switches for a decisive advan
     const place=(reg,x,y)=>regimentMembers(reg).forEach((u,i)=>{
       u.x=x+(i%4)*3;u.y=y+Math.floor(i/4)*3;u.targetX=u.x;u.targetY=u.y;u.morale=100;u.hp=u.maxHp;
     });
-    place(first,1600,820);place(second,1540,980);
+    // v285: anchor the hysteresis fixture to the relocated British base.
+    // Fixed 1600/1540 coordinates reversed target priority after map expansion.
+    const base=aiBritishTC();
+    place(first,base.x-900,base.y-500);place(second,base.x-1000,base.y-490);
     eval('elapsed=100');
     window.__AI_COMMANDER_V1__.forceState('ATTACK');
     window.__AI_COMMANDER_V1__.tick();
     const initial=window.__AI_COMMANDER_V1__.state().target.id;
 
-    place(first,1540,820);place(second,1580,980);
+    place(first,base.x-940,base.y-500);place(second,base.x-950,base.y-490);
     const retained=window.__AI_COMMANDER_V1__.strategicTarget().id;
 
-    place(first,900,820);place(second,1700,980);
+    place(first,base.x-1600,base.y-500);place(second,base.x-750,base.y-490);
     const switched=window.__AI_COMMANDER_V1__.strategicTarget().id;
     v05PeaceMode=true;
     return{firstId,secondId,initial,retained,switched};
