@@ -206,6 +206,8 @@ test('v275 deployed eight-plus-musket square actually reduces 2D cavalry charge 
     Math.random=was;
     window.__BATTLEFIELD_3D_V1__.setEnabled(false);
     return{protectedNow,protected3d,reduced,open,in3d,protectedCount,
+      liveFireName:fire.name,liveFireSource:fire.toString().slice(0,190),
+      attackerCharge:attacker.chargeTimer,
       after:cav.stats().squaresProtected};
   });
   console.log('V275_SQUARE_COUNTERCHARGE',JSON.stringify(r));
