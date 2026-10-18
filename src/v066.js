@@ -6,6 +6,20 @@ document.title = `Napoleonic RTS v${V066_VERSION}`;
 const v066VersionBadge = document.querySelector('.version');
 if (v066VersionBadge) v066VersionBadge.textContent = `v${V066_VERSION}`;
 
+// v282: transform historic river/roads together; no unconnected bridge mouths.
+const STRATEGIC_LATITUDES_V282=Object.freeze([
+  [0,0],[900,900],[1065,1430],[1280,1920],[1700,2540],
+  [3050,3540],[4580,4580],[5000,5000]
+]);
+function strategicLatitudeV282(y){
+  const p=STRATEGIC_LATITUDES_V282;
+  for(let i=1;i<p.length;i++){
+    if(y>p[i][0])continue;
+    const [ax,ay]=p[i-1], [bx,by]=p[i];
+    return ay+(by-ay)*(y-ax)/Math.max(1,bx-ax);
+  }
+  return p[p.length-1][1]+(y-p[p.length-1][0]);
+}
 const ROAD_NETWORK_V066 = Object.freeze([
   { id:'grande-chaussee', name:'Grande Chaussée', roadClass:'chaussee', width:78, points:[[70,930],[420,915],[700,900],[1050,895],[1350,900],[1620,895],[1900,890],[2200,895],[2500,900],[2820,895],[3150,900],[3450,920],[3740,955]] },
   { id:'route-du-nord', name:'Route du Nord', roadClass:'chaussee', width:66, points:[[1910,55],[1885,300],[1875,540],[1885,720],[1900,890],[1930,1120],[1980,1390],[2040,1640],[2110,1900],[2180,2160]] },
@@ -27,7 +41,7 @@ const ROAD_NETWORK_V066 = Object.freeze([
   { id:'route-de-la-vallee-ouest', name:'Route de la Vallée Ouest', roadClass:'secondary', width:44, points:[[1030,2430],[850,3000],[800,3550],[750,4100],[750,4520]] },
   { id:'route-de-la-colline-sud', name:'Route de la Colline Sud', roadClass:'secondary', width:46, points:[[2300,3050],[2750,3420],[2960,3850],[3100,4200],[2930,4590]] },
   { id:'route-de-l-est-lointain', name:'Route de l’Est Lointain', roadClass:'secondary', width:48, points:[[3780,2020],[4110,2450],[4400,2950],[5000,3350],[5750,3700],[6200,4210]] }
-].map(r => Object.freeze({ ...r, points:Object.freeze(r.points.map(([x,y])=>Object.freeze({x,y}))) })));
+].map(r => Object.freeze({ ...r, points:Object.freeze(r.points.map(([x,y])=>Object.freeze({x,y:strategicLatitudeV282(y)}))) })));
 
 const ROAD_CLASS_SPEEDS_V066 = Object.freeze({
   chaussee: Object.freeze({ infantry:56, cavalry:90, artillery:30 }),
@@ -40,7 +54,7 @@ const ROAD_HAMLETS_V066 = Object.freeze([
   {name:'Bois-Hameau',x:590,y:430},{name:'Ferme du Sud',x:650,y:1650},{name:'Ferme de l’Est',x:3240,y:1580},
   {name:'Les Grands Bois',x:1450,y:2810},{name:'Pont du Sud',x:3650,y:4540},
   {name:'La Colline',x:2960,y:3850},{name:'Camp de l’Est',x:5000,y:3350}
-]);
+].map(h=>Object.freeze({...h,y:strategicLatitudeV282(h.y)})));
 
 function clampV066(v,min,max){return Math.max(min,Math.min(max,v));}
 function closestPointOnSegmentV066(px,py,a,b){const vx=b.x-a.x,vy=b.y-a.y,len2=vx*vx+vy*vy;if(len2<=.0001)return{x:a.x,y:a.y,t:0,distance:Math.hypot(px-a.x,py-a.y)};const t=clampV066(((px-a.x)*vx+(py-a.y)*vy)/len2,0,1),x=a.x+vx*t,y=a.y+vy*t;return{x,y,t,distance:Math.hypot(px-x,py-y)};}
