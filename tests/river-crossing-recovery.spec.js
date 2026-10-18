@@ -12,7 +12,7 @@ async function openGame(page) {
   await page.waitForFunction(() => Boolean(window.RTS_SIM && window.__RIVER_CROSSING_RECOVERY_V1__));
 }
 
-test('stalled soldiers at river banks, bridge corners and ford recover locally without entering blocked water', async ({ page }) => {
+test('stalled soldiers at two distinct bridge approaches recover without entering blocked water', async ({ page }) => {
   test.setTimeout(90_000);
   await openGame(page);
 
@@ -62,8 +62,8 @@ test('stalled soldiers at river banks, bridge corners and ford recover locally w
       };
     }
 
-    const bridge=WATER_CROSSINGS_V067.find(c=>c.type==='bridge'),ford=WATER_CROSSINGS_V067.find(c=>c.type==='ford');
-    scenarios.push(run(bridge));scenarios.push(run(ford));
+    const bridge=WATER_CROSSINGS_V067.find(c=>c.id==='pont-chaussee'),farBridge=WATER_CROSSINGS_V067.find(c=>c.id==='pont-grands-bois');
+    scenarios.push(run(bridge));scenarios.push(run(farBridge));
     return{scenarios,stats:window.__RIVER_CROSSING_RECOVERY_V1__.stats()};
   });
 
