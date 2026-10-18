@@ -43,7 +43,7 @@ test('v271 coordinated 2D volley aims, registers actual 12-musket shot group, an
   expect(r.groups.find(g=>g.id===271777)?.count).toBe(12);
   expect(r.stats.grouped).toBeGreaterThanOrEqual(11);
   expect(r.smokeGroup).toBeGreaterThanOrEqual(12);
-  expect(r.mainVersion).toBe('1.3.25');
+  expect(r.mainVersion).toBe('1.3.26');
 });
 
 test('v272 death poses and hit flinches are varied, capped and render-only',async({page})=>{

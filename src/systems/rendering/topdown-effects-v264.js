@@ -88,34 +88,16 @@
   drawParticles=function drawTopdownBurstLayerV264(){
     baseDrawParticles();drawBursts();
   };
-  const baseDrawUnit=drawUnit;
-  drawUnit=function drawTopdownFirePoseV263(u){
-    baseDrawUnit(u);
-    if(!twoD()||!u||u.dead||!['infantry','officer'].includes(u.type)||!isWorldVisible(u.x,u.y,30))return;
-    const state=root.__COMBAT_ANIMATIONS_V1__?.animationFor(u);
-    if(state?.kind!=='musket-fire')return;
-    // Musket reload has three readable beats: fire, reach for cartridge,
-    // ram down the barrel. Draw only hands/ramrod, never alter positions.
-    const t=state.t;
-    if(t<.18||t>.92)return;
-    ctx.save();ctx.translate(u.x,u.y);ctx.rotate(u.facing||0);
-    const reach=t<.5?(t-.18)/.32:1-(t-.5)/.42;
-    const hand=6+Math.max(0,reach)*5;
-    ctx.strokeStyle='#d0ae89';ctx.lineWidth=1.45;
-    ctx.beginPath();ctx.moveTo(1,-3.2);ctx.lineTo(hand,3.5);ctx.stroke();
-    if(t>.40&&t<.78){
-      ctx.strokeStyle='#aaaca8';ctx.lineWidth=.85;
-      ctx.beginPath();ctx.moveTo(3,6);ctx.lineTo(11+Math.sin(t*11)*2,6);ctx.stroke();
-    }
-    ctx.restore();
-  };
+  // v278: no drawUnit wrapper here. The character renderer is the sole
+  // authority for musket arms and ramrod; we retain flash, particles and
+  // hit visuals without painting a second loading animation.
   const oldReset=resetGame;
   resetGame=function resetTopdownEffectsV264(){
     bursts.length=0;return oldReset.apply(this,arguments);
   };
   const api=Object.freeze({
     version:'264.0',visualOnly:true,projection:'Canvas2D',
-    features:['shot-bloom','muzzle-pressure-wave','ramrod-and-reload','impact-dirt','bounded-pool'],
+    features:['shot-bloom','muzzle-pressure-wave','single-owner-character-reload','impact-dirt','bounded-pool'],
     stats:()=>({...stats,active:bursts.length,cap:MAX_BURSTS})
   });
   root.__TOPDOWN_EFFECTS_V264__=api;

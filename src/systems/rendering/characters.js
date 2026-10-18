@@ -95,6 +95,39 @@
       (p-.84)/.16),recoil:0,ramrod:0};
   }
 
+  // v278: the two arm chains and single ramrod are owned by the character
+  // renderer alone. All positions are local top-down coordinates; they are
+  // deterministic drawings, never positions fed back into the simulation.
+  function musketHands(u,pose){
+    const shoulder=clampMusket01(pose.shoulder||0);
+    const barrel=shoulder*7;
+    const gunY=6.05-3.75*shoulder+(pose.recoil||0)*.3;
+    const marker=u?.combatVisualV1;
+    const age=marker?.kind==='musket-fire'&&Number.isFinite(marker.started)?
+      Math.max(0,elapsed-marker.started):0;
+    const remaining=Math.max(0,Number(u?.reload)||0);
+    const reloadProgress=clampMusket01(age/Math.max(.6,age+remaining));
+    // The left hand reaches the cartridge pouch, then travels back to the
+    // barrel. The other hand keeps a firm grip; both meet the weapon again.
+    const cartridge=pose.phase==='reload'?
+      Math.max(0,1-Math.abs(reloadProgress-.30)/.18):0;
+    const ram=clampMusket01(pose.ramrod||0);
+    const individuality=(((Number(u?.id)||0)%5)-2)*.13;
+    return{
+      support:{
+        elbowX:.8+shoulder*.8,elbowY:-4.7+cartridge*.65,
+        handX:3+barrel*.33-cartridge*5.0+ram*2+individuality,
+        handY:gunY-cartridge*3.6
+      },
+      trigger:{
+        elbowX:1.0+shoulder*.9,elbowY:4.7-cartridge*.4,
+        handX:6+barrel*.52-cartridge*1.8+ram*.6,
+        handY:gunY+cartridge*.65
+      },
+      cartridge,ramrod:ram
+    };
+  }
+
   // Orthographic standing silhouette. A standing person must stay compact in plan view:
   // shoulders dominate, the enlarged head overlaps the torso and only the feet peek out
   // behind it. Long head-to-foot stacking reads as a prone/crawling body and is avoided.
@@ -146,6 +179,7 @@
       // lower it for cartridge work, ram the charge, and return to carry.
       // These are render-only transforms; no combat timing or physics change.
       const pose=musketPose(u);
+      const hands=musketHands(u,pose);
       // Slight stock kick and a smoothly lowering barrel; only drawn, never
       // applied to the unit's position, facing or gameplay hit calculation.
       const y=(6.05-3.75*pose.shoulder+pose.recoil*.3)*scale;
@@ -156,16 +190,38 @@
       ctx.beginPath();ctx.moveTo((-4.5-recoil)*scale,y);ctx.lineTo((7+barrel-recoil)*scale,y);ctx.stroke();
       ctx.strokeStyle='#a9aaa5';ctx.lineWidth=1.05*scale;
       ctx.beginPath();ctx.moveTo((5+barrel-recoil)*scale,y);ctx.lineTo((9.7+barrel-recoil)*scale,y);ctx.stroke();
-      // Hands shift with the musket instead of staying attached to a static gun.
-      if(pose.shoulder>.08){
-        ctx.strokeStyle='#cda585';ctx.lineWidth=1.55*scale;
-        ctx.beginPath();ctx.moveTo(-.5*scale,-3.7*scale);ctx.lineTo((3+barrel*.33)*scale,y);ctx.stroke();
-        ctx.beginPath();ctx.moveTo(1.3*scale,4.6*scale);ctx.lineTo((6+barrel*.52)*scale,y);ctx.stroke();
+      // Shoulder-to-elbow coat and elbow-to-hand flesh form two readable
+      // articulated arms. A single left-hand cartridge gesture replaces the
+      // old overlapping, floating lines from effects/overlay renderers.
+      ctx.strokeStyle=coat;ctx.lineWidth=2.25*scale;
+      ctx.beginPath();
+      ctx.moveTo(-.5*scale,-3.7*scale);
+      ctx.lineTo(hands.support.elbowX*scale,hands.support.elbowY*scale);
+      ctx.moveTo(1.3*scale,4.6*scale);
+      ctx.lineTo(hands.trigger.elbowX*scale,hands.trigger.elbowY*scale);
+      ctx.stroke();
+      ctx.strokeStyle='#cda585';ctx.lineWidth=1.4*scale;
+      ctx.beginPath();
+      ctx.moveTo(hands.support.elbowX*scale,hands.support.elbowY*scale);
+      ctx.lineTo(hands.support.handX*scale,hands.support.handY*scale);
+      ctx.moveTo(hands.trigger.elbowX*scale,hands.trigger.elbowY*scale);
+      ctx.lineTo(hands.trigger.handX*scale,hands.trigger.handY*scale);
+      ctx.stroke();
+      // One loading hand grips a cartridge near the belt, rendered only
+      // during its own brief reload phase.
+      if(hands.cartridge>.1){
+        ctx.fillStyle='#ad9981';
+        ctx.beginPath();ctx.arc(hands.support.handX*scale,
+          hands.support.handY*scale,.85*hands.cartridge*scale,0,Math.PI*2);
+        ctx.fill();
       }
-      if(pose.ramrod>0){
+      if(hands.ramrod>0){
         ctx.strokeStyle='#b5b2a6';ctx.lineWidth=.85*scale;
-        const reach=4+Math.sin(pose.ramrod*Math.PI)*6;
-        ctx.beginPath();ctx.moveTo((reach-2)*scale,y-4*scale);ctx.lineTo((reach+7)*scale,y-4*scale);ctx.stroke();
+        const reach=4+Math.sin(hands.ramrod*Math.PI)*6;
+        ctx.beginPath();
+        ctx.moveTo((reach-2)*scale,y-4*scale);
+        ctx.lineTo((reach+7)*scale,y-4*scale);
+        ctx.stroke();
       }
     }
   }
@@ -258,7 +314,8 @@
     cavalryRiderHead:true,
     napoleonicUniforms:true,
     musketPose,
-    version:'character-visuals-v2.4'
+    musketHands,
+    version:'character-visuals-v2.5'
   });
   if(nrts.subsystems.has('character-renderer')){
     global.__CHARACTER_VISUALS_V2__=api;

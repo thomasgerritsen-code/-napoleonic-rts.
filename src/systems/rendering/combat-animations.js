@@ -72,7 +72,8 @@
         ctx.beginPath();ctx.ellipse(5,3.5,3,1.7,-.35,0,Math.PI*2);ctx.fill();
       }
     }
-    if(a?.kind==='musket-fire'&&a.age>.34&&a.age<a.duration*.86){const p=(a.age-.34)/Math.max(.1,a.duration*.86-.34),ram=8+Math.sin(p*Math.PI)*7;ctx.strokeStyle='#a68c65';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(4,1);ctx.lineTo(ram,-7);ctx.stroke();}
+    // v278: the single physical-looking ramrod is now painted exclusively
+    // by characters.js; this overlay keeps the actual-shot flash only.
     if(a?.kind==='artillery-fire'&&a.age<.18){ctx.fillStyle='rgba(255,212,112,.8)';ctx.beginPath();ctx.arc(15,-2,4.5*(1-a.age/.18),0,Math.PI*2);ctx.fill();}
     if(a?.kind==='cavalry-strike'){const swing=Math.sin(a.t*Math.PI)*.7;ctx.rotate(-swing);ctx.strokeStyle='#d4d1c7';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(0,-6);ctx.lineTo(15,-9);ctx.stroke();}
     ctx.restore();
