@@ -39,21 +39,20 @@
       groupKindV06(reg)!=='infantry'||reg.crossingTrafficV068?.forcedColumn)return false;
     return regimentMembers(reg).filter(u=>u.type==='infantry'&&!u.dead&&!u.routing).length>=8;
   }
-  const priorFire=fire,priorDamage=applyDamage;
-  let activeSquareHit=null;
+  const priorFire=fire;
   fire=function fireSquareCounterchargeV275(attacker,enemy){
     if(!defendedSquare(attacker,enemy))return priorFire.apply(this,arguments);
-    const previous=activeSquareHit;
-    activeSquareHit={attacker,target:enemy};
-    try{return priorFire.apply(this,arguments);}
-    finally{activeSquareHit=previous;}
-  };
-  applyDamage=function applySquareCounterchargeV275(victim,damage,shock){
-    if(activeSquareHit?.target===victim){
+    // Historical baseline fire and the live v06 combat wrappers read
+    // TYPES.cavalry.damage synchronously, so reducing it for this ONE
+    // charge reaches the original damage calculation. Always restore it
+    // afterwards, including when a wrapper throws.
+    const original=TYPES.cavalry.damage;
+    TYPES.cavalry.damage=original*squareMultiplier;
+    try{
+      const result=priorFire.apply(this,arguments);
       stats.squaresProtected++;
-      return priorDamage.call(this,victim,damage*squareMultiplier,(shock??8)*.65);
-    }
-    return priorDamage.apply(this,arguments);
+      return result;
+    }finally{TYPES.cavalry.damage=original;}
   };
 
   const baseDraw=drawUnit;
