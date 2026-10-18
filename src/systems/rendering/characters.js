@@ -46,20 +46,55 @@
     return .65+Math.min(.5,speed/100);
   }
 
-  function musketPose(u){
-    const anim=global.__COMBAT_ANIMATIONS_V1__?.animationFor(u);
-    if(anim?.kind!=='musket-fire')return global.__TOPDOWN_VOLLEY_V271__?.preFirePose(u)||{phase:'carry',shoulder:0,recoil:0,ramrod:0};
-    const age=anim.age;
-    // Live-fire event begins at the exact real projectile discharge.
-    if(age<.15)return{phase:'fire',shoulder:1,recoil:Math.sin(age/.15*Math.PI),ramrod:0};
-    if(age<.39)return{phase:'lower',shoulder:1-(age-.15)/.24,recoil:0,ramrod:0};
-    const reloadFraction=Math.max(0,Math.min(1,(age-.39)/Math.max(.08,anim.duration-.39)));
-    if(reloadFraction<.73){
-      return{phase:'reload',shoulder:.15,recoil:0,ramrod:reloadFraction/.73};
-    }
-    return{phase:'ready',shoulder:(reloadFraction-.73)/.27,recoil:0,ramrod:0};
+  function clampMusket01(v){return Math.max(0,Math.min(1,v));}
+  function smoothMusket01(v){
+    const t=clampMusket01(v);
+    return t*t*(3-2*t);
   }
-  
+  function musketPose(u){
+    const aim=()=>global.__TOPDOWN_VOLLEY_V271__?.preFirePose(u)||
+      {phase:'carry',shoulder:0,recoil:0,ramrod:0};
+    const anim=global.__COMBAT_ANIMATIONS_V1__?.animationFor(u);
+    // The combat marker normally expires slightly before the real randomized
+    // reload timer (0.90–1.15 times the unit's base reload). Continue only
+    // the weapon motion from that marker until the actual reload completes.
+    const marker=u?.combatVisualV1;
+    const pending=Number.isFinite(u?.reload)&&u.reload>0;
+    const afterEvent=marker?.kind==='musket-fire'&&pending&&
+      Number.isFinite(marker.started)&&elapsed>=marker.started&&
+      elapsed-marker.started<Math.max(5,TYPES[u.type]?.reload*1.35||0);
+    const shot=anim?.kind==='musket-fire'?anim:
+      afterEvent?{age:elapsed-marker.started}:null;
+    if(!shot)return aim();
+
+    const age=Math.max(0,Number(shot.age)||0);
+    // The first instant is exactly the real shot: no artificial staggered
+    // muzzle flashes. Only the recovery spring varies by a few milliseconds.
+    const rebound=.18+((Number(u.id)||0)%5)*.007;
+    if(age<rebound){
+      return{phase:'fire',shoulder:1,
+        recoil:Math.sin(Math.PI*age/rebound),ramrod:0};
+    }
+    if(age<.5){
+      return{phase:'lower',shoulder:1-.86*smoothMusket01(
+        (age-rebound)/(.5-rebound)),recoil:0,ramrod:0};
+    }
+
+    // Recover, take a cartridge, ram, then shoulder again according to the
+    // *live* reload value. Never render a fully ready gun while reloading.
+    const remaining=Math.max(0,Number(u.reload)||0);
+    const cycle=Math.max(.6,age+remaining);
+    const p=clampMusket01(age/cycle);
+    if(p<.84){
+      const ramPhase=clampMusket01((p-.47)/.29);
+      const ramrod=(p>=.47&&p<=.76)?Math.sin(Math.PI*ramPhase):0;
+      return{phase:'reload',shoulder:.14+.045*Math.sin(p*Math.PI),
+        recoil:0,ramrod};
+    }
+    return{phase:'ready',shoulder:.14+.86*smoothMusket01(
+      (p-.84)/.16),recoil:0,ramrod:0};
+  }
+
   // Orthographic standing silhouette. A standing person must stay compact in plan view:
   // shoulders dominate, the enlarged head overlaps the torso and only the feet peek out
   // behind it. Long head-to-foot stacking reads as a prone/crawling body and is avoided.
@@ -111,7 +146,9 @@
       // lower it for cartridge work, ram the charge, and return to carry.
       // These are render-only transforms; no combat timing or physics change.
       const pose=musketPose(u);
-      const y=(6.05-3.75*pose.shoulder)*scale;
+      // Slight stock kick and a smoothly lowering barrel; only drawn, never
+      // applied to the unit's position, facing or gameplay hit calculation.
+      const y=(6.05-3.75*pose.shoulder+pose.recoil*.3)*scale;
       const recoil=(pose.recoil*2.8)*scale;
       const barrel=pose.shoulder*7;
       ctx.lineCap='round';
@@ -221,7 +258,7 @@
     cavalryRiderHead:true,
     napoleonicUniforms:true,
     musketPose,
-    version:'character-visuals-v2.3'
+    version:'character-visuals-v2.4'
   });
   if(nrts.subsystems.has('character-renderer')){
     global.__CHARACTER_VISUALS_V2__=api;

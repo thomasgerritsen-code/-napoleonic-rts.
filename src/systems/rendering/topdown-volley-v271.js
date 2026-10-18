@@ -12,10 +12,15 @@
     if(!reg||reg.destroyed||reg.formation!=='line'||reg.engagementV069?.mode!=='fire')return null;
     if(reg.crossingTrafficV068?.forcedColumn||reg.marchV063?.locomotionV064==='road-march')return null;
     if(!(u.reload<.42&&volleyClock>2.55))return null;
+    // v277: a deterministic <110 ms spread of the preparatory movement.
+    // The actual trigger, muzzle flash and projectile still use combat-ai's
+    // single global volley gate: this must never invent earlier/later shots.
     const untilVolley=Math.max(0,3.1-volleyClock);
-    const shoulder=Math.max(0,Math.min(1,(.42-untilVolley)/.31));
+    const soldierOffset=((Number(u.id)||0)%7)*.018;
+    const progress=Math.max(0,Math.min(1,(.48-untilVolley-soldierOffset)/.35));
+    const smooth=progress*progress*(3-2*progress);
     stats.aimedFrames++;
-    return {phase:'aim',shoulder:.35+.65*shoulder,recoil:0,ramrod:0};
+    return {phase:'aim',shoulder:.10+.90*smooth,recoil:0,ramrod:0};
   }
   const originalFire=fire;
   fire=function fireTopdownVolleyV271(unit,enemy){
@@ -87,7 +92,7 @@
   const oldReset=resetGame;
   resetGame=function resetTopdownVolleyV271(){groups.clear();return oldReset.apply(this,arguments);};
   const api=Object.freeze({
-    version:'271.1-276',projection:'Canvas2D',physicalFireAuthority:'combat-ai',preFirePose,
+    version:'271.2-277',projection:'Canvas2D',physicalFireAuthority:'combat-ai',preFirePose,
     groups:()=>[...groups.values()].map(v=>({...v,muzzles:v.muzzles.map(m=>({...m}))})),
     stats:()=>({...stats,groups:groups.size,maxMuzzles:MAX_MUZZLES,maxDrawPuffs:MAX_DRAW_PUFFS})
   });
