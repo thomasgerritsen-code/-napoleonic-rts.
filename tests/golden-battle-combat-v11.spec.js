@@ -11,6 +11,10 @@ function persistReport(report) {
 }
 
 test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder coverage', async ({ page }, testInfo) => {
+  // 180 real rendered frames plus full-page screenshot/report attachments can
+  // exceed Playwright's default 30 seconds on contended hosted Chromium.
+  // Keep every combat, smoke, and p95 performance assertion unchanged.
+  test.setTimeout(90_000);
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.addInitScript(seedValue => {
