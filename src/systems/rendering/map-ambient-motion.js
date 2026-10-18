@@ -7,6 +7,14 @@
   const baseDrawTerrain=drawTerrain;
   const baseDrawParticles=drawParticles;
   const wind={x:.72,y:-.28,strength:1};
+  function currentWind(){return {...wind};}
+  function setWindDirection(degrees){
+    if(!Number.isFinite(degrees))return currentWind();
+    const rad=degrees*Math.PI/180;
+    wind.x=Math.cos(rad);
+    wind.y=Math.sin(rad);
+    return currentWind();
+  }
 
   function clock(){return performance.now()/1000;}
   function visibleBounds(margin=0){
@@ -95,7 +103,9 @@
 
   const api=Object.freeze({
     version:'map-ambient-motion-v1.3.2',
-    wind:Object.freeze({...wind}),
+    get wind(){return Object.freeze(currentWind());},
+    currentWind,
+    setWindDirection,
     visualOnly:true,
     viewportCulling:true,
     baseTerrainDraw:baseDrawTerrain,
