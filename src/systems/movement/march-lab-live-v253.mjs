@@ -10,7 +10,8 @@ const controllers = new WeakMap();
 const stats = {orders:0,roadFrames:0,bridgeFrames:0,physicalMoves:0,
   skippedUnsafe:0,invalidRoutes:0,longRouteOrders:0,longRouteFallbacks:0,
   preservedReplans:0,formationHandovers:0,fieldFrames:0,trailResets:0,
-  singleAuthorityFrames:0,blockedWaterSteps:0,waterCorrections:0};
+  singleAuthorityFrames:0,blockedWaterSteps:0,waterCorrections:0,
+  staleBridgeWaypointsSkipped:0,bridgeAnchorCaps:0};
 const finite = Number.isFinite;
 const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
 const distance = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -86,14 +87,39 @@ function stabilizeBridgeAnchor(state,march,bridge){
   if(state.bridgeProgress===null&&(along< -half-35||along>half+85))return;
   if(state.bridgeProgress===null)state.bridgeProgress=along;
   const dt=typeof formationDtV063==='number'?clamp(formationDtV063,.001,.05):.05;
-  const minimum=state.bridgeProgress+dt*35;
-  const maximum=state.bridgeProgress+dt*150;
-  along=clamp(Math.max(along,minimum),state.bridgeProgress,maximum);
+  // Do not pull the lead files arbitrarily far away from a stranded tail.
+  // An earlier build marched a Pont de la Crête leader >2500 units from the deck.
+  const ranks=Math.ceil(state.rankIds.length/4);
+  const safeLimit=half+Math.max(150,(ranks+3)*19+55);
+  const minimum=Math.min(safeLimit,state.bridgeProgress+dt*35);
+  const maximum=Math.min(safeLimit,state.bridgeProgress+dt*150);
+  const next=clamp(Math.max(along,minimum),state.bridgeProgress,Math.max(state.bridgeProgress,maximum));
+  if(next>=safeLimit-.01)stats.bridgeAnchorCaps++;
+  along=next;
   state.bridgeProgress=along;
   const p=crossingPointV068(bridge,along*dir,0);
   march.anchorX=p.x;
   march.anchorY=p.y;
   march.marchFacing=crossingHeadingV068(bridge,state.bridgeSide);
+}
+function discardPassedBridgeWaypoints(reg,state,bridge,march){
+  // The bridge solver can carry the physical column farther than legacy path
+  // indices advance. After the exit, stale approach/entry waypoints would
+  // otherwise send the battalion straight BACK onto the bridge.
+  const direction=-(state.bridgeSide||1);
+  const front=crossingLocalV068(bridge,march.anchorX,march.anchorY).along*direction;
+  if(front<bridge.length/2+24||!reg.path?.length)return;
+  let index=reg.pathIndex||0;
+  const start=index;
+  const threshold=Math.max(bridge.length/2+14,front-32);
+  while(index<reg.path.length-1){
+    const p=reg.path[index];
+    if(!finite(p?.x)||!finite(p?.y)){index++;continue;}
+    const progress=crossingLocalV068(bridge,p.x,p.y).along*direction;
+    if(progress>=threshold)break;
+    index++;
+  }
+  if(index>start){reg.pathIndex=index;stats.staleBridgeWaypointsSkipped+=index-start;}
 }
 function recordLeader(state,march){
   // YUKA.Path stores the actual route already travelled: no corner shortcut.
@@ -198,7 +224,10 @@ function refresh(reg){
     s=startController(reg,s);
   if(!s)return;
   const people=living(reg),bridge=bridgeFor(reg,s);
-  if(bridge)stabilizeBridgeAnchor(s,march,bridge);
+  if(bridge){
+    stabilizeBridgeAnchor(s,march,bridge);
+    discardPassedBridgeWaypoints(reg,s,bridge,march);
+  }
   const onRoad=Boolean(bridge||march.locomotionV064==='road-march'||
     (typeof roadAtV064==='function'&&roadAtV064(march.anchorX,march.anchorY)));
   if(onRoad)s.lastRoadAt=elapsed;
