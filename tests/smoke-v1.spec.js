@@ -71,6 +71,46 @@ test('game boots with current version and essential UI', async ({ page }) => {
   expect(versions.simulation).toBe(versions.release);
   expect(versions.foundation).toBe(versions.release);
   expect(versions.foundationRuntime).toBe(versions.release);
+
+  // v286: six old one-page-per-subsystem tests are retained here without
+  // six extra Chromium boot cycles. Preserve their original behaviour checks.
+  const subsystems = await page.evaluate(() => ({
+    weather: {
+      loaded: NRTS.subsystems.has('battlefield-weather'),
+      kind: window.__BATTLEFIELD_WEATHER_V1__?.state()?.kind ?? null
+    },
+    cavalryArtillery: {
+      loaded: NRTS.subsystems.has('cavalry-artillery-tactics'),
+      chargeVsSquare: window.__CAVALRY_ARTILLERY_V1__?.chargeVsSquare ?? null,
+      roundAmmo: window.__CAVALRY_ARTILLERY_V1__?.ammo({})?.round ?? null
+    },
+    fogScouting: {
+      loaded: NRTS.subsystems.has('fog-scouting'),
+      cavalryVision: window.__FOG_SCOUTING_V1__?.cavalryVision ?? null
+    },
+    moraleCommand: {
+      loaded: NRTS.subsystems.has('morale-command'),
+      steady: window.__MORALE_COMMAND_V2__?.statusFor(90) ?? null,
+      wavering: window.__MORALE_COMMAND_V2__?.statusFor(40) ?? null
+    },
+    staminaDiscipline: {
+      loaded: NRTS.subsystems.has('stamina-discipline'),
+      factor: window.__STAMINA_DISCIPLINE_V1__?.speedFactor({staminaV1:50}) ?? null
+    },
+    tacticalTerrain: {
+      loaded: NRTS.subsystems.has('tactical-terrain'),
+      lineOfSight: typeof window.__TACTICAL_TERRAIN_V1__?.lineOfSight === 'function'
+    }
+  }));
+  expect(subsystems.weather.loaded).toBe(true);
+  expect(['clear', 'rain', 'mist']).toContain(subsystems.weather.kind);
+  expect(subsystems.cavalryArtillery).toEqual({loaded:true,chargeVsSquare:0.35,roundAmmo:24});
+  expect(subsystems.fogScouting).toEqual({loaded:true,cavalryVision:430});
+  expect(subsystems.moraleCommand).toEqual({loaded:true,steady:'STEADY',wavering:'WAVERING'});
+  expect(subsystems.staminaDiscipline.loaded).toBe(true);
+  expect(subsystems.staminaDiscipline.factor).toBeGreaterThan(0.8);
+  expect(subsystems.staminaDiscipline.factor).toBeLessThan(0.9);
+  expect(subsystems.tacticalTerrain).toEqual({loaded:true,lineOfSight:true});
   expect(errors).toEqual([]);
 });
 
