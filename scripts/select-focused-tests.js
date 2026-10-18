@@ -41,7 +41,8 @@ function selectFocusedTests(files) {
   };
 
   for (const file of normalized) {
-    if (/^tests\/[^/]+\.spec\.js$/.test(file)) selected.add(file);
+    // Git diffs include deleted specs; do not schedule removed files.
+    if (/^tests\/[^/]+\.spec\.js$/.test(file) && fs.existsSync(file)) selected.add(file);
     if (restorationFiles.has(file)) addRestoration();
 
     if (file === 'src/systems/navigation/bridge-follower-safety-v1.js' || file === 'tests/bridge-follower-safety-v1.spec.js') addBridgeFollowerSafety();
