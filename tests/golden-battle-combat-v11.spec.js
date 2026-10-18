@@ -33,6 +33,11 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
   const setup = await page.evaluate(() => {
     window.__RTS_DEBUG__.runScenario('regiment-duel');
     window.__RTS_DEBUG__.setPeaceMode(false);
+    // v284: a correctly restored British town center can order every battery
+    // back to the far SE defensive camp during this 12-second weapons benchmark.
+    // Isolate the combat/animation fixture from strategic AI marching decisions:
+    // regiment orders below and the real firing simulation still run unchanged.
+    aiMilitaryOrder = () => {};
     const infantryIds = [];
     for (let row = 0; row < 5; row += 1) {
       const y = 610 + row * 175;
