@@ -21,19 +21,30 @@ test('AI production uses central targets and keeps replenishing after attrition'
       createUnit('britain','worker',2520+Math.random()*40,820+Math.random()*40);
     }
 
-    let barracks=livingBuildings('britain').filter(b=>b.type==='barracks');
-    while(barracks.length<2){
-      createBuilding('britain','barracks',2460-barracks.length*120,720,true);
-      barracks=livingBuildings('britain').filter(b=>b.type==='barracks');
-    }
+    // v285: old (2460,720) fixture coordinates are now covered by the
+    // expanded road/village exclusions. createBuilding() may return null.
+    // Use bounded, base-relative positions rather than looping forever.
+    const base=livingBuildings('britain').find(b=>b.type==='towncenter');
+    const placeFixtureBuilding=(type)=>{
+      for(let attempt=0;attempt<28;attempt++){
+        const col=attempt%7,row=Math.floor(attempt/7);
+        const x=base.x-350-col*85;
+        const y=base.y+145+row*95;
+        if(x<100||y>WORLD.height-100)continue;
+        const created=createBuilding('britain',type,x,y,true);
+        if(created)return created;
+      }
+      throw new Error('AI fixture cannot place '+type+' at the new British camp');
+    };
+    while(livingBuildings('britain').filter(b=>b.type==='barracks').length<2)
+      placeFixtureBuilding('barracks');
+    const barracks=livingBuildings('britain').filter(b=>b.type==='barracks');
     barracks.forEach(b=>{b.complete=true;b.queue.length=0;b.production=0;});
 
     // Give the deterministic fixture enough population headroom that this regression tests
     // replenishment rather than stopping on the deliberately separate house-building branch.
-    while(livingBuildings('britain').filter(b=>b.type==='house'&&b.complete).length<3){
-      const i=livingBuildings('britain').filter(b=>b.type==='house').length;
-      createBuilding('britain','house',2500-i*75,1060,true);
-    }
+    while(livingBuildings('britain').filter(b=>b.type==='house'&&b.complete).length<3)
+      placeFixtureBuilding('house');
     recalcPopCap('britain');
 
     // Remove existing British regiment bookkeeping and create a deliberately damaged field force.
@@ -66,11 +77,12 @@ test('AI production uses central targets and keeps replenishing after attrition'
     // Manual fixture units can consume the remaining cap. Keep the test focused on formation
     // logic and allow multiple one-action production cycles, matching the real AI cadence.
     recalcPopCap('britain');
-    while(economies.britain.popCap-populationUsed('britain')<20){
-      const i=livingBuildings('britain').filter(b=>b.type==='house').length;
-      createBuilding('britain','house',2500-i*75,1125,true);
+    for(let i=0;i<12&&economies.britain.popCap-populationUsed('britain')<20;i++){
+      placeFixtureBuilding('house');
       recalcPopCap('britain');
     }
+    if(economies.britain.popCap-populationUsed('britain')<20)
+      throw new Error('AI fixture could not establish 20 population headroom');
     const formedBefore=window.__AI_PRODUCTION_V125__.snapshot().formed;
     for(let i=0;i<6 && window.__AI_PRODUCTION_V125__.snapshot().formed===formedBefore;i++) aiDevelop();
     const afterForm=window.__AI_PRODUCTION_V125__.snapshot();
