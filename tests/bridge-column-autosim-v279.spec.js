@@ -25,6 +25,9 @@ test('v279 six real 4-wide regiment routes must clear every bridge without stran
       {id:'pont-chaussee',side: 1,count:36,lateral:-40},
       {id:'pont-crete',side:-1,count:24,lateral:68},
       {id:'pont-crete',side: 1,count:12,lateral:0},
+      // v280 reproducible route-regression: from this east bank angle the
+      // old 55-unit threshold preserved a Chaussée detour.
+      {id:'pont-crete',side: 1,count:12,lateral:-45},
       {id:'pont-fermes',side:-1,count:18,lateral:32},
       {id:'pont-fermes',side: 1,count:24,lateral:-26}
     ];
@@ -166,7 +169,7 @@ test('v279 six real 4-wide regiment routes must clear every bridge without stran
   console.log('BRIDGE_COLUMN_AUTOSIM_V279',JSON.stringify({
     version:report.version,passed:report.passed,total:report.scenarioCount,
     failures:errorsInCases}));
-  expect(report.scenarioCount).toBe(6);
+  expect(report.scenarioCount).toBe(7);
   expect(errors,errors.join('\n')).toEqual([]);
   expect(errorsInCases,JSON.stringify(errorsInCases,null,2)).toEqual([]);
 });

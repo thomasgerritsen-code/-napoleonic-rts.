@@ -173,7 +173,12 @@
     if(ids.includes(best.id))return null;
     const chosen=ids.map(id=>WATER_CROSSINGS_V067.find(c=>c.id===id)).filter(Boolean);
     const chosenScore=chosen.length?Math.min(...chosen.map(crossingScore)):Infinity;
-    if(crossingScore(best)+55>=chosenScore)return null;
+    // v280: 55 world-units is too high for neighbouring bridges. A direct
+    // Crête approach can be shorter by 40–50 units yet incorrectly preserve a
+    // Chaussée detour, even with both endpoints close to Crête. Require a
+    // meaningful 20-unit improvement before replacing the chosen crossing;
+    // only safe, continuous corridors are ever accepted below.
+    if(crossingScore(best)+20>=chosenScore)return null;
 
     const corridor=global.NRTS_NAVIGATION_V2.bridgeCorridor(best.id,fromSide);
     if(!corridor)return null;
