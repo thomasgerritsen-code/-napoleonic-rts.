@@ -12,14 +12,18 @@ const RIVER_NAV_HALF_WIDTH_V067 = 72;
 const RIVER_POINTS_V067 = Object.freeze([
   {x:1510,y:0},{x:1490,y:260},{x:1475,y:520},{x:1490,y:760},
   {x:1500,y:900},{x:1510,y:1065},{x:1420,y:1160},{x:1530,y:1280},
-  {x:1580,y:1450},{x:1645,y:1700},{x:1665,y:1950},{x:1700,y:2200}
+  {x:1580,y:1450},{x:1645,y:1700},{x:1665,y:1950},{x:1700,y:2200},
+  {x:1780,y:2650},{x:1900,y:3050},{x:2000,y:3550},
+  {x:2140,y:4070},{x:2250,y:4580},{x:2300,y:5000}
 ].map(p=>Object.freeze(p)));
 
 const WATER_CROSSINGS_V067 = Object.freeze([
   Object.freeze({id:'pont-chaussee',name:'Pont de la Chaussée',type:'bridge',material:'stone',x:1500,y:900,angle:0,length:270,width:112}),
   Object.freeze({id:'pont-crete',name:'Pont de la Crête',type:'bridge',material:'wood',x:1510,y:1065,angle:-0.08,length:250,width:98}),
   Object.freeze({id:'gue-colline',name:'Gué de la Colline',type:'ford',material:'ford',x:1530,y:1280,angle:-0.52,length:310,width:154}),
-  Object.freeze({id:'pont-fermes',name:'Pont des Fermes',type:'bridge',material:'wood',x:1645,y:1700,angle:-0.074,length:270,width:98})
+  Object.freeze({id:'pont-fermes',name:'Pont des Fermes',type:'bridge',material:'wood',x:1645,y:1700,angle:-0.074,length:270,width:98}),
+  Object.freeze({id:'pont-grands-bois',name:'Pont des Grands Bois',type:'bridge',material:'wood',x:1900,y:3050,angle:0,length:270,width:112}),
+  Object.freeze({id:'pont-du-sud',name:'Pont du Sud',type:'bridge',material:'stone',x:2250,y:4580,angle:0,length:270,width:118})
 ]);
 
 function riverHitV067(x,y){

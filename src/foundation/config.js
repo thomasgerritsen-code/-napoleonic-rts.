@@ -82,7 +82,7 @@
       })
     }),
     world: Object.freeze({
-      battlefield: Object.freeze({ width:4300, height:2500 }),
+      battlefield: Object.freeze({ width:8000, height:5000 }),
       roads: Object.freeze({
         omittedIds: Object.freeze(['chemin-de-la-crete-ouest','chemin-de-la-crete-est','voie-de-la-ferme','voie-du-verger','voie-de-la-lisiere']),
         rendering: Object.freeze({ shoulderExtra:13, rutFraction:0.19, junctionApronScale:0.62, textureSpacing:34 })
