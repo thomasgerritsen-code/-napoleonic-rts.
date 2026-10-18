@@ -206,7 +206,7 @@
         const radius=m.radius*(.66+(seededOffset(e.seed^0x85ebca6b,k)+1)*.23)*regFactor;
         const shaded=k%4===0,edge=!shaded&&k%3===0;
         ctx.fillStyle=shaded?colors.core:edge?colors.rim:colors.middle;
-        const strength=shaded?1.06:edge?.72:.94;
+        const strength=shaded?1.06:(edge?0.72:0.94);
         ctx.globalAlpha=m.opacity*(cannon?.27:.265)*strength*
           (1-Math.min(.46,k*.018));
         ctx.beginPath();ctx.ellipse(x,y,radius*(.94+.18*Math.sin(k)),radius*.8,
