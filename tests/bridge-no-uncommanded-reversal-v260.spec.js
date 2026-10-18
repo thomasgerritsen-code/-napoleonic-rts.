@@ -59,7 +59,20 @@ test('v260 real player move: completed bridge crossing never loops back without 
             min:+min.toFixed(0),max:+max.toFixed(0),phase:st?.phase||null,
             traffic:reg.crossingTrafficV068?.state||null,initialSide:reg.crossingTrafficV068?.initialSide||null,
             pathIndex:reg.pathIndex,pathCount:reg.path?.length||0,finalTarget:reg.finalTarget,
-            mphase:m?.phase||null});
+            mphase:m?.phase||null,
+            waypoint:reg.path?.[reg.pathIndex]?
+              {...crossingLocalV068(c,reg.path[reg.pathIndex].x,reg.path[reg.pathIndex].y),
+                progress:+(crossingLocalV068(c,reg.path[reg.pathIndex].x,reg.path[reg.pathIndex].y).along*dir).toFixed(0)}:null,
+            worst:(()=>{
+              const u=members.reduce((w,u)=>crossingLocalV068(c,u.x,u.y).along*dir<
+                crossingLocalV068(c,w.x,w.y).along*dir?u:w,members[0]);
+              const l=crossingLocalV068(c,u.x,u.y);
+              const to=crossingLocalV068(c,u.targetX,u.targetY);
+              return {id:u.id,type:u.type,along:+(l.along*dir).toFixed(0),
+                lateral:+l.perp.toFixed(0),targetProgress:+(to.along*dir).toFixed(0),
+                targetLateral:+to.perp.toFixed(0),
+                blocked:segmentCrossesBlockedWaterV067(u.x,u.y,u.targetX,u.targetY)};
+            })()});
       }
       const progress=members.map(u=>crossingLocalV068(c,u.x,u.y).along*dir);
       runs.push({crossId,side,count,extra,selected,commanded,onceBeyond,clearedAll,returnedToDeck,
