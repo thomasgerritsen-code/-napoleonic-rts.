@@ -14,6 +14,11 @@
       if(u.task==='return'&&u.carry>0)return'carrying';
     }
     if(u.type==='cavalry'&&(u.chargeTimer||0)>0)return'charging';
+    // Actual physical displacement wins over distant formation targets.
+    // Without this, blocked bridge followers run in place indefinitely.
+    if(global.__TOPDOWN_MARCH_V262__?.samplesFor(u)){
+      return global.__TOPDOWN_MARCH_V262__.isMoving(u)?(u.marchingV064?'marching':'moving'):'idle';
+    }
     const d=Math.hypot((u.targetX??u.x)-u.x,(u.targetY??u.y)-u.y);
     if(d>4)return u.marchingV064?'marching':'moving';
     return'idle';
@@ -36,14 +41,24 @@
     }
   }
 
+  function marchingAnimationAmplitude(marching,speed){
+    if(!marching)return 0;
+    return .65+Math.min(.5,speed/100);
+  }
+
   // Orthographic standing silhouette. A standing person must stay compact in plan view:
   // shoulders dominate, the enlarged head overlaps the torso and only the feet peek out
   // behind it. Long head-to-foot stacking reads as a prone/crawling body and is avoided.
   function drawTopDownSoldierAt(u,state,opts={}){
     const p=palette(u),scale=opts.scale||1;
     const marching=['moving','marching','routing','carrying'].includes(state);
-    const gait=marching?Math.sin(phase(u,1.8))*0.85*scale:0;
-    const armSwing=marching?Math.sin(phase(u,1.8)+Math.PI/2)*0.55*scale:0;
+    const speed=global.__TOPDOWN_MARCH_V262__?.speedFor(u)||0;
+    // One shared gait phase per soldier, fast enough for marching but bounded.
+    const cadence=1.6+Math.min(.65,speed/150);
+    const amplitude=marchingAnimationAmplitude(marching,speed);
+    const stridePhase=phase(u,cadence);
+    const gait=Math.sin(stridePhase)*.85*scale*amplitude;
+    const armSwing=Math.sin(stridePhase+Math.PI/2)*.55*scale*amplitude;
     const coat=opts.coat||p.coat;
 
     // Feet remain close to the body. They alternate slightly while marching without
