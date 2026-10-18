@@ -9,7 +9,7 @@ if (v066VersionBadge) v066VersionBadge.textContent = `v${V066_VERSION}`;
 // v282: transform historic river/roads together; no unconnected bridge mouths.
 const STRATEGIC_LATITUDES_V282=Object.freeze([
   [0,0],[900,900],[1065,1430],[1280,1920],[1700,2540],
-  [3050,3540],[4580,4580],[5000,5000]
+  [3050,3050],[4580,4580],[5000,5000]
 ]);
 function strategicLatitudeV282(y){
   const p=STRATEGIC_LATITUDES_V282;
