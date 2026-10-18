@@ -221,7 +221,7 @@
     historicalHierarchy:true,
     crossMapConnectivity:true,
     originalRoadCount:ROAD_NETWORK_V066.length,
-    removedRoadCount:ROAD_NETWORK_V066.length-roads.length,
+    removedRoadCount:ROAD_NETWORK_V066.filter(road=>omitted.has(road.id)).length,
     omittedRoadIds:omittedIds,
     configDriven:true,
     sparserRoadNetwork:true,
