@@ -8,6 +8,10 @@ GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
 
+## v1.3.33 — langeafstandsmars Britse AI (update 285)
+
+Op de vergrote kaart (8000 × 5000) behoudt de Britse commandant de **opmars in colonne** tot een meerderheid van zijn levende regimenten op maximaal 760 spel-eenheden van het gekozen doel staat. Een timer van twaalf seconden is niet langer genoeg om over te schakelen naar de gevechtslinie. Daardoor houden regimentsorders voor lange marsen de bestaande wegroute, vier-brede colonne en brugpassage intact. Vlak voor contact ontplooit het leger alsnog, met achterblijvers als reserve. De bestaande tactische contact-, terugtocht- en brugveiligheidsregels blijven leidend.
+
 ## v1.0.0 — eerste volledige release
 
 Versie 1.0 bundelt de complete geïntegreerde releasecandidate en markeert het punt waarop de kernsystemen gezamenlijk door de volledige release-regressie zijn gekomen.
