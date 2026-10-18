@@ -20,7 +20,6 @@ const RIVER_POINTS_V067 = Object.freeze([
 const WATER_CROSSINGS_V067 = Object.freeze([
   Object.freeze({id:'pont-chaussee',name:'Pont de la Chaussée',type:'bridge',material:'stone',x:1500,y:900,angle:0,length:270,width:112}),
   Object.freeze({id:'pont-crete',name:'Pont de la Crête',type:'bridge',material:'wood',x:1510,y:1065,angle:-0.08,length:250,width:98}),
-  Object.freeze({id:'gue-colline',name:'Gué de la Colline',type:'ford',material:'ford',x:1530,y:1280,angle:-0.52,length:310,width:154}),
   Object.freeze({id:'pont-fermes',name:'Pont des Fermes',type:'bridge',material:'wood',x:1645,y:1700,angle:-0.074,length:270,width:98}),
   Object.freeze({id:'pont-grands-bois',name:'Pont des Grands Bois',type:'bridge',material:'wood',x:1900,y:3050,angle:0,length:270,width:112}),
   Object.freeze({id:'pont-du-sud',name:'Pont du Sud',type:'bridge',material:'stone',x:2250,y:4580,angle:0,length:270,width:118})
