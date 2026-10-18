@@ -102,6 +102,9 @@ test('v277 reload follows actual remaining time even after the old visual marker
   assert.equal(end.phase,'ready');
   assert(end.shoulder>.95);
   const final=sample(3.25,0);
-  assert.equal(final.phase,'carry');
+  // An engaged, loaded soldier should immediately prepare the next volley.
+  assert.equal(final.phase,'aim');
+  f.regiment.engagementV069=null;
+  assert.equal(sample(3.25,0).phase,'carry');
   assert.equal(f.fireCount(),0);
 });
