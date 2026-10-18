@@ -100,6 +100,9 @@ test('F3 test lab and bug reports expose the active runtime version', async ({ p
 
 test('v282 distant camps and legacy bridges are physically spread across the enlarged map',async({page})=>{
  const pageErrors=await openGame(page);
+ // Inspect a fresh, peaceful match; background battle startup can move/destroy
+ // town centers before the first assertion on slower CI machines.
+ await page.evaluate(()=>{resetGame();window.__RTS_DEBUG__.setPeaceMode(true);});
  const inspect=()=>page.evaluate(()=>{
    const france=buildings.find(b=>b.side==='france'&&b.type==='towncenter'&&!b.dead);
    const britain=buildings.find(b=>b.side==='britain'&&b.type==='towncenter'&&!b.dead);
