@@ -12,7 +12,7 @@ async function openGame(page) {
   return pageErrors;
 }
 
-test('current runtime preserves single-lane bridge traffic and wider ford capacity', async ({ page }) => {
+test('current runtime retains five single-lane bridges and no removed Colline ford', async ({ page }) => {
   const errors = await openGame(page);
   const runtimeVersion = await page.evaluate(() => window.RTS_SIM.version);
   await expect(page).toHaveTitle(new RegExp(`Napoleonic RTS v${runtimeVersion.replace(/\./g,'\\.')}`));
@@ -23,7 +23,9 @@ test('current runtime preserves single-lane bridge traffic and wider ford capaci
   const ford = traffic.crossings.find(c => c.id === 'gue-colline');
   expect(chauss.capacity).toBe(1);
   expect(crete.capacity).toBe(1);
-  expect(ford.capacity).toBe(2);
+  expect(ford).toBeUndefined();
+  expect(traffic.crossings).toHaveLength(5);
+  expect(traffic.crossings.every(c=>c.capacity===1)).toBe(true);
   expect(traffic.holdDistance).toBeGreaterThan(150);
   expect(traffic.queueGap).toBeGreaterThan(100);
   expect(errors).toEqual([]);

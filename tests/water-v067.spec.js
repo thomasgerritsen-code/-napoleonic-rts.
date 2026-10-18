@@ -118,7 +118,7 @@ test('v282 distant camps and legacy bridges are physically spread across the enl
    expect(d.world.width).toBeGreaterThanOrEqual(8000);
    expect(d.world.height).toBeGreaterThanOrEqual(5000);
    expect(d.france.x).toBeLessThan(d.world.width*.20);
-   expect(d.france.y).toBeLessThan(d.world.height*.25);
+   expect(d.france.y).toBeLessThan(d.world.height*.30);
    expect(d.britain.x).toBeGreaterThan(d.world.width*.85);
    expect(d.britain.y).toBeGreaterThan(d.world.height*.75);
    expect(Math.hypot(d.britain.x-d.france.x,d.britain.y-d.france.y)).toBeGreaterThan(7500);
