@@ -17,8 +17,101 @@
   // mostly decorative parallel routes creates wider open fields without moving bridge mouths.
   const omittedIds=worldConfig.roads.omittedIds;
   const omitted=new Set(omittedIds);
-  const roads=Object.freeze(ROAD_NETWORK_V066.filter(road=>!omitted.has(road.id)));
-  const hamlets=Object.freeze(ROAD_HAMLETS_V066.filter(hamlet=>{
+  // v283: imperial post roads + departmental connectors + genuine village tracks.
+  // Unlike disconnected, decorative polylines, intersections are EXACT shared
+  // coordinates. The existing road graph and 4-wide column solver consume these
+  // same authoritative segments; bridge passages alone cross the river.
+  //
+  // Routes impériales and routes départementales reflect the 1811 hierarchy.
+  // The battlefield geography is fictional, not a historical map reproduction.
+  const historicRoad=(id,name,roadClass,width,coords)=>Object.freeze({
+    id:'imperial-'+id,name,roadClass,width,
+    points:Object.freeze(coords.map(([x,y])=>Object.freeze({x,y})))
+  });
+  const strategicRoads=Object.freeze([
+    // Two long bankside post roads join every crossing, north to south.
+    historicRoad('western-post','Route impériale de l’Ouest','chaussee',66,[
+      [650,60],[710,450],[740,1000],[950,1430],[970,1920],
+      [1100,2540],[1350,3050],[1510,3900],[1740,4580],[1700,4920]]),
+    historicRoad('eastern-post','Route impériale de l’Est','chaussee',68,[
+      [2650,80],[2500,460],[2400,900],[1950,900],[2300,900],[2350,1180],[2350,1430],[2060,1430],[2150,1920],[2360,2540],
+      [2670,3050],[2900,3900],[3140,4580],[3300,4920]]),
+
+    // A separate legally navigable segment crosses each bridge or ford.
+    // Exact end nodes connect the two riverside post roads in the route graph.
+    historicRoad('chaussee-bridge','Chaussée du Grand Pont','chaussee',70,[
+      [740,1000],[1150,900],[1350,900],[1500,900],[1650,900],[1950,900]]),
+    historicRoad('crete-bridge','Route départementale de la Crête','secondary',46,[
+      [950,1430],[1280,1430],[1510,1430],[1740,1430],[2060,1430]]),
+    historicRoad('colline-ford','Chemin du Gué de la Colline','track',28,[
+      [970,1920],[1330,1920],[1530,1920],[1730,1920],[2150,1920]]),
+    historicRoad('fermes-bridge','Route des Fermes','secondary',46,[
+      [1100,2540],[1400,2540],[1645,2540],[1900,2540],[2360,2540]]),
+    historicRoad('grands-bois-bridge','Chaussée des Grands Bois','chaussee',64,[
+      [1350,3050],[1650,3050],[1900,3050],[2150,3050],[2670,3050]]),
+    historicRoad('southern-bridge','Grande Route du Midi','chaussee',68,[
+      [1740,4580],[2000,4580],[2250,4580],[2500,4580],[3140,4580]]),
+
+    // Postal roads continue all the way across the eastern province and to
+    // the border. Camp spurs stop outside actual building footprints.
+    historicRoad('paris-est-poste','Grande Route des Postes de l’Est','chaussee',72,[
+      [1950,900],[3000,900],[4100,1100],[5250,1630],[6150,2550],
+      [6740,3450],[7160,4100],[7380,4190],[7900,4480]]),
+    historicRoad('northern-post','Chaussée des Marchands du Nord','chaussee',64,[
+      [3000,900],[3900,600],[5000,320],[6500,100],[7900,80]]),
+    historicRoad('southern-post','Route impériale du Midi','chaussee',68,[
+      [3140,4580],[5050,4500],[6200,4400],[7380,4190]]),
+    historicRoad('frontier-post','Route de la Frontière','secondary',44,[
+      [7900,80],[7820,1000],[7750,2000],[7810,3000],[7780,3900],
+      [7900,4480],[7950,4850]]),
+
+    // Regional routes follow valleys and connect real junctions, not blind ends.
+    historicRoad('eastern-market','Route départementale du Marché','secondary',46,[
+      [2060,1430],[3000,1470],[4100,1100]]),
+    historicRoad('eastern-grain','Route des Charretiers','secondary',44,[
+      [2150,1920],[3300,1960],[4400,2500],[6150,2550]]),
+    historicRoad('eastern-south-valley','Route de la Vallée Orientale','secondary',48,[
+      [2360,2540],[3800,3000],[5000,3400],[6740,3450]]),
+    historicRoad('eastern-far-post','Route des Relais du Sud','secondary',48,[
+      [2670,3050],[3880,3670],[5050,4500]]),
+    historicRoad('western-northern-plateau','Route du Plateau de l’Ouest','secondary',44,[
+      [250,80],[280,380],[490,700],[740,1000]]),
+    historicRoad('western-hill-lane','Chemin de la Colline','secondary',42,[
+      [950,1430],[400,1590],[400,2180],[970,1920]]),
+    historicRoad('western-south-detour','Route Départementale des Bois','secondary',44,[
+      [1100,2540],[400,2700],[420,3650],[1510,3900]]),
+    historicRoad('western-valley','Chemin de la Vallée','secondary',42,[
+      [1350,3050],[890,3190],[550,3700],[1510,3900]]),
+
+    // Dirt tracks end at real farmland or border settlements, not mid-field
+    // halfway along the long main road.
+    historicRoad('camp-francais','Chemin du Camp français','track',26,[
+      [740,1000],[625,1010],[640,1120]]),
+    historicRoad('camp-britannique','Chemin du Camp britannique','track',26,[
+      [7380,4190],[7240,4290]]),
+    historicRoad('rural-verger','Chemin vicinal du Verger','track',26,[
+      [3000,1470],[3450,1530],[3650,1750]]),
+    historicRoad('rural-moulin','Chemin vicinal du Moulin','track',24,[
+      [400,2180],[220,2400]]),
+    historicRoad('rural-forest','Chemin forestier','track',24,[
+      [5000,3400],[5420,3580],[5550,3900]])
+  ]);
+
+  const roads=Object.freeze([
+    ...ROAD_NETWORK_V066.filter(road=>!omitted.has(road.id)),
+    ...strategicRoads
+  ]);
+  const postalRelays=Object.freeze([
+    {name:'Relais de la Chaussée',x:1150,y:900},
+    {name:'Marché de l’Est',x:3000,y:900},
+    {name:'Saint-Pierre-des-Bois',x:2060,y:1430},
+    {name:'Relais de la Colline',x:2150,y:1920},
+    {name:'Bourg des Fermes',x:2360,y:2540},
+    {name:'Relais des Grands Bois',x:2670,y:3050},
+    {name:'Village du Val',x:5000,y:3400},
+    {name:'Les Postes du Midi',x:6200,y:4400}
+  ].map(h=>Object.freeze(h)));
+  const hamlets=Object.freeze([...ROAD_HAMLETS_V066,...postalRelays].filter(hamlet=>{
     for(const road of roads){
       for(let i=1;i<road.points.length;i++){
         if(closestPointOnSegmentV066(hamlet.x,hamlet.y,road.points[i-1],road.points[i]).distance<=road.width/2+30) return true;
@@ -122,8 +215,13 @@
     width:WORLD.width,
     height:WORLD.height,
     roadCount:roads.length,
+    historicalRoadCount:strategicRoads.length,
+    roadSystemVersion:'283',
+    relayVillageCount:postalRelays.length,
+    historicalHierarchy:true,
+    crossMapConnectivity:true,
     originalRoadCount:ROAD_NETWORK_V066.length,
-    removedRoadCount:ROAD_NETWORK_V066.length-roads.length,
+    removedRoadCount:ROAD_NETWORK_V066.filter(road=>omitted.has(road.id)).length,
     omittedRoadIds:omittedIds,
     configDriven:true,
     sparserRoadNetwork:true,
@@ -132,6 +230,6 @@
   global.__BATTLEFIELD_EXPANSION_V7__=api;
   nrts.subsystems.register('battlefield-expansion-v7',api,{
     phase:'architecture-v2',legacyBridge:false,
-    responsibility:'increase playable battlefield area and reduce road density while preserving strategic junction and bridge coordinates'
+    responsibility:'continuous empire-period road hierarchy, bank-side postal routes and safe bridge links across whole battlefield'
   });
 })(window);
