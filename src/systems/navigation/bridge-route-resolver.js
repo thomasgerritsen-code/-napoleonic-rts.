@@ -227,6 +227,11 @@
       if(typeof routeCrossingsForPathV067==='function')
         reg.routeCrossingsV067=routeCrossingsForPathV067(start,reg.path);
       reseed(reg);
+      // Artillery uses rigid per-unit targets rather than the infantry march
+      // anchor. Once a local bridge corridor replaces its initial A* path,
+      // retarget the cannon and crew at the NEW first waypoint, otherwise
+      // they settle at the stale old target while pathIndex remains zero.
+      if(kind==='artillery'&&typeof setGroupWaypointV06==='function')setGroupWaypointV06(reg);
       stats.resolvedSplitCrossings++;
       return;
     }
