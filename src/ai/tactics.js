@@ -91,7 +91,20 @@ function aiChooseState(regs){
   if(elapsed<35||regs.length<2)return'DEFEND';
   if(AI_COMMANDER_V1.state==='DEFEND')return'MASS';
   if(AI_COMMANDER_V1.state==='MASS')return age>9?'ADVANCE':'MASS';
-  if(AI_COMMANDER_V1.state==='ADVANCE')return age>12?'ATTACK':'ADVANCE';
+  if(AI_COMMANDER_V1.state==='ADVANCE'){
+    // v285: map V7 stretches a strategic march across thousands of world units.
+    // Never cancel a four-file road column merely because twelve seconds passed.
+    if(age<=12||!AI_COMMANDER_V1.target)return'ADVANCE';
+    const active=regs.filter(r=>regimentMembers(r).some(u=>!u.dead&&!u.routing));
+    if(!active.length)return'DEFEND';
+    const target=AI_COMMANDER_V1.target;
+    const withinAssaultRange=active.filter(r=>{
+      const p=aiRegCenter(r);
+      return Math.hypot(p.x-target.x,p.y-target.y)<=760;
+    }).length;
+    // A majority can deploy while the last regiment acts as a road-marching reserve.
+    return withinAssaultRange>=Math.ceil(active.length*.6)?'ATTACK':'ADVANCE';
+  }
   if(AI_COMMANDER_V1.state==='ATTACK'){
     if(age>18&&livingUnits('britain').some(u=>u.type==='cavalry'&&!u.routing))return'FLANK';
     return age>28?'REGROUP':'ATTACK';
