@@ -5,8 +5,9 @@ document.title = 'Napoleonic RTS v0.6';
 const v06VersionBadge = document.querySelector('.version');
 if (v06VersionBadge) v06VersionBadge.textContent = 'v0.6';
 
-WORLD.width = 3800;
-WORLD.height = 2200;
+// The initial reset may happen before the v7 renderer; use real bounds now.
+WORLD.width = Math.max(3800, window.NRTS_CONFIG?.world?.battlefield?.width||3800);
+WORLD.height = Math.max(2200, window.NRTS_CONFIG?.world?.battlefield?.height||2200);
 
 const PRODUCTION_BUILDINGS_V06 = new Set(['towncenter', 'barracks', 'stable', 'foundry']);
 const GROUP_BREAK_MORALE = 32;
@@ -312,4 +313,27 @@ const drawV05ForV06=draw;
 draw=function drawV06(){drawV05ForV06();drawRallyMarkersV06();};
 
 const resetGameV05ForV06=resetGame;
-resetGame=function resetGameV06(){exploredCells.clear();exploreClockV06=0;rallyPlacementBuilding=null;resetGameV05ForV06();for(const u of livingUnits('britain')){u.x+=420;u.targetX+=420;u.task=null;u.resourceTarget=null;u.returnResource=null;}for(const b of livingBuildings('britain')){b.x+=420;b.rallyX+=420;}for(let i=0;i<4;i++)createUnit('france','infantry',650+i*22,1280);const britishCrew=[createUnit('britain','infantry',3010,1270),createUnit('britain','infantry',3035,1270)],britishGun=livingUnits('britain').find(u=>u.type==='artillery'&&!u.regimentId);if(britishGun)createArtilleryBatteryV06('britain',britishGun,britishCrew,'Britse Startbatterij');[['wood',3340,520,18],['food',3420,780,9],['wood',3220,1720,16],['food',2860,1820,8]].forEach(([type,cx,cy,count])=>{for(let i=0;i<count;i++)createResource(type,cx+(Math.random()-.5)*190,cy+(Math.random()-.5)*150,type==='wood'?240:380);});const roll=Math.random();aiStrategyV06=roll<.34?'aggressive':roll<.67?'balanced':'defensive';autoAssignAIWorkers();recalcPopCap('france');recalcPopCap('britain');markExploredV06();actionSignature='';updateHud(true);statusEl.textContent='v0.6: kies rallypoints, vorm regimenten/cavalerie en wijs 2 musketiers toe aan ieder kanon.';};
+resetGame=function resetGameV06(){exploredCells.clear();exploreClockV06=0;rallyPlacementBuilding=null;resetGameV05ForV06();// Move Britain's initial whole settlement to the SE corner, keeping
+  // the physical spacing of soldiers, artillery, rallies and resources.
+  const britishTown=livingBuildings('britain').find(b=>b.type==='towncenter');
+  const campX=WORLD.width-620,campY=WORLD.height-640;
+  const dx=campX-(britishTown?.x??2640),dy=campY-(britishTown?.y??900);
+  for(const u of livingUnits('britain')){
+    u.x+=dx;u.y+=dy;u.targetX+=dx;u.targetY+=dy;
+    u.task=null;u.resourceTarget=null;u.returnResource=null;
+  }
+  for(const b of livingBuildings('britain')){
+    b.x+=dx;b.y+=dy;
+    if(Number.isFinite(b.rallyX))b.rallyX+=dx;
+    if(Number.isFinite(b.rallyY))b.rallyY+=dy;
+  }
+  for(const r of resources)if(r.x>2150){r.x+=dx;r.y+=dy;}for(let i=0;i<4;i++)createUnit('france','infantry',650+i*22,1280);const britishGun=livingUnits('britain').find(u=>u.type==='artillery'&&!u.regimentId);
+  if(britishGun){
+    const britishCrew=[
+      createUnit('britain','infantry',britishGun.x-26,britishGun.y-20),
+      createUnit('britain','infantry',britishGun.x-26,britishGun.y+20)
+    ];
+    createArtilleryBatteryV06('britain',britishGun,britishCrew,'Britse Startbatterij');
+  }
+  [['wood',campX-260,campY-420,18],['food',campX-150,campY-250,9],
+   ['wood',campX-370,campY+250,16],['food',campX-490,campY+160,8]].forEach(([type,cx,cy,count])=>{for(let i=0;i<count;i++)createResource(type,cx+(Math.random()-.5)*190,cy+(Math.random()-.5)*150,type==='wood'?240:380);});const roll=Math.random();aiStrategyV06=roll<.34?'aggressive':roll<.67?'balanced':'defensive';autoAssignAIWorkers();recalcPopCap('france');recalcPopCap('britain');markExploredV06();actionSignature='';updateHud(true);statusEl.textContent='v0.6: kies rallypoints, vorm regimenten/cavalerie en wijs 2 musketiers toe aan ieder kanon.';};
