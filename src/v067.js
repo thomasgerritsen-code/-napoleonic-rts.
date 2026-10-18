@@ -15,7 +15,7 @@ const RIVER_POINTS_V067 = Object.freeze([
   {x:1580,y:1450},{x:1645,y:1700},{x:1665,y:1950},{x:1700,y:2200},
   {x:1780,y:2650},{x:1900,y:3050},{x:2000,y:3550},
   {x:2140,y:4070},{x:2250,y:4580},{x:2300,y:5000}
-].map(p=>Object.freeze(p)));
+].map(p=>Object.freeze({...p,y:strategicLatitudeV282(p.y)})));
 
 const WATER_CROSSINGS_V067 = Object.freeze([
   Object.freeze({id:'pont-chaussee',name:'Pont de la Chaussée',type:'bridge',material:'stone',x:1500,y:900,angle:0,length:270,width:112}),
@@ -24,7 +24,7 @@ const WATER_CROSSINGS_V067 = Object.freeze([
   Object.freeze({id:'pont-fermes',name:'Pont des Fermes',type:'bridge',material:'wood',x:1645,y:1700,angle:-0.074,length:270,width:98}),
   Object.freeze({id:'pont-grands-bois',name:'Pont des Grands Bois',type:'bridge',material:'wood',x:1900,y:3050,angle:0,length:270,width:112}),
   Object.freeze({id:'pont-du-sud',name:'Pont du Sud',type:'bridge',material:'stone',x:2250,y:4580,angle:0,length:270,width:118})
-]);
+].map(c=>Object.freeze({...c,y:strategicLatitudeV282(c.y)})));
 
 function riverHitV067(x,y){
   let best=null;
