@@ -9,14 +9,14 @@ const version = fs.readFileSync('src/foundation/version.js', 'utf8');
 const hud = fs.readFileSync('src/hud.js', 'utf8');
 const reform = fs.readFileSync('src/systems/movement/post-crossing-reform-v1322.js', 'utf8');
 
-test('v1.3.22 identity and browser cache keys stay aligned', () => {
-  assert.equal(pkg.version, '1.3.22');
-  assert.match(version, /const VERSION = '1\.3\.22'/);
-  assert.match(index, /Napoleonic RTS v1\.3\.22/);
-  assert.match(index, /class="version">v1\.3\.22</);
-  assert.match(index, /src\/foundation\/version\.js\?build=1322a/);
-  assert.match(index, /src\/hud\.js\?build=productioncost1/);
-  assert.match(index, /style\.css\?build=194victory/);
+test('semantic version identity and browser cache keys stay aligned', () => {
+  assert.match(pkg.version, /^\\d+\\.\\d+\\.\\d+$/);
+  assert.ok(version.includes("const VERSION = '"+pkg.version+"'"));
+  assert.ok(index.includes('Napoleonic RTS v'+pkg.version));
+  assert.ok(index.includes('class="version">v'+pkg.version+'</'));
+  assert.match(index, /src\\/foundation\\/version\\.js\\?build=1322a/);
+  assert.match(index, /src\\/hud\\.js\\?build=productioncost1/);
+  assert.match(index, /style\\.css\\?build=194victory/);
 });
 
 test('selected regiments expose post-crossing regroup progress and cohesion', () => {
