@@ -38,6 +38,21 @@ test('AI Commander progresses through mass, advance, attack and flank while prod
     window.__AI_COMMANDER_V1__.tick();
     states.push(window.__AI_COMMANDER_V1__.state().state);
 
+    // After twelve seconds on the expanded battlefield the army is still
+    // far from contact, so its marching columns must remain intact.
+    const farState=window.__AI_COMMANDER_V1__.state();
+    const objective=farState.target;
+    for(const r of activeRegiments('britain')){
+      regimentMembers(r).forEach((u,i)=>{
+        u.x=objective.x+520+(i%4)*4;
+        u.y=objective.y+Math.floor(i/4)*4;
+        u.targetX=u.x;u.targetY=u.y;
+      });
+    }
+    eval('elapsed+=1');
+    window.__AI_COMMANDER_V1__.tick();
+    states.push(window.__AI_COMMANDER_V1__.state().state);
+
     eval('elapsed+=19');
     window.__AI_COMMANDER_V1__.tick();
     states.push(window.__AI_COMMANDER_V1__.state().state);
@@ -56,7 +71,7 @@ test('AI Commander progresses through mass, advance, attack and flank while prod
     };
   });
 
-  expect(result.states).toEqual(['MASS','ADVANCE','ATTACK','FLANK']);
+  expect(result.states).toEqual(['MASS','ADVANCE','ADVANCE','ATTACK','FLANK']);
   expect(result.diag?.meta?.phase).toBe('architecture-v2');
   expect(result.diag?.meta?.legacyBridge).toBe(false);
   expect(result.state.wave).toBeGreaterThanOrEqual(1);
