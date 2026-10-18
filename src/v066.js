@@ -19,7 +19,14 @@ const ROAD_NETWORK_V066 = Object.freeze([
   { id:'voie-du-moulin', name:'Voie du Moulin', roadClass:'track', width:26, points:[[390,1145],[330,1320],[350,1490],[470,1640],[650,1650]] },
   { id:'voie-de-la-ferme', name:'Voie de la Ferme', roadClass:'track', width:26, points:[[1260,1085],[1170,920],[1090,760],[1000,620],[890,520]] },
   { id:'voie-du-verger', name:'Voie du Verger', roadClass:'track', width:24, points:[[2320,1040],[2440,1210],[2500,1390],[2520,1540],[2580,1660]] },
-  { id:'voie-de-la-lisiere', name:'Voie de la Lisière', roadClass:'track', width:24, points:[[2390,665],[2530,790],[2650,900],[2760,1010],[2890,1090]] }
+  { id:'voie-de-la-lisiere', name:'Voie de la Lisière', roadClass:'track', width:24, points:[[2390,665],[2530,790],[2650,900],[2760,1010],[2890,1090]] },
+  // v281: an entirely new southern theatre, not merely an empty map boundary.
+  // The new crossings are more than 1,000 units apart, with long, sparse roads.
+  { id:'route-de-grands-bois', name:'Route des Grands Bois', roadClass:'chaussee', width:66, points:[[650,1650],[780,2000],[1030,2430],[1450,2810],[1690,3040],[1900,3050],[2300,3050],[2750,2930],[3360,2710],[4110,2450],[4870,2200]] },
+  { id:'chaussee-du-sud', name:'Chaussée du Sud', roadClass:'chaussee', width:68, points:[[180,4580],[750,4520],[1320,4540],[1920,4565],[2250,4580],[2930,4590],[3650,4540],[4400,4440],[5220,4310],[6200,4210],[7390,4000]] },
+  { id:'route-de-la-vallee-ouest', name:'Route de la Vallée Ouest', roadClass:'secondary', width:44, points:[[1030,2430],[850,3000],[800,3550],[750,4100],[750,4520]] },
+  { id:'route-de-la-colline-sud', name:'Route de la Colline Sud', roadClass:'secondary', width:46, points:[[2300,3050],[2750,3420],[2960,3850],[3100,4200],[2930,4590]] },
+  { id:'route-de-l-est-lointain', name:'Route de l’Est Lointain', roadClass:'secondary', width:48, points:[[3780,2020],[4110,2450],[4400,2950],[5000,3350],[5750,3700],[6200,4210]] }
 ].map(r => Object.freeze({ ...r, points:Object.freeze(r.points.map(([x,y])=>Object.freeze({x,y}))) })));
 
 const ROAD_CLASS_SPEEDS_V066 = Object.freeze({
@@ -30,7 +37,9 @@ const ROAD_CLASS_SPEEDS_V066 = Object.freeze({
 const ROAD_CLASS_PRIORITY_V066 = Object.freeze({ chaussee:3, secondary:2, track:1 });
 const ROAD_HAMLETS_V066 = Object.freeze([
   {name:'Les Quatre Chemins',x:1900,y:890},{name:'St.-Martin',x:700,y:900},{name:'La Croix',x:2820,y:895},
-  {name:'Bois-Hameau',x:590,y:430},{name:'Ferme du Sud',x:650,y:1650},{name:'Ferme de l’Est',x:3240,y:1580}
+  {name:'Bois-Hameau',x:590,y:430},{name:'Ferme du Sud',x:650,y:1650},{name:'Ferme de l’Est',x:3240,y:1580},
+  {name:'Les Grands Bois',x:1450,y:2810},{name:'Pont du Sud',x:3650,y:4540},
+  {name:'La Colline',x:2960,y:3850},{name:'Camp de l’Est',x:5000,y:3350}
 ]);
 
 function clampV066(v,min,max){return Math.max(min,Math.min(max,v));}
