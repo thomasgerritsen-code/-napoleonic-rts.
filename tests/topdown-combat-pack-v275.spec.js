@@ -118,7 +118,7 @@ test('v273 artillery crew phases follow actual gunshot; v274 panic states and v2
     horse.chargeTimer=4;horse.chargeMomentumV1=.72;
     drawUnit(horse);
     const first={x:horse.x,y:horse.y};
-    window.RTS_SIM.step(.09);
+    for(let i=0;i<4;i++)window.RTS_SIM.step(.05);
     horse.x+=14;drawUnit(horse);
     drawParticles();
     const second={x:horse.x,y:horse.y};
@@ -166,4 +166,56 @@ test('v271-275 are 2D display layers and 3D engine stays in control when enabled
   expect(info.features).toEqual([true,true,true,true,true]);
   expect(info.before).toBe(info.after);
   expect(errors).toEqual([]);
+});
+
+test('v275 deployed eight-plus-musket square actually reduces 2D cavalry charge damage but never affects 3D',async({page})=>{
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>!!window.__TOPDOWN_CAVALRY_V275__&&!!window.__BATTLEFIELD_3D_V1__);
+  const r=await page.evaluate(()=>{
+    resetGame();v05PeaceMode=true;gameOver=false;
+    for(const u of units)u.dead=true;
+    for(const r of regiments)r.destroyed=true;
+    const cav=window.__TOPDOWN_CAVALRY_V275__;
+    const reg={id:275888,side:'britain',kind:'infantry',formation:'square',
+      memberIds:[],facing:0,destroyed:false,morale:100};
+    regiments.push(reg);
+    const defenders=[];
+    for(let i=0;i<10;i++){
+      const u=createUnit('britain','infantry',camera.x+50+(i%4)*9,camera.y+70+Math.floor(i/4)*9);
+      u.regimentId=reg.id;reg.memberIds.push(u.id);u.hp=900;
+      defenders.push(u);
+    }
+    const target=defenders[0],attacker=createUnit('france','cavalry',camera.x,camera.y+80);
+    attacker.chargeTimer=5;attacker.reload=0;attacker.chargeMomentumV1=.7;
+    const was=Math.random,previousHp=target.hp;
+    Math.random=()=>.5;
+    window.__BATTLEFIELD_3D_V1__.setEnabled(false);
+    const protectedNow=cav.defendedSquare(attacker,target);
+    fire(attacker,target);
+    const reduced=previousHp-target.hp;
+    const protectedCount=cav.stats().squaresProtected;
+    reg.formation='line';target.hp=previousHp;attacker.reload=0;
+    fire(attacker,target);
+    const open=previousHp-target.hp;
+    reg.formation='square';target.hp=previousHp;attacker.reload=0;
+    window.__BATTLEFIELD_3D_V1__.setEnabled(true);
+    const protected3d=cav.defendedSquare(attacker,target);
+    fire(attacker,target);
+    const in3d=previousHp-target.hp;
+    Math.random=was;
+    window.__BATTLEFIELD_3D_V1__.setEnabled(false);
+    return{protectedNow,protected3d,reduced,open,in3d,protectedCount,
+      after:cav.stats().squaresProtected};
+  });
+  console.log('V275_SQUARE_COUNTERCHARGE',JSON.stringify(r));
+  expect(errors).toEqual([]);
+  expect(r.protectedNow).toBe(true);
+  expect(r.protected3d).toBe(false);
+  expect(r.reduced).toBeGreaterThan(0);
+  expect(r.open).toBeGreaterThan(r.reduced*2);
+  expect(r.reduced/r.open).toBeCloseTo(.35,3);
+  expect(r.in3d).toBeCloseTo(r.open,3);
+  expect(r.protectedCount).toBeGreaterThan(0);
+  expect(r.after).toBe(r.protectedCount);
 });
