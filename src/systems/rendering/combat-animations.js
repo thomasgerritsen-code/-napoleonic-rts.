@@ -126,6 +126,44 @@
     return{stage,jetReach,forward,breadth,radius,opacity,
       panIntensity:cannon?0:Math.max(0,1-ageClamped/.72)};
   }
+  // v270: measured-looking black-powder colours from photographs of
+  // reenactment volleys. RGB stops are art-directed rather than spectral
+  // measurements: bright white/ivory fresh aerosol -> neutral greys ->
+  // faint cool blue-grey as a translucent bank disperses.
+  // All layers transition continuously; no abrupt change at phase borders.
+  const SMOKE_COLOR_STOPS=Object.freeze([
+    {at:0,   core:'#d7d2c5',middle:'#e9e4d9',rim:'#f4f1e8',jet:'#f5f1e7',pan:'#d9d2c4'},
+    {at:.25, core:'#cdc9be',middle:'#e6e2d7',rim:'#f1efe7',jet:'#f1efe9',pan:'#d5cdc0'},
+    {at:1.2, core:'#c7c7c2',middle:'#deded8',rim:'#ebebe7',jet:'#ebebe6',pan:'#cbc6bd'},
+    {at:3.0, core:'#b7b9b7',middle:'#d1d4d3',rim:'#e2e4e3',jet:'#e2e4e3',pan:'#bebeb8'},
+    {at:6.5, core:'#adb4bb',middle:'#c6cdd2',rim:'#d9dfe3',jet:'#d9dfe3',pan:'#b9c0c5'}
+  ]);
+  function mixHex(a,b,t){
+    const clamped=Math.max(0,Math.min(1,t));
+    const channels=[1,3,5].map(i=>{
+      const first=parseInt(a.slice(i,i+2),16),last=parseInt(b.slice(i,i+2),16);
+      return Math.round(first+(last-first)*clamped).toString(16).padStart(2,'0');
+    });
+    return '#'+channels.join('');
+  }
+  function smokePalette(age){
+    const t=Math.max(0,Number(age)||0);
+    let left=SMOKE_COLOR_STOPS[0],right=SMOKE_COLOR_STOPS.at(-1);
+    for(let i=1;i<SMOKE_COLOR_STOPS.length;i++){
+      if(t<=SMOKE_COLOR_STOPS[i].at){
+        left=SMOKE_COLOR_STOPS[i-1];right=SMOKE_COLOR_STOPS[i];
+        break;
+      }
+    }
+    const blend=left===right?0:Math.max(0,Math.min(1,
+      (t-left.at)/Math.max(.001,right.at-left.at)));
+    return {core:mixHex(left.core,right.core,blend),
+      middle:mixHex(left.middle,right.middle,blend),
+      rim:mixHex(left.rim,right.rim,blend),
+      jet:mixHex(left.jet,right.jet,blend),
+      pan:mixHex(left.pan,right.pan,blend)};
+  }
+
   function drawSmoke(){
     if(!smokeEvents.length||global.__BATTLEFIELD_3D_V1__?.enabled?.())return;
     ctx.save();ctx.lineCap='round';
@@ -139,8 +177,21 @@
       const cx=e.x+e.driftX,cy=e.y+e.driftY;
       const extent=120+m.breadth+m.radius;
       if(!isWorldVisible(cx,cy,extent))continue;
-      // Film grain is deterministic per shot and evolves smoothly over time;
-      // fewer billows are painted at low zoom for a 500+ soldier battle.
+      // One low-opacity, cool-toned translucent rim under the dense billows.
+      // A single ellipse per smoke bank adds an outer layer without expensive
+      // per-lobe canvas gradients or extra particle objects.
+      const colors=smokePalette(age);
+      ctx.fillStyle=colors.rim;
+      ctx.globalAlpha=m.opacity*(cannon?.078:.066);
+      ctx.beginPath();
+      ctx.ellipse(cx+fx*m.forward,cy+fy*m.forward,
+        m.breadth*1.22+m.radius*.34,
+        m.breadth*.83+m.radius*.4,e.facing,0,Math.PI*2);
+      ctx.fill();
+
+      // At near zoom we distinguish three blended tones: the shaded central
+      // smoke masses, warm/neutral middle layer and light wispy outer edges.
+      // Fewer billows are painted at low zoom for 500+ soldiers.
       const lobes=zoom<.67?7:cannon?14:Math.min(15,9+Math.ceil((e.count||1)/7));
       const regFactor=1+Math.min(.75,Math.sqrt(e.count||1)*.1);
       for(let k=0;k<lobes;k++){
@@ -153,8 +204,11 @@
         const x=cx+fx*along+px*lateral;
         const y=cy+fy*along+py*lateral;
         const radius=m.radius*(.66+(seededOffset(e.seed^0x85ebca6b,k)+1)*.23)*regFactor;
-        ctx.fillStyle=k%4===0?'#a9aaa5':k%3===0?'#e8e7e0':'#d6d5cd';
-        ctx.globalAlpha=m.opacity*(cannon?.27:.265)*(1-Math.min(.46,k*.018));
+        const shaded=k%4===0,edge=!shaded&&k%3===0;
+        ctx.fillStyle=shaded?colors.core:edge?colors.rim:colors.middle;
+        const strength=shaded?1.06:edge?.72:.94;
+        ctx.globalAlpha=m.opacity*(cannon?.27:.265)*strength*
+          (1-Math.min(.46,k*.018));
         ctx.beginPath();ctx.ellipse(x,y,radius*(.94+.18*Math.sin(k)),radius*.8,
           e.facing+Math.sin(k*2.7+age*.32)*.35,0,Math.PI*2);ctx.fill();
       }
@@ -163,7 +217,7 @@
       // teleport the main cloud downrange, and naturally fades into billows.
       if(m.jetReach>1.1){
         const jetFade=Math.min(1,age/.045)*Math.exp(-Math.max(0,age-.13)*8);
-        ctx.fillStyle='#efeee8';
+        ctx.fillStyle=colors.jet;
         ctx.globalAlpha=(cannon?.35:.44)*jetFade;
         for(let j=0;j<4;j++){
           const fraction=(j+.45)/4;
@@ -177,7 +231,7 @@
       // shooter, not a second large musket smoke cloud.
       if(m.panIntensity>0&&zoom>.65){
         const nearX=cx-fx*12+px*1.2,nearY=cy-fy*12+py*1.2;
-        ctx.fillStyle='#c6c2b4';ctx.globalAlpha=.24*m.panIntensity;
+        ctx.fillStyle=colors.pan;ctx.globalAlpha=.24*m.panIntensity;
         ctx.beginPath();
         ctx.ellipse(nearX,nearY,3.8+age*10,2.4+age*7,e.facing+.35,0,Math.PI*2);
         ctx.fill();
@@ -189,7 +243,7 @@
   drawParticles=function drawParticlesCombatAnimationsV1(){baseDrawParticles();drawSmoke();drawFalls();};
 
   function smokeStats(){let musketClouds=0,artilleryClouds=0,maxPooledShots=0,persistentVolleyClouds=0;for(const e of smokeEvents){if(e.kind==='artillery')artilleryClouds+=1;else{musketClouds+=1;if(e.count>=8&&elapsed-e.born>=.35)persistentVolleyClouds+=1;}maxPooledShots=Math.max(maxPooledShots,e.count||1);}return {active:smokeEvents.length,musketClouds,artilleryClouds,maxPooledShots,persistentVolleyClouds,cap:MAX_SMOKE_EVENTS};}
-  const api=Object.freeze({version:'combat-animations-v1.3',eventCount:()=>visualEvents.length,animationFor:u=>active(u),smokeStats,smokeSnapshot,smokeProfile,features:Object.freeze(['musket-fire','reload','bayonet','cavalry-charge','artillery-recoil','hit-reaction','death-fall','pooled-volley-smoke','persistent-smoke-line','artillery-smoke','batched-smoke-canvas-state','wind-advected-dense-powder-smoke','flintlock-pan-puff','directed-jet-then-billow'])});
+  const api=Object.freeze({version:'combat-animations-v1.3',eventCount:()=>visualEvents.length,animationFor:u=>active(u),smokeStats,smokeSnapshot,smokeProfile,smokePalette,smokeColorStops:SMOKE_COLOR_STOPS,features:Object.freeze(['musket-fire','reload','bayonet','cavalry-charge','artillery-recoil','hit-reaction','death-fall','pooled-volley-smoke','persistent-smoke-line','artillery-smoke','batched-smoke-canvas-state','wind-advected-dense-powder-smoke','flintlock-pan-puff','directed-jet-then-billow','age-interpolated-three-layer-smoke-colors'])});
   nrts.subsystems.register('combat-animations',api,{phase:'architecture-v2',legacyBridge:false,responsibility:'visual-only combat event animation and pooled black-powder smoke synchronized to simulation fire and damage events'});
   global.__COMBAT_ANIMATIONS_V1__=api;
 })(window);
