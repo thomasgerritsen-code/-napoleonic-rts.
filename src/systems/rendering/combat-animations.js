@@ -18,11 +18,15 @@
 
   function addSmokeEvent(unit,kind){
     if(!unit)return;
-    const facing=unit.facing||0,muzzle=kind==='artillery'?19:18;
-    const x=unit.x+Math.cos(facing)*muzzle,y=unit.y+Math.sin(facing)*muzzle;
+    const facing=unit.facing||0,muzzle=kind==='artillery'?19:20;
+    // Flintlock barrel runs along +X in the 2D character renderer; muzzle
+    // sits slightly to the soldier's right, not at the middle of the shako.
+    const lateral=kind==='artillery'?0:2.3;
+    const x=unit.x+Math.cos(facing)*muzzle-Math.sin(facing)*lateral;
+    const y=unit.y+Math.sin(facing)*muzzle+Math.cos(facing)*lateral;
     const regimentKey=kind==='musket'&&unit.regimentId?unit.regimentId:null;
     const previous=regimentKey?lastVolleyByRegiment.get(regimentKey):null;
-    if(previous&&elapsed-previous.lastShot<=.48&&elapsed-previous.born<=2.8){
+    if(previous&&elapsed-previous.lastShot<=.48&&elapsed-previous.born<=2.8&&elapsed-previous.born<previous.life){
       const count=Math.min(48,previous.count+1),weight=Math.min(12,count);
       previous.x+=(x-previous.x)/weight;previous.y+=(y-previous.y)/weight;
       previous.facing+=(Math.atan2(Math.sin(facing-previous.facing),Math.cos(facing-previous.facing)))/weight;
@@ -61,6 +65,12 @@
       const f=1-a.age/.11;
       ctx.fillStyle=`rgba(255,222,131,${.92*f})`;
       ctx.beginPath();ctx.moveTo(21,2);ctx.lineTo(30,-1);ctx.lineTo(27,2);ctx.lineTo(30,5);ctx.closePath();ctx.fill();
+      // Tiny flintlock pan flash by the breech precedes the main muzzle jet
+      // visually. The combat event clock is not modified.
+      if(a.age<.045){
+        ctx.fillStyle=`rgba(255,185,91,${.65*(1-a.age/.045)})`;
+        ctx.beginPath();ctx.ellipse(5,3.5,3,1.7,-.35,0,Math.PI*2);ctx.fill();
+      }
     }
     if(a?.kind==='musket-fire'&&a.age>.34&&a.age<a.duration*.86){const p=(a.age-.34)/Math.max(.1,a.duration*.86-.34),ram=8+Math.sin(p*Math.PI)*7;ctx.strokeStyle='#a68c65';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(4,1);ctx.lineTo(ram,-7);ctx.stroke();}
     if(a?.kind==='artillery-fire'&&a.age<.18){ctx.fillStyle='rgba(255,212,112,.8)';ctx.beginPath();ctx.arc(15,-2,4.5*(1-a.age/.18),0,Math.PI*2);ctx.fill();}
@@ -90,46 +100,96 @@
       advanceSmoke(e);
       return{kind:e.kind,count:e.count,born:e.born,life:e.life,
         origin:{x:e.x,y:e.y},center:{x:e.x+e.driftX,y:e.y+e.driftY},
-        drift:{x:e.driftX,y:e.driftY}};
+        drift:{x:e.driftX,y:e.driftY},profile:smokeProfile(e,elapsed-e.born)};
     });
   }
 
+  // Black-powder muskets do not discharge an already-round fog ball:
+  // a sharp axial muzzle jet expands into irregular white salt-particle
+  // billows, which diffuse and drift. See NPS live volleys, NIJ propellant
+  // comparison, and high-speed flintlock pan/vent/muzzle studies.
+  // These are deliberately stylised world-space distances, not a CFD solver.
+  function smokeProfile(e,age){
+    const t=Math.max(0,Math.min(1,age/e.life));
+    const cannon=e.kind==='artillery',ageClamped=Math.max(0,age);
+    const bloom=1-Math.exp(-ageClamped*2.6);
+    const jetUp=Math.min(1,ageClamped/.14);
+    const jetDecay=Math.exp(-Math.max(0,ageClamped-.14)*4.6);
+    const jetReach=(cannon?95:69)*jetUp*jetDecay;
+    const forward=(cannon?6:4)+(cannon?42:29)*bloom;
+    const breadth=(cannon?20:13)+(cannon?35:28)*Math.pow(Math.min(1,ageClamped/2.4),.65)+
+      Math.min(41,(e.count||1)*.95);
+    const radius=(cannon?7:4.6)+(cannon?20:15.5)*Math.pow(Math.min(1,ageClamped/2),.6)+
+      Math.min(13,(e.count||1)*.22);
+    const opacity=Math.pow(1-t,1.04)*Math.min(1,.37+ageClamped*5.0);
+    const stage=ageClamped<.24?'muzzle-jet':ageClamped<1.05?'billowing':'wind-drift';
+    return{stage,jetReach,forward,breadth,radius,opacity,
+      panIntensity:cannon?0:Math.max(0,1-ageClamped/.72)};
+  }
   function drawSmoke(){
-    if(!smokeEvents.length)return;
-    ctx.save();ctx.fillStyle='#d9d5c9';
+    if(!smokeEvents.length||global.__BATTLEFIELD_3D_V1__?.enabled?.())return;
+    ctx.save();ctx.lineCap='round';
+    const zoom=Math.max(.1,camera.zoom||1);
     for(let i=smokeEvents.length-1;i>=0;i--){
       const e=smokeEvents[i],age=elapsed-e.born;
-      if(age>=e.life){smokeEvents.splice(i,1);continue;}
+      if(age>=e.life||age<0){smokeEvents.splice(i,1);continue;}
       advanceSmoke(e);
-      const t=Math.max(0,Math.min(1,age/e.life));
-      // Powder smoke is dense at the muzzle, spreads across the formation,
-      // and gradually thins. Wind moves the *entire* cloud, not just a halo.
-      const fade=Math.pow(1-t,.92),artillery=e.kind==='artillery';
-      const lobeCount=artillery?14:Math.min(13,6+Math.ceil(e.count/5));
-      const forward=(artillery?31:13)*Math.min(1,age*.9);
-      const spread=(artillery?32:23)*(.32+t*1.35)+Math.min(33,e.count*.78);
-      const baseRadius=(artillery?11:7)+(artillery?29:20)*Math.pow(t,.78)+Math.min(13,e.count*.28);
+      const m=smokeProfile(e,age),cannon=e.kind==='artillery';
       const fx=Math.cos(e.facing),fy=Math.sin(e.facing),px=-fy,py=fx;
       const cx=e.x+e.driftX,cy=e.y+e.driftY;
-      if(!isWorldVisible(cx,cy,110+spread+baseRadius))continue;
-      for(let l=0;l<lobeCount;l++){
-        const lateral=seededOffset(e.seed,l)*spread;
-        const along=forward+seededOffset(e.seed^0x9e3779b9,l)*spread*.44;
-        const radius=baseRadius*(.68+(seededOffset(e.seed^0x85ebca6b,l)+1)*.23);
-        ctx.globalAlpha=fade*(artillery?.27:.22)*(1-Math.min(.46,l*.027));
+      const extent=120+m.breadth+m.radius;
+      if(!isWorldVisible(cx,cy,extent))continue;
+      // Film grain is deterministic per shot and evolves smoothly over time;
+      // fewer billows are painted at low zoom for a 500+ soldier battle.
+      const lobes=zoom<.67?7:cannon?14:Math.min(15,9+Math.ceil((e.count||1)/7));
+      const regFactor=1+Math.min(.75,Math.sqrt(e.count||1)*.1);
+      for(let k=0;k<lobes;k++){
+        const noise=seededOffset(e.seed^0xa511e9b3,k);
+        const side=seededOffset(e.seed^0x9e3779b9,k);
+        const curl=Math.sin(age*1.5+k*1.71+e.seed*.000009)*2.7;
+        const along=m.forward+noise*m.breadth*.77+
+          (k%4===0?-m.forward*.58:0);
+        const lateral=side*m.breadth*.92+curl*Math.min(1,age);
+        const x=cx+fx*along+px*lateral;
+        const y=cy+fy*along+py*lateral;
+        const radius=m.radius*(.66+(seededOffset(e.seed^0x85ebca6b,k)+1)*.23)*regFactor;
+        ctx.fillStyle=k%4===0?'#a9aaa5':k%3===0?'#e8e7e0':'#d6d5cd';
+        ctx.globalAlpha=m.opacity*(cannon?.27:.265)*(1-Math.min(.46,k*.018));
+        ctx.beginPath();ctx.ellipse(x,y,radius*(.94+.18*Math.sin(k)),radius*.8,
+          e.facing+Math.sin(k*2.7+age*.32)*.35,0,Math.PI*2);ctx.fill();
+      }
+
+      // 0–0.4 s: directed, fast, pale muzzle jet; does not permanently
+      // teleport the main cloud downrange, and naturally fades into billows.
+      if(m.jetReach>1.1){
+        const jetFade=Math.min(1,age/.045)*Math.exp(-Math.max(0,age-.13)*8);
+        ctx.fillStyle='#efeee8';
+        ctx.globalAlpha=(cannon?.35:.44)*jetFade;
+        for(let j=0;j<4;j++){
+          const fraction=(j+.45)/4;
+          const x=cx+fx*m.jetReach*fraction;
+          const y=cy+fy*m.jetReach*fraction;
+          const lobe=Math.max(2,(cannon?11:7)+fraction*8)*Math.max(.4,1-age*.65);
+          ctx.beginPath();ctx.ellipse(x,y,lobe*1.8,lobe*.62,e.facing,0,Math.PI*2);ctx.fill();
+        }
+      }
+      // The flash pan/vent contributes a small secondary puff beside the
+      // shooter, not a second large musket smoke cloud.
+      if(m.panIntensity>0&&zoom>.65){
+        const nearX=cx-fx*12+px*1.2,nearY=cy-fy*12+py*1.2;
+        ctx.fillStyle='#c6c2b4';ctx.globalAlpha=.24*m.panIntensity;
         ctx.beginPath();
-        ctx.arc(cx+fx*along+px*lateral,cy+fy*along+py*lateral,radius,0,Math.PI*2);
+        ctx.ellipse(nearX,nearY,3.8+age*10,2.4+age*7,e.facing+.35,0,Math.PI*2);
         ctx.fill();
       }
     }
     ctx.restore();
   }
-
   function drawFalls(){for(let i=visualEvents.length-1;i>=0;i--){const e=visualEvents[i],age=elapsed-e.born;if(age>=e.life){visualEvents.splice(i,1);continue;}const t=Math.min(1,age/.42),alpha=Math.min(.72,(e.life-age)*.7);ctx.save();ctx.globalAlpha=alpha;ctx.translate(e.x,e.y);ctx.rotate(e.facing+t*Math.PI*.42);ctx.fillStyle=e.side==='france'?'#244d9a':'#a5322f';if(e.type==='cavalry'){ctx.fillStyle='#564334';ctx.beginPath();ctx.ellipse(0,2,11,5.2,.25,0,Math.PI*2);ctx.fill();}ctx.fillStyle=e.side==='france'?'#244d9a':'#a5322f';ctx.beginPath();ctx.ellipse(0,0,5,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d1a784';ctx.beginPath();ctx.arc(0,-7,2.5,0,Math.PI*2);ctx.fill();ctx.restore();}}
   drawParticles=function drawParticlesCombatAnimationsV1(){baseDrawParticles();drawSmoke();drawFalls();};
 
   function smokeStats(){let musketClouds=0,artilleryClouds=0,maxPooledShots=0,persistentVolleyClouds=0;for(const e of smokeEvents){if(e.kind==='artillery')artilleryClouds+=1;else{musketClouds+=1;if(e.count>=8&&elapsed-e.born>=.35)persistentVolleyClouds+=1;}maxPooledShots=Math.max(maxPooledShots,e.count||1);}return {active:smokeEvents.length,musketClouds,artilleryClouds,maxPooledShots,persistentVolleyClouds,cap:MAX_SMOKE_EVENTS};}
-  const api=Object.freeze({version:'combat-animations-v1.3',eventCount:()=>visualEvents.length,animationFor:u=>active(u),smokeStats,smokeSnapshot,features:Object.freeze(['musket-fire','reload','bayonet','cavalry-charge','artillery-recoil','hit-reaction','death-fall','pooled-volley-smoke','persistent-smoke-line','artillery-smoke','batched-smoke-canvas-state','wind-advected-dense-powder-smoke'])});
+  const api=Object.freeze({version:'combat-animations-v1.3',eventCount:()=>visualEvents.length,animationFor:u=>active(u),smokeStats,smokeSnapshot,smokeProfile,features:Object.freeze(['musket-fire','reload','bayonet','cavalry-charge','artillery-recoil','hit-reaction','death-fall','pooled-volley-smoke','persistent-smoke-line','artillery-smoke','batched-smoke-canvas-state','wind-advected-dense-powder-smoke','flintlock-pan-puff','directed-jet-then-billow'])});
   nrts.subsystems.register('combat-animations',api,{phase:'architecture-v2',legacyBridge:false,responsibility:'visual-only combat event animation and pooled black-powder smoke synchronized to simulation fire and damage events'});
   global.__COMBAT_ANIMATIONS_V1__=api;
 })(window);
