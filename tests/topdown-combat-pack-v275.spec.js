@@ -90,10 +90,18 @@ test('v273 artillery crew phases follow actual gunshot; v274 panic states and v2
       morale=window.__TOPDOWN_MORALE_V274__,cavalry=window.__TOPDOWN_CAVALRY_V275__;
     const target=createUnit('britain','infantry',camera.x+75,camera.y);
     const cannon=createUnit('france','artillery',camera.x,camera.y);
+    // A cannon without both live crew is correctly forbidden to fire.
+    // Create a real battery, then complete the visual staging approach.
+    const crew=[createUnit('france','infantry',camera.x-18,camera.y-19),
+      createUnit('france','infantry',camera.x-18,camera.y+19)];
+    const battery=createArtilleryBatteryV06('france',cannon,crew);
+    battery.crewApproachV1.active=false;
+    cannon.crewReadyV1=true;
     cannon.reload=-1;target.reload=999;
     const orig={x:cannon.x,y:cannon.y};
     fire(cannon,target);cannon.reload=999;
     const recoil=artillery.phaseFor(cannon);
+    drawBatteryCompositeV061(cannon,battery);
     for(let i=0;i<10;i++)window.RTS_SIM.step(.05);
     const sponge=artillery.phaseFor(cannon);
     cannon.artilleryVisualV273.reloadDuration=4;
