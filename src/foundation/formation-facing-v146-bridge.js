@@ -47,7 +47,13 @@
 
       regs.forEach((reg, index) => {
         const lateral = (index - (regs.length - 1) / 2) * spacing;
-        window.arrangeFacingRegimentV146(
+        // A MOVE is a navigation order, not an instant rearrangement.
+        // The old v146 code called arrangeFacingRegimentV146 here. That clears
+        // reg.path/marchV063 and prevents the road column controller from
+        // EVER activating on regular 2D right-click or 3D single-tap moves.
+        // Preserve the user's chosen destination/final facing, but let the
+        // authoritative RTS route planner own travel and bridge crossing.
+        window.orderGroupPathV06(
           reg,
           x + perpX * lateral,
           y + perpY * lateral,
@@ -63,9 +69,18 @@
     }
 
     if (regs.length || loose.length) {
+      const routed = regs.filter(reg => reg.path?.length && reg.marchV063?.v064);
+      const marchingOnRoad = routed.some(reg =>
+        reg.marchV063?.locomotionV064 === 'road-march' ||
+        (typeof window.roadAtV064 === 'function' &&
+         window.roadAtV064(reg.marchV063.anchorX,reg.marchV063.anchorY)));
       statusEl.textContent = regs.length
-        ? `${regs.length} regiment${regs.length > 1 ? 'en' : ''} marcheert richting doel in ${formationLabel(regs[0].formation).toLowerCase()}.`
-        : `${loose.length} losse eenheden verplaatsen.`;
+        ? routed.length
+          ? marchingOnRoad
+            ? `Marscolonne actief · ${routed.length} regiment${routed.length > 1 ? 'en' : ''} · vier breed op de weg.`
+            : `${routed.length} regiment${routed.length > 1 ? 'en' : ''} onderweg · marscolonne zodra de weg bereikt wordt.`
+          : 'Geen route gestart: controleer de selectie van het regiment.'
+        : `${loose.length} losse eenheden verplaatsen · vorm eerst een regiment voor automatische marscolonne.`;
     }
   };
 
