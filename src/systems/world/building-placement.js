@@ -81,8 +81,16 @@
   const previousCreateBuilding = createBuilding;
   createBuilding = function createBuildingPlacementSafe(side, type, x, y, complete = true) {
     const safe = nearestPlacementSafePosition(type, x, y);
-    if (!safe) return null;
-    return previousCreateBuilding(side, type, safe.x, safe.y, complete);
+    if (safe) return previousCreateBuilding(side, type, safe.x, safe.y, complete);
+    // v284: the expanded historic road network can occupy every placement-search
+    // ring around an OLD scenario anchor (notably Britain's pre-relocation anchor).
+    // Never silently skip a starting town center: a reset without both capitals
+    // breaks the game. British buildings are subsequently moved to the far SE
+    // camp by resetGameV06; this fallback only preserves the essential spawn.
+    const essentialTownCenter = type === 'towncenter' && complete &&
+      !livingBuildings(side).some(b => b.type === 'towncenter');
+    if (essentialTownCenter) return previousCreateBuilding(side, type, x, y, complete);
+    return null;
   };
 
   const previousFindBuildLocation = findBuildLocation;
