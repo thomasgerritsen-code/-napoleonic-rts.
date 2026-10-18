@@ -41,7 +41,7 @@
     }
   }
 
-  function marсhingAnimationAmplitude(marching,speed){
+  function marchingAnimationAmplitude(marching,speed){
     if(!marching)return 0;
     return .65+Math.min(.5,speed/100);
   }
@@ -55,7 +55,7 @@
     const speed=global.__TOPDOWN_MARCH_V262__?.speedFor(u)||0;
     // One shared gait phase per soldier, fast enough for marching but bounded.
     const cadence=1.6+Math.min(.65,speed/150);
-    const amplitude=marсhingAnimationAmplitude(marching,speed);
+    const amplitude=marchingAnimationAmplitude(marching,speed);
     const stridePhase=phase(u,cadence);
     const gait=Math.sin(stridePhase)*.85*scale*amplitude;
     const armSwing=Math.sin(stridePhase+Math.PI/2)*.55*scale*amplitude;
