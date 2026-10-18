@@ -101,7 +101,17 @@
     ...ROAD_NETWORK_V066.filter(road=>!omitted.has(road.id)),
     ...strategicRoads
   ]);
-  const hamlets=Object.freeze(ROAD_HAMLETS_V066.filter(hamlet=>{
+  const postalRelays=Object.freeze([
+    {name:'Relais de la Chaussée',x:1150,y:900},
+    {name:'Marché de l’Est',x:3000,y:900},
+    {name:'Saint-Pierre-des-Bois',x:2060,y:1430},
+    {name:'Relais de la Colline',x:2150,y:1920},
+    {name:'Bourg des Fermes',x:2360,y:2540},
+    {name:'Relais des Grands Bois',x:2670,y:3050},
+    {name:'Village du Val',x:5000,y:3400},
+    {name:'Les Postes du Midi',x:6200,y:4400}
+  ].map(h=>Object.freeze(h)));
+  const hamlets=Object.freeze([...ROAD_HAMLETS_V066,...postalRelays].filter(hamlet=>{
     for(const road of roads){
       for(let i=1;i<road.points.length;i++){
         if(closestPointOnSegmentV066(hamlet.x,hamlet.y,road.points[i-1],road.points[i]).distance<=road.width/2+30) return true;
@@ -206,6 +216,7 @@
     height:WORLD.height,
     roadCount:roads.length,
     historicalRoadCount:strategicRoads.length,
+    relayVillageCount:postalRelays.length,
     historicalHierarchy:true,
     crossMapConnectivity:true,
     originalRoadCount:ROAD_NETWORK_V066.length,
