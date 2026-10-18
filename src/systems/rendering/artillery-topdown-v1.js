@@ -20,20 +20,41 @@
     const moving=!!cannon.batteryMovingV061||batteryMovingV061(reg,cannon);
     const offsets=batteryCrewLocalOffsetsV061(reg,cannon);
     const selected=selectedUnits.has(cannon)||crew.some(member=>selectedUnits.has(member));
+    const phase=global.__TOPDOWN_GUN_CREW_V273__?.phaseFor(cannon)||
+      {stage:'ready',recoil:0,ram:0,crewShift:0};
 
     ctx.save();ctx.translate(cannon.x,cannon.y);ctx.rotate(facing);
     if(selected){ctx.strokeStyle=COLORS.selected;ctx.lineWidth=2.2/camera.zoom;ctx.beginPath();ctx.ellipse(-7,0,40,32,0,0,Math.PI*2);ctx.stroke();}
 
+    // Carriage kicks back against the wheels then recovers, while the cannon
+    // and crew retain their true simulated world coordinates.
+    ctx.save();ctx.translate(-phase.recoil,0);
     // Gun carriage and wheels in orthographic plan view.
     ctx.fillStyle='#654b32';ctx.beginPath();ctx.moveTo(-22,-5);ctx.lineTo(6,-4);ctx.lineTo(12,0);ctx.lineTo(6,4);ctx.lineTo(-22,5);ctx.closePath();ctx.fill();
     ctx.fillStyle='#282522';ctx.beginPath();ctx.ellipse(-3,-10,5.5,2.7,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(-3,10,5.5,2.7,0,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle='#1b1b1a';ctx.lineWidth=5.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(2,0);ctx.lineTo(24,0);ctx.stroke();
     ctx.strokeStyle='#77736b';ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(11,-1.6);ctx.lineTo(24,-1.6);ctx.stroke();
     ctx.fillStyle='#4a3728';ctx.beginPath();ctx.arc(-14,0,3.2,0,Math.PI*2);ctx.fill();
+    ctx.restore();
 
     crew.forEach((member,index)=>{
       const off=offsets[index]||{ox:-12,oy:index?-22:22};
-      drawCrew(member,off.ox,off.oy,moving||!!reg.crewApproachV1?.active);
+      // The first gunner leans in with the sponge/ramrod. The second gunner
+      // shifts slightly back when bringing up the cartridge. Visual only.
+      const crewX=off.ox+(moving?0:index===0?phase.crewShift:-phase.crewShift*.4);
+      drawCrew(member,crewX,off.oy,moving||!!reg.crewApproachV1?.active);
+      if(!moving&&phase.ram>0&&index===0){
+        const reach=10+11*phase.ram;
+        ctx.strokeStyle='#9b855f';ctx.lineWidth=1.4;
+        ctx.beginPath();ctx.moveTo(crewX+4,off.oy*.65);
+        ctx.lineTo(reach,off.oy>0?2:-2);ctx.stroke();
+        ctx.fillStyle='#3c332d';ctx.beginPath();
+        ctx.arc(reach,off.oy>0?2:-2,2.0,0,Math.PI*2);ctx.fill();
+      }
+      if(!moving&&phase.stage==='charge'&&index===1){
+        ctx.fillStyle='#c1a778';ctx.beginPath();
+        ctx.ellipse(crewX+7,off.oy*.65,4.2,2.8,0,0,Math.PI*2);ctx.fill();
+      }
     });
 
     if(moving&&!reg.crewApproachV1?.active){
@@ -49,7 +70,7 @@
     ctx.restore();
   };
 
-  const api=Object.freeze({version:'artillery-topdown-v1.1',projection:'orthographic-top-down',crewUsesNapoleonicRenderer:true,crewUsesMuskets:false});
+  const api=Object.freeze({version:'artillery-topdown-v1.2',projection:'orthographic-top-down',crewUsesNapoleonicRenderer:true,crewUsesMuskets:false});
   global.__ARTILLERY_TOPDOWN_V1__=api;
   nrts.subsystems.register('artillery-renderer',api,{phase:'architecture-v2.1',legacyBridge:false,responsibility:'strict top-down cannon, carriage and unified crew rendering'});
 })(window);
