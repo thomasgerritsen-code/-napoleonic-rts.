@@ -16,10 +16,13 @@ test('v281 playable map expands by at least 3.5x original world area',()=>{
 });
 
 test('v281 bridges are distant, traverse a continued river and have actual connecting roads',()=>{
- const r=vm.runInNewContext(riverSource.match(/const WATER_CROSSINGS_V067 = Object\.freeze\(\[(.*?)\]\);/s)[1]
-   .replace(/Object\.freeze\(/g,'(').replace(/\),\s*\(/g,'),(')
-   .replace(/\)\s*$/,'') ,{});
- assert(r); // parse fixture should not silently claim missing geography
+ const match=riverSource.match(/const WATER_CROSSINGS_V067 = Object\.freeze\((\[[\s\S]*?\])\);/);
+ assert(match,'missing crossing geometry array');
+ const crossings=vm.runInNewContext(match[1],{});
+ const northern=crossings.find(c=>c.id==='pont-grands-bois');
+ const southern=crossings.find(c=>c.id==='pont-du-sud');
+ assert(northern&&southern,'new crossing IDs must be usable');
+ assert(Math.hypot(northern.x-southern.x,northern.y-southern.y)>1500);
  assert.match(riverSource,/\{x:1900,y:3050\}/);
  assert.match(riverSource,/\{x:2250,y:4580\}/);
  assert.match(roadSource,/id:'route-de-grands-bois'/);
