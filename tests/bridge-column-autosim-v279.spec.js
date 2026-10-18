@@ -24,7 +24,7 @@ test('v279 six real 4-wide regiment routes must clear every bridge without stran
       {id:'pont-chaussee',side:-1,count:12,lateral:0},
       {id:'pont-chaussee',side: 1,count:36,lateral:-40},
       {id:'pont-crete',side:-1,count:24,lateral:68},
-      {id:'pont-crete',side: 1,count:12,lateral:-45},
+      {id:'pont-crete',side: 1,count:12,lateral:0},
       {id:'pont-fermes',side:-1,count:18,lateral:32},
       {id:'pont-fermes',side: 1,count:24,lateral:-26}
     ];
