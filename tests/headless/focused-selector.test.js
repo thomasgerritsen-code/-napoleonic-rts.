@@ -100,6 +100,11 @@ test('final AI authority keeps replenishment, AI separation and restoration cove
   assert.deepEqual(selected, ['tests/ai-production-v125.spec.js','tests/ai-separation.spec.js','tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js']);
 });
 
+test('deleted legacy browser tests are not selected by the git diff', () => {
+  const selected = selectFocusedTests(['tests/rts.spec.js', 'tests/removed-v066.spec.js']);
+  assert.deepEqual(selected, ['tests/smoke-v1.spec.js']);
+});
+
 test('documentation-only changes keep browser coverage minimal', () => {
   const selected = selectFocusedTests(['docs/testing-architecture.md']);
   assert.deepEqual(selected, ['tests/smoke-v1.spec.js']);

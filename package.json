@@ -1,6 +1,6 @@
 {
   "name": "napoleonic-rts",
-  "version": "1.3.33",
+  "version": "1.3.34",
   "private": true,
   "description": "Browser Napoleonic RTS with Playwright Chromium regression, stress and soak tests",
   "scripts": {
@@ -8,7 +8,6 @@
     "test:fast": "npm run audit && node --test tests/headless/*.test.js",
     "test:e2e": "playwright test --project=chromium",
     "test:ci": "npm run test:fast && npm run test:e2e",
-    "test:soak": "playwright test --project=chromium -g \"10-minute accelerated soak\"",
     "art:list": "node scripts/generate-art.mjs --list",
     "art:dry": "node scripts/generate-art.mjs --dry-run",
     "art:generate": "node scripts/generate-art.mjs",
