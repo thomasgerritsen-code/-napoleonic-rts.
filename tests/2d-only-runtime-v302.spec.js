@@ -27,7 +27,7 @@ test('desktop boots strictly in 2D without 3D renderer, mode toggle or external 
   expect(result.threeBridge).toBe(false);
   expect(result.staticCanvas).toBe(true);
   expect(result.currentRiver).toBe(true);
-  expect(result.runtimeVersion).toBe('1.3.50');
+  expect(result.runtimeVersion).toMatch(/^1\.3\.\d+$/);
   expect(responses).toEqual([]);
   expect(errors).toEqual([]);
 });

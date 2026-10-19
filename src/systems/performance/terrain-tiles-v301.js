@@ -9,6 +9,7 @@
   let bytes = 0, profile = '';
 
   function invalidate() {
+    root.__GPU_TERRAIN_V303__?.invalidate?.();
     if (tiles.size) stats.invalidations++;
     tiles.clear();
     bytes = 0;
@@ -72,8 +73,12 @@
     const scale = liveZoom * dpr;
     const x0 = Math.floor(left / step), x1 = Math.floor(right / step);
     const y0 = Math.floor(top / step), y1 = Math.floor(bottom / step);
-    outputCtx.setTransform(1, 0, 0, 1, 0, 0);
-    outputCtx.clearRect(0, 0, outputCtx.canvas.width, outputCtx.canvas.height);
+    const gpu = root.__GPU_TERRAIN_V303__;
+    const gpuActive = gpu?.begin?.(outputCtx.canvas.width, outputCtx.canvas.height) === true;
+    if (!gpuActive) {
+      outputCtx.setTransform(1, 0, 0, 1, 0, 0);
+      outputCtx.clearRect(0, 0, outputCtx.canvas.width, outputCtx.canvas.height);
+    }
     try {
       for (let ty = y0; ty <= y1; ty++) {
         for (let tx = x0; tx <= x1; tx++) {
@@ -93,11 +98,13 @@
           const sy = Math.round((ty * step - top) * scale);
           const ey = Math.round(((ty + 1) * step - top) * scale);
           // Identical rounded edges eliminate hairline cracks between tiles.
-          outputCtx.drawImage(tile.canvas, sx, sy, ex - sx, ey - sy);
+          if (gpuActive) gpu.drawTile(key, tile.canvas, sx, sy, ex - sx, ey - sy);
+          else outputCtx.drawImage(tile.canvas, sx, sy, ex - sx, ey - sy);
           stats.composites++;
         }
       }
     } finally {
+      if (gpuActive) gpu.finish();
       // Rasterization used the live game canvas; discard those scratch pixels
       // before the renderer draws units, smoke, resources, and selection HUD.
       ctx.save();
@@ -110,6 +117,7 @@
       const tile = tiles.get(oldest);
       tiles.delete(oldest);
       bytes -= tile.bytes;
+      gpu?.dropTile?.(oldest);
       stats.evictions++;
     }
     // Animation remains real-time even on a completely cached battlefield.
