@@ -30,7 +30,7 @@
     return Number.isFinite(h?.plotRadius) ? h.plotRadius : Math.hypot(h?.w||0,h?.h||0)*.72+10;
   }
   function resourceRadius(type){
-    return type==='wood' ? 22 : (cfg.berryRadius ?? 19);
+    return type==='wood' ? 22 : type==='iron' ? 22 : (cfg.berryRadius ?? 19);
   }
   function pointSegmentDistanceSq(px,py,ax,ay,bx,by){
     const dx=bx-ax,dy=by-ay;
@@ -57,6 +57,17 @@
   }
   function roadConflict(type,x,y){
     return roadConflictAt(x,y,resourceRadius(type),roadPadding);
+  }
+  // Use the raw river geometry, NOT waterAtV067 alone: bridge decks are
+  // excluded by waterAt, but ore must also stay away from the bridge entrance
+  // and wet riverbanks. The 30-unit outer bank allows a miner to stand beside
+  // the entire half-buried rock without stepping into navigational water.
+  function oreShoreConflict(x,y){
+    if(typeof riverHitV067!=='function' || typeof RIVER_NAV_HALF_WIDTH_V067==='undefined'){
+      return typeof waterAtV067==='function' && waterAtV067(x,y);
+    }
+    const hit=riverHitV067(x,y);
+    return !!hit && hit.distance < RIVER_NAV_HALF_WIDTH_V067+resourceRadius('iron')+30;
   }
   function buildingConflict(type,x,y,padding=buildingPadding){
     const rr=resourceRadius(type);
@@ -102,6 +113,7 @@
   function validResourceSpot(type,x,y,ignore=null){
     const rr=resourceRadius(type);
     if(x<rr+16||y<rr+16||x>WORLD.width-rr-16||y>WORLD.height-rr-16)return false;
+    if(type==='iron'&&oreShoreConflict(x,y))return false;
     if(roadConflict(type,x,y)||buildingConflict(type,x,y)||villageHouseConflict(type,x,y))return false;
     if(type==='food'&&insideVillage(x,y))return false;
     return !resourceConflict(type,x,y,ignore);
@@ -152,7 +164,7 @@
   function stampResource(r,type,extra=null){
     if(!r)return null;
     r.radius=resourceRadius(type);
-    r.visualKind=type==='food'?'berry-bush':'deciduous-tree';
+    r.visualKind=type==='food'?'berry-bush':type==='iron'?'embedded-ironstone':'deciduous-tree';
     r.ecologyV1=true;
     if(extra)Object.assign(r,extra);
     return r;
@@ -316,6 +328,8 @@
     roadConflictAt,
     resourceRadius,
     roadPadding,
+    oreShoreConflict,
+    oreShoreExclusion:true,
     relocatedInitial:relocated,
     relocatedFromRoad:roadRelocated,
     removedInitial:removed,
@@ -332,7 +346,8 @@
     ensureBaseVillageBerries,
     baseVillageBerryStats,
     resourceBuildingExclusion:true,
-    resourceRoadExclusion:true
+    resourceRoadExclusion:true,
+    ironRiverbankExclusion:true
   });
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
