@@ -167,6 +167,13 @@
   function getStaticWorld() {
     return {
       world: { width: WORLD.width, height: WORLD.height },
+      // Renderer receives the exact sampled simulation curve, never a
+      // separate aesthetically interpolated channel.
+      river: typeof RIVER_CURVE_V296==='undefined' ? null : {
+        points:RIVER_CURVE_V296.map(p=>({x:p.x,y:p.y})),
+        navigationHalfWidth:RIVER_NAV_HALF_WIDTH_V067,
+        crossings:WATER_CROSSINGS_V067.map(c=>({id:c.id,x:c.x,y:c.y}))
+      },
       roads: cloneRoads(),
       villages: cloneVillages(),
       woods: typeof TERRAIN_WOODS === 'undefined' ? [] : cloneTerrainRects(TERRAIN_WOODS),
@@ -207,7 +214,7 @@
   }
 
   const api = Object.freeze({
-    version: 'battlefield-3d-bridge-v1.3.43',
+    version: 'battlefield-3d-bridge-v1.3.45',
     snapshotMode: 'lightweight-live-render-state',
     snapshotAllocationMode: 'single-pass-live-collections',
     villageMetadata: 'archetype-zone-cluster-role-render-only',
