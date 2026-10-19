@@ -73,6 +73,13 @@ test('mobile 2D continues using original terrain path without desktop tiles', as
   const page = await context.newPage();
   try {
     await page.goto('/?test=v071', { waitUntil:'networkidle' });
+    // Under mobile emulation, readiness can lag network-idle while the final
+    // scripts finish evaluating. Do not query the addon before it exists.
+    await page.waitForFunction(() => Boolean(
+      window.__DESKTOP_TERRAIN_TILES_V301__ &&
+      window.__LARGE_ARMY_PERFORMANCE_V1__ &&
+      window.__MOBILE_RENDER_BUDGET_V1__
+    ));
     const result = await page.evaluate(() => {
       const cache = window.__DESKTOP_TERRAIN_TILES_V301__;
       const before = cache.stats();
