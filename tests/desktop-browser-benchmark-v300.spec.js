@@ -104,7 +104,7 @@ async function measure(browser, url, scenario) {
   }
 }
 
-test('v300 browser FPS and frame pacing vs untouched v299 baseline', async ({ browser }, testInfo) => {
+test('v301 browser FPS and frame pacing vs untouched v299 baseline', async ({ browser }, testInfo) => {
   test.setTimeout(240000);
   const sourceDir = mkdtempSync(path.join(os.tmpdir(), 'rts-baseline-v299-'));
   const baseDir = path.join(sourceDir, 'site');
@@ -120,13 +120,13 @@ test('v300 browser FPS and frame pacing vs untouched v299 baseline', async ({ br
     const current = 'http://127.0.0.1:4173';
     const sampleOrder = [
       ['v299/main', base, 'normal'],
-      ['v300/PR', current, 'normal'],
-      ['v300/PR', current, '520 units'],
+      ['v301/PR', current, 'normal'],
+      ['v301/PR', current, '520 units'],
       ['v299/main', base, '520 units'],
-      ['v300/PR', current, 'normal'],
+      ['v301/PR', current, 'normal'],
       ['v299/main', base, 'normal'],
       ['v299/main', base, '520 units'],
-      ['v300/PR', current, '520 units']
+      ['v301/PR', current, '520 units']
     ];
     const entries = [];
     for (const [version, url, scenario] of sampleOrder) {
@@ -157,15 +157,15 @@ test('v300 browser FPS and frame pacing vs untouched v299 baseline', async ({ br
     const report = { baselineSha:baseSha, viewport:VIEWPORT, nativeDpr:2.5,
       runLengthMs:RENDER_DURATION_MS, summary, entries };
     mkdirSync(path.resolve('test-results'), { recursive:true });
-    writeFileSync(path.resolve('test-results/desktop-frame-benchmark-v300.json'), JSON.stringify(report,null,2));
-    console.log('DESKTOP_BENCHMARK_V300=' + JSON.stringify(report));
-    await testInfo.attach('desktop-frame-benchmark-v300.json', {
+    writeFileSync(path.resolve('test-results/desktop-frame-benchmark-v301.json'), JSON.stringify(report,null,2));
+    console.log('DESKTOP_BENCHMARK_V301=' + JSON.stringify(report));
+    await testInfo.attach('desktop-frame-benchmark-v301.json', {
       body: Buffer.from(JSON.stringify(report, null, 2)), contentType: 'application/json'
     });
     expect(summary['v299/main:normal']).toBeDefined();
-    expect(summary['v300/PR:normal']).toBeDefined();
+    expect(summary['v301/PR:normal']).toBeDefined();
     expect(summary['v299/main:520 units']).toBeDefined();
-    expect(summary['v300/PR:520 units']).toBeDefined();
+    expect(summary['v301/PR:520 units']).toBeDefined();
   } finally {
     if (server) {
       server.kill('SIGTERM');
