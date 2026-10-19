@@ -45,7 +45,7 @@ void main() {
      1.0-screen.y*2.0/uViewport.y,0.0,1.0);
   vLocal=aCorner;
   vStyle=iStyle;
-}`.replace('  float dpr=uViewport.x/float(max(1.0,innerWidth)); // overwritten below\n','');
+}`.replace('','');
   const fragmentShader = `#version 300 es
 precision mediump float;
 in vec2 vLocal;
@@ -185,7 +185,7 @@ void main(){
       const dpr=game.width/Math.max(1,innerWidth);
       gl.useProgram(program);gl.bindVertexArray(vao);
       gl.uniform2f(viewportUniform,gpuCanvas.width,gpuCanvas.height);
-      gl.uniform3f(cameraUniform,camera.x*dpr,camera.y*dpr,camera.zoom*dpr);
+      gl.uniform3f(cameraUniform,camera.x,camera.y,camera.zoom*dpr);
       gl.bindBuffer(gl.ARRAY_BUFFER,instanceBuffer);
       gl.bufferSubData(gl.ARRAY_BUFFER,0,data.subarray(0,count*STRIDE));
       gl.drawArraysInstanced(gl.TRIANGLES,0,6,count);
