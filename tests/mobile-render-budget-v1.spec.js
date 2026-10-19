@@ -66,12 +66,32 @@ test('orientation resize reapplies budget without changing touch coordinate spac
   await context.close();
 });
 
-test('desktop keeps existing DPR ceiling', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2.5 });
+test('large desktop is pixel-budgeted consistently by both 2D canvas owners', async ({ browser }) => {
+  const viewport = { width: 1920, height: 1080 };
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 2.5 });
   const page = await context.newPage();
   await page.goto('/?test');
-  const state = await page.evaluate(() => window.__MOBILE_RENDER_BUDGET_V1__?.state?.());
-  expect(state.mobile).toBe(false);
-  expect(state.renderDpr).toBe(2);
+  const state = await page.evaluate(() => {
+    const budget = window.__MOBILE_RENDER_BUDGET_V1__;
+    const main = document.getElementById('game');
+    const staticCanvas = document.getElementById('game-static');
+    return {
+      budget: budget.state(),
+      contract: budget.contract,
+      effectiveDpr: budget.desiredDpr(),
+      main: { width: main.width, height: main.height },
+      staticCanvas: { width: staticCanvas.width, height: staticCanvas.height },
+      cssWidth: main.getBoundingClientRect().width
+    };
+  });
+  expect(state.budget.mobile).toBe(false);
+  const expectedDpr = Math.sqrt(2200000 / (viewport.width * viewport.height));
+  expect(state.effectiveDpr).toBeCloseTo(expectedDpr, 4);
+  expect(state.budget.renderDpr).toBeCloseTo(expectedDpr, 4);
+  expect(state.main.width).toBe(Math.floor(viewport.width * expectedDpr));
+  expect(state.main.height).toBe(Math.floor(viewport.height * expectedDpr));
+  expect(state.staticCanvas).toEqual(state.main);
+  expect(state.main.width * state.main.height).toBeLessThanOrEqual(2200000);
+  expect(state.cssWidth).toBe(viewport.width);
   await context.close();
 });
