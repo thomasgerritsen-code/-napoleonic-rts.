@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.51
+# Napoleonic RTS — v1.3.52
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.52 — één GPU-tekenopdracht voor uitgezoomde soldaten (update 304)
+
+Bij meer dan 360 levende eenheden en camera-zoom kleiner dan 0,82 worden niet-geselecteerde infanteristen, officieren, drummers en ruiters met WebGL2-instancing als eenvoudige 2D-silhouetten samengevoegd in één batch. De CPU beheert nog steeds beweging, formatie, AI, botsingen en schieten. Dichtbij blijven de originele getekende uniformen en animaties actief, evenals artillerie en geselecteerde soldaten. De GPU-units staan op een transparante laag die geen muis- of touchinvoer ontvangt.
+
+Mobiel of geen WebGL2: automatische terugval naar oorspronkelijke Canvas-unit-LOD. Met `?units=cpu` vergelijk je de oude unitrenderer terwijl het terrein eventueel nog via de GPU loopt. Met `?gpu=off` schakel je beide GPU-renderpaden uit. Het is een gerichte optimalisatie voor grote, uitgezoomde veldslagen; gedetailleerde soldaten blijven bewust op Canvas totdat ze zonder verlies van beeldkwaliteit kunnen worden overgezet.
 
 ## v1.3.51 — GPU-textures voor de bestaande 2D-kaart (update 303)
 
