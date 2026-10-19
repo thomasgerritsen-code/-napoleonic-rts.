@@ -186,7 +186,11 @@
     for (const [type, cx, cy] of clusters) {
       const count = type === 'wood' ? 14 : type === 'iron' ? 6 : 7;
       for (let i = 0; i < count; i++) {
-        createResource(type, cx + (Math.random() - 0.5) * 150, cy + (Math.random() - 0.5) * 120, type === 'wood' ? 220 : type === 'iron' ? 330 : 360);
+        // Ore veins use fixed local offsets so adding them does not perturb the
+        // seeded historical movement/column simulation via Math.random().
+        const x=type==='iron'?cx+(i%3-1)*46:cx+(Math.random()-.5)*150;
+        const y=type==='iron'?cy+(Math.floor(i/3)-.5)*76:cy+(Math.random()-.5)*120;
+        createResource(type,x,y,type==='wood'?220:type==='iron'?330:360);
       }
     }
   }
