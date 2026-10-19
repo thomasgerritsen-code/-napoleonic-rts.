@@ -264,7 +264,10 @@
   };
 
   function resize2DCanvasForPerformance() {
-    const desiredDpr = Math.min(devicePixelRatio || 1, MAX_2D_DPR);
+    // Share the same DPR decision as the early budget installer: resizing must
+    // not allocate a full Retina canvas twice (or undo the desktop pixel cap).
+    const desiredDpr = Math.min(MAX_2D_DPR,
+      global.__MOBILE_RENDER_BUDGET_V1__?.desiredDpr?.() ?? (devicePixelRatio || 1));
     const desiredWidth = Math.max(1, Math.floor(innerWidth * desiredDpr));
     const desiredHeight = Math.max(1, Math.floor(innerHeight * desiredDpr));
     const sameMain = canvas.width === desiredWidth && canvas.height === desiredHeight;
