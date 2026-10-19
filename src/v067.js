@@ -113,7 +113,9 @@ window.__RIVER_GEOMETRY_V296__=Object.freeze({
   tangentAt:riverTangentAtV296,
   bankAt:riverBankAtV296,
   sharedNavigation:true,
-  originalBridgeAnchors:true
+  originalBridgeAnchors:true,
+  navHalfWidth:RIVER_NAV_HALF_WIDTH_V067,
+  crossings:WATER_CROSSINGS_V067
 });
 function bankSideV067(x,y){return x-riverCenterXAtYV067(y);}
 function segmentWaterCrossingV067(ax,ay,bx,by){
@@ -299,13 +301,72 @@ issueMoveWithFacingV06=function issueMoveWithFacingV067(x,y,finalFacing=null){
   if(adjusted)statusEl.textContent=`Water blokkeert de positie; order verplaatst naar ${crossing.name}.`;
 };
 
+// Layered wet banks, shallow shoals, deep water and tangent-following glints.
+// Only visuals change here: waterAtV067 and bridge routing keep their common
+// geometry from update 296.
 function drawRiverV067(){
-  const trace=()=>{ctx.beginPath();ctx.moveTo(RIVER_SMOOTH_POINTS_V296[0].x,RIVER_SMOOTH_POINTS_V296[0].y);for(let i=1;i<RIVER_SMOOTH_POINTS_V296.length;i++)ctx.lineTo(RIVER_SMOOTH_POINTS_V296[i].x,RIVER_SMOOTH_POINTS_V296[i].y);};
+  const trace=()=>{
+    ctx.beginPath();ctx.moveTo(RIVER_SMOOTH_POINTS_V296[0].x,RIVER_SMOOTH_POINTS_V296[0].y);
+    for(let i=1;i<RIVER_SMOOTH_POINTS_V296.length;i++)
+      ctx.lineTo(RIVER_SMOOTH_POINTS_V296[i].x,RIVER_SMOOTH_POINTS_V296[i].y);
+  };
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
-  ctx.strokeStyle='rgba(45,54,47,.55)';ctx.lineWidth=RIVER_VISUAL_WIDTH_V067+16;trace();ctx.stroke();
-  ctx.strokeStyle='rgba(70,119,139,.86)';ctx.lineWidth=RIVER_VISUAL_WIDTH_V067;trace();ctx.stroke();
-  ctx.strokeStyle='rgba(166,204,207,.33)';ctx.lineWidth=3;ctx.setLineDash([18,24]);trace();ctx.stroke();ctx.restore();
+  const strata=[
+    {width:175,color:'rgba(86,85,58,.17)'},   // distant grass/silt seam
+    {width:161,color:'rgba(94,83,65,.47)'},   // wet, muddy outer bank
+    {width:151,color:'rgba(128,119,85,.58)'}, // shallow sediment
+    {width:143,color:'rgba(95,133,134,.92)'}, // full walk-blocking river
+    {width:120,color:'rgba(57,105,119,.86)'}, // mid-channel depth
+    {width:78,color:'rgba(42,83,102,.49)'}   // gently darkened thalweg
+  ];
+  for(const layer of strata){
+    trace();ctx.strokeStyle=layer.color;ctx.lineWidth=layer.width;ctx.stroke();
+  }
+  const time=typeof elapsed==='number'?elapsed:0;
+  const halfW=innerWidth/(2*Math.max(.15,camera.zoom))+120;
+  const halfH=innerHeight/(2*Math.max(.15,camera.zoom))+120;
+  let drawn=0;
+  // Pre-sampled channel markers follow local water tangents downstream.
+  // Draw no offscreen ripples and allocate no persistent graphics per frame.
+  for(let i=5;i<RIVER_SMOOTH_POINTS_V296.length-5;i+=5){
+    const p=RIVER_SMOOTH_POINTS_V296[i];
+    if(Math.abs(p.x-camera.x)>halfW||Math.abs(p.y-camera.y)>halfH)continue;
+    const tangent=riverTangentAtV296(p.y);
+    const normal={x:tangent.y,y:-tangent.x};
+    const drift=(time*5.8+(i*17)%61)%61-30;
+    const bankOffset=Math.sin(i*9.7)*30;
+    const cx=p.x+tangent.x*drift+normal.x*bankOffset;
+    const cy=p.y+tangent.y*drift+normal.y*bankOffset;
+    const len=8+((i*19)%12);
+    const shade=.10+.055*(.5+.5*Math.sin(time*.7+i*1.7));
+    ctx.strokeStyle='rgba(209,223,204,'+shade.toFixed(3)+')';
+    ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(cx-tangent.x*len*.5,cy-tangent.y*len*.5);
+    ctx.quadraticCurveTo(cx+normal.x*2,cy+normal.y*2,
+      cx+tangent.x*len*.5,cy+tangent.y*len*.5);
+    ctx.stroke();drawn++;
+  }
+  // Muted eddies beside supports, never bright foam across the whole river.
+  for(const c of WATER_CROSSINGS_V067){
+    if(Math.abs(c.x-camera.x)>halfW||Math.abs(c.y-camera.y)>halfH)continue;
+    for(const side of[-1,1]){
+      const x=c.x+side*c.length*.22,y=c.y+c.width*.18;
+      ctx.strokeStyle='rgba(207,216,196,.15)';ctx.lineWidth=1.25;
+      ctx.beginPath();ctx.ellipse(x,y,6.2,2.8,Math.sin(time*.5)*.14,0,Math.PI*1.55);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  window.__RIVER_RENDER_V297__.lastDrawn=drawn;
 }
+window.__RIVER_RENDER_V297__={
+  version:'river-surface-v297',
+  flowingRipples:true,
+  muddyBanks:true,
+  shallowWater:true,
+  deepChannel:true,
+  lastDrawn:0
+};
 function drawCrossingsV067(){
   ctx.save();
   for(const c of WATER_CROSSINGS_V067){
