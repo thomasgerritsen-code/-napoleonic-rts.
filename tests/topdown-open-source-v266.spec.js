@@ -9,9 +9,11 @@ test('v262-v266 2D march, black-powder effects, user-unlocked audio and utility 
   const first=await page.evaluate(()=>{
     const march=window.__TOPDOWN_MARCH_V262__,effect=window.__TOPDOWN_EFFECTS_V264__,
       audio=window.__TOPDOWN_AUDIO_V265__,ai=window.__TOPDOWN_TACTICS_V266__;
-    const attacker=createUnit('france','infantry',580,700);
-    const defender=createUnit('britain','infantry',635,700);
-    attacker.targetX=900;attacker.targetY=700;
+    // v281 expanded the battlefield: sample visible units so camera culling
+    // does not intentionally skip their animation hooks.
+    const attacker=createUnit('france','infantry',camera.x,camera.y);
+    const defender=createUnit('britain','infantry',camera.x+55,camera.y);
+    attacker.targetX=attacker.x+320;attacker.targetY=attacker.y;
     drawUnit(attacker);
     const idleSpeed=march.speedFor(attacker);
     window.RTS_SIM.step(.05);
