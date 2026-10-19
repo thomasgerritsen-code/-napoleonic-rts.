@@ -335,7 +335,8 @@ resetGame=function resetGameV06(){exploredCells.clear();exploreClockV06=0;rallyP
    ['iron',campX-420,campY-350,9],['iron',campX-360,campY+330,9]]
    .forEach(([type,cx,cy,count])=>{
      for(let i=0;i<count;i++){
-       const x=cx+(Math.random()-.5)*150,y=cy+(Math.random()-.5)*130;
+       const x=type==='iron'?cx+(i%3-1)*53:cx+(Math.random()-.5)*150;
+       const y=type==='iron'?cy+(Math.floor(i/3)-1)*49:cy+(Math.random()-.5)*130;
        if(type==='iron'&&typeof waterAtV067==='function'&&waterAtV067(x,y))continue;
        createResource(type,x,y,type==='iron'?340:type==='wood'?240:380);
      }
