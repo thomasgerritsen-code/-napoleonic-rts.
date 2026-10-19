@@ -95,7 +95,6 @@ test('artillery cannon and crew move as one stable compound unit and deploy with
   expect(result.error).toBeUndefined();
   expect(result.subsystem?.meta?.phase).toBe('architecture-v2');
   expect(result.subsystem?.meta?.legacyBridge).toBe(false);
-  console.log('V292_ARTILLERY_MOVEMENT',JSON.stringify({sawTravel:result.sawTravel,distanceMoved:result.distanceMoved,modeChanges:result.modeChanges,first:result.lastFive?.[0],final:result.final}));
   expect(result.sawTravel).toBe(true);
   expect(result.distanceMoved).toBeGreaterThan(60);
   expect(result.modeChanges).toBeLessThanOrEqual(2);
