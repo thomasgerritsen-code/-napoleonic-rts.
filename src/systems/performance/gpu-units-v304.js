@@ -125,7 +125,7 @@
       '  if(!valid)discard;',
       '  outputColor=vec4(color,1.0);',
       '}'
-    ].join('\\n'));
+    ].join('\n'));
     program=gl.createProgram();
     gl.attachShader(program,v);gl.attachShader(program,f);
     gl.linkProgram(program);gl.deleteShader(v);gl.deleteShader(f);
