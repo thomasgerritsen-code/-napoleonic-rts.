@@ -16,12 +16,18 @@
     return best;
   }
   function roadConflictAt(x,y,radius=0,padding=8){const road=roadAt(x,y);return Boolean(road&&Number.isFinite(road.edgeClearance)&&road.edgeClearance<Math.max(0,radius)+Math.max(0,padding));}
+  function vegetationInRiver(x,y,radius=0){
+    const ecology=global.__BATTLEFIELD_ECOLOGY_V1__;
+    if(ecology?.riverbankConflict)return ecology.riverbankConflict('wood',x,y,radius);
+    const hit=typeof riverHitV067==='function'?riverHitV067(x,y):null;
+    return !!hit && hit.distance<(typeof RIVER_NAV_HALF_WIDTH_V067==='number'?RIVER_NAV_HALF_WIDTH_V067:72)+radius+18;
+  }
   function strokePath(ax,ay,bx,by,width,color,dash){ctx.save();ctx.strokeStyle=color;ctx.lineWidth=Math.max(width,width/camera.zoom);ctx.lineCap='round';if(dash)ctx.setLineDash(dash.map(v=>v/camera.zoom));ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();ctx.restore();}
   function drawWell(x,y){
     const r=5.5;ctx.save();ctx.fillStyle='rgba(94,92,79,.72)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(64,68,67,.74)';ctx.beginPath();ctx.arc(x,y,r*.52,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(197,187,155,.45)';ctx.lineWidth=Math.max(.7,1/camera.zoom);ctx.stroke();ctx.restore();
   }
   function drawCommonTree(x,y,seed){
-    const r=7+hash01(seed^0x77)*3;if(roadConflictAt(x,y,r,8))return;ctx.save();ctx.fillStyle='rgba(66,83,43,.28)';ctx.beginPath();ctx.arc(x,y,r+2,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(43,76,40,.62)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(54,43,30,.55)';ctx.fillRect(x-.8,y-.8,1.6,1.6);ctx.restore();
+    const r=7+hash01(seed^0x77)*3;if(roadConflictAt(x,y,r,8)||vegetationInRiver(x,y,r))return;ctx.save();ctx.fillStyle='rgba(66,83,43,.28)';ctx.beginPath();ctx.arc(x,y,r+2,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(43,76,40,.62)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(54,43,30,.55)';ctx.fillRect(x-.8,y-.8,1.6,1.6);ctx.restore();
   }
   function drawBench(x,y,angle){
     ctx.save();ctx.translate(x,y);ctx.rotate(angle||0);ctx.fillStyle='rgba(91,66,43,.52)';ctx.fillRect(-6,-1.3,12,2.6);ctx.fillRect(-4.5,-3.2,1.2,2.2);ctx.fillRect(3.3,-3.2,1.2,2.2);ctx.restore();
@@ -67,7 +73,7 @@
     }
   }
   function drawWoodlandEdge(village,seed){
-    for(let i=0;i<16;i++){const a=hash01(seed^(i*149+0x90))*Math.PI*2;const d=114+hash01(seed^(i*173+0x91))*54;const x=village.x+Math.cos(a)*d,y=village.y+Math.sin(a)*d;const r=3.8+hash01(seed^(i*197+0x92))*4.2;if(roadConflictAt(x,y,r,8))continue;ctx.fillStyle='rgba(35,66,38,.46)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();if(i%3===0){ctx.fillStyle='rgba(68,48,31,.35)';ctx.fillRect(x-.6,y-.6,1.2,1.2);}if(i%2===0){ctx.fillStyle='rgba(58,89,45,.18)';for(let j=0;j<3;j++){const ox=(hash01(seed^(i*311+j*17))-.5)*14,oy=(hash01(seed^(i*353+j*19))-.5)*14;if(roadConflictAt(x+ox,y+oy,2,6))continue;ctx.beginPath();ctx.arc(x+ox,y+oy,1.8,0,Math.PI*2);ctx.fill();}}}
+    for(let i=0;i<16;i++){const a=hash01(seed^(i*149+0x90))*Math.PI*2;const d=114+hash01(seed^(i*173+0x91))*54;const x=village.x+Math.cos(a)*d,y=village.y+Math.sin(a)*d;const r=3.8+hash01(seed^(i*197+0x92))*4.2;if(roadConflictAt(x,y,r,8)||vegetationInRiver(x,y,r))continue;ctx.fillStyle='rgba(35,66,38,.46)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();if(i%3===0){ctx.fillStyle='rgba(68,48,31,.35)';ctx.fillRect(x-.6,y-.6,1.2,1.2);}if(i%2===0){ctx.fillStyle='rgba(58,89,45,.18)';for(let j=0;j<3;j++){const ox=(hash01(seed^(i*311+j*17))-.5)*14,oy=(hash01(seed^(i*353+j*19))-.5)*14;if(roadConflictAt(x+ox,y+oy,2,6)||vegetationInRiver(x+ox,y+oy,2))continue;ctx.beginPath();ctx.arc(x+ox,y+oy,1.8,0,Math.PI*2);ctx.fill();}}}
   }
   function drawHouseGateHints(village){
     for(const h of village.houses||[]){if(!Number.isFinite(h.accessX)||!Number.isFinite(h.accessY))continue;const dx=h.accessX-h.x,dy=h.accessY-h.y,d=Math.hypot(dx,dy)||1;const start=Math.min(18,d*.35);const important=h.kind==='inn'||h.kind==='chapel';strokePath(h.x+dx/d*start,h.y+dy/d*start,h.accessX,h.accessY,important?3.4:2.1,important?'rgba(149,126,83,.29)':'rgba(149,126,83,.22)');if(important){const nx=-dy/d,ny=dx/d;ctx.save();ctx.fillStyle='rgba(81,68,47,.40)';for(const side of[-1,1])ctx.fillRect(h.accessX+nx*side*3-1,h.accessY+ny*side*3-1,2,2);ctx.restore();}}

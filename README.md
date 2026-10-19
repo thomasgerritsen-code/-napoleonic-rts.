@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.41
+# Napoleonic RTS — v1.3.42
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,14 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.42 — bomen en bessenstruiken buiten het water (update 294)
+
+Alle **houtbomen** en **bessenstruiken** worden voortaan gegenereerd of verplaatst naar **droge grond met voldoende oevermarge**. Dit geldt ook voor de vijf gegarandeerde bessenstruiken bij elk startdorp, bij iedere nieuwe ronde én voor extra grondstoffen die later worden aangemaakt. De controle gebruikt de echte rivierbedding, dus ook de overgangen en brugdekken blijven vrij. Het plantenrijk vermijdt nog steeds wegen, huizen, dorpsbebouwing en andere grondstoffen. De bestaande ijzerertsregeling blijft intact.
+
+De 2D-tekenaar verbergt eventueel toch fout aangeleverde bomen en struiken uit voorzorg bij de rivier. Ook decoratieve boskruinen en de groene dorps- en erfbeplanting blijven nu buiten het water. De 3D-bomen komen uit dezelfde veilige locaties. **Geen wijzigingen aan routes, bruggen, legereenheden of economie.**
+
+Nieuwe browserregressies in `tests/vegetation-river-clearance-v294.spec.js` controleren alle levende bronnen na meerdere resets, minstens vijf droge bessenstruiken bij ieder dorp, kunstmatige spawnpogingen op oever/rivier/brug, de 2D- en 3D-locaties en de renderbeveiliging.
 
 ## v1.3.41 — natuurlijke ijzerstenen op droge oevers (update 293)
 

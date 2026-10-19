@@ -58,16 +58,19 @@
   function roadConflict(type,x,y){
     return roadConflictAt(x,y,resourceRadius(type),roadPadding);
   }
-  // Use the raw river geometry, NOT waterAtV067 alone: bridge decks are
-  // excluded by waterAt, but ore must also stay away from the bridge entrance
-  // and wet riverbanks. The 30-unit outer bank allows a miner to stand beside
-  // the entire half-buried rock without stepping into navigational water.
-  function oreShoreConflict(x,y){
+  // The raw river geometry also covers bridge decks (which waterAtV067
+  // deliberately treats as traversable). All resource canopies must stay
+  // entirely on dry ground with room for the harvesting worker.
+  function riverbankConflict(type,x,y,radius=resourceRadius(type)){
     if(typeof riverHitV067!=='function' || typeof RIVER_NAV_HALF_WIDTH_V067==='undefined'){
       return typeof waterAtV067==='function' && waterAtV067(x,y);
     }
     const hit=riverHitV067(x,y);
-    return !!hit && hit.distance < RIVER_NAV_HALF_WIDTH_V067+resourceRadius('iron')+30;
+    const bankPadding=type==='iron'?30:18;
+    return !!hit && hit.distance < RIVER_NAV_HALF_WIDTH_V067+radius+bankPadding;
+  }
+  function oreShoreConflict(x,y){
+    return riverbankConflict('iron',x,y);
   }
   function buildingConflict(type,x,y,padding=buildingPadding){
     const rr=resourceRadius(type);
@@ -113,7 +116,7 @@
   function validResourceSpot(type,x,y,ignore=null){
     const rr=resourceRadius(type);
     if(x<rr+16||y<rr+16||x>WORLD.width-rr-16||y>WORLD.height-rr-16)return false;
-    if(type==='iron'&&oreShoreConflict(x,y))return false;
+    if(riverbankConflict(type,x,y))return false;
     if(roadConflict(type,x,y)||buildingConflict(type,x,y)||villageHouseConflict(type,x,y))return false;
     if(type==='food'&&insideVillage(x,y))return false;
     return !resourceConflict(type,x,y,ignore);
@@ -125,7 +128,8 @@
   function validBaseBerrySpot(x,y){
     const rr=resourceRadius('food');
     if(x<rr+16||y<rr+16||x>WORLD.width-rr-16||y>WORLD.height-rr-16)return false;
-    if(roadConflictAt(x,y,rr+7,roadPadding)||buildingConflict('food',x,y)||villageHouseConflict('food',x,y))return false;
+    if(riverbankConflict('food',x,y,rr*1.16)||
+      roadConflictAt(x,y,rr+7,roadPadding)||buildingConflict('food',x,y)||villageHouseConflict('food',x,y))return false;
     return !resourceConflict('food',x,y,null);
   }
   function baseBerryApproachClear(tc,x,y){
@@ -179,19 +183,25 @@
 
   // Initial resources are generated before Architecture-v2 world systems load. Normalize
   // them once and keep the same gameplay resource objects/amounts.
-  let relocated=0,removed=0,roadRelocated=0;
-  for(const r of [...resources]){
-    if(!r||r.dead)continue;
-    const startedOnRoad=roadConflict(r.type,r.x,r.y);
-    const safe=nearestEcologySpot(r.type,r.x,r.y,r);
-    if(!safe){r.dead=true;removed++;continue;}
-    if(Math.hypot(safe.x-r.x,safe.y-r.y)>.5){
-      relocated++;
-      if(startedOnRoad)roadRelocated++;
+  let relocated=0,removed=0,roadRelocated=0,resetRelocated=0;
+  function normalizeExistingResources(isReset=false){
+    let moved=0;
+    for(const r of [...resources]){
+      if(!r||r.dead)continue;
+      const startedOnRoad=roadConflict(r.type,r.x,r.y);
+      const safe=nearestEcologySpot(r.type,r.x,r.y,r);
+      if(!safe){r.dead=true;removed++;continue;}
+      if(Math.hypot(safe.x-r.x,safe.y-r.y)>.5){
+        moved++;relocated++;
+        if(startedOnRoad)roadRelocated++;
+      }
+      r.x=safe.x;r.y=safe.y;
+      stampResource(r,r.type);
     }
-    r.x=safe.x;r.y=safe.y;
-    stampResource(r,r.type);
+    if(isReset)resetRelocated+=moved;
+    return moved;
   }
+  normalizeExistingResources();
 
   function townCenters(){
     return buildings.filter(b=>b&&!b.dead&&b.complete&&b.type==='towncenter');
@@ -308,6 +318,11 @@
   const previousResetGame=resetGame;
   resetGame=function resetGameEcologyV1(...args){
     const result=previousResetGame(...args);
+    // v06 repositions Britain and its old wood/berry clusters AFTER they
+    // were spawned. Revalidate their final world positions against current
+    // roads, riverbanks, bridge decks, buildings and other harvestable items.
+    // Keep each resource object/id so worker assignments remain valid.
+    normalizeExistingResources(true);
     refreshBaseVillageAccess();
     return result;
   };
@@ -329,10 +344,14 @@
     resourceRadius,
     roadPadding,
     oreShoreConflict,
+    riverbankConflict,
+    treeBerryShoreExclusion:true,
     oreShoreExclusion:true,
     relocatedInitial:relocated,
     relocatedFromRoad:roadRelocated,
     removedInitial:removed,
+    resetPostMoveNormalization:true,
+    resetRelocated:()=>resetRelocated,
     berryVillageExclusion:true,
     berryVillageAccess:true,
     baseVillageBerryMin,
@@ -347,7 +366,8 @@
     baseVillageBerryStats,
     resourceBuildingExclusion:true,
     resourceRoadExclusion:true,
-    ironRiverbankExclusion:true
+    ironRiverbankExclusion:true,
+    allResourceRiverbankExclusion:true
   });
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
