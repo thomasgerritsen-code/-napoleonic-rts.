@@ -99,16 +99,22 @@ test('v291 unsafe crossing, missing officer or absent ally hold returning AI in 
     const api=__AI_REGROUP_RESERVE_V291__;
     aiOrderReg(reg,assault,'line',0);
     const unsupported={...reg.finalTarget};
+    const beforeCross={state:AI_COMMANDER_V1.state,peace:v05PeaceMode,dead:reg.destroyed,
+      officer:api.hasOfficer(reg),stats:api.stats()};
     reg.crossingTrafficV068={forcedColumn:true,state:'crossing',crossingId:'pont-crete'};
     aiOrderReg(reg,assault,'line',0);
     const crossing={...reg.finalTarget};
+    const duringCross={state:AI_COMMANDER_V1.state,peace:v05PeaceMode,dead:reg.destroyed,
+      traffic:reg.crossingTrafficV068,stats:api.stats()};
     reg.crossingTrafficV068=null;
     const officer=regimentMembers(reg).find(u=>u.id===reg.officerId);
     officer.dead=true;
     aiOrderReg(reg,assault,'line',0);
     const officerMissing={...reg.finalTarget};
-    return{goal,unsupported,crossing,officerMissing,stats:api.stats()};
+    return{goal,unsupported,crossing,officerMissing,stats:api.stats(),
+      beforeCross,duringCross,officerCheck:api.hasOfficer(reg)};
   });
+  console.log('V291_GUARD_DIAGNOSTICS',JSON.stringify(r));
   expect(errors).toEqual([]);
   expect(r.unsupported).toEqual(r.goal);
   expect(r.crossing).toEqual(r.goal);
