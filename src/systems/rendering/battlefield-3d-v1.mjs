@@ -56,6 +56,7 @@ let enabled = true;
 let cameraDistance = 760;
 let cameraAzimuth = 0;
 let renderFrame = 0;
+const riverFrameHooks = new Set();
 let lastSnapshot = null;
 let rightDrag = null;
 const touchPointers = new Map();
@@ -647,6 +648,7 @@ function render() {
   }
   updateResources();
   updateCamera();
+  for(const hook of riverFrameHooks)hook(clock.getElapsedTime());
   renderer.render(scene, camera3d);
 }
 
@@ -654,6 +656,8 @@ window.__BATTLEFIELD_3D_V1__ = Object.freeze({
   version: 'battlefield-3d-v1',
   renderer: 'three.js',
   enabled: () => enabled,
+  groundHeightAt(x,z){return hillHeightAt(x,z);},
+  onFrame(fn){riverFrameHooks.add(fn);return()=>riverFrameHooks.delete(fn);},
   setEnabled(value) {
     enabled = Boolean(value);
     canvas.classList.toggle('hidden', !enabled);
@@ -670,6 +674,7 @@ window.__BATTLEFIELD_3D_V1__ = Object.freeze({
       unitMeshes: unitMeshes.size,
       buildings: buildingMeshes.size,
       ironOutcrops: ironOreMesh?.count||0,
+      riverFlowHooks: riverFrameHooks.size,
       cameraDistance,
       cameraAzimuth,
       frames: renderFrame

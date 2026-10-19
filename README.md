@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.44
+# Napoleonic RTS — v1.3.45
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,14 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.45 — stromend water en natuurlijke oevers in 2D en 3D (update 297)
+
+De in update 296 gedeelde riviergeometrie krijgt **zichtbaar stromend water**. De 2D-tekenaar bouwt zes vloeiende water- en oeverlagen op: modderige grasranden, licht ondiep water en donkerder rivierdiepte. Subtiele, langs de riviertangent bewegende schuim- en rimpelstrepen en turbulentie nabij de vijf bruggen geven de rivier leven. De golfjes werken op spelklok en zijn begrensd tot het zichtbare cameragebied.
+
+In de 3D-weergave krijgt de hele rivier een afzonderlijk waterlint met natuurlijke silt-oeverschouders, variabele gedempte waterkleuren en langzaam verschuivende watertextuur. Er is slechts één watermesh plus twee oevermeshes; er worden geen nieuwe geometrieën per frame gebouwd. De 3D- en 2D-lagen lezen de **dezelfde geometrie als de waternavigatie**, zodat geen extra visuele rivier buiten de bewegingsgrenzen kan ontstaan.
+
+**Ongewijzigd**: alle vijf brugcentra, wegen, vier-breedse wegmars, soldatenpathfinding, huizen-, ijzer- en begroeiing-terreincontrole.
 
 ## v1.3.44 — natuurlijke meanders, één riviermodel (update 296)
 
