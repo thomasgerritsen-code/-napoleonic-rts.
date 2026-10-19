@@ -251,6 +251,9 @@
   });
   const api=Object.freeze({
     version:'305.0',desktopOnly:true,lowZoomOnly:true,
+    gaitFor:unit=>{const v=motion.get(unit?.id);return v?{
+      moving:Boolean(v.moving),phase:v.phase,t:v.t,x:v.x,y:v.y
+    }:null;},
     actualDisplacementGait:true,uniformDetails:true,
     no3D:true,artilleryUnchanged:true,active,enqueue,flush,
     metrics:()=>({...stats,active:active(),queued:count,maxUnits:MAX_UNITS,
