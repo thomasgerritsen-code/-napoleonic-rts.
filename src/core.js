@@ -32,8 +32,8 @@
   const selectedUnits = new Set();
 
   const economies = {
-    france: { food: 1100, wood: 1100, popCap: 45 },
-    britain: { food: 850, wood: 850, popCap: 35 }
+    france: { food: 1100, wood: 1100, iron: 0, popCap: 45 },
+    britain: { food: 850, wood: 850, iron: 0, popCap: 35 }
   };
 
   let selectedBuilding = null;
@@ -180,12 +180,13 @@
       ['food', 730, 610], ['food', 840, 690],
       ['wood', 1450, 410], ['wood', 1530, 1370], ['food', 1520, 880],
       ['wood', 2700, 520], ['wood', 2820, 650], ['wood', 2450, 1310],
-      ['food', 2530, 690], ['food', 2720, 1110]
+      ['food', 2530, 690], ['food', 2720, 1110],
+      ['iron', 1230, 1140], ['iron', 1460, 1500]
     ];
     for (const [type, cx, cy] of clusters) {
-      const count = type === 'wood' ? 14 : 7;
+      const count = type === 'wood' ? 14 : type === 'iron' ? 6 : 7;
       for (let i = 0; i < count; i++) {
-        createResource(type, cx + (Math.random() - 0.5) * 150, cy + (Math.random() - 0.5) * 120, type === 'wood' ? 220 : 360);
+        createResource(type, cx + (Math.random() - 0.5) * 150, cy + (Math.random() - 0.5) * 120, type === 'wood' ? 220 : type === 'iron' ? 330 : 360);
       }
     }
   }
@@ -202,8 +203,8 @@
     actionSignature = ''; volleyClock = 0; aiDecisionClock = 0; aiAttackClock = 0; elapsed = 0; aiPlan = 'opbouwen';
     window.NRTS?.events?.emit?.('game:reset', { previousElapsed, previousUnitCount, previousRegimentCount });
 
-    economies.france.food = 1100; economies.france.wood = 1100; economies.france.popCap = 45;
-    economies.britain.food = 850; economies.britain.wood = 850; economies.britain.popCap = 35;
+    economies.france.food = 1100; economies.france.wood = 1100; economies.france.iron = 0; economies.france.popCap = 45;
+    economies.britain.food = 850; economies.britain.wood = 850; economies.britain.iron = 0; economies.britain.popCap = 35;
     camera.x = 720; camera.y = 900; camera.zoom = 0.72;
     messageEl.classList.add('hidden'); buildHintEl.classList.add('hidden');
 
@@ -213,13 +214,11 @@
     createUnit('france', 'officer', 805, 970);
     createUnit('france', 'drummer', 775, 970);
     spawnLine('france', 'cavalry', 660, 1130, 4, 4, 28);
-    spawnLine('france', 'artillery', 620, 1210, 2, 2, 48);
 
     createBuilding('britain', 'towncenter', 2640, 900, true);
     for (let i = 0; i < 6; i++) createUnit('britain', 'worker', 2540 - (i % 3) * 24, 830 + Math.floor(i / 3) * 28);
     spawnLine('britain', 'infantry', 2460, 1030, 6, 6, 18);
     spawnLine('britain', 'cavalry', 2630, 1140, 3, 3, 28);
-    spawnLine('britain', 'artillery', 2690, 1220, 1, 1, 48);
 
     createResourceClusters();
 
