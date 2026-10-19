@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.43
+# Napoleonic RTS — v1.3.44
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,10 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.44 — glooiende rivierbochten (update 296)
+
+De rivier gebruikt nu een continue, vloeiend geïnterpoleerde curve over de bestaande 18 ankerpunten. Riviergrenzen, hit-testing, de doorwaadbaarheid van brugdekken, terreinblokkades, rivieroevers, 2D-rendering en minimap gebruiken **dezelfde** precieze bemonstering. Alle vijf bestaande bruggen blijven op hun oude coördinaten en het oorspronkelijke wegennet is ongewijzigd. De tests `tests/smooth-river-v296.spec.js` en alle bestaande brug- en marsregressies bewaken deze scheiding.
 
 ## v1.3.43 — woningen en dorpen op droge oevers (update 295)
 
