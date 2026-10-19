@@ -5,9 +5,9 @@ async function openArtilleryV2(page) {
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/?test=v071',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>Boolean(
-    window.RTS_SIM?.version==='0.7.1' &&
+    window.RTS_SIM?.version===window.RTS_VERSION &&
     window.NRTS?.subsystems.has('artillery') &&
-    window.__RTS_DEBUG__?.selectForBattery
+    window.__RTS_DEBUG__?.setPeaceMode
   ));
   return errors;
 }
