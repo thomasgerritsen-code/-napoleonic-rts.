@@ -30,7 +30,7 @@ test('desktop 2D terrain uses GPU textures without re-uploading on a short camer
       mainVisible:getComputedStyle(document.getElementById('game')).display!=='none',
       currentVersion:window.RTS_VERSION};
   });
-  expect(result.currentVersion).toBe('1.3.51');
+  expect(result.currentVersion).toMatch(/^1\.3\.\d+$/);
   expect(result.mainVisible).toBe(true);
   expect(result.tileFirst.misses).toBeGreaterThan(0);
   expect(result.tileSecond.misses).toBe(result.tileFirst.misses);
