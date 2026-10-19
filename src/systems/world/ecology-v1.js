@@ -58,16 +58,19 @@
   function roadConflict(type,x,y){
     return roadConflictAt(x,y,resourceRadius(type),roadPadding);
   }
-  // Use the raw river geometry, NOT waterAtV067 alone: bridge decks are
-  // excluded by waterAt, but ore must also stay away from the bridge entrance
-  // and wet riverbanks. The 30-unit outer bank allows a miner to stand beside
-  // the entire half-buried rock without stepping into navigational water.
-  function oreShoreConflict(x,y){
+  // The raw river geometry also covers bridge decks (which waterAtV067
+  // deliberately treats as traversable). All resource canopies must stay
+  // entirely on dry ground with room for the harvesting worker.
+  function riverbankConflict(type,x,y,radius=resourceRadius(type)){
     if(typeof riverHitV067!=='function' || typeof RIVER_NAV_HALF_WIDTH_V067==='undefined'){
       return typeof waterAtV067==='function' && waterAtV067(x,y);
     }
     const hit=riverHitV067(x,y);
-    return !!hit && hit.distance < RIVER_NAV_HALF_WIDTH_V067+resourceRadius('iron')+30;
+    const bankPadding=type==='iron'?30:18;
+    return !!hit && hit.distance < RIVER_NAV_HALF_WIDTH_V067+radius+bankPadding;
+  }
+  function oreShoreConflict(x,y){
+    return riverbankConflict('iron',x,y);
   }
   function buildingConflict(type,x,y,padding=buildingPadding){
     const rr=resourceRadius(type);
@@ -113,7 +116,7 @@
   function validResourceSpot(type,x,y,ignore=null){
     const rr=resourceRadius(type);
     if(x<rr+16||y<rr+16||x>WORLD.width-rr-16||y>WORLD.height-rr-16)return false;
-    if(type==='iron'&&oreShoreConflict(x,y))return false;
+    if(riverbankConflict(type,x,y))return false;
     if(roadConflict(type,x,y)||buildingConflict(type,x,y)||villageHouseConflict(type,x,y))return false;
     if(type==='food'&&insideVillage(x,y))return false;
     return !resourceConflict(type,x,y,ignore);
@@ -125,7 +128,8 @@
   function validBaseBerrySpot(x,y){
     const rr=resourceRadius('food');
     if(x<rr+16||y<rr+16||x>WORLD.width-rr-16||y>WORLD.height-rr-16)return false;
-    if(roadConflictAt(x,y,rr+7,roadPadding)||buildingConflict('food',x,y)||villageHouseConflict('food',x,y))return false;
+    if(riverbankConflict('food',x,y,rr*1.16)||
+      roadConflictAt(x,y,rr+7,roadPadding)||buildingConflict('food',x,y)||villageHouseConflict('food',x,y))return false;
     return !resourceConflict('food',x,y,null);
   }
   function baseBerryApproachClear(tc,x,y){
@@ -329,6 +333,8 @@
     resourceRadius,
     roadPadding,
     oreShoreConflict,
+    riverbankConflict,
+    treeBerryShoreExclusion:true,
     oreShoreExclusion:true,
     relocatedInitial:relocated,
     relocatedFromRoad:roadRelocated,
@@ -347,7 +353,8 @@
     baseVillageBerryStats,
     resourceBuildingExclusion:true,
     resourceRoadExclusion:true,
-    ironRiverbankExclusion:true
+    ironRiverbankExclusion:true,
+    allResourceRiverbankExclusion:true
   });
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
