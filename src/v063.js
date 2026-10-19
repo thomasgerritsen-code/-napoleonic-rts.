@@ -112,7 +112,8 @@ aiDevelop = function aiDevelopV063() {
 
   if (aiStageBuildingV063('barracks', 'Barracks')) return;
   if (elapsed > 45 && aiStageBuildingV063('stable', 'Stable')) return;
-  if (elapsed > 70 && aiStageBuildingV063('foundry', 'Artillery Foundry')) return;
+  if (elapsed > 95 && e.iron >= (BUILDINGS.foundry.cost?.iron || 0) &&
+      aiStageBuildingV063('foundry', 'Artillery Foundry')) return;
 
   const barracksCount = livingBuildings('britain').filter(b => b.type === 'barracks' && b.complete).length;
   if (elapsed > 130 && barracksCount < 2 && e.wood >= BUILDINGS.barracks.cost.wood) {
