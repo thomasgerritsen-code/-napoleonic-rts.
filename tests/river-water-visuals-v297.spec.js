@@ -25,7 +25,7 @@ test('v297 2D river uses six soft layers and animated current following the shar
   expect(result.signedAdvance).toBeGreaterThan(30);
   expect(result.navigationShared).toBe(true);
   expect(result.channelWithinNavigation).toBe(true);
-  expect(result.drawName).toBe('drawRiverNaturalV297');
+  expect(result.drawName).toBe('drawRiverNatural2DV298');
   expect(result.crossings).toHaveLength(5);
   for(const crossing of result.crossings){
     expect(crossing.water).toBe(false);

@@ -5,7 +5,6 @@ const fs = require('node:fs');
 
 const index = fs.readFileSync('index.html', 'utf8');
 const feedback2d = fs.readFileSync('src/systems/rendering/order-target-feedback-v1.js', 'utf8');
-const feedback3d = fs.readFileSync('src/systems/rendering/battlefield-3d-order-feedback-v1.mjs', 'utf8');
 
 test('regiment order targets expose a footprint derived from production formation offsets', () => {
   assert.match(feedback2d, /regimentRoleOffsets\(reg, reg\.formation\)/);
@@ -23,16 +22,6 @@ test('2D battlefield draws the destination footprint and reports its dimensions'
   assert.match(feedback2d, /footprintLabel/);
 });
 
-test('3D battlefield mirrors the same landing zone without movement authority', () => {
-  assert.match(feedback3d, /target\.footprint/);
-  assert.match(feedback3d, /PlaneGeometry\(width, depth\)/);
-  assert.match(feedback3d, /EdgesGeometry/);
-  assert.match(feedback3d, /orderFootprint/);
-  assert.doesNotMatch(feedback3d, /\.targetX\s*=/);
-  assert.doesNotMatch(feedback3d, /\.targetY\s*=/);
-});
-
-test('formation destination preview keeps its own 2D and 3D cache keys', () => {
-  assert.match(index, /order-target-feedback-v1\.js\?build=1321a/);
-  assert.match(index, /battlefield-3d-order-feedback-v1\.mjs\?build=1321a/);
+test('formation destination preview is wired in the 2D runtime', () => {
+  assert.match(index, /order-target-feedback-v1\\.js\\?build=1321a/);
 });

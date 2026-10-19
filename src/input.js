@@ -132,17 +132,13 @@
 
   // ---------- Loop ----------
   // Regression pages advance the simulation explicitly via tick()/RTS_SIM.step().
-  // Keep requestAnimationFrame alive, but do not pay for the complete legacy 2D draw
-  // while the WebGL battlefield is the visible renderer.
+  // The top-down 2D renderer is the sole active battlefield display.
   function frame(now) {
     const dt = Math.min(0.033, (now - lastTime) / 1000);
     lastTime = now;
     if (!TEST_MANUAL_SIMULATION) update(dt);
-    const threeDActive = Boolean(window.__BATTLEFIELD_3D_V1__?.enabled?.());
-    if (!threeDActive) {
-      if (typeof window.renderStableFrameV1 === 'function') window.renderStableFrameV1(() => draw(), now);
-      else draw();
-    }
+    if (typeof window.renderStableFrameV1 === 'function') window.renderStableFrameV1(() => draw(), now);
+    else draw();
     requestAnimationFrame(frame);
   }
 

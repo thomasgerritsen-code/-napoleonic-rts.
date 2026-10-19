@@ -21,11 +21,8 @@ test('musketeer sprite authority stays focused on sprite rendering', () => {
   }
 });
 
-test('3D renderer changes select the WebGL regression plus smoke', () => {
-  for (const file of ['src/systems/rendering/battlefield-3d-bridge-v1.js','src/systems/rendering/battlefield-3d-v1.mjs','style.css']) {
-    const selected = selectFocusedTests([file]);
-    assert.deepEqual(selected, ['tests/battlefield-3d-v1.spec.js','tests/smoke-v1.spec.js']);
-  }
+test('2D stylesheet changes select the 2D performance regression and smoke', () => {
+  assert.deepEqual(selectFocusedTests(['style.css']), ['tests/2d-performance-v132.spec.js','tests/smoke-v1.spec.js']);
 });
 
 test('Battlefield V7 bundle keeps browser coverage targeted on smoke and village regressions', () => {
@@ -45,9 +42,9 @@ test('AI changes include replenishment coverage plus the lightweight AI/smoke te
   }
 });
 
-test('index changes include 3D, village and restoration regressions', () => {
+test('index changes include 2D, village and restoration regressions', () => {
   const selected = selectFocusedTests(['index.html']);
-  assert.deepEqual(selected, ['tests/battlefield-3d-v1.spec.js','tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js','tests/village-renderer-v2.spec.js']);
+  assert.deepEqual(selected, ['tests/2d-performance-v132.spec.js','tests/restoration-batch-v1.spec.js','tests/smoke-v1.spec.js','tests/village-renderer-v2.spec.js']);
 });
 
 test('village renderer changes stay lightweight but always verify the settlement model', () => {
