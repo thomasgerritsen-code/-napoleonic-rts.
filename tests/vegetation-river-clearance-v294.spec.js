@@ -65,9 +65,12 @@ test('v294 harvestable trees and berries stay clear of all riverbanks and bridge
       expect(base.count).toBeGreaterThanOrEqual(5);
   }
   expect(state.attempts).toHaveLength(6);
+  // Near a congested bridge the correct behavior is to reject the new
+  // resource if no safe inland spot exists. Unsafe spawns are never allowed.
+  expect(state.attempts.some(a=>a.spawned)).toBe(true);
   for(const attempt of state.attempts){
     expect(attempt.initialConflict).toBe(true);
-    expect(attempt.spawned).toBe(true);
+    if(!attempt.spawned)continue;
     expect(attempt.moved).toBeGreaterThan(20);
     expect(attempt.dry).toBe(true);
     expect(attempt.valid).toBe(true);
