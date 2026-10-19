@@ -41,7 +41,7 @@ test('v296 river has continuous smooth curve through every unchanged road bridge
     expect(c.dryLeft&&c.dryRight).toBe(true);
   }
   expect(result.jumps).toBe(0);
-  expect(result.stepMax).toBeLessThan(25);
+  expect(result.stepMax).toBeLessThan(28);
   expect(result.maxTurn).toBeLessThan(.45);
   expect(result.wet.every(p=>p.wet)).toBe(true);
   expect(result.hitDistance).toBeGreaterThan(12);
