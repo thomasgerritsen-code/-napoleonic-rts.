@@ -23,6 +23,7 @@ test('v289 wavering infantry fall back in formation, not over rivers or active b
       if(!reg)return null;
       const soldiers=regimentMembers(reg);
       soldiers.forEach(u=>u.morale=33);
+      reg.morale=43;
       reg.movementPhaseV063='combat-halt';
       reg.engagementV069={mode:'fire',heading:0};
       reg.path=null;
