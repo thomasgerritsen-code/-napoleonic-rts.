@@ -25,11 +25,55 @@ const WATER_CROSSINGS_V067 = Object.freeze([
   Object.freeze({id:'pont-du-sud',name:'Pont du Sud',type:'bridge',material:'stone',x:2250,y:4580,angle:0,length:270,width:118})
 ].map(c=>Object.freeze({...c,y:strategicLatitudeV282(c.y)})));
 
+// v296: a single smooth and deterministic river for drawing, collision,
+// village placement and navigation. Fixed historic bridge anchors never move.
+const RIVER_CURVE_V296=(()=>{
+  const anchors=RIVER_POINTS_V067,points=[];
+  const segmentCount=anchors.length-1;
+  for(let i=0;i<segmentCount;i++){
+    const a=anchors[i],b=anchors[i+1];
+    const prev=anchors[Math.max(0,i-1)],next=anchors[Math.min(anchors.length-1,i+2)];
+    const dy=b.y-a.y;
+    const slopeA=Math.max(-.28,Math.min(.28,(b.x-prev.x)/(b.y-prev.y||1)));
+    const slopeB=Math.max(-.28,Math.min(.28,(next.x-a.x)/(next.y-a.y||1)));
+    const steps=Math.max(2,Math.ceil(dy/24));
+    for(let j=0;j<steps;j++){
+      const t=j/steps,t2=t*t,t3=t2*t;
+      const x=(2*t3-3*t2+1)*a.x+(t3-2*t2+t)*dy*slopeA+
+        (-2*t3+3*t2)*b.x+(t3-t2)*dy*slopeB;
+      // Gentle secondary bend; exactly zero position and slope at the
+      // original control points, preserving physical bridge-road joins.
+      const bend=12*Math.sin(Math.PI*t)**2*((i%2===0)?1:-1);
+      points.push(Object.freeze({x:x+bend,y:a.y+dy*t}));
+    }
+  }
+  points.push(Object.freeze({...anchors[anchors.length-1]}));
+  return Object.freeze(points);
+})();
+function riverCenterXAtYV067(y){
+  const points=RIVER_CURVE_V296;
+  if(y<=points[0].y)return points[0].x;
+  if(y>=points[points.length-1].y)return points[points.length-1].x;
+  let lo=0,hi=points.length-1;
+  while(lo+1<hi){const mid=(lo+hi)>>1;if(points[mid].y<=y)lo=mid;else hi=mid;}
+  const a=points[lo],b=points[hi],t=(y-a.y)/(b.y-a.y||1);
+  return a.x+(b.x-a.x)*t;
+}
+function riverTangentV296(y){
+  const delta=6,dx=riverCenterXAtYV067(y+delta)-riverCenterXAtYV067(y-delta);
+  const len=Math.hypot(dx,2*delta)||1;
+  return{x:dx/len,y:2*delta/len};
+}
 function riverHitV067(x,y){
+  // Monotone latitude permits a fast local search: constant ~10 short
+  // segments instead of checking the full 240-point channel per soldier.
+  const p=RIVER_CURVE_V296;
+  let lo=0,hi=p.length-1;
+  while(lo+1<hi){const mid=(lo+hi)>>1;if(p[mid].y<y)lo=mid;else hi=mid;}
   let best=null;
-  for(let i=1;i<RIVER_POINTS_V067.length;i++){
-    const hit=closestPointOnSegmentV066(x,y,RIVER_POINTS_V067[i-1],RIVER_POINTS_V067[i]);
-    if(!best||hit.distance<best.distance) best={...hit,segmentIndex:i-1};
+  for(let i=Math.max(0,lo-5);i<Math.min(p.length-1,lo+6);i++){
+    const hit=closestPointOnSegmentV066(x,y,p[i],p[i+1]);
+    if(!best||hit.distance<best.distance)best={...hit,segmentIndex:i};
   }
   return best;
 }
@@ -47,16 +91,6 @@ function waterAtV067(x,y){
   const hit=riverHitV067(x,y);
   if(!hit||hit.distance>RIVER_NAV_HALF_WIDTH_V067)return false;
   return !WATER_CROSSINGS_V067.some(c=>crossingPassageContainsV067(c,x,y));
-}
-function riverCenterXAtYV067(y){
-  const yy=Math.max(RIVER_POINTS_V067[0].y,Math.min(RIVER_POINTS_V067[RIVER_POINTS_V067.length-1].y,y));
-  for(let i=1;i<RIVER_POINTS_V067.length;i++){
-    const a=RIVER_POINTS_V067[i-1],b=RIVER_POINTS_V067[i];
-    if(yy<a.y||yy>b.y)continue;
-    const t=(yy-a.y)/Math.max(.0001,b.y-a.y);
-    return a.x+(b.x-a.x)*t;
-  }
-  return RIVER_POINTS_V067[RIVER_POINTS_V067.length-1].x;
 }
 function bankSideV067(x,y){return x-riverCenterXAtYV067(y);}
 function segmentWaterCrossingV067(ax,ay,bx,by){
@@ -243,7 +277,7 @@ issueMoveWithFacingV06=function issueMoveWithFacingV067(x,y,finalFacing=null){
 };
 
 function drawRiverV067(){
-  const trace=()=>{ctx.beginPath();ctx.moveTo(RIVER_POINTS_V067[0].x,RIVER_POINTS_V067[0].y);for(let i=1;i<RIVER_POINTS_V067.length;i++)ctx.lineTo(RIVER_POINTS_V067[i].x,RIVER_POINTS_V067[i].y);};
+  const trace=()=>{ctx.beginPath();ctx.moveTo(RIVER_CURVE_V296[0].x,RIVER_CURVE_V296[0].y);for(let i=1;i<RIVER_CURVE_V296.length;i++)ctx.lineTo(RIVER_CURVE_V296[i].x,RIVER_CURVE_V296[i].y);};
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
   ctx.strokeStyle='rgba(45,54,47,.55)';ctx.lineWidth=RIVER_VISUAL_WIDTH_V067+16;trace();ctx.stroke();
   ctx.strokeStyle='rgba(70,119,139,.86)';ctx.lineWidth=RIVER_VISUAL_WIDTH_V067;trace();ctx.stroke();
@@ -286,8 +320,8 @@ const drawMinimapV066ForV067=drawMinimap;
 drawMinimap=function drawMinimapV067(){
   drawMinimapV066ForV067();miniCtx.save();miniCtx.lineCap='round';miniCtx.lineJoin='round';
   miniCtx.strokeStyle='rgba(92,151,174,.88)';miniCtx.lineWidth=2.1;
-  for(let i=1;i<RIVER_POINTS_V067.length;i++){
-    const a=RIVER_POINTS_V067[i-1],b=RIVER_POINTS_V067[i],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+  for(let i=1;i<RIVER_CURVE_V296.length;i++){
+    const a=RIVER_CURVE_V296[i-1],b=RIVER_CURVE_V296[i],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
     if(typeof isExploredV06==='function'&&!isExploredV06(mx,my))continue;
     const ma=miniPoint(a.x,a.y),mb=miniPoint(b.x,b.y);miniCtx.beginPath();miniCtx.moveTo(ma.x,ma.y);miniCtx.lineTo(mb.x,mb.y);miniCtx.stroke();
   }
