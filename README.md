@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.39
+# Napoleonic RTS — v1.3.40
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,14 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.40 — ijzerwinning en latere kanonnen (update 292)
+
+**Derde grondstof: ijzer (⛏️).** Zowel de Franse als de Britse economie begint met **0 ijzer**. Op de speelkaart liggen herkenbare ijzerertsstukken die boeren via het bestaande verzamel-/afleversysteem kunnen winnen. Het Franse grondstoffenoverzicht en de Britse AI-economie tonen vanaf nu ook de ijzervoorraad. De Britse AI begint na circa 70 spel-seconden mijnwerkers in te zetten.
+
+**Geen gratis kanonnen meer bij aanvang.** Beide legers starten zonder artillerie. Een **geschutsgieterij** kost nu **420 hout + 90 ijzer**. Daarna kan pas na **120 spel-seconden** een kanon worden geproduceerd voor **120 voedsel + 140 hout + 160 ijzer**, met een productietijd van 24 seconden. De Britse AI bouwt de gieterij pas nadat voldoende ijzer beschikbaar is en de vroege infanterierekrutering is begonnen. Zo blijft artillerie een investering voor later in het spel.
+
+De bestaande kanonbemanning met twee musketiers, geschutballistiek, wegen en bruggen zijn behouden. Een bestaande artillerieregressie krijgt nu een expliciet testkanon in plaats van op het vroegere startkanon te vertrouwen. De nieuwe `tests/iron-artillery-v292.spec.js` toetst winbare ijzerertsafzettingen, echte afleveringen, grondstofkosten, het tijdslot en beide legers zonder startartillerie.
 
 ## v1.3.39 — AI-herinzet na hergroeperen (update 291)
 
