@@ -7,8 +7,10 @@
 
   const CONTRACT = Object.freeze({
     version: 'mobile-render-budget-v1',
-    desktopDprCap: 2,
+    desktopDprCap: 1.5,
     mobileDprCap: 1.5,
+    desktopMaxBackingPixels: 2200000,
+    minDesktopDpr: 0.75,
     mobileShortEdgeCssPx: 700,
     preservesCssViewport: true,
     sharedWorldInputCoordinates: true
@@ -25,7 +27,13 @@
 
   function desiredDpr() {
     const nativeDpr = Math.max(1, Number(root.devicePixelRatio) || 1);
-    return Math.min(nativeDpr, mobileTarget() ? CONTRACT.mobileDprCap : CONTRACT.desktopDprCap);
+    if (mobileTarget()) return Math.min(nativeDpr, CONTRACT.mobileDprCap);
+    // A large monitor may otherwise require 4-8x as many pixels as a phone
+    // on every frame, despite showing the same simulation.
+    const viewportPixels = Math.max(1, Math.floor(innerWidth) * Math.floor(innerHeight));
+    const pixelCapDpr = Math.max(CONTRACT.minDesktopDpr,
+      Math.sqrt(CONTRACT.desktopMaxBackingPixels / viewportPixels));
+    return Math.min(nativeDpr, CONTRACT.desktopDprCap, pixelCapDpr);
   }
 
   function apply(reason = 'manual') {
@@ -72,6 +80,7 @@
 
   root.__MOBILE_RENDER_BUDGET_V1__ = Object.freeze({
     contract: CONTRACT,
+    desiredDpr,
     apply,
     state: () => last
   });
