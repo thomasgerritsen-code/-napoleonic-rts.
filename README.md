@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.40
+# Napoleonic RTS — v1.3.41
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,14 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.41 — natuurlijke ijzerstenen op droge oevers (update 293)
+
+IJzererts komt **niet meer in de rivier of op bruggen** voor. De bestaande ecologische terreinkeuring verplaatst erts bij het genereren en na het herstarten naar een droge plek, met een veilige afstand van de rivieroevers. Ook wegen, gebouwen, dorpen en andere grondstoffen blijven vrij. De plaatsing blijft deterministisch en wijzigt de vier-breedse brug- en wegmars niet.
+
+In 2D zijn de voormalige losse lichtgrijze rotsjes vervangen door **half ingegraven, onregelmatige ijzerhoudende stenen** met gedempte kleuren, mos, grassprieten en zachtere bodemschaduwen. In 3D verschijnen kleine, lage, verschillende rotsvormen op de werkelijke ertsposities; ze verdwijnen na uitputting. Beide weergaven blijven geschikt om erts met boeren te verzamelen.
+
+Een extra browserregressie `tests/iron-natural-shores-v293.spec.js` controleert alle ertslocaties na meerdere resets, nieuwe ertspogingen in rivier en brugvakken, en de zichtbaarheid in 2D en 3D. Kosten en late-game vrijspelen van kanonnen zijn ongewijzigd.
 
 ## v1.3.40 — ijzerwinning en latere kanonnen (update 292)
 
