@@ -226,6 +226,7 @@
   const ambientTerrain = global.__MAP_AMBIENT_MOTION_V1__;
   const drawStaticTerrainSource = ambientTerrain?.baseTerrainDraw || drawTerrain;
   const drawAmbientTerrainOverlay = ambientTerrain?.drawOverlay || null;
+  const desktopTiles = global.__DESKTOP_TERRAIN_TILES_V301__ || null;
 
   function terrainCacheKey() {
     return [
@@ -244,6 +245,16 @@
   drawTerrain = function drawTerrainCachedV132() {
     refreshCameraFrame();
     const now = performance.now();
+    if (desktopTiles && !global.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile) {
+      const previous = desktopTiles.stats();
+      desktopTiles.draw(drawStaticTerrainSource, staticCtx);
+      const latest = desktopTiles.stats();
+      renderStats.staticTerrainCaptures += latest.misses - previous.misses;
+      renderStats.staticTerrainHits += latest.hits - previous.hits;
+      renderStats.staticTerrainInvalidations += latest.invalidations - previous.invalidations;
+      if (drawAmbientTerrainOverlay) drawAmbientTerrainOverlay();
+      return;
+    }
     const key = terrainCacheKey();
     const cameraChanged = key !== staticTerrainKey;
     const refreshExpired = now - staticTerrainCapturedAt >= STATIC_TERRAIN_REFRESH_MS;
@@ -286,6 +297,7 @@
     staticCanvas.style.height = `${innerHeight}px`;
     staticTerrainKey = '';
     staticTerrainCapturedAt = -Infinity;
+    desktopTiles?.invalidate();
     renderStats.dprResizes++;
   }
 
@@ -316,6 +328,8 @@
     unitLodThreshold: LOD_UNIT_THRESHOLD,
     unitLodZoomThreshold: LOD_ZOOM_THRESHOLD,
     staticTerrainCache: true,
+    worldAlignedTerrainTiles: Boolean(desktopTiles),
+    desktopTileCache: () => desktopTiles?.stats() || null,
     staticTerrainRefreshMs: STATIC_TERRAIN_REFRESH_MS,
     staticTerrainCanvasId: staticCanvas.id,
     livingUnitCount: () => livingUnitCount,
