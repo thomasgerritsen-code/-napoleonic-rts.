@@ -44,6 +44,9 @@
       length:12+((i*11)%17),intensity:.13+(i%5)*.035};
   }
   function drawFlow(time){
+    // v299 replaces the repetitive fixed-speed strokes with the richer 2D
+    // flow field; retain v297 as a safe fallback if the addon is absent.
+    if(global.__RIVER_FLOW_2D_V299__?.draw) return global.__RIVER_FLOW_2D_V299__.draw(time);
     const c=global.camera||camera,zoom=c?.zoom||1;
     const left=(c?.x||0)-innerWidth/(2*zoom)-85,right=(c?.x||0)+innerWidth/(2*zoom)+85;
     const top=(c?.y||0)-innerHeight/(2*zoom)-95,bottom=(c?.y||0)+innerHeight/(2*zoom)+95;
