@@ -5,9 +5,9 @@ async function openArtilleryV2(page) {
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/?test=v071',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>Boolean(
-    window.RTS_SIM?.version==='0.7.1' &&
+    window.RTS_SIM?.version===window.RTS_VERSION &&
     window.NRTS?.subsystems.has('artillery') &&
-    window.__RTS_DEBUG__?.selectForBattery
+    window.__RTS_DEBUG__?.setPeaceMode
   ));
   return errors;
 }
@@ -16,8 +16,13 @@ test('artillery cannon and crew move as one stable compound unit and deploy with
   const errors=await openArtilleryV2(page);
   const result=await page.evaluate(()=>{
     window.__RTS_DEBUG__.setPeaceMode(true);
-    window.__RTS_DEBUG__.selectForBattery('france');
-    makePlayerArtilleryBatteryV06();
+    // v292 removes the free opening guns. Explicitly create the artillery
+    // fixture to keep testing the same battery movement behaviour.
+    const fixtureGun=createUnit('france','artillery',620,1210);
+    const fixtureCrew=[createUnit('france','infantry',596,1190),
+      createUnit('france','infantry',596,1230)];
+    const battery=createArtilleryBatteryV06('france',fixtureGun,fixtureCrew);
+    selectWholeRegiment(battery);
     const reg=regiments.find(r=>!r.destroyed && r.side==='france' && groupKindV06(r)==='artillery');
     if(!reg) return {error:'no battery'};
     const cannon=artilleryForGroupV06(reg);

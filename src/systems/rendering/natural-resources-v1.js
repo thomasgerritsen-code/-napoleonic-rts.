@@ -14,6 +14,7 @@
   function seedFor(r,salt=0){return(((r.id||1)*2654435761)^((Math.round(r.x)*73856093)>>>0)^((Math.round(r.y)*19349663)>>>0)^salt)>>>0;}
   function berryScale(r){return r?.localVillageBerry===true?1.16:1;}
   function visualRadius(r,ratio=1){
+    if(r?.type==='iron')return 19;
     if(r?.type==='wood'){
       const scale=(cfg.treeCanopyScale??1.18)*(0.88+ratio*.16);
       return 16.5*scale*1.12;
@@ -76,6 +77,18 @@
     ctx.restore();
   }
 
+  function drawIronOre(r,ratio){
+    const rad=10+ratio*5;
+    ctx.save();ctx.translate(r.x,r.y);
+    ctx.fillStyle='rgba(13,23,25,.26)';ctx.beginPath();ctx.ellipse(3,5,rad*1.2,rad*.65,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#686d73';ctx.strokeStyle='#262c35';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(-rad,3);ctx.lineTo(-rad*.75,-rad*.7);
+    ctx.lineTo(-rad*.18,-rad);ctx.lineTo(rad*.65,-rad*.65);
+    ctx.lineTo(rad,2);ctx.lineTo(rad*.2,rad*.6);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle='#9c6650';ctx.beginPath();ctx.ellipse(-rad*.1,-rad*.1,rad*.34,rad*.24,-.4,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+
   function drawFoodResource(r,ratio){
     if(overlapsRoad(r,ratio))return false;
     drawBerryBush(r,ratio);
@@ -93,6 +106,7 @@
     if(r.localVillageBerry===true)return;
     if(overlapsRoad(r,ratio))return;
     if(r.type==='wood')drawTree(r,ratio);
+    else if(r.type==='iron')drawIronOre(r,ratio);
     else drawFoodResource(r,ratio);
   };
 

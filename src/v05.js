@@ -7,9 +7,9 @@ if (versionBadge) versionBadge.textContent = 'v0.5';
 
 // New economy/building branches.
 TRAINING.cavalry = { cost: { food: 150, wood: 50 }, time: 10 };
-TRAINING.artillery = { cost: { food: 120, wood: 100 }, time: 14 };
+TRAINING.artillery = { cost: { food: 120, wood: 140, iron: 160 }, time: 24 };
 BUILDINGS.stable = { w: 84, h: 62, hp: 820, label: 'Stable', cost: { wood: 360 } };
-BUILDINGS.foundry = { w: 88, h: 64, hp: 900, label: 'Artillery Foundry', cost: { wood: 420 } };
+BUILDINGS.foundry = { w: 88, h: 64, hp: 900, label: 'Artillery Foundry', cost: { wood: 420, iron: 90 } };
 
 // Add building controls without hard-coding them into the old HUD module.
 function ensureV05BuildButtons() {
@@ -22,7 +22,7 @@ function ensureV05BuildButtons() {
   if (!actionsEl.querySelector('[data-action="build-foundry"]')) {
     const foundry = document.createElement('button');
     foundry.type = 'button'; foundry.dataset.action = 'build-foundry';
-    foundry.innerHTML = 'Foundry<br><small>420 🪵</small>';
+    foundry.innerHTML = 'Geschutsgieterij<br><small>420 🪵 · 90 ⛏️</small>';
     actionsEl.appendChild(foundry);
   }
 }
@@ -117,7 +117,13 @@ renderDynamicActions = function renderDynamicActionsV05(force = false) {
 
   if (selectedBuilding?.complete && selectedBuilding.side === 'france') {
     if (selectedBuilding.type === 'stable') add('train-cavalry', 'Cavalerie<br><small>150 🍞 · 50 🪵</small>');
-    if (selectedBuilding.type === 'foundry') add('train-artillery', 'Artillerie<br><small>120 🍞 · 100 🪵</small>');
+    if (selectedBuilding.type === 'foundry') {
+      const ready=elapsed>=120 && canAfford('france',TRAINING.artillery.cost);
+      const caption=elapsed>=120?'120 🍞 · 140 🪵 · 160 ⛏️':'Vrij na 120 s · 160 ⛏️';
+      const button=makeDynamicButton('train-artillery',`Artillerie<br><small>${caption}</small>`,!ready);
+      button.title=elapsed>=120?'IJzer, hout en voedsel nodig':'Artillerie is pas na 120 spel-seconden beschikbaar';
+      actionsEl.prepend(button);
+    }
   }
 
   if (selectedRegiments().length) {

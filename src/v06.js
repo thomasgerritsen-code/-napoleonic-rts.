@@ -327,13 +327,18 @@ resetGame=function resetGameV06(){exploredCells.clear();exploreClockV06=0;rallyP
     if(Number.isFinite(b.rallyX))b.rallyX+=dx;
     if(Number.isFinite(b.rallyY))b.rallyY+=dy;
   }
-  for(const r of resources)if(r.x>2150){r.x+=dx;r.y+=dy;}for(let i=0;i<4;i++)createUnit('france','infantry',650+i*22,1280);const britishGun=livingUnits('britain').find(u=>u.type==='artillery'&&!u.regimentId);
-  if(britishGun){
-    const britishCrew=[
-      createUnit('britain','infantry',britishGun.x-26,britishGun.y-20),
-      createUnit('britain','infantry',britishGun.x-26,britishGun.y+20)
-    ];
-    createArtilleryBatteryV06('britain',britishGun,britishCrew,'Britse Startbatterij');
-  }
+  for(const r of resources)if(r.x>2150){r.x+=dx;r.y+=dy;}
+  for(let i=0;i<4;i++)createUnit('france','infantry',650+i*22,1280);
+  // Artillery is a late-game iron investment: there is no initial battery.
   [['wood',campX-260,campY-420,18],['food',campX-150,campY-250,9],
-   ['wood',campX-370,campY+250,16],['food',campX-490,campY+160,8]].forEach(([type,cx,cy,count])=>{for(let i=0;i<count;i++)createResource(type,cx+(Math.random()-.5)*190,cy+(Math.random()-.5)*150,type==='wood'?240:380);});const roll=Math.random();aiStrategyV06=roll<.34?'aggressive':roll<.67?'balanced':'defensive';autoAssignAIWorkers();recalcPopCap('france');recalcPopCap('britain');markExploredV06();actionSignature='';updateHud(true);statusEl.textContent='v0.6: kies rallypoints, vorm regimenten/cavalerie en wijs 2 musketiers toe aan ieder kanon.';};
+   ['wood',campX-370,campY+250,16],['food',campX-490,campY+160,8],
+   ['iron',campX-420,campY-350,9],['iron',campX-360,campY+330,9]]
+   .forEach(([type,cx,cy,count])=>{
+     for(let i=0;i<count;i++){
+       const x=type==='iron'?cx+(i%3-1)*53:cx+(Math.random()-.5)*150;
+       const y=type==='iron'?cy+(Math.floor(i/3)-1)*49:cy+(Math.random()-.5)*130;
+       if(type==='iron'&&typeof waterAtV067==='function'&&waterAtV067(x,y))continue;
+       createResource(type,x,y,type==='iron'?340:type==='wood'?240:380);
+     }
+   });
+  const roll=Math.random();aiStrategyV06=roll<.34?'aggressive':roll<.67?'balanced':'defensive';autoAssignAIWorkers();recalcPopCap('france');recalcPopCap('britain');markExploredV06();actionSignature='';updateHud(true);statusEl.textContent='v0.6: kies rallypoints, vorm regimenten/cavalerie en wijs 2 musketiers toe aan ieder kanon.';};

@@ -2,12 +2,13 @@
 // ---------- Economy ----------
   function canAfford(side, cost) {
     const e = economies[side];
-    return (!cost.food || e.food >= cost.food) && (!cost.wood || e.wood >= cost.wood);
+    return (!cost.food || e.food >= cost.food) && (!cost.wood || e.wood >= cost.wood) && (!cost.iron || e.iron >= cost.iron);
   }
   function pay(side, cost) {
     const e = economies[side];
     if (cost.food) e.food -= cost.food;
     if (cost.wood) e.wood -= cost.wood;
+    if (cost.iron) e.iron -= cost.iron;
   }
 
   function nearestTownCenter(side, x, y) {
@@ -65,10 +66,22 @@
   }
 
   function autoAssignAIWorkers() {
+    // In the opening minutes the AI builds its food/wood economy. Iron mining
+    // begins later, preventing a free early artillery technology jump.
+    const allWorkers=livingUnits('britain').filter(u=>u.type==='worker');
+    const miners=allWorkers.filter(u=>u.preferredResourceType==='iron' && u.task==='gather');
+    if(elapsed>=70 && economies.britain.iron < 700 && miners.length<2) {
+      const candidates=allWorkers.filter(u=>u.task==='gather' &&
+        u.preferredResourceType!=='iron' && u.carry===0);
+      const ore=nearestResource('iron',allWorkers[0]?.x||0,allWorkers[0]?.y||0);
+      if(ore && candidates.length)assignWorkerToResource(candidates[0],ore);
+    }
     const aiWorkers = livingUnits('britain').filter(u => u.type === 'worker' && !u.task);
     aiWorkers.forEach((u, i) => {
-      const preferred = i % 2 === 0 ? 'food' : 'wood';
-      assignWorkerToResource(u, nearestResource(preferred, u.x, u.y) || nearestResource(preferred === 'food' ? 'wood' : 'food', u.x, u.y));
+      const preferred = elapsed>=70 && economies.britain.iron<700 &&
+         livingUnits('britain').filter(w=>w.type==='worker'&&w.preferredResourceType==='iron').length<2
+         ? 'iron' : i%2===0 ? 'food' : 'wood';
+      assignWorkerToResource(u, nearestResource(preferred, u.x, u.y) || nearestResource('food',u.x,u.y) || nearestResource('wood',u.x,u.y));
     });
   }
 
@@ -85,7 +98,7 @@
       }
       moveToward(u, u.targetX, u.targetY, dt);
       if (u.side === 'britain') {
-        const preferred = economies.britain.wood < economies.britain.food ? 'wood' : 'food';
+        const preferred = u.preferredResourceType==='iron' ? 'iron' : economies.britain.wood < economies.britain.food ? 'wood' : 'food';
         assignWorkerToResource(u, nearestResource(preferred, u.x, u.y));
       }
       return;
@@ -183,7 +196,7 @@
   function startBuild(type) {
     const workers = [...selectedUnits].filter(u => !u.dead && u.type === 'worker');
     if (!workers.length) { statusEl.textContent = 'Selecteer eerst één of meer boeren.'; return; }
-    if (!canAfford('france', BUILDINGS[type].cost)) { statusEl.textContent = 'Niet genoeg hout.'; return; }
+    if (!canAfford('france', BUILDINGS[type].cost)) { statusEl.textContent = 'Niet genoeg grondstoffen (controleer ook ijzer).'; return; }
     buildMode = type; buildHintEl.classList.remove('hidden'); updateActionVisuals();
   }
 
@@ -200,6 +213,9 @@
 
   function queueUnitForBuilding(side, building, type) {
     if (!building || building.dead || !building.complete || building.side !== side || !TRAINING[type]) return false;
+    const requiredBuilding = type==='worker'?'towncenter':type==='cavalry'?'stable':type==='artillery'?'foundry':'barracks';
+    if(building.type!==requiredBuilding) return false;
+    if(type==='artillery' && elapsed<120) return false;
     const info = TRAINING[type];
     if (!canAfford(side, info.cost)) return false;
     if (populationUsed(side) + TYPES[type].pop > economies[side].popCap) return false;

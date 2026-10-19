@@ -10,7 +10,7 @@
 
   function signature(){
     const e=economies.britain;
-    return [Math.round(e.food),Math.round(e.wood),populationUsed('britain'),e.popCap,livingBuildings('britain').length,livingUnits('britain').length,livingBuildings('britain').reduce((s,b)=>s+(b.queue?.length||0),0)].join(':');
+    return [Math.round(e.food),Math.round(e.wood),Math.round(e.iron),populationUsed('britain'),e.popCap,livingBuildings('britain').length,livingUnits('britain').length,livingBuildings('britain').reduce((s,b)=>s+(b.queue?.length||0),0)].join(':');
   }
   function complete(type){return livingBuildings('britain').filter(b=>b.type===type&&b.complete);}
   function any(type){return livingBuildings('britain').filter(b=>b.type===type);}
@@ -40,7 +40,8 @@
     if(complete('stable').length&&livingUnits('britain').filter(u=>u.type==='cavalry').length<(cfg.desiredCavalry??8)&&aiQueue('cavalry','stable'))return'cavalry';
     if(typeof aiTryCavalryRegimentV06==='function'&&aiTryCavalryRegimentV06())return'cavalry-regiment';
 
-    if(combatRegs.length>=1&&complete('stable').length&&!any('foundry').length&&e.wood>=(BUILDINGS.foundry?.cost?.wood||420)&&aiBuild('foundry'))return'foundry';
+    if(elapsed>=95&&combatRegs.length>=1&&complete('stable').length&&!any('foundry').length&&
+      e.wood>=(BUILDINGS.foundry?.cost?.wood||420)&&e.iron>=(BUILDINGS.foundry?.cost?.iron||90)&&aiBuild('foundry'))return'foundry';
     if(complete('foundry').length&&livingUnits('britain').filter(u=>u.type==='artillery').length<(cfg.desiredArtillery??3)&&aiQueue('artillery','foundry'))return'artillery';
     if(typeof aiAutoCrewArtilleryV06==='function'&&aiAutoCrewArtilleryV06()===false)return null;
 

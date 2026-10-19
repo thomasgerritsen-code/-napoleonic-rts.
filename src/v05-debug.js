@@ -27,9 +27,10 @@ if (window.__RTS_DEBUG__) {
     return state;
   };
 
-  window.__RTS_DEBUG__.grantResources = function grantResources(side, food = 0, wood = 0) {
+  window.__RTS_DEBUG__.grantResources = function grantResources(side, food = 0, wood = 0, iron = 0) {
     economies[side].food += food;
     economies[side].wood += wood;
+    economies[side].iron += iron;
     updateHud(true);
   };
 
