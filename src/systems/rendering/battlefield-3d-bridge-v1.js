@@ -167,6 +167,12 @@
   function getStaticWorld() {
     return {
       world: { width: WORLD.width, height: WORLD.height },
+      // Same immutable river samples used by 2D/nav, not a separate 3D river.
+      river: global.__RIVER_GEOMETRY_V296__ ? {
+        samples: global.__RIVER_GEOMETRY_V296__.samples.map(p=>({x:p.x,y:p.y})),
+        navHalfWidth: RIVER_NAV_HALF_WIDTH_V067,
+        crossings: WATER_CROSSINGS_V067.map(c=>({id:c.id,x:c.x,y:c.y}))
+      } : null,
       roads: cloneRoads(),
       villages: cloneVillages(),
       woods: typeof TERRAIN_WOODS === 'undefined' ? [] : cloneTerrainRects(TERRAIN_WOODS),
