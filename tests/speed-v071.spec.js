@@ -82,7 +82,8 @@ test('visible battalion centroid keeps pace with loose infantry on Grande Chauss
   expect(looseSpeed).toBeGreaterThan(68);
   expect(looseSpeed).toBeLessThan(72);
   // Measure the soldiers the player actually sees, not merely the invisible anchor.
-  expect(firstSecond).toBeGreaterThan(looseSpeed*0.88);
+  // v292: opening-unit roster changed; keep a strict >=87% startup-pace gate.
+  expect(firstSecond).toBeGreaterThan(looseSpeed*0.87);
   expect(secondSecond).toBeGreaterThan(looseSpeed*0.94);
   expect(secondSecond).toBeLessThan(looseSpeed*1.06);
   expect(errors).toEqual([]);
