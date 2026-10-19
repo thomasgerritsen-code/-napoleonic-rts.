@@ -5,9 +5,7 @@ test('v268 fired 2D smoke drifts in self-changing wind, while musket drawing pre
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>Boolean(window.__TOPDOWN_WIND_V267__&&
-    window.__COMBAT_ANIMATIONS_V1__&&window.__CHARACTER_VISUALS_V2__&&
-    window.__BATTLEFIELD_3D_V1__));
-  await page.evaluate(()=>window.__BATTLEFIELD_3D_V1__.setEnabled(false));
+    window.__COMBAT_ANIMATIONS_V1__&&window.__CHARACTER_VISUALS_V2__));
   const result=await page.evaluate(()=>{
     resetGame();v05PeaceMode=true;
     for(const u of units)u.dead=true;
@@ -77,8 +75,7 @@ test('v268 fired 2D smoke drifts in self-changing wind, while musket drawing pre
 test('v268 wind changes autonomously, smoothly, deterministically with no manual button',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=v071',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>Boolean(window.__TOPDOWN_WIND_V267__&&window.__BATTLEFIELD_3D_V1__));
-  await page.evaluate(()=>window.__BATTLEFIELD_3D_V1__.setEnabled(false));
+  await page.waitForFunction(()=>Boolean(window.__TOPDOWN_WIND_V267__));
   const indicator=page.locator('#topdown-wind-direction-v267');
   await expect(indicator).toBeVisible();
   const before=await page.evaluate(()=>{
@@ -129,7 +126,7 @@ test('v268 wind changes autonomously, smoothly, deterministically with no manual
   expect(animated.after).not.toBeCloseTo(animated.before,2);
   expect(animated.hidden).toBe(false);
   expect(animated.label).toContain('Automatische windrichting');
-  await page.evaluate(()=>{window.__BATTLEFIELD_3D_V1__.setEnabled(true);drawParticles();});
-  await expect(indicator).toBeHidden();
+  await page.evaluate(()=>drawParticles());
+  await expect(indicator).toBeVisible();
   expect(errors).toEqual([]);
 });

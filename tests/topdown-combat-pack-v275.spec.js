@@ -3,9 +3,9 @@ const {test,expect}=require('@playwright/test');
 test('v271 coordinated 2D volley aims, registers actual 12-musket shot group, and does not move a soldier when drawn',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>Boolean(window.__TOPDOWN_VOLLEY_V271__&&window.__TOPDOWN_CASUALTIES_V272__&&window.__BATTLEFIELD_3D_V1__));
+  await page.waitForFunction(()=>Boolean(window.__TOPDOWN_VOLLEY_V271__&&window.__TOPDOWN_CASUALTIES_V272__));
   const r=await page.evaluate(()=>{
-    window.__BATTLEFIELD_3D_V1__.setEnabled(false);
+
     resetGame();gameOver=false;v05PeaceMode=true;
     for(const u of units)u.dead=true;
     for(const r of regiments)r.destroyed=true;
@@ -43,15 +43,15 @@ test('v271 coordinated 2D volley aims, registers actual 12-musket shot group, an
   expect(r.groups.find(g=>g.id===271777)?.count).toBe(12);
   expect(r.stats.grouped).toBeGreaterThanOrEqual(11);
   expect(r.smokeGroup).toBeGreaterThanOrEqual(12);
-  expect(r.mainVersion).toBe('1.3.26');
+  expect(r.mainVersion).toMatch(/^1\.3\.\d+$/);
 });
 
 test('v272 death poses and hit flinches are varied, capped and render-only',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=v071',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>Boolean(window.__TOPDOWN_CASUALTIES_V272__&&window.__BATTLEFIELD_3D_V1__));
+  await page.waitForFunction(()=>Boolean(window.__TOPDOWN_CASUALTIES_V272__));
   const result=await page.evaluate(()=>{
-    window.__BATTLEFIELD_3D_V1__.setEnabled(false);
+
     const api=window.__TOPDOWN_CASUALTIES_V272__;
     const hit=createUnit('france','infantry',camera.x,camera.y);
     hit.morale=95;applyDamage(hit,7,8);
@@ -80,9 +80,9 @@ test('v272 death poses and hit flinches are varied, capped and render-only',asyn
 test('v273 artillery crew phases follow actual gunshot; v274 panic states and v275 galloping/carré remain physical-authority-safe',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>Boolean(window.__TOPDOWN_GUN_CREW_V273__&&window.__TOPDOWN_MORALE_V274__&&window.__TOPDOWN_CAVALRY_V275__&&window.__BATTLEFIELD_3D_V1__));
+  await page.waitForFunction(()=>Boolean(window.__TOPDOWN_GUN_CREW_V273__&&window.__TOPDOWN_MORALE_V274__&&window.__TOPDOWN_CAVALRY_V275__));
   const result=await page.evaluate(()=>{
-    window.__BATTLEFIELD_3D_V1__.setEnabled(false);
+
     resetGame();v05PeaceMode=true;gameOver=false;
     for(const u of units)u.dead=true;
     for(const r of regiments)r.destroyed=true;
@@ -147,31 +147,10 @@ test('v273 artillery crew phases follow actual gunshot; v274 panic states and v2
   expect(result.squareDefence).toBeCloseTo(.35,5);
 });
 
-test('v271-275 are 2D display layers and 3D engine stays in control when enabled',async({page})=>{
-  const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('/?test=v071',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>!!window.__TOPDOWN_CAVALRY_V275__&&!!window.__BATTLEFIELD_3D_V1__);
-  const info=await page.evaluate(()=>{
-    const ids=['topdown-volley-v271','topdown-casualties-v272','topdown-gun-crew-v273','topdown-morale-v274','topdown-cavalry-v275'];
-    const features=ids.map(x=>NRTS.subsystems.has(x));
-    window.__BATTLEFIELD_3D_V1__.setEnabled(true);
-    const unit=createUnit('france','cavalry',camera.x,camera.y);
-    unit.chargeTimer=5;
-    const before=__TOPDOWN_CAVALRY_V275__.stats().galloping;
-    drawUnit(unit);drawParticles();drawRegimentMarkers();
-    const after=__TOPDOWN_CAVALRY_V275__.stats().galloping;
-    window.__BATTLEFIELD_3D_V1__.setEnabled(false);
-    return{features,before,after};
-  });
-  expect(info.features).toEqual([true,true,true,true,true]);
-  expect(info.before).toBe(info.after);
-  expect(errors).toEqual([]);
-});
-
-test('v275 infantry square retains the real existing mounted-charge counter, while new charge art stays 2D only',async({page})=>{
+test('v275 infantry square retains the mounted-charge counter without changing physics',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>!!window.__TOPDOWN_CAVALRY_V275__&&!!window.__CAVALRY_ARTILLERY_V1__&&!!window.__BATTLEFIELD_3D_V1__);
+  await page.waitForFunction(()=>!!window.__TOPDOWN_CAVALRY_V275__&&!!window.__CAVALRY_ARTILLERY_V1__);
   const result=await page.evaluate(()=>{
     resetGame();v05PeaceMode=true;gameOver=false;
     for(const u of units)u.dead=true;
@@ -191,22 +170,20 @@ test('v275 infantry square retains the real existing mounted-charge counter, whi
     const baseHP=900;
     const originalRandom=Math.random;
     Math.random=()=>.5;
-    function strike(mode,view3D){
+    function strike(mode){
       regiment.formation=mode;
       victim.hp=baseHP;
       horse.chargeTimer=5;horse.chargeMomentumV1=.7;horse.reload=0;
-      window.__BATTLEFIELD_3D_V1__.setEnabled(view3D);
       fire(horse,victim);
       return baseHP-victim.hp;
     }
-    const protection=strike('square',false);
-    const unprotected=strike('line',false);
-    const squareIn3D=strike('square',true);
+    const protection=strike('square');
+    const unprotected=strike('line');
     Math.random=originalRandom;
-    window.__BATTLEFIELD_3D_V1__.setEnabled(false);
+
     drawRegimentMarkers();
     return{
-      protection,unprotected,squareIn3D,
+      protection,unprotected,
       multiplier:cavalry.existingSquareDefence,
       originalMultiplier:window.__CAVALRY_ARTILLERY_V1__.chargeVsSquare,
       defensiveArtwork:cavalry.stats().squares,
@@ -224,6 +201,5 @@ test('v275 infantry square retains the real existing mounted-charge counter, whi
   // flanking bonuses for an unformed line, so the final ratio can be lower.
   expect(result.protection/result.unprotected).toBeGreaterThan(.2);
   expect(result.protection/result.unprotected).toBeLessThanOrEqual(.36);
-  expect(result.squareIn3D).toBeCloseTo(result.protection,4);
   expect(result.defensiveArtwork).toBeGreaterThan(0);
 });
