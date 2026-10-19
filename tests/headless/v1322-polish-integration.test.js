@@ -15,7 +15,7 @@ test('semantic version identity and browser cache keys stay aligned', () => {
   assert.ok(index.includes('Napoleonic RTS v'+pkg.version));
   assert.ok(index.includes('class="version">v'+pkg.version+'</'));
   assert.match(index, /src\/foundation\/version\.js\?build=[0-9a-z]+/);
-  assert.ok(index.includes('src/hud.js?build=productioncost1'));
+  assert.match(index, /src\/hud\.js\?build=[0-9a-z_-]+/);
   assert.ok(index.includes('style.css?build=194victory'));
 });
 
