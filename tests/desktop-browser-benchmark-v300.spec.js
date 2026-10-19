@@ -64,6 +64,12 @@ async function measure(browser, url, scenario) {
     await page.waitForTimeout(750);
     await page.keyboard.down('d');
     const timing = await page.evaluate(ms => new Promise(resolve => {
+      const round = n => Math.round(n * 100) / 100;
+      const percentile = (values, p) => {
+        if (!values.length) return null;
+        const sorted = values.slice().sort((a, b) => a - b);
+        return round(sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)]);
+      };
       const deltas = [];
       let started = null;
       let prev = null;
