@@ -53,6 +53,15 @@
     });
   }
 
+  // Decorative woodland canopy is separate from harvestable tree resources.
+  // Keep those background crowns clear of river channels and bridge decks too.
+  function dryCanopy(x,y,radius=0){
+    const hit=typeof riverHitV067==='function'?riverHitV067(x,y):null;
+    if(!hit||typeof RIVER_NAV_HALF_WIDTH_V067==='undefined')
+      return typeof waterAtV067!=='function'||!waterAtV067(x,y);
+    return hit.distance>=RIVER_NAV_HALF_WIDTH_V067+radius+12;
+  }
+
   const woodRenderData=(typeof TERRAIN_WOODS!=='undefined'?TERRAIN_WOODS:[]).map((w,index)=>{
     const local=seeded(9000+index*97);
     const cx=w.x+w.w/2,cy=w.y+w.h/2,rx=w.w/2,ry=w.h/2;
@@ -65,7 +74,7 @@
     const count=Math.max(12,Math.floor(w.w*w.h/3400));
     for(let i=0;i<count;i++){
       const tree={x:w.x+local()*w.w,y:w.y+local()*w.h,canopy:5+local()*8};
-      if(!roadConflictAt(tree.x,tree.y,tree.canopy))trees.push(tree);
+      if(!roadConflictAt(tree.x,tree.y,tree.canopy)&&dryCanopy(tree.x,tree.y,tree.canopy))trees.push(tree);
     }
     return{w,index,outline,trees};
   });
@@ -133,7 +142,7 @@
     ctx.save();ctx.fillStyle='rgba(39,67,38,.15)';ctx.beginPath();
     data.outline.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);});ctx.closePath();ctx.fill();
     for(const tree of data.trees){
-      if(!pointVisible(bounds,tree.x,tree.y,16)||roadConflictAt(tree.x,tree.y,tree.canopy))continue;
+      if(!pointVisible(bounds,tree.x,tree.y,16)||roadConflictAt(tree.x,tree.y,tree.canopy)||!dryCanopy(tree.x,tree.y,tree.canopy))continue;
       ctx.fillStyle='rgba(29,65,34,.58)';ctx.beginPath();ctx.arc(tree.x,tree.y,tree.canopy,0,Math.PI*2);ctx.fill();
       ctx.fillStyle='rgba(83,112,61,.32)';ctx.beginPath();ctx.arc(tree.x-2,tree.y-2,tree.canopy*.55,0,Math.PI*2);ctx.fill();
     }
@@ -202,6 +211,8 @@
     precomputedJunctions:true,
     roadClearance2D:true,
     vegetationRoadPadding,
+    waterVegetationClearance:true,
+    dryCanopy,
     roadConflictAt,
     visibleBounds
   });
