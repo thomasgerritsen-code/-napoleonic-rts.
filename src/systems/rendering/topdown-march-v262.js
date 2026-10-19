@@ -8,7 +8,7 @@
   const footprints=[];
   const MAX_FOOTPRINTS=180;
   const stats={samples:0,moving:0,standing:0,footprints:0,renderedFootprints:0};
-  const in2d=()=>!root.__BATTLEFIELD_3D_V1__?.enabled?.();
+  const in2d=()=>true;
   const time=()=>Number(elapsed)||0;
   function sample(u){
     let data=motion.get(u.id);

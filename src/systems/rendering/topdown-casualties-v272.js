@@ -4,7 +4,7 @@
   if(!root.NRTS)return;
   const LIMIT=130;
   const stats={fallsDrawn:0,hitFlinches:0,variants:new Set()};
-  const in2D=()=>!root.__BATTLEFIELD_3D_V1__?.enabled?.();
+  const in2D=()=>true;
   function variant(event){
     const seed=(Math.imul(Number(event.id||1),2654435761)>>>0);
     return seed%3;

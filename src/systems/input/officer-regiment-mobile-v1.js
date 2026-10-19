@@ -9,8 +9,7 @@
     autoFillMinimumInfantry: 12,
     autoFillRadius: 320,
     autoAssignNearestDrummer: true,
-    preserveExplicitSelection: true,
-    mobile3dOfficerTap: true
+    preserveExplicitSelection: true
   });
 
   const baseEligibility = regimentEligibility;
@@ -144,8 +143,6 @@
 
   const api = {
     contract: CONTRACT,
-    threeDInstalled: false,
-    threeDClaimedTaps: 0,
     draft() {
       const draft = officerDraft([...selectedUnits], 'france');
       if (!draft) return null;
@@ -157,170 +154,7 @@
         autoAddedInfantry: draft.autoAddedInfantry,
         autoAddedDrummer: draft.autoAddedDrummer
       };
-    },
-    threeDReady() {
-      return Boolean(api.threeDInstalled);
-    },
-    screenPointForOfficer() {
-      return null;
     }
   };
   global.__OFFICER_REGIMENT_MOBILE_V1__ = api;
-
-  async function install3DOfficerTap() {
-    let THREE;
-    try {
-      THREE = await import('https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js');
-    } catch (error) {
-      console.warn('Mobile officer selection enhancement could not load Three.js.', error);
-      return;
-    }
-
-    const source = global.NRTS_3D_SOURCE;
-    const renderApi = global.__BATTLEFIELD_3D_V1__;
-    const canvas = document.getElementById('battlefield3d');
-    if (!source || !renderApi || !canvas) return;
-
-    const staticWorld = source.staticWorld?.() || {};
-    const world = staticWorld.world || { width: 3200, height: 1850 };
-    const hills = staticWorld.hills || [];
-    const claimed = new Map();
-    const point = new THREE.Vector3();
-    const projectionCamera = new THREE.PerspectiveCamera(43, 1, 1, 9500);
-    const OFFICER_TOUCH_RADIUS_PX = 48;
-    const TAP_DRAG_PX = 12;
-
-    function hillHeightAt(x, z) {
-      let height = Math.sin(x * 0.0041) * 2.4 + Math.sin(z * 0.0057 + 1.1) * 2.0;
-      for (const hill of hills) {
-        const rx = Math.max(1, hill.rx || hill.w / 2 || 1);
-        const rz = Math.max(1, hill.ry || hill.h / 2 || 1);
-        const dx = (x - hill.x) / rx;
-        const dz = (z - hill.y) / rz;
-        const q = dx * dx + dz * dz;
-        if (q < 1) height += (1 - q) * (1 - q) * 34;
-      }
-      return height;
-    }
-
-    function syncProjectionCamera(rect) {
-      const simCamera = source.camera?.();
-      if (!simCamera || !rect.width || !rect.height) return false;
-      const diagnostics = renderApi.diagnostics?.() || {};
-      const cameraDistance = Number.isFinite(diagnostics.cameraDistance) ? diagnostics.cameraDistance : 760;
-      const cameraAzimuth = Number.isFinite(diagnostics.cameraAzimuth) ? diagnostics.cameraAzimuth : 0;
-      const centerX = Math.max(0, Math.min(world.width, simCamera.x));
-      const centerZ = Math.max(0, Math.min(world.height, simCamera.y));
-      const back = cameraDistance * 0.78;
-      const height = cameraDistance * 0.82;
-      projectionCamera.aspect = rect.width / rect.height;
-      projectionCamera.position.set(
-        centerX + Math.sin(cameraAzimuth) * back,
-        height,
-        centerZ + Math.cos(cameraAzimuth) * back
-      );
-      projectionCamera.lookAt(centerX, hillHeightAt(centerX, centerZ), centerZ);
-      projectionCamera.updateProjectionMatrix();
-      projectionCamera.updateMatrixWorld(true);
-      return true;
-    }
-
-    function screenPoint(unit) {
-      const rect = canvas.getBoundingClientRect();
-      if (!syncProjectionCamera(rect)) return null;
-      point.set(unit.x, hillHeightAt(unit.x, unit.y) + 8, unit.y).project(projectionCamera);
-      if (point.z < -1 || point.z > 1) return null;
-      const x = rect.left + (point.x + 1) * 0.5 * rect.width;
-      const y = rect.top + (1 - point.y) * 0.5 * rect.height;
-      if (x < rect.left - OFFICER_TOUCH_RADIUS_PX || x > rect.right + OFFICER_TOUCH_RADIUS_PX ||
-          y < rect.top - OFFICER_TOUCH_RADIUS_PX || y > rect.bottom + OFFICER_TOUCH_RADIUS_PX) return null;
-      return { x, y };
-    }
-
-    function looseFrenchOfficers() {
-      return (source.snapshot?.().units || []).filter(unit =>
-        unit.side === 'france' && unit.type === 'officer' && !unit.dead && !unit.routing && !unit.regimentId
-      );
-    }
-
-    function nearestOfficer(clientX, clientY) {
-      let best = null;
-      let bestDistance = OFFICER_TOUCH_RADIUS_PX;
-      for (const officer of looseFrenchOfficers()) {
-        const projected = screenPoint(officer);
-        if (!projected) continue;
-        const d = Math.hypot(projected.x - clientX, projected.y - clientY);
-        if (d <= bestDistance) {
-          best = officer;
-          bestDistance = d;
-        }
-      }
-      return best;
-    }
-
-    api.screenPointForOfficer = function screenPointForOfficer(id = null) {
-      const officers = looseFrenchOfficers();
-      const officer = id == null ? officers[0] : officers.find(unit => unit.id === id);
-      const projected = officer ? screenPoint(officer) : null;
-      return projected ? { id: officer.id, ...projected } : null;
-    };
-
-    // Let the 3D controller receive ALL touch pointers so pinch/pan can arbitrate
-    // gestures. A nearby officer is only claimed as a single-finger tap at release.
-    const activeTouchPointers = new Set();
-    canvas.addEventListener('pointerdown', event => {
-      if (event.pointerType !== 'touch') return;
-      activeTouchPointers.add(event.pointerId);
-      if (activeTouchPointers.size > 1) claimed.forEach(tap => { tap.multi = true; });
-      const officer = nearestOfficer(event.clientX, event.clientY);
-      if (!officer) return;
-      claimed.set(event.pointerId, {
-        officerId: officer.id, sx: event.clientX, sy: event.clientY,
-        multi: activeTouchPointers.size > 1
-      });
-    }, true);
-
-    canvas.addEventListener('pointerup', event => {
-      if (event.pointerType !== 'touch') return;
-      activeTouchPointers.delete(event.pointerId);
-      const claim = claimed.get(event.pointerId);
-      if (!claim) return;
-      claimed.delete(event.pointerId);
-      if (claim.multi) return; // A camera gesture must not select or order troops.
-      // The battlefield controller still gets pointerup to release its pointer;
-      // this marker tells it not to issue a second gameplay action.
-      event.__nrtsOfficerTapHandled = true;
-      if (Math.hypot(event.clientX - claim.sx, event.clientY - claim.sy) > TAP_DRAG_PX) return;
-      const officer = looseFrenchOfficers().find(unit => unit.id === claim.officerId);
-      if (!officer) return;
-      if (source.dispatch({ type: 'select-point', x: officer.x, y: officer.y })) {
-        api.threeDClaimedTaps++;
-        source.setStatus('Officier geselecteerd · kies “Maak regiment” om automatisch manschappen toe te wijzen.');
-      }
-    }, true);
-
-    canvas.addEventListener('pointercancel', event => {
-      activeTouchPointers.delete(event.pointerId);
-      claimed.delete(event.pointerId);
-    }, true);
-
-    api.threeDInstalled = true;
-  }
-
-  function start3DEnhancement() {
-    const tryInstall = () => {
-      if (document.getElementById('battlefield3d') && global.__BATTLEFIELD_3D_V1__ && global.NRTS_3D_SOURCE) {
-        install3DOfficerTap();
-        return;
-      }
-      setTimeout(tryInstall, 50);
-    };
-    tryInstall();
-  }
-
-  if (document.readyState === 'loading') {
-    global.addEventListener('DOMContentLoaded', start3DEnhancement, { once: true });
-  } else {
-    start3DEnhancement();
-  }
 })(window);

@@ -33,9 +33,8 @@
       indicator.dataset.directionDegrees=String(rounded);
       lastDegrees=rounded;
     }
-    // The wind is a 2D visual effect; the indicator is hidden in 3D mode.
-    indicator.hidden=Boolean(root.__BATTLEFIELD_3D_V1__?.enabled?.());
-    indicator.style.display=indicator.hidden?'none':'inline-flex';
+    indicator.hidden=false;
+    indicator.style.display='inline-flex';
     return degrees;
   }
 
@@ -43,8 +42,7 @@
   // timer, which would drift on iPhones when the browser tab is suspended.
   const baseDrawParticles=drawParticles;
   drawParticles=function drawParticlesWithWindIndicatorV268(){
-    const in3d=Boolean(root.__BATTLEFIELD_3D_V1__?.enabled?.());
-    if(elapsed<lastUpdate||elapsed-lastUpdate>=.22||indicator.hidden!==in3d){
+    if(elapsed<lastUpdate||elapsed-lastUpdate>=.22){
       lastUpdate=elapsed;
       refresh();
     }

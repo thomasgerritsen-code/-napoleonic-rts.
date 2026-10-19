@@ -6,7 +6,7 @@
   const bursts=[];
   const MAX_BURSTS=100;
   const stats={shots:0,musketShots:0,cannonShots:0,impactEvents:0,drawn:0,peakBursts:0};
-  const twoD=()=>!root.__BATTLEFIELD_3D_V1__?.enabled?.();
+  const twoD=()=>true;
   function add(kind,x,y,angle,weight=1,seed=1){
     if(!Number.isFinite(x)||!Number.isFinite(y))return;
     bursts.push({kind,x,y,angle,weight,seed,born:elapsed});

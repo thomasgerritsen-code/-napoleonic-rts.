@@ -5,7 +5,7 @@
   if(!root.NRTS||typeof fire!=='function')return;
   const groups=new Map(),stats={shots:0,grouped:0,aimedFrames:0,drawn:0};
   const MAX_MUZZLES=32,MAX_DRAW_PUFFS=240;
-  const enabled=()=>!root.__BATTLEFIELD_3D_V1__?.enabled?.();
+  const enabled=()=>true;
   function preFirePose(u){
     if(!enabled()||!u||u.dead||u.routing||u.type!=='infantry'||u.attackMode==='bayonet')return null;
     const reg=u.regimentId?getRegiment(u.regimentId):null;

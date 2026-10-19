@@ -23,5 +23,5 @@ test('2D battlefield draws the destination footprint and reports its dimensions'
 });
 
 test('formation destination preview is wired in the 2D runtime', () => {
-  assert.match(index, /order-target-feedback-v1\\.js\\?build=1321a/);
+  assert.ok(index.includes('order-target-feedback-v1.js?build=1321a'));
 });
