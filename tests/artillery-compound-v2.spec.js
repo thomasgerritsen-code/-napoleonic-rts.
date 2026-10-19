@@ -16,8 +16,13 @@ test('artillery cannon and crew move as one stable compound unit and deploy with
   const errors=await openArtilleryV2(page);
   const result=await page.evaluate(()=>{
     window.__RTS_DEBUG__.setPeaceMode(true);
-    window.__RTS_DEBUG__.selectForBattery('france');
-    makePlayerArtilleryBatteryV06();
+    // v292 removes the free opening guns. Explicitly create the artillery
+    // fixture to keep testing the same battery movement behaviour.
+    const cannon=createUnit('france','artillery',720,1210);
+    const crew=[createUnit('france','infantry',696,1190),
+      createUnit('france','infantry',696,1230)];
+    const battery=createArtilleryBatteryV06('france',cannon,crew);
+    selectWholeRegiment(battery);
     const reg=regiments.find(r=>!r.destroyed && r.side==='france' && groupKindV06(r)==='artillery');
     if(!reg) return {error:'no battery'};
     const cannon=artilleryForGroupV06(reg);
