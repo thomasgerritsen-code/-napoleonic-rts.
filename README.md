@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.36
+# Napoleonic RTS — v1.3.37
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.37 — gecontroleerde terugval bij laag moreel (update 289)
+
+Een infanterieregiment dat onder vuur wankelt (moreel tussen 32 en 46) kan als **gehele gevechtslinie** een korte terugval van circa 180 spel-eenheden inzetten als zijn officier nog leeft. Het gebruikt dezelfde bestaande pad- en formatieplanner, met tijdelijke onderbreking van het vuurcontact. De terugval wordt niet telkens herhaald; na voldoende moreelherstel kan een volgende zware gevechtsschok weer een terugval uitlokken.
+
+**Bescherming:** geen ingreep op bruggen, in riviercorridors of tijdens een lopende mars; geen rechtstreekse wijziging van soldatenposities. Gevaarlijke terugvalroutes over water worden afgewezen. De game blijft het bestaande systeem gebruiken om volledig gebroken regimenten uiteen te laten vallen.
 
 ## v1.3.36 — lokaal moreel bij verliezen (update 288)
 
