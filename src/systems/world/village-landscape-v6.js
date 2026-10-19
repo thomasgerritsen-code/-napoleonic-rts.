@@ -49,6 +49,13 @@
     return Boolean(road&&Number.isFinite(road.edgeClearance)&&road.edgeClearance<Math.max(0,radius)+Math.max(0,padding));
   }
 
+  function vegetationInRiver(x,y,radius=0){
+    const ecology=global.__BATTLEFIELD_ECOLOGY_V1__;
+    if(ecology?.riverbankConflict)return ecology.riverbankConflict('wood',x,y,radius);
+    const hit=typeof riverHitV067==='function'?riverHitV067(x,y):null;
+    return !!hit && hit.distance<(typeof RIVER_NAV_HALF_WIDTH_V067==='number'?RIVER_NAV_HALF_WIDTH_V067:72)+radius+18;
+  }
+
   function archetypeGround(village,seed,coreCount){
     const road=activeRoadGeometryAt(village.x,village.y);
     const roadAngle=road?Math.atan2(road.ty,road.tx):0;
@@ -99,7 +106,7 @@
       const d=72+hash01(seed^(i*131+0x802))*64;
       const x=village.x+Math.cos(a)*d,y=village.y+Math.sin(a)*d;
       const r=3.5+hash01(seed^(i*151+0x803))*3.8;
-      if(roadConflictAt(x,y,r,8))continue;
+      if(roadConflictAt(x,y,r,8)||vegetationInRiver(x,y,r))continue;
       ctx.fillStyle='rgba(45,73,42,.52)';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
     }
   }
@@ -134,7 +141,7 @@
       const py=rear*(house.h*.9+hash01(seed^(0x800+i*31))*house.h*1.5);
       const r=3+hash01(seed^(0x900+i*37))*3.2;
       const wx=house.x+px*ca-py*sa,wy=house.y+px*sa+py*ca;
-      if(roadConflictAt(wx,wy,r,8))continue;
+      if(roadConflictAt(wx,wy,r,8)||vegetationInRiver(wx,wy,r))continue;
       ctx.fillStyle='rgba(42,72,39,.70)';ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.fill();
       ctx.fillStyle='rgba(78,104,56,.34)';ctx.beginPath();ctx.arc(px-1.2,py-1.2,r*.55,0,Math.PI*2);ctx.fill();
     }
