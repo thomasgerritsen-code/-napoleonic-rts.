@@ -36,7 +36,8 @@
     return !!r && !!ecology?.riverbankConflict?.(r.type,r.x,r.y,visualRadius(r,ratio));
   }
 
-  function drawTree(r,ratio){
+  function drawTree(r,ratio,renderCtx=ctx){
+    const ctx=renderCtx;
     const scale=(cfg.treeCanopyScale??1.18)*(0.88+ratio*.16);
     const base=16.5*scale;
     ctx.save();ctx.translate(r.x,r.y);
@@ -59,7 +60,8 @@
     ctx.restore();
   }
 
-  function drawBerryBush(r,ratio){
+  function drawBerryBush(r,ratio,renderCtx=ctx){
+    const ctx=renderCtx;
     ctx.save();ctx.translate(r.x,r.y);
     const local=r.localVillageBerry===true;
     const radius=(cfg.berryRadius??19)*(0.88+ratio*.12)*berryScale(r);
@@ -84,7 +86,8 @@
 
   // v293: subdued, partially buried fieldstone clusters with a touch of moss.
   // Shape/rotation are per-resource deterministic, not a repeated grey icon.
-  function drawIronOre(r,ratio){
+  function drawIronOre(r,ratio,renderCtx=ctx){
+    const ctx=renderCtx;
     const seed=seedFor(r,0x293),n=2+Math.floor(rand01(seed^0x722)*2);
     const width=16+ratio*3.5;
     ctx.save();
@@ -137,6 +140,24 @@
     return true;
   }
 
+  // v306: share the exact same deterministic tree/bush/fieldstone drawing
+  // with a dedicated offscreen sprite atlas. No mutable swap of global ctx,
+  // no gameplay authority changes and no objects resurrected in rivers.
+  function paintToContext(r,renderCtx){
+    if(!renderCtx||!r||r.dead||r.localVillageBerry===true||r.amount<=0)return false;
+    const ratio=Math.max(0,Math.min(1,r.amount/Math.max(1,r.maxAmount)));
+    if(overlapsRoad(r,ratio)||overlapsRiver(r,ratio))return false;
+    if(r.type==='wood')drawTree(r,ratio,renderCtx);
+    else if(r.type==='iron')drawIronOre(r,ratio,renderCtx);
+    else drawBerryBush(r,ratio,renderCtx);
+    return true;
+  }
+  function canPaint(r){
+    if(!r||r.dead||r.localVillageBerry===true||r.amount<=0)return false;
+    const ratio=Math.max(0,Math.min(1,r.amount/Math.max(1,r.maxAmount)));
+    return !overlapsRoad(r,ratio)&&!overlapsRiver(r,ratio);
+  }
+
   drawResource=function drawNaturalResourceV1(r){
     if(!r||r.dead)return;
     const ratio=Math.max(0,Math.min(1,r.amount/Math.max(1,r.maxAmount)));
@@ -184,6 +205,8 @@
     roadRenderGuard:true,
     riverRenderGuard:true,
     overlapsRiver,
+    canPaint,paintToContext,
+    offscreenSpriteSource:true,
     oreNaturalBlend:true,
     overlapsRoad,
     diagnostics:()=>({foodDraws,localVillageBerryDraws,localOverlayFrames})
