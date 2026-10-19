@@ -226,6 +226,7 @@
   const ambientTerrain = global.__MAP_AMBIENT_MOTION_V1__;
   const drawStaticTerrainSource = ambientTerrain?.baseTerrainDraw || drawTerrain;
   const drawAmbientTerrainOverlay = ambientTerrain?.drawOverlay || null;
+  const desktopTiles = global.__DESKTOP_TERRAIN_TILES_V301__ || null;
 
   function terrainCacheKey() {
     return [
@@ -244,6 +245,16 @@
   drawTerrain = function drawTerrainCachedV132() {
     refreshCameraFrame();
     const now = performance.now();
+    if (desktopTiles && !global.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile) {
+      const previous = desktopTiles.stats();
+      desktopTiles.draw(drawStaticTerrainSource, staticCtx);
+      const latest = desktopTiles.stats();
+      renderStats.staticTerrainCaptures += latest.misses - previous.misses;
+      renderStats.staticTerrainHits += latest.hits - previous.hits;
+      renderStats.staticTerrainInvalidations += latest.invalidations - previous.invalidations;
+      if (drawAmbientTerrainOverlay) drawAmbientTerrainOverlay();
+      return;
+    }
     const key = terrainCacheKey();
     const cameraChanged = key !== staticTerrainKey;
     const refreshExpired = now - staticTerrainCapturedAt >= STATIC_TERRAIN_REFRESH_MS;
@@ -264,7 +275,10 @@
   };
 
   function resize2DCanvasForPerformance() {
-    const desiredDpr = Math.min(devicePixelRatio || 1, MAX_2D_DPR);
+    // Share the same DPR decision as the early budget installer: resizing must
+    // not allocate a full Retina canvas twice (or undo the desktop pixel cap).
+    const desiredDpr = Math.min(MAX_2D_DPR,
+      global.__MOBILE_RENDER_BUDGET_V1__?.desiredDpr?.() ?? (devicePixelRatio || 1));
     const desiredWidth = Math.max(1, Math.floor(innerWidth * desiredDpr));
     const desiredHeight = Math.max(1, Math.floor(innerHeight * desiredDpr));
     const sameMain = canvas.width === desiredWidth && canvas.height === desiredHeight;
@@ -283,21 +297,13 @@
     staticCanvas.style.height = `${innerHeight}px`;
     staticTerrainKey = '';
     staticTerrainCapturedAt = -Infinity;
+    desktopTiles?.invalidate();
     renderStats.dprResizes++;
   }
 
   addEventListener('resize', resize2DCanvasForPerformance);
   resize2DCanvasForPerformance();
   refreshCameraFrame();
-
-  addEventListener('load', () => {
-    const params = new URLSearchParams(location.search);
-    const explicit3D = params.get('view') === '3d' || params.get('test') === '3d';
-    if (!explicit3D && global.__BATTLEFIELD_3D_V1__?.enabled?.()) {
-      global.__BATTLEFIELD_3D_V1__.setEnabled(false);
-      statusEl.textContent = '2D-weergave actief · geoptimaliseerd voor vloeiende grote veldslagen.';
-    }
-  }, { once:true });
 
   const api = Object.freeze({
     version: 'large-army-v1.3.2',
@@ -313,6 +319,8 @@
     unitLodThreshold: LOD_UNIT_THRESHOLD,
     unitLodZoomThreshold: LOD_ZOOM_THRESHOLD,
     staticTerrainCache: true,
+    worldAlignedTerrainTiles: Boolean(desktopTiles),
+    desktopTileCache: () => desktopTiles?.stats() || null,
     staticTerrainRefreshMs: STATIC_TERRAIN_REFRESH_MS,
     staticTerrainCanvasId: staticCanvas.id,
     livingUnitCount: () => livingUnitCount,

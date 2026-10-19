@@ -22,20 +22,17 @@ test('v298 only 2D bank rendering adds inside-bend bars and outer-bank erosion w
     }));
     camera.x=cam.x;camera.y=cam.y;camera.zoom=cam.zoom;
     return{
-      api:{twoDOnly:api.twoDOnly,threeDUntouched:api.threeDUntouched,
+      api:{twoDOnly:api.twoDOnly,
         sharedGeometry:api.sharedGeometry,erosionByBend:api.erosionByBend,
         drawName:drawRiverV067.name,
         stats:api.stats()},
       highestBend:bend.shape,visible,bridges,
       timeChanged:Math.hypot(timeA.x-timeB.x,timeA.y-timeB.y),
-      v297DrawPreserved:typeof window.__RIVER_SURFACE_V297__.draw==='function',
-      untouched3dScripts:Array.from(document.querySelectorAll('script[src*="battlefield-3d"]'))
-        .map(s=>s.getAttribute('src')).filter(src=>src.includes('v297')).length
+      v297DrawPreserved:typeof window.__RIVER_SURFACE_V297__.draw==='function'
     };
   });
   expect(errors).toEqual([]);
   expect(state.api.twoDOnly).toBe(true);
-  expect(state.api.threeDUntouched).toBe(true);
   expect(state.api.sharedGeometry).toBe(true);
   expect(state.api.erosionByBend).toBe(true);
   expect(state.api.drawName).toBe('drawRiverNatural2DV298');
@@ -53,5 +50,4 @@ test('v298 only 2D bank rendering adds inside-bend bars and outer-bank erosion w
     expect(crossing.water).toBe(false);
   }
   expect(state.v297DrawPreserved).toBe(true);
-  expect(state.untouched3dScripts).toBeGreaterThanOrEqual(1);
 });

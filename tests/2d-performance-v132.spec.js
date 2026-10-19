@@ -8,8 +8,7 @@ test('normal play prioritizes viewport-culled 2D rendering with density LOD', as
   await page.waitForFunction(() => Boolean(
     window.__LARGE_ARMY_PERFORMANCE_V1__ &&
     window.__MAP_REALISM_V2__ &&
-    window.__MAP_AMBIENT_MOTION_V1__ &&
-    window.__BATTLEFIELD_3D_V1__
+    window.__MAP_AMBIENT_MOTION_V1__
   ));
   await page.waitForTimeout(120);
 
@@ -33,9 +32,10 @@ test('normal play prioritizes viewport-culled 2D rendering with density LOD', as
       precomputedGroundMarks: window.__MAP_REALISM_V2__.precomputedGroundMarks,
       precomputedRoadPaths: window.__MAP_REALISM_V2__.precomputedRoadPaths,
       precomputedJunctions: window.__MAP_REALISM_V2__.precomputedJunctions,
+      precomputedFieldRows: window.__MAP_REALISM_V2__.precomputedFieldRows,
+      precomputedWoodClearance: window.__MAP_REALISM_V2__.precomputedWoodClearance,
       ambientCull: window.__MAP_AMBIENT_MOTION_V1__.viewportCulling,
       ambientOverlaySplit: typeof window.__MAP_AMBIENT_MOTION_V1__.drawOverlay === 'function',
-      threeDEnabled: window.__BATTLEFIELD_3D_V1__.enabled(),
       canvasWidth: document.getElementById('game').width,
       cssWidth: innerWidth,
       boundsWidth: bounds.width,
@@ -54,9 +54,10 @@ test('normal play prioritizes viewport-culled 2D rendering with density LOD', as
   expect(baseline.precomputedGroundMarks).toBe(true);
   expect(baseline.precomputedRoadPaths).toBe(true);
   expect(baseline.precomputedJunctions).toBe(true);
+  expect(baseline.precomputedFieldRows).toBe(true);
+  expect(baseline.precomputedWoodClearance).toBe(true);
   expect(baseline.ambientCull).toBe(true);
   expect(baseline.ambientOverlaySplit).toBe(true);
-  expect(baseline.threeDEnabled).toBe(false);
   expect(baseline.canvasWidth).toBeLessThanOrEqual(Math.ceil(baseline.cssWidth * 1.5) + 1);
   expect(baseline.boundsWidth).toBeLessThan(baseline.worldWidth);
 

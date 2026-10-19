@@ -5,7 +5,7 @@
   if(!root.NRTS||typeof aiAttack!=='function'||typeof aiFlank!=='function')return;
   const originalAttack=aiAttack,originalFlank=aiFlank,originalChoose=aiChooseState;
   const stats={attacks:0,reserveChoices:0,flankChoices:0,pressureRetreats:0,protectedCrossings:0};
-  const only2d=()=>!root.__BATTLEFIELD_3D_V1__?.enabled?.();
+  const only2d=()=>true;
   const clock=()=>Number(elapsed)||0;
   const clamp=x=>Math.max(0,Math.min(1,x));
   let pressureSince=-Infinity,lastFlankAt=-Infinity;

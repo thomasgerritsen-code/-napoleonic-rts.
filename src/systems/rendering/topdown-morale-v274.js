@@ -4,7 +4,7 @@
 (function installTopdownMoraleV274(root){
   if(!root.NRTS)return;
   const stats={waveringDraws:0,routingDraws:0,regimentsMarked:0};
-  const enabled=()=>!root.__BATTLEFIELD_3D_V1__?.enabled?.();
+  const enabled=()=>true;
   function stateFor(u){
     if(!u||u.dead||u.type==='worker')return'steady';
     if(u.routing)return'routing';

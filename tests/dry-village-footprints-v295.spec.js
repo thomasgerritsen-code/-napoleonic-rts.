@@ -48,21 +48,3 @@ test('v295 every scaled village house and yard stays clear of water and bridge d
   expect(errors).toEqual([]);
 });
 
-test('v295 3D houses use the same dry canonical village coordinates',async({page})=>{
-  const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('/?test=3d',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>Boolean(window.NRTS_3D_SOURCE?.staticWorld &&
-    window.__BATTLEFIELD_3D_V1__?.diagnostics()));
-  const result=await page.evaluate(()=>{
-    const sceneVillages=NRTS_3D_SOURCE.staticWorld().villages;
-    const houses=sceneVillages.flatMap(v=>v.houses||[]);
-    const c=__VILLAGE_COLLISION_V4__;
-    const bad=houses.filter(h=>!c.clearOfRiver(h,h.plotRadius));
-    return {count:houses.length,bad:bad.map(h=>h.id),
-      authority:window.__VILLAGE_AUTHORITY_V6__?.collisionLayer};
-  });
-  expect(errors).toEqual([]);
-  expect(result.count).toBeGreaterThan(20);
-  expect(result.bad).toEqual([]);
-  expect(result.authority).toBe('village-collision-v4');
-});

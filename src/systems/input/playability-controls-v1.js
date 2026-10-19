@@ -139,10 +139,9 @@
         .topbar .brand,.topbar #status{display:none}
         .topbar .resources{display:flex;flex:1 1 auto;min-width:0;grid-column:auto;grid-row:auto;gap:2px;overflow:hidden;justify-content:flex-start;font-size:clamp(.59rem,2.7vw,.76rem)}
         .topbar .resources span{padding:4px 3px;white-space:nowrap}
-        .topbar #resetBtn,.topbar #renderModeBtn{display:none}
+        .topbar #resetBtn{display:none}
         .topbar button.mobile-chrome-button{display:block;flex:0 0 auto;min-width:44px;min-height:44px;padding:3px 6px;font-size:.7rem}
-        body.mobile-menu-open .topbar #resetBtn,body.mobile-menu-open .topbar #renderModeBtn{display:block;position:fixed;top:calc(max(4px,env(safe-area-inset-top)) + 49px);right:max(4px,env(safe-area-inset-right));min-width:110px;min-height:44px;background:#202720;z-index:31}
-        body.mobile-menu-open .topbar #renderModeBtn{right:calc(max(4px,env(safe-area-inset-right)) + 114px)}
+        body.mobile-menu-open .topbar #resetBtn{display:block;position:fixed;top:calc(max(4px,env(safe-area-inset-top)) + 49px);right:max(4px,env(safe-area-inset-right));min-width:110px;min-height:44px;background:#202720;z-index:31}
         .bottombar{bottom:max(4px,env(safe-area-inset-bottom));left:max(4px,env(safe-area-inset-left));transform:none;width:calc(100% - max(4px,env(safe-area-inset-left)) - max(4px,env(safe-area-inset-right)));min-height:0;padding:3px 5px;display:grid;grid-template-columns:minmax(0,1fr);gap:2px}
         .selection-panel{max-height:27px;display:block;overflow:hidden;white-space:nowrap}
         .selection-panel .label,#selectionDetails,.army-counts{display:none}
@@ -151,7 +150,6 @@
         .actions button{flex:0 0 auto;min-width:58px;min-height:44px;font-size:.65rem;padding:3px 6px}
         #minimap{display:none;right:max(5px,env(safe-area-inset-right));bottom:calc(max(4px,env(safe-area-inset-bottom)) + 84px);width:150px;height:88px}
         body.mobile-map-open #minimap{display:block}
-        .village-identity-3d{display:none}
         .production-queue{right:max(5px,env(safe-area-inset-right));bottom:calc(max(4px,env(safe-area-inset-bottom)) + 84px);width:min(190px,45vw);max-height:94px;padding:5px;font-size:.65rem}
         .production-queue .rally-line,.production-queue li.empty{display:none}
         #mobileGestureHint{display:none;bottom:calc(max(4px,env(safe-area-inset-bottom)) + 85px);max-width:calc(100vw - 16px);overflow:hidden;text-overflow:ellipsis;font-size:.65rem}

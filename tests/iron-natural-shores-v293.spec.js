@@ -70,28 +70,3 @@ test('v293 all iron deposits remain on dry land clear of riverbanks, roads and b
   }
 });
 
-test('v293 3D battlefield draws unobtrusive low-profile ironstone meshes',async({page})=>{
-  const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('/?test=3d',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>Boolean(
-    window.__BATTLEFIELD_3D_V1__?.diagnostics()?.ironOutcrops>0&&
-    window.__NRTS_THREE_SCENE__?.getObjectByName('iron-ore-fieldstones-v293')
-  ),null,{timeout:25000});
-  const result=await page.evaluate(()=>{
-    const scene=window.__NRTS_THREE_SCENE__;
-    const mesh=scene.getObjectByName('iron-ore-fieldstones-v293');
-    const source=window.NRTS_3D_SOURCE;
-    const count=source.resources().filter(r=>r.type==='iron'&&!r.dead&&r.amount>0).length;
-    return{count,meshCount:mesh?.count,instanced:mesh?.isInstancedMesh===true,
-      geometry:mesh?.geometry?.type,roughness:mesh?.material?.roughness,
-      diagnostics:window.__BATTLEFIELD_3D_V1__.diagnostics(),
-      shoreClear:window.__BATTLEFIELD_ECOLOGY_V1__.oreShoreExclusion};
-  });
-  expect(errors).toEqual([]);
-  expect(result.count).toBeGreaterThanOrEqual(15);
-  expect(result.meshCount).toBe(result.count);
-  expect(result.instanced).toBe(true);
-  expect(result.geometry).toBe('DodecahedronGeometry');
-  expect(result.roughness).toBe(1);
-  expect(result.shoreClear).toBe(true);
-});

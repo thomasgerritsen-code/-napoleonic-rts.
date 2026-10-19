@@ -5,7 +5,7 @@
   if(!root.NRTS)return;
   const trails=[],motion=new Map(),MAX_DUST=140;
   const stats={galloping:0,dustEmitted:0,dustDrawn:0,squares:0};
-  const enabled=()=>!root.__BATTLEFIELD_3D_V1__?.enabled?.();
+  const enabled=()=>true;
   function chargeFor(u){
     return u?.type==='cavalry'&&!u.dead&&!u.routing&&(u.chargeTimer||0)>0;
   }

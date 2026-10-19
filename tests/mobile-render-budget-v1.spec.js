@@ -43,7 +43,10 @@ test('orientation resize reapplies budget without changing touch coordinate spac
   const state = await page.evaluate(() => {
     const sx = 195;
     const sy = 422;
-    const before = window.__RTS_DEBUG__.worldToScreen(720, 900);
+    // The game's actual camera may already have advanced during startup.
+    // Verify a round-trip through the live camera instead of assuming the
+    // historical reset coordinates are still its center.
+    const before = window.__RTS_DEBUG__.worldToScreen(camera.x, camera.y);
     const canvas = document.getElementById('game');
     const rect = canvas.getBoundingClientRect();
     return {
@@ -57,7 +60,7 @@ test('orientation resize reapplies budget without changing touch coordinate spac
   expect(state.budget.reason).toBe('resize');
   expect(state.budget.renderDpr).toBe(1.5);
   // The public worldToScreen hook is the same coordinate path used by selection/rendering.
-  // After portrait resize the reset camera center must still map to CSS viewport center,
+  // After portrait resize the live camera center must map to CSS viewport center,
   // independently of the lower backing-store DPR.
   expect(Math.abs(state.cameraCenter.x - state.cssPoint.x)).toBeLessThan(0.01);
   expect(Math.abs(state.cameraCenter.y - state.cssPoint.y)).toBeLessThan(0.01);
@@ -66,12 +69,32 @@ test('orientation resize reapplies budget without changing touch coordinate spac
   await context.close();
 });
 
-test('desktop keeps existing DPR ceiling', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2.5 });
+test('large desktop is pixel-budgeted consistently by both 2D canvas owners', async ({ browser }) => {
+  const viewport = { width: 1920, height: 1080 };
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 2.5 });
   const page = await context.newPage();
   await page.goto('/?test');
-  const state = await page.evaluate(() => window.__MOBILE_RENDER_BUDGET_V1__?.state?.());
-  expect(state.mobile).toBe(false);
-  expect(state.renderDpr).toBe(2);
+  const state = await page.evaluate(() => {
+    const budget = window.__MOBILE_RENDER_BUDGET_V1__;
+    const main = document.getElementById('game');
+    const staticCanvas = document.getElementById('game-static');
+    return {
+      budget: budget.state(),
+      contract: budget.contract,
+      effectiveDpr: budget.desiredDpr(),
+      main: { width: main.width, height: main.height },
+      staticCanvas: { width: staticCanvas.width, height: staticCanvas.height },
+      cssWidth: main.getBoundingClientRect().width
+    };
+  });
+  expect(state.budget.mobile).toBe(false);
+  const expectedDpr = Math.sqrt(2200000 / (viewport.width * viewport.height));
+  expect(state.effectiveDpr).toBeCloseTo(expectedDpr, 4);
+  expect(state.budget.renderDpr).toBeCloseTo(expectedDpr, 4);
+  expect(state.main.width).toBe(Math.floor(viewport.width * expectedDpr));
+  expect(state.main.height).toBe(Math.floor(viewport.height * expectedDpr));
+  expect(state.staticCanvas).toEqual(state.main);
+  expect(state.main.width * state.main.height).toBeLessThanOrEqual(2200000);
+  expect(state.cssWidth).toBe(viewport.width);
   await context.close();
 });

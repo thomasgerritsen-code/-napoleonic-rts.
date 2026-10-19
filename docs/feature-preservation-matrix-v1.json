@@ -7,13 +7,13 @@
     {"id":"CORE-DESKTOP-ORDERS","name":"Desktop selection, multi-selection, move and facing orders","required":true,"evidence":["Focused Chromium gate","Deterministic Golden Battle gate"]},
     {"id":"CORE-MOBILE-ORDERS","name":"Mobile select, multi-select/box alternative, move, facing, pan, pinch and formation controls","required":true,"evidence":["tests/mobile-playability-v1.spec.js","Focused Chromium gate"]},
     {"id":"CORE-FORMATIONS","name":"Accepted formation switching and formation cohesion remain available","required":true,"evidence":["Deterministic Golden Battle gate","520-unit Game Health gate","relevant formation tests"]},
-    {"id":"CORE-CAMERA","name":"Camera pan/zoom plus resize/orientation behaviour","required":true,"evidence":["tests/mobile-playability-v1.spec.js","Focused Chromium gate","anti-flicker/stable-canvas checks"]},
+    {"id":"CORE-CAMERA","name":"Camera pan/zoom plus resize/orientation behaviour","required":true,"evidence":["tests/mobile-playability-v1.spec.js","Focused Chromium gate","anti-flicker/stable-2D-canvas checks"]},
     {"id":"CORE-ROUTES","name":"Roads, road exits, bridges/chokepoints and legal route completion","required":true,"evidence":["tests/movement-coverage.spec.js","Movement coverage gate","bridge/chokepoint regression scenarios"]},
     {"id":"CORE-UNIT-ROLES","name":"Infantry, cavalry and artillery remain usable participants in the core battle","required":true,"evidence":["Deterministic Golden Battle gate","520-unit Game Health gate","tests/artillery-compound-v2.spec.js"]},
     {"id":"CORE-COMBAT","name":"Existing deterministic combat, targeting and morale/routing behaviour does not disappear","required":true,"evidence":["Deterministic Golden Battle gate","tests/golden-battle-combat-v11.spec.js","relevant AI/combat tests"]},
     {"id":"CORE-HUD-FEEDBACK","name":"Essential order/selection/formation feedback remains accessible","required":true,"evidence":["Focused Chromium gate","mobile playability coverage","North Star structured playtest"]},
     {"id":"CORE-REPLAY-DEBUG","name":"Deterministic Test Lab/replay hooks required by regression coverage remain functional","required":true,"evidence":["Deterministic Golden Battle gate","Movement-Contact replay","North Star golden scenario"]},
-    {"id":"CORE-RENDERER-SAFETY","name":"Stable canvas/no blank frames and renderer fallback while an alternate renderer is experimental","required":true,"evidence":["anti-flicker/stable-canvas checks","exact-head Vercel runtime","desktop/mobile golden captures"]}
+    {"id":"CORE-RENDERER-SAFETY","name":"Stable 2D canvas/no blank frames on desktop and mobile, including pan and resize","required":true,"evidence":["anti-flicker/stable-canvas checks","exact-head Vercel runtime","desktop/mobile golden captures"]}
   ],
   "mergeRequirements": [
     "PR declares PRESERVATION IMPACT",

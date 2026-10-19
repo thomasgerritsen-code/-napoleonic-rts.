@@ -7,7 +7,7 @@
   const maxVoices=12;
   let audio=null,noise=null,voices=0,enabled=false,lastBeat=-Infinity;
   const lastVolley=new Map();
-  const twoD=()=>!root.__BATTLEFIELD_3D_V1__?.enabled?.();
+  const twoD=()=>true;
   const supported=!!(root.AudioContext||root.webkitAudioContext);
   const button=document.createElement('button');
   button.id='topdown-audio-toggle';
