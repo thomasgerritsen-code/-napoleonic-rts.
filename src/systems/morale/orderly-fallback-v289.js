@@ -21,7 +21,9 @@
     // Do not endlessly re-issue orders. After rallying, a later collapse
     // can trigger a fresh withdrawal.
     if (prior) {
-      if (reg.morale >= RECOVER_MORALE &&
+      // Only release this cooldown after the soldiers actually rallied.
+      // Morale can recover while still marching; that alone is not readiness.
+      if (reg.regroupV290?.phase === 'ready' && reg.morale >= RECOVER_MORALE &&
           elapsed >= prior.startedAt + 8) delete reg.orderlyFallbackV289;
       else return false;
     }

@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.37
+# Napoleonic RTS — v1.3.38
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.38 — hergroeperen na terugtocht (update 290)
+
+Na de gecontroleerde terugval van v289 krijgt een regiment nu een echte **hergroepeerfase**. Alleen als het groepscentrum de terugvalpositie heeft bereikt **én minimaal 75% van de mannen hun formatieplaats hebben ingenomen**, start het herstel. Een vijand binnen 235 spel-eenheden pauzeert het herstel; de officier is vereist en de drummer versnelt de moreelopbouw. Na minimaal vijf seconden veilig hergroeperen en voldoende moreel (62%) wordt het regiment weer **GEREED** voor normale bevelen.
+
+Bij een nieuwe spelers- of AI-order wordt de hergroepering afgebroken en gaat de opdracht voor. De kaart, wegen, brugreserveringen en loopcode zijn niet gewijzigd. In de 2D-weergave staat tijdelijk TERUGVAL, HERGROEPT of GEREED boven het regiment. Gerichte browsertests simuleren aankomst, onafgemaakte achterhoede, vijandelijke druk en een nieuwe opdracht.
 
 ## v1.3.37 — gecontroleerde terugval bij laag moreel (update 289)
 

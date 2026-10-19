@@ -41,15 +41,23 @@
     ctx.save();ctx.textAlign='center';ctx.font='bold 10px sans-serif';
     for(const reg of regiments){
       if(count>=18)break;
-      if(reg.destroyed||!(reg.morale<49))continue;
+      const rally=reg.regroupV290;
+      const regrouping=rally?.phase==='regrouping';
+      const withdrawing=rally?.phase==='withdrawing';
+      const ready=rally?.phase==='ready'&&elapsed-(rally.readyAt||0)<4;
+      if(reg.destroyed||!(reg.morale<49||regrouping||withdrawing||ready))continue;
       const soldiers=regimentMembers(reg).filter(u=>!u.dead);
       if(!soldiers.length)continue;
       const p=centroid(soldiers);
       if(!isWorldVisible(p.x,p.y,110))continue;
       const routed=soldiers.filter(u=>u.routing).length;
-      const message=routed>=Math.max(2,soldiers.length*.35)?'VLUCHT':
+      const message=regrouping?'HERGROEPT':withdrawing?'TERUGVAL':ready?'GEREED':
+        routed>=Math.max(2,soldiers.length*.35)?'VLUCHT':
         reg.morale<26?'PANIEK':'ONRUST';
-      ctx.fillStyle=message==='VLUCHT'?'#b86655':message==='PANIEK'?'#d79c67':'#edc77f';
+      ctx.fillStyle=message==='GEREED'?'#a3d0a2':
+        message==='HERGROEPT'?'#e6ce8b':
+        message==='TERUGVAL'?'#e2a477':
+        message==='VLUCHT'?'#b86655':message==='PANIEK'?'#d79c67':'#edc77f';
       ctx.globalAlpha=.9;
       ctx.fillText(message,p.x,p.y-48);
       stats.regimentsMarked++;count++;
