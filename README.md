@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.53
+# Napoleonic RTS — v1.3.54
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.54 — natuurlijke grondstoffen op de GPU (update 306)
+
+Op desktop met WebGL2 worden de bestaande **2D-boomkruinen, bessenstruiken en met mos begroeide ijzerstenen** eerst door hun originele deterministische Canvas2D-renderer in een beperkte GPU-textuuratlas vastgelegd. Daarna zijn alle zichtbare, gewone natuurlijke grondstoffen per frame samen te tekenen in **één instanced GPU-opdracht**. Texturen worden bij herhaald tekenen hergebruikt, en passen zich aan bij het oogsten. De originele variatie, plaatsing en bekende rivier-/weg-uitsluitingen zijn behouden.
+
+Mobiel, geselecteerde/nabije Canvas-elementen en de gegarandeerde bessenstruiken bij dorpen blijven in hun bestaande Canvas 2D-pad. Als de videokaart ontbreekt, de atlas volloopt of de camera sterk inzoomt, blijft de oorspronkelijke Canvas-resourceweergave beschikbaar. Met `?gpuProps=off` kun je de GPU-grondstoffen apart uitschakelen. **Gebouwen, rook en het stromende water zijn nog geen onderdeel van deze GPU-update.**
 
 ## v1.3.53 — herkenbare GPU-soldaten en echte marcheerbeweging (update 305)
 
