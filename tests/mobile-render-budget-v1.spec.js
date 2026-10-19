@@ -43,7 +43,10 @@ test('orientation resize reapplies budget without changing touch coordinate spac
   const state = await page.evaluate(() => {
     const sx = 195;
     const sy = 422;
-    const before = window.__RTS_DEBUG__.worldToScreen(720, 900);
+    // The game's actual camera may already have advanced during startup.
+    // Verify a round-trip through the live camera instead of assuming the
+    // historical reset coordinates are still its center.
+    const before = window.__RTS_DEBUG__.worldToScreen(camera.x, camera.y);
     const canvas = document.getElementById('game');
     const rect = canvas.getBoundingClientRect();
     return {
@@ -57,7 +60,7 @@ test('orientation resize reapplies budget without changing touch coordinate spac
   expect(state.budget.reason).toBe('resize');
   expect(state.budget.renderDpr).toBe(1.5);
   // The public worldToScreen hook is the same coordinate path used by selection/rendering.
-  // After portrait resize the reset camera center must still map to CSS viewport center,
+  // After portrait resize the live camera center must map to CSS viewport center,
   // independently of the lower backing-store DPR.
   expect(Math.abs(state.cameraCenter.x - state.cssPoint.x)).toBeLessThan(0.01);
   expect(Math.abs(state.cameraCenter.y - state.cssPoint.y)).toBeLessThan(0.01);
