@@ -199,7 +199,9 @@
     }
     if (useUnitLod(unit)) {
       renderStats.lodUnits++;
-      drawUnitLod(unit);
+      // v304: far-away unselected infantry/cavalry/crew can be drawn in one
+      // shared GPU batch; the familiar Canvas LOD remains the full fallback.
+      if (!global.__GPU_UNITS_V304__?.enqueue?.(unit)) drawUnitLod(unit);
     } else {
       renderStats.fullUnits++;
       drawUnitBeforePerformanceV12(unit);
