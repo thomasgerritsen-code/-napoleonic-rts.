@@ -116,6 +116,64 @@ function buildTerrain() {
   scene.add(terrain);
 }
 
+let riverFlowV297=null;
+let riverWaterV297=null;
+function buildRiverV297(){
+  const r=window.__RIVER_GEOMETRY_V296__;
+  if(!r?.samples?.length)return;
+  const samples=r.samples,half=r.navHalfWidth||72;
+  function makeStrip(a,b){
+    const vertices=[],uv=[],faces=[];
+    for(let i=0;i<samples.length;i++){
+      const p=samples[i],t=r.tangentAtY(p.y),nx=t.y,nz=-t.x;
+      for(const [side,u]of [[a,0],[b,1]]){
+        const x=p.x+nx*side,z=p.y+nz*side;
+        const under=(r.crossings||[]).some(c=>Math.abs(z-c.y)<c.width*.64&&Math.abs(x-c.x)<c.length*.55);
+        vertices.push(x,hillHeightAt(x,z)+(under?-1.5:.8),z);
+        uv.push(u,i/12);
+      }
+      if(i){const k=i*2;faces.push(k-2,k-1,k,k-1,k+1,k);}
+    }
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+    geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+    geo.setIndex(faces);geo.computeVertexNormals();
+    return geo;
+  }
+  const surface=makeStrip(-half,half);
+  riverWaterV297=new THREE.Mesh(surface,new THREE.MeshStandardMaterial({
+    color:0x557e84,roughness:.86,metalness:0,side:THREE.DoubleSide
+  }));
+  riverWaterV297.name='river-water-v297';scene.add(riverWaterV297);
+  const bank=new THREE.Group();bank.name='river-banks-v297';
+  const dirt=new THREE.MeshStandardMaterial({color:0x817b5f,roughness:1,side:THREE.DoubleSide});
+  for(const [a,b]of [[-half-17,-half],[half,half+17]]){
+    const edge=new THREE.Mesh(makeStrip(a,b),dirt);
+    edge.position.y=-.12;bank.add(edge);
+  }
+  scene.add(bank);
+  riverFlowV297=new THREE.ShaderMaterial({
+    transparent:true,depthWrite:false,side:THREE.DoubleSide,
+    uniforms:{time:{value:0}},
+    vertexShader:`
+      varying vec2 vUv;
+      void main(){vUv=uv;vec3 p=position;p.y+=0.14;
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);}
+    `,
+    fragmentShader:`
+      uniform float time;varying vec2 vUv;
+      void main(){
+        float phase=vUv.y*14.0-time*1.7+sin(vUv.x*16.0+vUv.y*2.0)*.6;
+        float wave=smoothstep(.87,.995,sin(phase)*.5+.5);
+        float alpha=wave*.13+max(0.0,sin(vUv.y*43.0-time*2.9+vUv.x*18.0))*.025;
+        gl_FragColor=vec4(.78,.85,.81,alpha);
+      }
+    `
+  });
+  const ripples=new THREE.Mesh(surface,riverFlowV297);
+  ripples.name='river-current-v297';ripples.renderOrder=2;scene.add(ripples);
+}
+
 function buildRoads() {
   const roadGroup = new THREE.Group();
   roadGroup.name = 'roads-3d';
@@ -217,6 +275,7 @@ function buildFieldPatches() {
 
 buildTerrain();
 buildFieldPatches();
+buildRiverV297();
 buildRoads();
 buildVillages();
 
@@ -646,6 +705,7 @@ function render() {
     }
   }
   updateResources();
+  if(riverFlowV297)riverFlowV297.uniforms.time.value=clock.getElapsedTime();
   updateCamera();
   renderer.render(scene, camera3d);
 }
@@ -670,6 +730,9 @@ window.__BATTLEFIELD_3D_V1__ = Object.freeze({
       unitMeshes: unitMeshes.size,
       buildings: buildingMeshes.size,
       ironOutcrops: ironOreMesh?.count||0,
+      riverWaterMesh:!!riverWaterV297,
+      riverShoreBands:scene.getObjectByName('river-banks-v297')?.children.length||0,
+      riverCurrentTime:riverFlowV297?.uniforms.time.value??null,
       cameraDistance,
       cameraAzimuth,
       frames: renderFrame
