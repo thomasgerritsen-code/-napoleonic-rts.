@@ -180,7 +180,8 @@ test('v275 infantry square retains the mounted-charge counter without changing p
     const protection=strike('square');
     const unprotected=strike('line');
     Math.random=originalRandom;
-
+    // Restore the carré before checking the 2D defensive square outline.
+    regiment.formation='square';
     drawRegimentMarkers();
     return{
       protection,unprotected,

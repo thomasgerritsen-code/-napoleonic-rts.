@@ -15,6 +15,8 @@ test('v262-v266 2D march, black-powder effects, user-unlocked audio and utility 
     drawUnit(attacker);
     const idleSpeed=march.speedFor(attacker);
     window.RTS_SIM.step(.05);
+    // Sample real displacement after a guaranteed positive visual-clock step.
+    elapsed+=.1;
     attacker.x+=5;drawUnit(attacker);
     const moveSpeed=march.speedFor(attacker);
     const before={x:attacker.x,y:attacker.y};
