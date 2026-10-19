@@ -215,8 +215,83 @@ function buildFieldPatches() {
   scene.add(group);
 }
 
+// v297 riverbanks: a single low-profile 3D ribbon follows the EXACT
+// v296 gameplay samples supplied through NRTS_3D_SOURCE. No separate curve.
+const riverGeometry=staticWorld.river;
+let waterMesh3D=null,riverFlowMesh3D=null;
+let riverTime3D=0;
+function riverSample3D(y){
+  const ps=riverGeometry?.points||[];
+  if(ps.length<2)return null;
+  let lo=0,hi=ps.length-1;
+  while(lo+1<hi){const mid=(lo+hi)>>1;if(ps[mid].y<y)lo=mid;else hi=mid;}
+  const a=ps[lo],b=ps[hi],t=Math.max(0,Math.min(1,(y-a.y)/(b.y-a.y||1)));
+  const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
+  return{x:a.x+dx*t,y:a.y+dy*t,tx:dx/len,ty:dy/len};
+}
+function buildRiverRibbon3D(name,widthFactor,shoulder,lift,color,roughness=1){
+  const samples=riverGeometry?.points||[];
+  if(samples.length<2)return null;
+  const half=riverGeometry.navigationHalfWidth*widthFactor+shoulder;
+  const vertices=new Float32Array(samples.length*6),indices=[];
+  for(let i=0;i<samples.length;i++){
+    const p=samples[i],prev=samples[Math.max(0,i-1)],next=samples[Math.min(samples.length-1,i+1)];
+    const dx=next.x-prev.x,dz=next.y-prev.y,len=Math.hypot(dx,dz)||1;
+    const nx=-dz/len,nz=dx/len;
+    // Stream width undulates just a few units without changing collision.
+    const variation=2.8*Math.sin(p.y*.0045)+1.7*Math.sin(p.y*.012);
+    const w=half+variation;
+    for(let side=0;side<2;side++){
+      const sign=side===0?-1:1,x=p.x+sign*nx*w,z=p.y+sign*nz*w;
+      const offset=(i*2+side)*3;
+      vertices[offset]=x;vertices[offset+1]=hillHeightAt(x,z)+lift;vertices[offset+2]=z;
+    }
+    if(i){const k=(i-1)*2;indices.push(k,k+1,k+2,k+1,k+3,k+2);}
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(vertices,3));geo.setIndex(indices);geo.computeVertexNormals();
+  const mat=new THREE.MeshStandardMaterial({color,roughness,metalness:0.02,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(geo,mat);mesh.name=name;mesh.frustumCulled=false;scene.add(mesh);
+  return mesh;
+}
+function buildRiverScene3D(){
+  if(!riverGeometry?.points?.length)return;
+  buildRiverRibbon3D('river-damp-embankment-v297',1,20,0.65,0x6c7053,1);
+  buildRiverRibbon3D('river-silt-shore-v297',1,10,0.95,0x9d9876,1);
+  buildRiverRibbon3D('river-shallow-water-v297',1,3,1.22,0x6b938c,.48);
+  waterMesh3D=buildRiverRibbon3D('river-deep-water-v297',.83,0,1.45,0x3f7278,.33);
+  // Only one instanced draw call for all highlights; update matrices, never
+  // allocate new geometry/material while the game is running.
+  const count=48;
+  const mat=new THREE.MeshBasicMaterial({color:0xb9d1c5,transparent:true,opacity:.19,depthWrite:false,side:THREE.DoubleSide});
+  riverFlowMesh3D=new THREE.InstancedMesh(new THREE.BoxGeometry(1,.08,1),mat,count);
+  riverFlowMesh3D.name='river-moving-ripples-v297';
+  riverFlowMesh3D.frustumCulled=false;riverFlowMesh3D.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(riverFlowMesh3D);
+}
+function animateRiver3D(){
+  if(!riverFlowMesh3D || renderFrame%3!==0)return;
+  riverTime3D=clock.getElapsedTime();
+  const ps=riverGeometry.points;
+  const min=ps[0].y,max=ps[ps.length-1].y,span=max-min;
+  for(let i=0;i<riverFlowMesh3D.count;i++){
+    const y=min+((i*.61803398875*span+riverTime3D*(13+i%5*1.6))%span);
+    const point=riverSample3D(y);if(!point)continue;
+    const side=Math.sin(i*18.29)*riverGeometry.navigationHalfWidth*.63;
+    const x=point.x-point.ty*side,z=point.y+point.tx*side;
+    tempPosition.set(x,hillHeightAt(x,z)+1.8,z);
+    tempEuler.set(0,-Math.atan2(point.tx,point.ty),0);
+    tempQuaternion.setFromEuler(tempEuler);
+    tempScale.set(1.1,.8,10+i%4*3);
+    tempMatrix.compose(tempPosition,tempQuaternion,tempScale);
+    riverFlowMesh3D.setMatrixAt(i,tempMatrix);
+  }
+  riverFlowMesh3D.instanceMatrix.needsUpdate=true;
+}
+
 buildTerrain();
 buildFieldPatches();
+buildRiverScene3D();
 buildRoads();
 buildVillages();
 
@@ -646,6 +721,7 @@ function render() {
     }
   }
   updateResources();
+  animateRiver3D();
   updateCamera();
   renderer.render(scene, camera3d);
 }
@@ -670,6 +746,10 @@ window.__BATTLEFIELD_3D_V1__ = Object.freeze({
       unitMeshes: unitMeshes.size,
       buildings: buildingMeshes.size,
       ironOutcrops: ironOreMesh?.count||0,
+      riverSurfaceSegments:riverGeometry?.points?.length||0,
+      riverRibbonVisible:!!waterMesh3D,
+      riverRippleInstances:riverFlowMesh3D?.count||0,
+      riverAnimationClock:riverTime3D,
       cameraDistance,
       cameraAzimuth,
       frames: renderFrame
