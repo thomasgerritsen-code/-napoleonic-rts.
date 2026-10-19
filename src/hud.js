@@ -12,7 +12,7 @@
     selected.forEach(u => typeCounts[u.type] = (typeCounts[u.type] || 0) + 1);
     const typePart = Object.entries(typeCounts).sort().map(([k,v]) => `${k}:${v}`).join(',');
     const regPart = [...new Set(selected.map(u => u.regimentId).filter(Boolean))].sort().join(',');
-    const economyPart = `${Math.floor(economies.france.food)}:${Math.floor(economies.france.wood)}:${populationUsed('france')}:${economies.france.popCap}`;
+    const economyPart = `${Math.floor(economies.france.food)}:${Math.floor(economies.france.wood)}:${Math.floor(economies.france.iron)}:${elapsed>=120?'guns-open':'guns-locked'}:${populationUsed('france')}:${economies.france.popCap}`;
     return `${buildingPart}|${typePart}|${regPart}|economy:${economyPart}`;
   }
 
@@ -29,10 +29,14 @@
     const shortages = [];
     if ((info.cost.food || 0) > economy.food) shortages.push('food');
     if ((info.cost.wood || 0) > economy.wood) shortages.push('wood');
+    if ((info.cost.iron || 0) > economy.iron) shortages.push('iron');
+    if(type==='artillery' && elapsed<120) shortages.push('technology');
     if (populationUsed('france') + popRequired > economy.popCap) shortages.push('population');
     const reasons = [];
     if (shortages.includes('food')) reasons.push(`${Math.ceil((info.cost.food || 0) - economy.food)} eten`);
     if (shortages.includes('wood')) reasons.push(`${Math.ceil((info.cost.wood || 0) - economy.wood)} hout`);
+    if (shortages.includes('iron')) reasons.push(`${Math.ceil((info.cost.iron || 0) - economy.iron)} ijzer`);
+    if (shortages.includes('technology')) reasons.push(`artillerie beschikbaar na 120 seconden`);
     if (shortages.includes('population')) reasons.push(`${popRequired} populatieruimte`);
     return { info, popRequired, shortages, reasons };
   }
@@ -45,12 +49,14 @@
     const costs = [
       token(availability.info.cost.food, '🍞', 'food'),
       token(availability.info.cost.wood, '🪵', 'wood'),
+      token(availability.info.cost.iron, '⛏️', 'iron'),
       token(availability.popRequired, '👥', 'population')
     ].filter(Boolean).join(' · ');
     const button = makeDynamicButton(action, `${label}<br><small>${costs}</small>`, availability.shortages.length > 0);
     button.dataset.shortage = availability.shortages.join(',');
     button.dataset.costFood = String(availability.info.cost.food || 0);
     button.dataset.costWood = String(availability.info.cost.wood || 0);
+    button.dataset.costIron = String(availability.info.cost.iron || 0);
     button.dataset.costPopulation = String(availability.popRequired);
     const reason = availability.reasons.length
       ? `Niet beschikbaar: ${availability.reasons.join(' en ')} tekort.`
@@ -239,12 +245,13 @@
 
     setHudText(foodEl, Math.floor(economies.france.food));
     setHudText(woodEl, Math.floor(economies.france.wood));
+    setHudText(document.getElementById('iron'), Math.floor(economies.france.iron));
     setHudText(populationEl, `${populationUsed('france')}/${economies.france.popCap}`);
     setHudText(frenchCountEl, frenchLiving.length);
     setHudText(britishCountEl, britishLiving.length);
     setHudText(frenchRegimentsEl, frenchRegs.length);
 
-    setHudText(aiEconomyEl, `Economie: 🍞 ${Math.floor(economies.britain.food)} · 🪵 ${Math.floor(economies.britain.wood)} · 👥 ${populationUsed('britain')}/${economies.britain.popCap}`);
+    setHudText(aiEconomyEl, `Economie: 🍞 ${Math.floor(economies.britain.food)} · 🪵 ${Math.floor(economies.britain.wood)} · ⛏️ ${Math.floor(economies.britain.iron)} · 👥 ${populationUsed('britain')}/${economies.britain.popCap}`);
     setHudText(aiBuildingsEl, `Gebouwen: ${livingBuildings('britain').filter(b => b.complete).length} compleet`);
     setHudText(aiRegimentsEl, `Regimenten: ${britishRegs.length}`);
     setHudText(aiPlanEl, `Plan: ${aiPlan}`);
