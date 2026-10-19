@@ -78,8 +78,38 @@
     ];
   }
 
+  function riverSafe3DHouse(house){
+    if(typeof riverHitV067!=='function'||typeof RIVER_NAV_HALF_WIDTH_V067!=='number')
+      return true;
+    const hit=riverHitV067(house.x,house.y);
+    return !hit||hit.distance>=RIVER_NAV_HALF_WIDTH_V067+
+      (house.plotRadius||Math.hypot(house.w,house.h)*.5+10)+16;
+  }
+  function normalize3DScenery(house, canonical){
+    // Extra 3D silhouettes are render-only; they must never bypass the
+    // canonical village river/bridge clearance.
+    if(riverSafe3DHouse(house))return house;
+    for(let ring=1;ring<=20;ring++){
+      const radius=ring*18;
+      for(let k=0;k<24;k++){
+        const angle=k*Math.PI/12, x=house.x+Math.cos(angle)*radius;
+        const y=house.y+Math.sin(angle)*radius;
+        const moved={...house,x,y};
+        if(x<75||y<75||x>WORLD.width-75||y>WORLD.height-75 ||
+          !riverSafe3DHouse(moved))continue;
+        if(canonical.some(h=>Math.hypot(h.x-x,h.y-y)<
+          (h.plotRadius||Math.hypot(h.w,h.h)*.5+10)+house.plotRadius+6))continue;
+        return moved;
+      }
+    }
+    return null;
+  }
+
   function cloneVillages() {
-    const source = global.VILLAGE_SCENERY_V6 || (typeof VILLAGE_SCENERY_V069 === 'undefined' ? [] : VILLAGE_SCENERY_V069);
+    // Canonical V4 has the FINAL post-scale, collision- and water-safe
+    // coordinates. V6 has the un-normalized source and must not be rendered.
+    const source = global.VILLAGE_SCENERY_V4 || global.__VILLAGE_SCENERY_V4_DATA__ ||
+      global.VILLAGE_SCENERY_V6 || (typeof VILLAGE_SCENERY_V069 === 'undefined' ? [] : VILLAGE_SCENERY_V069);
     return source.map(village => {
       const cloned = {
         name: village.name,
@@ -98,10 +128,16 @@
           w: house.w,
           h: house.h,
           angle: house.angle || 0,
+          plotRadius: house.plotRadius || Math.hypot(house.w,house.h)*.5+10,
           renderOnly: false
         }))
       };
-      cloned.houses.push(...archetypeScenery({ ...village, archetype: cloned.archetype }));
+      const silhouettes=archetypeScenery({ ...village, archetype: cloned.archetype });
+      for(const silhouette of silhouettes){
+        silhouette.plotRadius=Math.hypot(silhouette.w,silhouette.h)*.5+10;
+        const safe=normalize3DScenery(silhouette,cloned.houses);
+        if(safe)cloned.houses.push(safe);
+      }
       cloned.renderOnlySceneryCount = cloned.houses.filter(house => house.renderOnly).length;
       return cloned;
     });
@@ -171,7 +207,7 @@
   }
 
   const api = Object.freeze({
-    version: 'battlefield-3d-bridge-v1.3.22',
+    version: 'battlefield-3d-bridge-v1.3.43',
     snapshotMode: 'lightweight-live-render-state',
     snapshotAllocationMode: 'single-pass-live-collections',
     villageMetadata: 'archetype-zone-cluster-role-render-only',
