@@ -38,6 +38,17 @@
     return roofEdgeGap >= 9 && nearest.edgeClearance <= 185;
   }
 
+  // Check the complete village plot rather than the house center. Using the
+  // raw river geometry also excludes bridge decks (waterAtV067 is intentionally
+  // false there for soldiers and carts).
+  function clearOfRiver(candidate, radius) {
+    if (typeof riverHitV067 !== 'function' ||
+        typeof RIVER_NAV_HALF_WIDTH_V067 !== 'number') return true;
+    const hit=riverHitV067(candidate.x,candidate.y);
+    const shoreMargin=16;
+    return !hit || hit.distance >= RIVER_NAV_HALF_WIDTH_V067 + radius + shoreMargin;
+  }
+
   function withinWorld(candidate, radius) {
     const margin = radius + 10;
     return candidate.x >= margin && candidate.y >= margin &&
@@ -63,6 +74,7 @@
 
   function safeCandidate(candidate, radius, occupied) {
     return withinWorld(candidate,radius) &&
+      clearOfRiver(candidate,radius) &&
       clearOfRoads(candidate) &&
       clearOfGameplayBuildings(candidate,radius) &&
       clearOfOccupied(candidate,radius,occupied);
@@ -172,7 +184,9 @@
     globalSeparation:true,
     includesRenderedYards:true,
     activeRoadNetworkAware:true,
-    hiddenLegacyRoadsIgnored:true
+    hiddenLegacyRoadsIgnored:true,
+    dryRiverPlots:true,
+    clearOfRiver
   });
 
   global.__VILLAGE_COLLISION_V4__ = api;

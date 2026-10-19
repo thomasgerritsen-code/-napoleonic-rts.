@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.42
+# Napoleonic RTS — v1.3.43
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.43 — woningen en dorpen op droge oevers (update 295)
+
+Dorpshuizen worden bij het vastleggen van de kaartlocaties gecontroleerd tegen de volledige rivierstrook, inclusief brugdekken, natte oevers en de oppervlakte van het hele erf. Een botsend huis krijgt een andere veilige locatie; zonder geschikte locatie wordt het overgeslagen. Ook bouwbare huizen en andere gebouwen krijgen deze controle. De 2D- en 3D-scènes gebruiken dezelfde vaste posities en de mars- en brugsystemen blijven ongewijzigd.
+
+De browsertest `tests/dry-village-footprints-v295.spec.js` controleert huislocaties en erven, bruglocaties, 3D-huizen en drie opeenvolgende resets.
 
 ## v1.3.42 — bomen en bessenstruiken buiten het water (update 294)
 

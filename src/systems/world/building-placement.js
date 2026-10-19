@@ -54,8 +54,18 @@
     return villageClearanceForBuilding(type, x, y) >= margin;
   }
 
+  function clearOfRiver(type,x,y) {
+    if (typeof riverHitV067 !== 'function' ||
+        typeof RIVER_NAV_HALF_WIDTH_V067 !== 'number') {
+      return typeof waterAtV067 !== 'function' || !waterAtV067(x,y);
+    }
+    const hit=riverHitV067(x,y);
+    return !hit || hit.distance >= RIVER_NAV_HALF_WIDTH_V067+footprintRadius(type)+18;
+  }
+
   function clearPlacement(type,x,y) {
-    return clearOfRoad(type,x,y,10) && clearOfVillage(type,x,y,14);
+    return clearOfRiver(type,x,y) &&
+      clearOfRoad(type,x,y,10) && clearOfVillage(type,x,y,14);
   }
 
   function nearestPlacementSafePosition(type, x, y) {
@@ -127,6 +137,8 @@
     villageClearance: villageClearanceForBuilding,
     clearOfRoad,
     clearOfVillage,
+    clearOfRiver,
+    riverShoreClearance:true,
     nearestSafe: nearestPlacementSafePosition,
     villageObstacleCount: villageStructures().length,
     roadCount: activeRoadNetwork.length,
