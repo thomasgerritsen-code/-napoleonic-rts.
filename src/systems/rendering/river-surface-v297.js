@@ -84,7 +84,9 @@
     ribbon(RIVER_NAV_HALF_WIDTH_V067-5,'rgba(119,148,130,.91)');
     ribbon(RIVER_NAV_HALF_WIDTH_V067-15,'rgba(80,128,133,.91)');
     ribbon(RIVER_NAV_HALF_WIDTH_V067-32,'rgba(52,97,114,.62)');
-    drawFlow(typeof elapsed==='number'?elapsed:0);
+    // Desktop tiles contain only stationary water color; animate the flow
+    // separately over cached terrain every frame. Mobile retains its old path.
+    if(!global.__STATIC_TERRAIN_CAPTURE_V301__)drawFlow(typeof elapsed==='number'?elapsed:0);
     ctx.restore();
   };
   global.__RIVER_SURFACE_V297__=Object.freeze({
