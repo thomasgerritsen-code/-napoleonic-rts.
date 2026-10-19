@@ -40,6 +40,25 @@
     fields.push({x:120+rand()*(WORLD.width-240-w),y:130+rand()*(WORLD.height-260-h),w,h,angle:(rand()-.5)*.13,tone:i%3,rows:7+Math.floor(rand()*7)});
   }
 
+  // v300: Field furrows and their road clearance never change at runtime.
+  // Precompute a local-coordinate Path2D instead of testing every little field
+  // segment against every road on each desktop camera redraw.
+  const fieldRowPaths=fields.map(f=>{
+    const path=new Path2D();
+    const centerX=f.x+f.w/2,centerY=f.y+f.h/2;
+    const ca=Math.cos(f.angle),sa=Math.sin(f.angle),spacing=f.h/f.rows;
+    for(let y=-f.h/2+spacing;y<f.h/2;y+=spacing){
+      const start=-f.w/2+5,end=f.w/2-5,step=18;
+      for(let x=start;x<end;x+=step){
+        const x2=Math.min(end,x+step),mx=(x+x2)/2;
+        const wx=centerX+mx*ca-y*sa,wy=centerY+mx*sa+y*ca;
+        if(roadConflictAt(wx,wy,2))continue;
+        path.moveTo(x,y);path.lineTo(x2,y);
+      }
+    }
+    return path;
+  });
+
   // v1.3.2: static map texture positions are generated once. Previously all 900
   // deterministic ground marks were recalculated and redrawn across the entire world every frame.
   const groundMarks=[];
@@ -117,16 +136,8 @@
       ctx.save();ctx.translate(centerX,centerY);ctx.rotate(f.angle);
       ctx.fillStyle=f.tone===0?'rgba(154,145,88,.20)':f.tone===1?'rgba(130,126,78,.17)':'rgba(175,157,101,.16)';ctx.fillRect(-f.w/2,-f.h/2,f.w,f.h);
       ctx.strokeStyle='rgba(96,82,53,.25)';ctx.lineWidth=1.6;ctx.strokeRect(-f.w/2,-f.h/2,f.w,f.h);
-      ctx.strokeStyle='rgba(88,75,45,.15)';ctx.lineWidth=1;const spacing=f.h/f.rows;
-      for(let y=-f.h/2+spacing;y<f.h/2;y+=spacing){
-        const start=-f.w/2+5,end=f.w/2-5,step=18;
-        for(let x=start;x<end;x+=step){
-          const x2=Math.min(end,x+step),mx=(x+x2)/2;
-          const wx=centerX+mx*ca-y*sa,wy=centerY+mx*sa+y*ca;
-          if(roadConflictAt(wx,wy,2))continue;
-          ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y);ctx.stroke();
-        }
-      }
+      ctx.strokeStyle='rgba(88,75,45,.15)';ctx.lineWidth=1;
+      ctx.stroke(fieldRowPaths[index]);
       if(index%3===0){ctx.strokeStyle='rgba(75,70,43,.30)';ctx.lineWidth=2.3;ctx.beginPath();ctx.moveTo(-f.w/2,-f.h/2);ctx.lineTo(f.w/2,-f.h/2);ctx.stroke();}
       ctx.restore();
     });
@@ -142,7 +153,8 @@
     ctx.save();ctx.fillStyle='rgba(39,67,38,.15)';ctx.beginPath();
     data.outline.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);});ctx.closePath();ctx.fill();
     for(const tree of data.trees){
-      if(!pointVisible(bounds,tree.x,tree.y,16)||roadConflictAt(tree.x,tree.y,tree.canopy)||!dryCanopy(tree.x,tree.y,tree.canopy))continue;
+      // The road/river clearance was already validated when this tree was made.
+      if(!pointVisible(bounds,tree.x,tree.y,16))continue;
       ctx.fillStyle='rgba(29,65,34,.58)';ctx.beginPath();ctx.arc(tree.x,tree.y,tree.canopy,0,Math.PI*2);ctx.fill();
       ctx.fillStyle='rgba(83,112,61,.32)';ctx.beginPath();ctx.arc(tree.x-2,tree.y-2,tree.canopy*.55,0,Math.PI*2);ctx.fill();
     }
@@ -209,6 +221,8 @@
     precomputedGroundMarks:true,
     precomputedRoadPaths:true,
     precomputedJunctions:true,
+    precomputedFieldRows:true,
+    precomputedWoodClearance:true,
     roadClearance2D:true,
     vegetationRoadPadding,
     waterVegetationClearance:true,
