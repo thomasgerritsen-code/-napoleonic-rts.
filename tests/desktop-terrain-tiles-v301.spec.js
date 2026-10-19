@@ -31,6 +31,11 @@ test('desktop terrain tile cache survives small pans, replaces only uncovered ti
       // An immediate repeat never rasterizes terrain.
       draw();
       const repeat = cache.stats();
+      // Explicitly center on the river to test actual moving water, rather
+      // than depending on whether the final army camera can see the river.
+      camera.x = window.__RIVER_GEOMETRY_V296__.centerAt(900);
+      camera.y = 900;
+      draw();
       return {
         first, smallPan, largePan, repeat,
         api:window.__LARGE_ARMY_PERFORMANCE_V1__.worldAlignedTerrainTiles,
