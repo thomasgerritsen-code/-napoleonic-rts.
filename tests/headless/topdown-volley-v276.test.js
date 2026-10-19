@@ -6,7 +6,6 @@ const {runInNewContext}=require('node:vm');
 
 const source=readFileSync('src/systems/rendering/topdown-volley-v271.js','utf8');
 function setup(){
-  let use3D=false;
   const ellipses=[],labels=[];
   const ctx={
     save(){},restore(){},beginPath(){},fill(){},
@@ -17,7 +16,6 @@ function setup(){
     engagementV069:{mode:'fire'},memberIds:[]};
   const root={
     NRTS:{subsystems:{register(){}}},
-    __BATTLEFIELD_3D_V1__:{enabled:()=>use3D},
     __MAP_AMBIENT_MOTION_V1__:{currentWind:()=>({x:1,y:0,strength:1})}
   };
   const world={
@@ -29,7 +27,7 @@ function setup(){
     resetGame(){}
   };
   runInNewContext(source,world,{filename:'topdown-volley-v271.js'});
-  return{world,root,regiment,ellipses,labels,set3D:v=>{use3D=v;}};
+  return{world,root,regiment,ellipses,labels};
 }
 function shoot(world,i){
   const u={id:i+1,kind:'unit',type:'infantry',regimentId:271777,
@@ -54,8 +52,8 @@ test('v276 twelve-musket volley produces spatial muzzle smoke, not an arcade rin
   assert.equal(api.stats().grouped,11);
   assert.equal(api.stats().maxDrawPuffs,240);
 });
-test('v276 effects are capped, disabled in 3D and cleared on reset',()=>{
-  const{world,root,set3D,ellipses}=setup();
+test('v276 effects are capped, remain active in 2D and clear on reset',()=>{
+  const{world,root,ellipses}=setup();
   for(let i=0;i<50;i++)shoot(world,i);
   const api=root.__TOPDOWN_VOLLEY_V271__;
   assert.equal(api.groups()[0].count,50);
@@ -63,11 +61,9 @@ test('v276 effects are capped, disabled in 3D and cleared on reset',()=>{
   world.drawParticles();
   assert(ellipses.length<=api.stats().maxDrawPuffs);
   const before=api.stats().shots;
-  set3D(true);
   shoot(world,50);
   world.drawParticles();
-  assert.equal(api.stats().shots,before);
-  set3D(false);
+  assert.equal(api.stats().shots,before+1);
   world.resetGame();
   assert.equal(api.groups().length,0);
 });

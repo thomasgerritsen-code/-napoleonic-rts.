@@ -8,7 +8,7 @@ const characters=readFileSync('src/systems/rendering/characters.js','utf8');
 const volleys=readFileSync('src/systems/rendering/topdown-volley-v271.js','utf8');
 
 function fixture(){
-  let is3D=false,fireCount=0;
+  let fireCount=0;
   const registry=new Map();
   const context={
     elapsed:10,volleyClock:2.95,
@@ -28,7 +28,6 @@ function fixture(){
     engagementV069:{mode:'fire'},memberIds:[]};
   const root={
     NRTS:{subsystems:{register(name,api){registry.set(name,api);},has:()=>false}},
-    __BATTLEFIELD_3D_V1__:{enabled:()=>is3D},
     __COMBAT_ANIMATIONS_V1__:{animationFor:u=>{
       const event=u.combatVisualV1;
       if(!event)return null;
@@ -44,7 +43,7 @@ function fixture(){
     side:'france',regimentId:regiment.id,dead:false,routing:false,
     reload:.15,attackMode:'fire',facing:0,combatVisualV1:null});
   return{context,root,regiment,soldier,
-    fireCount:()=>fireCount,set3D:value=>{is3D=value;}};
+    fireCount:()=>fireCount};
 }
 
 test('v277 preparatory aiming is staggered visually but never fires early',()=>{
@@ -61,8 +60,8 @@ test('v277 preparatory aiming is staggered visually but never fires early',()=>{
   f.regiment.crossingTrafficV068={forcedColumn:true,state:'crossing'};
   assert.equal(f.root.__TOPDOWN_VOLLEY_V271__.preFirePose(blocked),null);
   f.regiment.crossingTrafficV068=null;
-  f.set3D(true);
-  assert.equal(f.root.__TOPDOWN_VOLLEY_V271__.preFirePose(blocked),null);
+  assert.equal(f.root.__TOPDOWN_VOLLEY_V271__.preFirePose(blocked)?.phase,'aim');
+  assert.equal(f.fireCount(),0);
 });
 
 test('v277 muzzle flash starts exactly on a shot; recoil varies without moving the soldier',()=>{
