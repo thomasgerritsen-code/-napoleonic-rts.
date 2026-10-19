@@ -305,15 +305,6 @@
   resize2DCanvasForPerformance();
   refreshCameraFrame();
 
-  addEventListener('load', () => {
-    const params = new URLSearchParams(location.search);
-    const explicit3D = params.get('view') === '3d' || params.get('test') === '3d';
-    if (!explicit3D && global.__BATTLEFIELD_3D_V1__?.enabled?.()) {
-      global.__BATTLEFIELD_3D_V1__.setEnabled(false);
-      statusEl.textContent = '2D-weergave actief · geoptimaliseerd voor vloeiende grote veldslagen.';
-    }
-  }, { once:true });
-
   const api = Object.freeze({
     version: 'large-army-v1.3.2',
     combatCellSize: CELL,

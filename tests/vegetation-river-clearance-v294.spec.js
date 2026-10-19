@@ -78,28 +78,3 @@ test('v294 harvestable trees and berries stay clear of all riverbanks and bridge
   }
 });
 
-test('v294 dry vegetation stays harvestable and hidden from river in 3D scene',async({page})=>{
-  const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('/?test=3d',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>Boolean(
-    window.NRTS_3D_SOURCE && window.__BATTLEFIELD_ECOLOGY_V1__?.riverbankConflict &&
-    window.__BATTLEFIELD_3D_V1__?.diagnostics()
-  ),null,{timeout:25000});
-  const out=await page.evaluate(()=>{
-    const eco=window.__BATTLEFIELD_ECOLOGY_V1__;
-    const nature=window.NRTS_3D_SOURCE.resources().filter(r=>
-      !r.dead&&['wood','food'].includes(r.type));
-    return{total:nature.length,bad:nature.filter(r=>eco.riverbankConflict(r.type,r.x,r.y))
-      .map(r=>({id:r.id,type:r.type})),
-      trees:nature.filter(r=>r.type==='wood').length,
-      berries:nature.filter(r=>r.type==='food').length,
-      oreDry:window.NRTS_3D_SOURCE.resources()
-        .filter(r=>r.type==='iron'&&!r.dead)
-        .every(r=>!eco.oreShoreConflict(r.x,r.y))};
-  });
-  expect(errors).toEqual([]);
-  expect(out.trees).toBeGreaterThan(30);
-  expect(out.berries).toBeGreaterThan(20);
-  expect(out.bad).toEqual([]);
-  expect(out.oreDry).toBe(true);
-});

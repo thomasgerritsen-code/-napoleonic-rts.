@@ -4,24 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="theme-color" content="#111713" />
-  <title>Napoleonic RTS v1.3.49</title>
+  <title>Napoleonic RTS v1.3.50</title>
   <link rel="stylesheet" href="style.css?build=194victory" />
   <link rel="stylesheet" href="v05.css" />
   <link rel="stylesheet" href="v06.css" />
   <link rel="stylesheet" href="v062.css" />
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js"
-    }
-  }
-  </script>
 </head>
 <body>
 <div id="app">
   <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
   <header class="hud topbar">
-    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v1.3.49</span></div>
+    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v1.3.50</span></div>
     <div class="resources"><span>🇫🇷 🍞 <strong id="food">0</strong></span><span>🪵 <strong id="wood">0</strong></span><span>⛏️ <strong id="iron">0</strong></span><span>👥 <strong id="population">0/0</strong></span></div>
     <div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button>
   </header>
@@ -35,7 +28,7 @@
   <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div><div id="message" class="message hidden"></div>
 </div>
 <script src="src/foundation/deployment-info.js?build=local"></script>
-<script src="src/foundation/version.js?build=300a"></script>
+<script src="src/foundation/version.js?build=302a"></script>
 <script src="src/foundation/runtime.js?build=arch21"></script>
 <script src="src/foundation/config.js?build=281a"></script>
 <script src="src/foundation/contracts.js"></script>
@@ -161,16 +154,7 @@
 <script src="src/test-lab.js?build=100b"></script>
 <script src="src/systems/diagnostics/game-health-observer-v1.js?build=health1"></script>
 <script src="src/foundation/legacy-facades.js?build=259a"></script>
-<script src="src/systems/rendering/battlefield-3d-bridge-v1.js?build=297a"></script>
 <script>window.RTS_VERSION_INFO?.apply();</script>
 <script type="module" src="src/systems/movement/march-lab-live-v253.mjs?build=261a"></script>
-<script type="module" src="src/systems/rendering/battlefield-3d-scene-hook-v1.mjs?build=1320a"></script>
-<script type="module" src="src/systems/rendering/battlefield-3d-v1.mjs?build=297a"></script>
-<script type="module" src="src/systems/rendering/battlefield-3d-order-feedback-v1.mjs?build=1321a"></script>
-<script type="module" src="src/systems/rendering/battlefield-3d-water-v297.mjs?build=297a"></script>
-<script type="module" src="src/systems/rendering/battlefield-3d-village-buildings-v1.mjs?build=1310a"></script>
-<script type="module" src="src/systems/rendering/battlefield-3d-village-props-v1.mjs?build=1312a"></script>
-<script type="module" src="src/systems/rendering/battlefield-3d-village-groundwear-v1.mjs?build=1312a"></script>
-<script type="module" src="src/systems/rendering/battlefield-3d-village-landscape-v1.mjs?build=139a"></script>
 </body>
 </html>
