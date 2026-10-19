@@ -18,9 +18,9 @@ test('artillery cannon and crew move as one stable compound unit and deploy with
     window.__RTS_DEBUG__.setPeaceMode(true);
     // v292 removes the free opening guns. Explicitly create the artillery
     // fixture to keep testing the same battery movement behaviour.
-    const fixtureGun=createUnit('france','artillery',720,1210);
-    const fixtureCrew=[createUnit('france','infantry',696,1190),
-      createUnit('france','infantry',696,1230)];
+    const fixtureGun=createUnit('france','artillery',620,1210);
+    const fixtureCrew=[createUnit('france','infantry',596,1190),
+      createUnit('france','infantry',596,1230)];
     const battery=createArtilleryBatteryV06('france',fixtureGun,fixtureCrew);
     selectWholeRegiment(battery);
     const reg=regiments.find(r=>!r.destroyed && r.side==='france' && groupKindV06(r)==='artillery');
@@ -95,6 +95,7 @@ test('artillery cannon and crew move as one stable compound unit and deploy with
   expect(result.error).toBeUndefined();
   expect(result.subsystem?.meta?.phase).toBe('architecture-v2');
   expect(result.subsystem?.meta?.legacyBridge).toBe(false);
+  console.log('V292_ARTILLERY_MOVEMENT',JSON.stringify({sawTravel:result.sawTravel,distanceMoved:result.distanceMoved,modeChanges:result.modeChanges,first:result.lastFive?.[0],final:result.final}));
   expect(result.sawTravel).toBe(true);
   expect(result.distanceMoved).toBeGreaterThan(60);
   expect(result.modeChanges).toBeLessThanOrEqual(2);
