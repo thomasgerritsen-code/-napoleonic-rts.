@@ -51,7 +51,7 @@ test('v292 French miners deliver iron and new foundry plus cannon spend its stoc
     const canBuildBefore=canAfford('france',BUILDINGS.foundry.cost);
     const canTrainBefore=canAfford('france',TRAINING.artillery.cost);
     const beforeFoundry={food:economies.france.food,wood:economies.france.wood,iron:economies.france.iron};
-    __RTS_DEBUG__.grantResources('france',200,500,150);
+    __RTS_DEBUG__.grantResources('france',200,500,350);
     let spot=null;
     for(let x=1050;x<1550&&!spot;x+=90)for(let y=450;y<1600&&!spot;y+=130)
       if(validBuildingSpot('foundry',x,y))spot={x,y};
