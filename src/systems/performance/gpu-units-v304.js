@@ -8,12 +8,13 @@
   const canvas=document.getElementById('game-terrain-gpu');
   const disabledByQuery=new URLSearchParams(location.search).get('gpuUnits')==='off';
   const gl=terrain?.available?.()&&canvas?.getContext('webgl2');
-  const STRIDE=6,MAX_UNITS=4096;
+  const STRIDE=8,MAX_UNITS=4096;
   let program=null,vao=null,buffer=null,vertex=null;
   let uCamera=null,uResolution=null,uDpr=null;
   let failed=false,count=0,instances=new Float32Array(512*STRIDE);
+  const lastMotion=new Map();
   const stats={drawCalls:0,soldiers:0,uploads:0,fallbacks:0,
-    failures:0,discardedOnReset:0};
+    failures:0,discardedOnReset:0,animatedSoldiers:0,motionSamples:0};
   const kindByType={infantry:0,cavalry:1,officer:2,drummer:3,worker:4};
 
   function compile(type,source){
@@ -31,9 +32,11 @@
       'layout(location=0) in vec2 corner;',
       'layout(location=1) in vec3 posAngle;',
       'layout(location=2) in vec3 typeSideRouting;',
+      'layout(location=3) in vec2 gait;',
       'uniform vec3 cameraPose;','uniform vec2 resolution;',
       'uniform float dpr;','out vec2 local;',
       'flat out vec3 soldier;',
+      'flat out vec2 animation;',
       'void main(){',
       'local=(corner*2.0-1.0)*20.0;',
       'float c=cos(posAngle.z),s=sin(posAngle.z);',
@@ -42,6 +45,7 @@
       'vec2 p=center+(posAngle.xy+turned-cameraPose.xy)*cameraPose.z*dpr;',
       'gl_Position=vec4(p.x*2.0/resolution.x-1.0,1.0-p.y*2.0/resolution.y,0.0,1.0);',
       'soldier=typeSideRouting;',
+      'animation=gait;',
       '}'
     ].join('\n'));
     const f=compile(gl.FRAGMENT_SHADER,[
@@ -132,6 +136,9 @@
     gl.enableVertexAttribArray(2);
     gl.vertexAttribPointer(2,3,gl.FLOAT,false,STRIDE*4,3*4);
     gl.vertexAttribDivisor(2,1);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3,2,gl.FLOAT,false,STRIDE*4,6*4);
+    gl.vertexAttribDivisor(3,1);
     gl.bindVertexArray(null);
     uCamera=gl.getUniformLocation(program,'cameraPose');
     uResolution=gl.getUniformLocation(program,'resolution');
@@ -157,6 +164,22 @@
     instances[i+3]=kind;
     instances[i+4]=unit.side==='britain'?1:0;
     instances[i+5]=unit.routing?1:0;
+    // Only real physical displacement advances the leg movement. A regiment
+    // blocked before a bridge must stand, not march on the spot.
+    const now=Number(elapsed)||0;
+    const prev=lastMotion.get(unit.id);
+    let gait=0;
+    if(prev && now>prev.time && now-prev.time<.8){
+      const dt=now-prev.time;
+      const displacement=Math.hypot(unit.x-prev.x,unit.y-prev.y);
+      const speed=displacement/dt;
+      if(speed>1.5 && speed<250 && displacement<30)gait=Math.min(1,speed/75);
+      stats.motionSamples++;
+    }
+    lastMotion.set(unit.id,{x:unit.x,y:unit.y,time:now});
+    instances[i+6]=(now*1.85+(unit.id%11)*.37)*6.2831853;
+    instances[i+7]=gait;
+    if(gait>0.05)stats.animatedSoldiers++;
     count++;return true;
   }
   function flush(){
@@ -196,10 +219,11 @@
     program=null;vao=null;buffer=null;vertex=null;failed=false;
   });
   root.NRTS?.events?.on?.('game:reset',()=>{
-    stats.discardedOnReset+=count;count=0;
+    stats.discardedOnReset+=count;count=0;lastMotion.clear();
   });
   const api=Object.freeze({
-    version:'304.0',desktopOnly:true,lowZoomOnly:true,
+    version:'305.0',desktopOnly:true,lowZoomOnly:true,
+    enhancedUniforms:true,actualMovementGait:true,
     no3D:true,artilleryUnchanged:true,active,enqueue,flush,
     metrics:()=>({...stats,active:active(),queued:count,maxUnits:MAX_UNITS,
       disabledByQuery})
@@ -207,6 +231,6 @@
   root.__GPU_UNITS_V304__=api;
   root.NRTS?.subsystems?.register?.('gpu-units-v304',api,{
     phase:'rendering',legacyBridge:false,
-    responsibility:'single WebGL2 instanced batch of distant 2D soldiers'
+    responsibility:'single WebGL2 instanced batch of detailed distant 2D soldiers with displacement-driven gait'
   });
 })(window);
