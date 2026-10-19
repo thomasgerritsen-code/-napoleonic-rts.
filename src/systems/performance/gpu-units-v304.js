@@ -39,13 +39,12 @@ void main() {
   vec2 offset=vec2(aCorner.x*heading.x-aCorner.y*heading.y,
                    aCorner.x*heading.y+aCorner.y*heading.x);
   vec2 world=iWorld+offset*18.0;
-  float dpr=uViewport.x/float(${'max(1.0,innerWidth)'}); // overwritten below
   vec2 screen=(world-uCamera.xy)*uCamera.z+uViewport*.5;
   gl_Position=vec4(screen.x*2.0/uViewport.x-1.0,
      1.0-screen.y*2.0/uViewport.y,0.0,1.0);
   vLocal=aCorner;
   vStyle=iStyle;
-}`.replace('','');
+}`;
   const fragmentShader = `#version 300 es
 precision mediump float;
 in vec2 vLocal;
