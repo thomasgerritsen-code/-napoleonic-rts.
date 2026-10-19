@@ -343,7 +343,10 @@ function updateBuildings(snapshot) {
 }
 
 function resourceSignature(resources) {
-  return `${resources.length}:${resources.slice(0, 12).map(r => `${r.id}:${Math.round(r.amount || 0)}`).join('|')}`;
+  // Ore depletion changes the visible rock count even when the first twelve
+  // resource items (mostly wood) did not change.
+  const ore=resources.filter(r=>r.type==='iron' && !r.dead && r.amount>0);
+  return `${resources.length}:${resources.slice(0, 12).map(r => `${r.id}:${Math.round(r.amount || 0)}`).join('|')}:${ore.map(r=>r.id).join(',')}`;
 }
 
 function rebuildTrees(resources) {
@@ -381,6 +384,41 @@ function rebuildTrees(resources) {
   scene.add(treeTrunks, treeCrowns);
 }
 
+let ironOreMesh = null;
+function rebuildIronFieldstones(resources) {
+  if (ironOreMesh) {
+    scene.remove(ironOreMesh);
+    ironOreMesh.geometry.dispose();
+    ironOreMesh.material.dispose();
+    ironOreMesh=null;
+  }
+  const ore=resources.filter(r=>r.type==='iron'&&!r.dead&&r.amount>0).slice(0,300);
+  if (!ore.length) return;
+  // One low, irregular stone per deposit. Bury the lower half in ground so
+  // it reads as a weathered outcrop, not a tall isolated metallic obstacle.
+  ironOreMesh=new THREE.InstancedMesh(
+    new THREE.DodecahedronGeometry(1,0),
+    new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,flatShading:true}),
+    ore.length
+  );
+  ironOreMesh.name='iron-ore-fieldstones-v293';
+  ironOreMesh.frustumCulled=false;
+  const palette=[0x767366,0x666f64,0x857c6b,0x727766];
+  ore.forEach((r,i)=>{
+    const seed=(Math.imul(r.id||1,2654435761) ^ Math.imul(Math.round(r.x),73856093))>>>0;
+    const angle=(seed%6283)/1000;
+    tempEuler.set(0,angle,(seed%7-3)*.075);
+    tempQuaternion.setFromEuler(tempEuler);
+    tempPosition.set(r.x,hillHeightAt(r.x,r.y)+1.5,r.y);
+    tempScale.set(7+seed%5,4.2+(seed%4)*.6,8+((seed>>>7)%4));
+    tempMatrix.compose(tempPosition,tempQuaternion,tempScale);
+    ironOreMesh.setMatrixAt(i,tempMatrix);
+    ironOreMesh.setColorAt(i,new THREE.Color(palette[seed%palette.length]));
+  });
+  ironOreMesh.instanceMatrix.needsUpdate=true;
+  if(ironOreMesh.instanceColor)ironOreMesh.instanceColor.needsUpdate=true;
+  scene.add(ironOreMesh);
+}
 function updateResources() {
   if (renderFrame % 90 !== 1) return;
   const resources = source.resources();
@@ -388,6 +426,7 @@ function updateResources() {
   if (signature === lastResourceSignature) return;
   lastResourceSignature = signature;
   rebuildTrees(resources);
+  rebuildIronFieldstones(resources);
 }
 
 function updateCamera() {
@@ -630,6 +669,7 @@ window.__BATTLEFIELD_3D_V1__ = Object.freeze({
       villages: staticWorld.villages?.length || 0,
       unitMeshes: unitMeshes.size,
       buildings: buildingMeshes.size,
+      ironOutcrops: ironOreMesh?.count||0,
       cameraDistance,
       cameraAzimuth,
       frames: renderFrame
