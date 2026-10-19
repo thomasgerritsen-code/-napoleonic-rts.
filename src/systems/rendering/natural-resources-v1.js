@@ -31,6 +31,11 @@
     return false;
   }
 
+  function overlapsRiver(r,ratio=1){
+    const ecology=global.__BATTLEFIELD_ECOLOGY_V1__;
+    return !!r && !!ecology?.riverbankConflict?.(r.type,r.x,r.y,visualRadius(r,ratio));
+  }
+
   function drawTree(r,ratio){
     const scale=(cfg.treeCanopyScale??1.18)*(0.88+ratio*.16);
     const base=16.5*scale;
@@ -125,7 +130,7 @@
   }
 
   function drawFoodResource(r,ratio){
-    if(overlapsRoad(r,ratio))return false;
+    if(overlapsRoad(r,ratio)||overlapsRiver(r,ratio))return false;
     drawBerryBush(r,ratio);
     foodDraws++;
     if(r.localVillageBerry===true)localVillageBerryDraws++;
@@ -139,7 +144,7 @@
     // pass below. This prevents later viewport/performance wrappers from silently
     // removing the bushes while still allowing them to cull ordinary resources.
     if(r.localVillageBerry===true)return;
-    if(overlapsRoad(r,ratio))return;
+    if(overlapsRoad(r,ratio)||overlapsRiver(r,ratio))return;
     if(r.type==='wood')drawTree(r,ratio);
     else if(r.type==='iron')drawIronOre(r,ratio);
     else drawFoodResource(r,ratio);
@@ -177,6 +182,8 @@
     explicitLocalBerry2DPass:true,
     ecologyAware:Boolean(global.__BATTLEFIELD_ECOLOGY_V1__),
     roadRenderGuard:true,
+    riverRenderGuard:true,
+    overlapsRiver,
     oreNaturalBlend:true,
     overlapsRoad,
     diagnostics:()=>({foodDraws,localVillageBerryDraws,localOverlayFrames})
