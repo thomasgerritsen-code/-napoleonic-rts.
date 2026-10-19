@@ -17,5 +17,7 @@ test('the 2D-only game contains no 3D renderer source or Three.js runtime entryp
   assert.doesNotMatch(html,/battlefield-3d|type="importmap"|three\.module\.js|battlefield3d/i);
   assert.doesNotMatch(css,/\.battlefield-3d-canvas|\.render-mode-button/);
   const symbols=/__BATTLEFIELD_3D|NRTS_3D_SOURCE|__NRTS_THREE_SCENE__|renderModeBtn|battlefield3d|from ['"]three['"]/;
-  for(const file of code)assert.doesNotMatch(fs.readFileSync(file,'utf8'),symbols,file);
+  const leftovers = code.filter(file => symbols.test(fs.readFileSync(file,'utf8')))
+    .map(file => path.relative(root,file));
+  assert.deepEqual(leftovers, [], 'Runtime still references the retired 3D renderer');
 });
