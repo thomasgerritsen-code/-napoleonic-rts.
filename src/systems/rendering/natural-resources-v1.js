@@ -14,7 +14,7 @@
   function seedFor(r,salt=0){return(((r.id||1)*2654435761)^((Math.round(r.x)*73856093)>>>0)^((Math.round(r.y)*19349663)>>>0)^salt)>>>0;}
   function berryScale(r){return r?.localVillageBerry===true?1.16:1;}
   function visualRadius(r,ratio=1){
-    if(r?.type==='iron')return 19;
+    if(r?.type==='iron')return 23;
     if(r?.type==='wood'){
       const scale=(cfg.treeCanopyScale??1.18)*(0.88+ratio*.16);
       return 16.5*scale*1.12;
@@ -77,15 +77,50 @@
     ctx.restore();
   }
 
+  // v293: subdued, partially buried fieldstone clusters with a touch of moss.
+  // Shape/rotation are per-resource deterministic, not a repeated grey icon.
   function drawIronOre(r,ratio){
-    const rad=10+ratio*5;
-    ctx.save();ctx.translate(r.x,r.y);
-    ctx.fillStyle='rgba(13,23,25,.26)';ctx.beginPath();ctx.ellipse(3,5,rad*1.2,rad*.65,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#686d73';ctx.strokeStyle='#262c35';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(-rad,3);ctx.lineTo(-rad*.75,-rad*.7);
-    ctx.lineTo(-rad*.18,-rad);ctx.lineTo(rad*.65,-rad*.65);
-    ctx.lineTo(rad,2);ctx.lineTo(rad*.2,rad*.6);ctx.closePath();ctx.fill();ctx.stroke();
-    ctx.fillStyle='#9c6650';ctx.beginPath();ctx.ellipse(-rad*.1,-rad*.1,rad*.34,rad*.24,-.4,0,Math.PI*2);ctx.fill();
+    const seed=seedFor(r,0x293),n=2+Math.floor(rand01(seed^0x722)*2);
+    const width=16+ratio*3.5;
+    ctx.save();
+    ctx.translate(r.x,r.y);
+    ctx.rotate((rand01(seed^0x12)-.5)*.34);
+
+    // Grass and soil cover the edge of the deposit, with only a soft shadow.
+    ctx.fillStyle='rgba(70,76,51,.16)';
+    ctx.beginPath();ctx.ellipse(0,4,width*1.3,9,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(90,83,57,.20)';
+    ctx.beginPath();ctx.ellipse(1,2,width*1.05,6.8,0,0,Math.PI*2);ctx.fill();
+
+    const stoneColors=['#746f63','#858073','#686f65','#807869'];
+    for(let i=0;i<n;i++){
+      const a=rand01(seed+i*351+5)*Math.PI*2;
+      const px=Math.cos(a)*width*.43,py=Math.sin(a)*4;
+      const w=6+rand01(seed+i*937+12)*5;
+      const h=3.8+rand01(seed+i*1057+24)*2.7;
+      ctx.fillStyle='rgba(33,42,32,.15)';
+      ctx.beginPath();ctx.ellipse(px+1.5,py+3,w*1.02,h*.75,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=stoneColors[Math.floor(rand01(seed+i*311+8)*stoneColors.length)];
+      ctx.beginPath();ctx.moveTo(px-w,py+2);ctx.lineTo(px-w*.68,py-h*.67);
+      ctx.lineTo(px-w*.12,py-h);ctx.lineTo(px+w*.70,py-h*.40);
+      ctx.lineTo(px+w,py+1);ctx.lineTo(px+w*.13,py+h*.57);ctx.closePath();ctx.fill();
+      ctx.fillStyle='rgba(53,86,50,.35)';
+      ctx.beginPath();ctx.ellipse(px-w*.22,py-h*.18,w*.32,h*.28,-.2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(205,194,166,.12)';
+      ctx.beginPath();ctx.moveTo(px-w*.62,py-h*.54);ctx.lineTo(px-w*.12,py-h*.79);
+      ctx.lineTo(px+w*.36,py-h*.39);ctx.closePath();ctx.fill();
+    }
+    // Irregular small meadow tufts conceal the stony outline while keeping it
+    // distinguishable enough for workers to gather it on mobile screens.
+    for(let i=0;i<7;i++){
+      const rx=(rand01(seed+i*947+220)-.5)*width*2.25;
+      const ry=2+(rand01(seed+i*843+235)-.5)*10;
+      ctx.strokeStyle=i%3===0?'rgba(89,112,62,.65)':'rgba(72,97,55,.55)';
+      ctx.lineWidth=1.25;ctx.lineCap='round';ctx.beginPath();
+      ctx.moveTo(rx-2,ry+2);ctx.lineTo(rx-3.5,ry-1.5);
+      ctx.moveTo(rx,ry+2);ctx.lineTo(rx+1,ry-2.5);
+      ctx.moveTo(rx+2,ry+2);ctx.lineTo(rx+4,ry-1);ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -133,14 +168,16 @@
   };
 
   const api=Object.freeze({
-    version:'natural-resources-v1.3-local-berry-2d-overlay',
+    version:'natural-resources-v1.4-road-guard-natural-ore',
     projection:'orthographic-top-down',
     treeStyle:'layered-deciduous-canopy',
     foodStyle:'berry-bush',
+    ironStyle:'mossy-half-buried-fieldstones',
     localVillageBerryEmphasis:true,
     explicitLocalBerry2DPass:true,
     ecologyAware:Boolean(global.__BATTLEFIELD_ECOLOGY_V1__),
     roadRenderGuard:true,
+    oreNaturalBlend:true,
     overlapsRoad,
     diagnostics:()=>({foodDraws,localVillageBerryDraws,localOverlayFrames})
   });
