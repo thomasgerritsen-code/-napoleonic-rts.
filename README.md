@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.35
+# Napoleonic RTS — v1.3.36
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.36 — lokaal moreel bij verliezen (update 288)
+
+Wanneer een soldaat sneuvelt, verliezen **nabije bondgenoten** tijdelijk extra moreel; soldaten verder dan 190 spel-eenheden en vijanden ondervinden geen extra effect. Een aanwezige officier en drummer houden een regiment merkbaar rustiger. Het verlies van een officier veroorzaakt juist een sterkere schok. Al vluchtende en gesneuvelde soldaten tellen niet opnieuw mee, en dubbelschade op een dode eenheid wordt niet opnieuw verwerkt. Onder druk kan het bestaande vluchtgedrag daardoor natuurlijker inzetten.
+
+Deze aanpassing raakt uitsluitend de gevechts-/moraalautoriteit; marsformaties, paden, bruggen en campagnekaart zijn ongewijzigd. De nieuwe automatische browsertest simuleert echte dodelijke schade, leiderschap, plaatselijke paniek, vluchten en ongewijzigde orders. Zie `tests/casualty-morale-v288.spec.js`.
 
 ## v1.3.35 — impactbewuste CI (update 287)
 
