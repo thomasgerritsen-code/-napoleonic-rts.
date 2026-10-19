@@ -102,14 +102,15 @@ test('v291 unsafe crossing, missing officer or absent ally hold returning AI in 
     const beforeCross={state:AI_COMMANDER_V1.state,peace:v05PeaceMode,dead:reg.destroyed,
       officer:api.hasOfficer(reg),stats:api.stats()};
     reg.crossingTrafficV068={forcedColumn:true,state:'crossing',crossingId:'pont-crete'};
-    aiOrderReg(reg,assault,'line',0);
+    // Distinct AI intents avoid upstream v141 duplicate-command suppression.
+    aiOrderReg(reg,{x:assault.x+100,y:assault.y+65},'line',0);
     const crossing={...reg.finalTarget};
     const duringCross={state:AI_COMMANDER_V1.state,peace:v05PeaceMode,dead:reg.destroyed,
       traffic:reg.crossingTrafficV068,stats:api.stats()};
     reg.crossingTrafficV068=null;
     const officer=regimentMembers(reg).find(u=>u.id===reg.officerId);
     officer.dead=true;
-    aiOrderReg(reg,assault,'line',0);
+    aiOrderReg(reg,{x:assault.x+230,y:assault.y-90},'line',0);
     const officerMissing={...reg.finalTarget};
     return{goal,unsupported,crossing,officerMissing,stats:api.stats(),
       beforeCross,duringCross,officerCheck:api.hasOfficer(reg)};
