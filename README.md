@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.38
+# Napoleonic RTS — v1.3.39
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,14 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.39 — AI-herinzet na hergroeperen (update 291)
+
+Een Brits regiment dat na een gevechtsschok **TERUGVAL** of **HERGROEPT** is, behoudt zijn terugtochtbestemming: nieuwe automatische aanvals- en flankbevelen onderbreken het herstel niet. Een dringend defensief bevel en rechtstreekse spelerorders hebben altijd voorrang.
+
+Wanneer het regiment weer **GEREED** is, zoekt het eerst een nabij eigen gezond regiment met levende officier. De mannen sluiten maximaal 16 seconden achter het front als reserve aan, in een colonne via de bestaande formatie- en routeplanner. Ontbreekt steun, een officier of een veilige reservepositie, dan blijft het regiment voorlopig op zijn herstelpositie. Daarna mag het weer normaal aanvallen. Dit verandert geen soldaatcoördinaten, wegen, bruggen, gevechtsballistiek of navigatie.
+
+Nieuw geautomatiseerd scenariotestbestand `tests/ai-regroup-reserve-v291.spec.js` controleert gerichte AI-aanvalsbevelen, behouden herstelbevelen, uitstel zonder leider of reserve, respect voor brugverkeer en terugkeer naar het aanvalsfront.
 
 ## v1.3.38 — hergroeperen na terugtocht (update 290)
 
