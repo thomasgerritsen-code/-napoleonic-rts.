@@ -25,14 +25,71 @@ const WATER_CROSSINGS_V067 = Object.freeze([
   Object.freeze({id:'pont-du-sud',name:'Pont du Sud',type:'bridge',material:'stone',x:2250,y:4580,angle:0,length:270,width:118})
 ].map(c=>Object.freeze({...c,y:strategicLatitudeV282(c.y)})));
 
+// One navigable AND visible channel. Cubic Hermite bends pass through all
+// old anchor points; bridges, roads, water blocking and vegetation share it.
+const RIVER_SAMPLES_V296=Object.freeze((()=>{
+  const knots=RIVER_POINTS_V067;
+  const slope=i=>{
+    const a=knots[Math.max(0,i-1)],b=knots[Math.min(knots.length-1,i+1)];
+    return Math.max(-.62,Math.min(.62,(b.x-a.x)/Math.max(1,b.y-a.y)));
+  };
+  const samples=[];
+  for(let i=1;i<knots.length;i++){
+    const a=knots[i-1],b=knots[i],d=b.y-a.y;
+    const steps=Math.max(1,Math.ceil(d/19));
+    for(let j=0;j<steps;j++){
+      const t=j/steps,t2=t*t,t3=t2*t;
+      const x=(2*t3-3*t2+1)*a.x+(t3-2*t2+t)*d*slope(i-1)+
+        (-2*t3+3*t2)*b.x+(t3-t2)*d*slope(i);
+      samples.push(Object.freeze({x,y:a.y+d*t}));
+    }
+  }
+  samples.push(Object.freeze({...knots[knots.length-1]}));
+  return samples;
+})());
+function riverSampleIndexAtYV296(y){
+  let low=0,high=RIVER_SAMPLES_V296.length-1;
+  while(low<high){
+    const mid=(low+high+1)>>>1;
+    if(RIVER_SAMPLES_V296[mid].y<=y)low=mid;else high=mid-1;
+  }
+  return Math.min(RIVER_SAMPLES_V296.length-2,low);
+}
+function riverCenterAtYV296(y){
+  const i=riverSampleIndexAtYV296(y);
+  const a=RIVER_SAMPLES_V296[i],b=RIVER_SAMPLES_V296[i+1];
+  const t=Math.max(0,Math.min(1,(y-a.y)/Math.max(.0001,b.y-a.y)));
+  return{x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};
+}
+function riverTangentAtYV296(y){
+  const i=riverSampleIndexAtYV296(y);
+  const a=RIVER_SAMPLES_V296[Math.max(0,i-1)];
+  const b=RIVER_SAMPLES_V296[Math.min(RIVER_SAMPLES_V296.length-1,i+2)];
+  const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
+  return{x:dx/len,y:dy/len};
+}
 function riverHitV067(x,y){
+  const centerIndex=riverSampleIndexAtYV296(y);
   let best=null;
-  for(let i=1;i<RIVER_POINTS_V067.length;i++){
-    const hit=closestPointOnSegmentV066(x,y,RIVER_POINTS_V067[i-1],RIVER_POINTS_V067[i]);
-    if(!best||hit.distance<best.distance) best={...hit,segmentIndex:i-1};
+  // Local y-window covers the nearest curved channel without evaluating
+  // hundreds of segments for every pathfinding, collision or terrain query.
+  const first=Math.max(1,centerIndex-9);
+  const last=Math.min(RIVER_SAMPLES_V296.length-1,centerIndex+11);
+  for(let i=first;i<=last;i++){
+    const hit=closestPointOnSegmentV066(x,y,RIVER_SAMPLES_V296[i-1],RIVER_SAMPLES_V296[i]);
+    if(!best||hit.distance<best.distance)best={...hit,segmentIndex:i-1};
   }
   return best;
 }
+window.__RIVER_GEOMETRY_V296__=Object.freeze({
+  version:'smooth-shared-river-v296',
+  samples:RIVER_SAMPLES_V296,
+  centerAtY:riverCenterAtYV296,
+  tangentAtY:riverTangentAtYV296,
+  hit:riverHitV067,
+  crossingAnchorsPreserved:true,
+  sharedWaterNavigation:true
+});
 function crossingPassageContainsV067(c,x,y){
   const dx=x-c.x,dy=y-c.y,cos=Math.cos(c.angle),sin=Math.sin(c.angle);
   const along=dx*cos+dy*sin,perp=-dx*sin+dy*cos;
@@ -48,16 +105,7 @@ function waterAtV067(x,y){
   if(!hit||hit.distance>RIVER_NAV_HALF_WIDTH_V067)return false;
   return !WATER_CROSSINGS_V067.some(c=>crossingPassageContainsV067(c,x,y));
 }
-function riverCenterXAtYV067(y){
-  const yy=Math.max(RIVER_POINTS_V067[0].y,Math.min(RIVER_POINTS_V067[RIVER_POINTS_V067.length-1].y,y));
-  for(let i=1;i<RIVER_POINTS_V067.length;i++){
-    const a=RIVER_POINTS_V067[i-1],b=RIVER_POINTS_V067[i];
-    if(yy<a.y||yy>b.y)continue;
-    const t=(yy-a.y)/Math.max(.0001,b.y-a.y);
-    return a.x+(b.x-a.x)*t;
-  }
-  return RIVER_POINTS_V067[RIVER_POINTS_V067.length-1].x;
-}
+function riverCenterXAtYV067(y){return riverCenterAtYV296(y).x;}
 function bankSideV067(x,y){return x-riverCenterXAtYV067(y);}
 function segmentWaterCrossingV067(ax,ay,bx,by){
   const distance=Math.hypot(bx-ax,by-ay),samples=Math.max(1,Math.ceil(distance/12));
@@ -243,7 +291,7 @@ issueMoveWithFacingV06=function issueMoveWithFacingV067(x,y,finalFacing=null){
 };
 
 function drawRiverV067(){
-  const trace=()=>{ctx.beginPath();ctx.moveTo(RIVER_POINTS_V067[0].x,RIVER_POINTS_V067[0].y);for(let i=1;i<RIVER_POINTS_V067.length;i++)ctx.lineTo(RIVER_POINTS_V067[i].x,RIVER_POINTS_V067[i].y);};
+  const trace=()=>{ctx.beginPath();ctx.moveTo(RIVER_SAMPLES_V296[0].x,RIVER_SAMPLES_V296[0].y);for(let i=1;i<RIVER_SAMPLES_V296.length;i++)ctx.lineTo(RIVER_SAMPLES_V296[i].x,RIVER_SAMPLES_V296[i].y);};
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
   ctx.strokeStyle='rgba(45,54,47,.55)';ctx.lineWidth=RIVER_VISUAL_WIDTH_V067+16;trace();ctx.stroke();
   ctx.strokeStyle='rgba(70,119,139,.86)';ctx.lineWidth=RIVER_VISUAL_WIDTH_V067;trace();ctx.stroke();
@@ -286,8 +334,8 @@ const drawMinimapV066ForV067=drawMinimap;
 drawMinimap=function drawMinimapV067(){
   drawMinimapV066ForV067();miniCtx.save();miniCtx.lineCap='round';miniCtx.lineJoin='round';
   miniCtx.strokeStyle='rgba(92,151,174,.88)';miniCtx.lineWidth=2.1;
-  for(let i=1;i<RIVER_POINTS_V067.length;i++){
-    const a=RIVER_POINTS_V067[i-1],b=RIVER_POINTS_V067[i],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+  for(let i=1;i<RIVER_SAMPLES_V296.length;i+=3){
+    const a=RIVER_SAMPLES_V296[i-1],b=RIVER_SAMPLES_V296[Math.min(i+2,RIVER_SAMPLES_V296.length-1)],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
     if(typeof isExploredV06==='function'&&!isExploredV06(mx,my))continue;
     const ma=miniPoint(a.x,a.y),mb=miniPoint(b.x,b.y);miniCtx.beginPath();miniCtx.moveTo(ma.x,ma.y);miniCtx.lineTo(mb.x,mb.y);miniCtx.stroke();
   }
