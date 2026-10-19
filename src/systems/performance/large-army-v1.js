@@ -15,7 +15,7 @@
   const getRegimentBeforePerformanceV12 = getRegiment;
   const regimentMembersBeforePerformanceV12 = regimentMembers;
   const renderStats = {
-    fullUnits:0,lodUnits:0,culledUnits:0,dprResizes:0,
+    fullUnits:0,lodUnits:0,gpuUnits:0,culledUnits:0,dprResizes:0,
     staticTerrainCaptures:0,staticTerrainHits:0,staticTerrainInvalidations:0
   };
   let livingUnitCount = 0;
@@ -199,7 +199,9 @@
     }
     if (useUnitLod(unit)) {
       renderStats.lodUnits++;
-      drawUnitLod(unit);
+      const gpu = global.__GPU_UNITS_V304__;
+      if (gpu?.queue?.(unit)) renderStats.gpuUnits++;
+      else drawUnitLod(unit);
     } else {
       renderStats.fullUnits++;
       drawUnitBeforePerformanceV12(unit);
