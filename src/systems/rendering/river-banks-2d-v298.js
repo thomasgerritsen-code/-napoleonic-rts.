@@ -1,7 +1,7 @@
 'use strict';
 // v298: 2D-ONLY riverbank erosion, point bars and shoreline meadow blending.
 // Geometry is purely decorative; never changes waterAtV067, roads, bridges,
-// navigation, houses, or any existing 3D module.
+// navigation, houses, or any other gameplay system.
 (function installRiverBanks2DV298(root){
   if(root.__RIVER_BANKS_2D_V298__)return;
   const river=root.__RIVER_GEOMETRY_V296__;
@@ -114,7 +114,7 @@
     drawDetail();
   };
   const api=Object.freeze({
-    version:'298.0',twoDOnly:true,threeDUntouched:true,
+    version:'298.0',twoDOnly:true,
     sharedGeometry:true,
     erosionByBend:true,
     bankShapeAt,

@@ -2,7 +2,7 @@
 // v299: 2D-only physically inspired flow-field artwork. Speed is highest
 // midstream, drops at the shore and changes around bends. Particles move along
 // a shared pre-integrated travel-time curve with no per-frame physics state.
-// Navigation, bridge logic, water collision and 3D remain untouched.
+// Navigation, bridge logic, and water collision remain untouched.
 (function installRiverFlow2DV299(root){
   if(root.__RIVER_FLOW_2D_V299__)return;
   const river=root.__RIVER_GEOMETRY_V296__;
@@ -136,7 +136,7 @@
     return lastDraw;
   }
   const api=Object.freeze({
-    version:'299.0',twoDOnly:true,threeDUntouched:true,
+    version:'299.0',twoDOnly:true,
     travelTimeFlow:true,curvatureResponsive:true,shoreDrag:true,
     bridgeEddies:true,particleLimit:PARTICLES+WAKE_PARTICLES,
     speedAt,bendAt,sample,draw,

@@ -30,7 +30,7 @@ test('v299 current follows the river, flows faster midstream, and is continuous 
       centerOffset:Math.abs(geometry.centerAt(c.y)-c.x)
     }));
     return{speed,tracks,before,after,stats,bridgeCheck,
-      flags:{twoDOnly:api.twoDOnly,threeDUntouched:api.threeDUntouched,
+      flags:{twoDOnly:api.twoDOnly,
         travelTimeFlow:api.travelTimeFlow,shoreDrag:api.shoreDrag,
         bridgeEddies:api.bridgeEddies,curvatureResponsive:api.curvatureResponsive,
         particles:api.particleLimit},
@@ -38,7 +38,7 @@ test('v299 current follows the river, flows faster midstream, and is continuous 
   });
   expect(errors).toEqual([]);
   expect(report.flags).toEqual({
-    twoDOnly:true,threeDUntouched:true,travelTimeFlow:true,
+    twoDOnly:true,travelTimeFlow:true,
     shoreDrag:true,bridgeEddies:true,curvatureResponsive:true,
     particles:196
   });
@@ -59,29 +59,25 @@ test('v299 current follows the river, flows faster midstream, and is continuous 
   expect(report.drawName).toBe('drawRiverNatural2DV298');
 });
 
-test('v299 bridge wakes animate without breaking 3D river view or old 2D water API',async({page})=>{
+test('v299 2D bridge wakes animate over the preserved river surface',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('/?test=3d',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>Boolean(window.__BATTLEFIELD_3D_WATER_V297__?.activeCurrent &&
-    window.__RIVER_FLOW_2D_V299__?.bridgeEddies),null,{timeout:30000});
+  await page.goto('/?test=movement-coverage',{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>Boolean(window.__RIVER_FLOW_2D_V299__?.bridgeEddies &&
+    window.__RIVER_SURFACE_V297__?.flowingRipples));
   const r=await page.evaluate(()=>{
-    const api=window.__RIVER_FLOW_2D_V299__,old=window.__RIVER_SURFACE_V297__;
+    const api=window.__RIVER_FLOW_2D_V299__,river=window.__RIVER_SURFACE_V297__;
     const bridge=WATER_CROSSINGS_V067[0];
     const cam={x:camera.x,y:camera.y,zoom:camera.zoom};
     camera.x=bridge.x;camera.y=bridge.y;camera.zoom=1.2;
     const a=api.draw(4.2),b=api.draw(5.5);
     camera.x=cam.x;camera.y=cam.y;camera.zoom=cam.zoom;
-    return{a,b,currentApi:old.flowingRipples,
-      oldSample:old.flowSample(5,2),bankApi:__RIVER_BANKS_2D_V298__.twoDOnly,
-      webglWater:__BATTLEFIELD_3D_WATER_V297__.diagnostics(),
-      namedMesh:!!__NRTS_THREE_SCENE__.getObjectByName('flowing-water-v297')};
+    return{a,b,flow:river.flowingRipples,sample:river.flowSample(5,2),
+      banks:window.__RIVER_BANKS_2D_V298__.twoDOnly};
   });
   expect(errors).toEqual([]);
   expect(r.a.wakes).toBeGreaterThanOrEqual(8);
   expect(r.b.wakes).toBeGreaterThanOrEqual(8);
-  expect(r.currentApi).toBe(true);
-  expect(r.oldSample).toBeTruthy();
-  expect(r.bankApi).toBe(true);
-  expect(r.webglWater.waterMeshes).toBe(1);
-  expect(r.namedMesh).toBe(true);
+  expect(r.flow).toBe(true);
+  expect(r.sample).toBeTruthy();
+  expect(r.banks).toBe(true);
 });

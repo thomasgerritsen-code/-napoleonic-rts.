@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.47
+# Napoleonic RTS — v1.3.50
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.50 — alleen 2D, experimentele 3D-modus verwijderd (update 302)
+
+De experimentele 3D-scène is definitief uit de speelbare game verwijderd: geen 3D-canvas, geen renderkeuzeknop, geen Three.js-import en geen 3D-modules in de browser of de repository. De bijbehorende uitsluitend 3D-gerichte tests zijn verwijderd. Alle tests voor 2D-water, oevers, bronnen, dorpen, touchbesturing, marsformaties en bruggen blijven bestaan. De desktop-tegelcache uit update 301 blijft actief; dit is **geen nieuwe GPU-renderer**. Eventuele GPU-versnelling voor de 2D-game krijgt een zelfstandige implementatie.
+
+De onderstaande oudere release-notities zijn historische beschrijvingen; vermeldingen van de vroegere 3D-experimenten beschrijven geen huidige spelmodus.
 
 ## v1.3.47 — realistischere stroming in 2D (update 299)
 
