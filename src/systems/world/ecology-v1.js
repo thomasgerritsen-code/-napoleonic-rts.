@@ -183,19 +183,25 @@
 
   // Initial resources are generated before Architecture-v2 world systems load. Normalize
   // them once and keep the same gameplay resource objects/amounts.
-  let relocated=0,removed=0,roadRelocated=0;
-  for(const r of [...resources]){
-    if(!r||r.dead)continue;
-    const startedOnRoad=roadConflict(r.type,r.x,r.y);
-    const safe=nearestEcologySpot(r.type,r.x,r.y,r);
-    if(!safe){r.dead=true;removed++;continue;}
-    if(Math.hypot(safe.x-r.x,safe.y-r.y)>.5){
-      relocated++;
-      if(startedOnRoad)roadRelocated++;
+  let relocated=0,removed=0,roadRelocated=0,resetRelocated=0;
+  function normalizeExistingResources(isReset=false){
+    let moved=0;
+    for(const r of [...resources]){
+      if(!r||r.dead)continue;
+      const startedOnRoad=roadConflict(r.type,r.x,r.y);
+      const safe=nearestEcologySpot(r.type,r.x,r.y,r);
+      if(!safe){r.dead=true;removed++;continue;}
+      if(Math.hypot(safe.x-r.x,safe.y-r.y)>.5){
+        moved++;relocated++;
+        if(startedOnRoad)roadRelocated++;
+      }
+      r.x=safe.x;r.y=safe.y;
+      stampResource(r,r.type);
     }
-    r.x=safe.x;r.y=safe.y;
-    stampResource(r,r.type);
+    if(isReset)resetRelocated+=moved;
+    return moved;
   }
+  normalizeExistingResources();
 
   function townCenters(){
     return buildings.filter(b=>b&&!b.dead&&b.complete&&b.type==='towncenter');
@@ -312,6 +318,11 @@
   const previousResetGame=resetGame;
   resetGame=function resetGameEcologyV1(...args){
     const result=previousResetGame(...args);
+    // v06 repositions Britain and its old wood/berry clusters AFTER they
+    // were spawned. Revalidate their final world positions against current
+    // roads, riverbanks, bridge decks, buildings and other harvestable items.
+    // Keep each resource object/id so worker assignments remain valid.
+    normalizeExistingResources(true);
     refreshBaseVillageAccess();
     return result;
   };
@@ -339,6 +350,8 @@
     relocatedInitial:relocated,
     relocatedFromRoad:roadRelocated,
     removedInitial:removed,
+    resetPostMoveNormalization:true,
+    resetRelocated:()=>resetRelocated,
     berryVillageExclusion:true,
     berryVillageAccess:true,
     baseVillageBerryMin,
