@@ -74,12 +74,27 @@ test('v315 right-click unfinished building resumes selected farmer instead of mo
   },setup);
   expect(point.taskBefore).not.toBe('build');
   expect(point.hitId).toBe('game');
+  await page.evaluate(()=>{
+    window.__RIGHT_CLICK_TRACE_V315__=[];
+    for(const kind of ['mousedown','mouseup','contextmenu']){
+      window.addEventListener(kind,e=>{
+        window.__RIGHT_CLICK_TRACE_V315__.push({kind,button:e.button,target:e.target?.id,
+          x:e.clientX,y:e.clientY,defaultPrevented:e.defaultPrevented});
+      },true);
+    }
+  });
   await page.mouse.click(point.x,point.y,{button:'right'});
   const state=await page.evaluate(({workerId,buildingId})=>{
     const u=units.find(x=>x.id===workerId);
-    return{task:u.task,buildingTarget:u.buildingTarget?.id,buildingId,selected:selectedUnits.has(u)};
+    const b=buildings.find(x=>x.id===buildingId);
+    const p=worldToScreen(b.x,b.y);
+    return{task:u.task,buildingTarget:u.buildingTarget?.id,buildingId,selected:selectedUnits.has(u),
+      selectedUnits:selectedUnits.size,hitOnMap:buildingAt(b.x,b.y,'france')?.id,
+      point:p,screenElement:document.elementFromPoint(p.x,p.y)?.id||null,
+      mouseEvents:window.__RIGHT_CLICK_TRACE_V315__,buildMode,
+      status:statusEl.textContent};
   },setup);
-  expect(state.task).toBe('build');
+  expect(state.task,JSON.stringify({point,state})).toBe('build');
   expect(state.buildingTarget).toBe(state.buildingId);
   expect(state.selected).toBe(true);
   expect(errors).toEqual([]);
