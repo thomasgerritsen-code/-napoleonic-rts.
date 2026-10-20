@@ -93,7 +93,10 @@
           cottage:Object.freeze([2.0,2.35]), farmhouse:Object.freeze([2.15,2.65]), barn:Object.freeze([1.8,2.0]), inn:Object.freeze([2.0,2.15]), chapel:Object.freeze([1.8,2.5])
         }),
         plotGap:10,
-        berryExclusionPadding:70
+        berryExclusionPadding:70,
+        baseBerryMin:10,
+        baseBerryAmount:600,
+        countrysideBerryAmount:600
       }),
       gameplayBuildings: Object.freeze({ scale:1.34, obstaclePadding:14 }),
       vegetation: Object.freeze({ buildingPadding:18, villageHousePadding:12, resourceGap:8, relocationStep:22, relocationRings:18, treeCanopyScale:1.18, berryRadius:19 })

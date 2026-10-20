@@ -18,6 +18,17 @@
   const baseVillageBerryStartRadius=villageCfg.baseBerryStartRadius ?? 110;
   const baseVillageSearchRadius=villageCfg.baseVillageSearchRadius ?? 460;
   const baseVillageBerryAmount=villageCfg.baseBerryAmount ?? 360;
+  // Food reserves scale to large armies without changing unit costs or worker speed.
+  // Dispersed patches reward exploration instead of crowding both starting camps.
+  const countrysideBerryAmount=villageCfg.countrysideBerryAmount ?? baseVillageBerryAmount;
+  const countrysideSites=Object.freeze([
+    [1100,1450],[1550,2400],[2150,3600],
+    [2850,1100],[3900,2300],[4750,3650],
+    [5500,1000],[6300,2400],[6900,3650]
+  ]);
+  const countrysidePerSite=5;
+  let berrySeedEpoch=0, countrysideSeededEpoch=-1;
+  nrts.events.on('game:reset',()=>{ berrySeedEpoch++; });
   const roadPadding=cfg.roadPadding ?? 8;
 
   function villageData(){
@@ -256,6 +267,49 @@
     }
     return best?{x:best.x,y:best.y}:null;
   }
+  // Create five reachable harvestable bushes at each of nine countryside
+  // locations. Search a small ring around each site and reject roads, rivers,
+  // village houses, buildings and other resources before creating an object.
+  // Generate once per battle; depleted bushes do not respawn mid-battle.
+  function ensureCountrysideBerries(){
+    if(countrysideSeededEpoch===berrySeedEpoch)return 0;
+    let added=0;
+    for(let siteIndex=0;siteIndex<countrysideSites.length;siteIndex++){
+      const [cx,cy]=countrysideSites[siteIndex];
+      for(let slot=0;slot<countrysidePerSite;slot++){
+        let spot=null;
+        // Large rivers and dense villages can fill the first few rings.
+        // Search farther within the same countryside district rather than
+        // silently skipping an entire food patch.
+        for(let ring=0;ring<34&&!spot;ring++){
+          const radius=65+ring*21;
+          for(let step=0;step<24;step++){
+            const angle=(slot*.61803398875+siteIndex*.173+step/24)*Math.PI*2;
+            const x=cx+Math.cos(angle)*radius;
+            const y=cy+Math.sin(angle)*radius;
+            if(validResourceSpot('food',x,y)){spot={x,y};break;}
+          }
+        }
+        if(!spot)continue;
+        const bush=stampResource(
+          previousCreateResource('food',spot.x,spot.y,countrysideBerryAmount),
+          'food',{countrysideBerryPatch:siteIndex+1}
+        );
+        if(bush)added++;
+      }
+    }
+    countrysideSeededEpoch=berrySeedEpoch;
+    return added;
+  }
+  function countrysideBerryStats(){
+    const bushes=resources.filter(r=>r&&!r.dead&&r.type==='food'&&r.countrysideBerryPatch);
+    return {
+      count:bushes.length,
+      totalFood:bushes.reduce((sum,r)=>sum+r.amount,0),
+      perSite:countrysideSites.map((_,i)=>
+        bushes.filter(r=>r.countrysideBerryPatch===i+1).length)
+    };
+  }
   function ensureBaseVillageBerries(){
     let added=0;
     for(const tc of townCenters()){
@@ -285,9 +339,11 @@
     return true;
   }
   function refreshBaseVillageAccess(){
+    // Starting villages take placement priority over outlying food patches.
     const added=ensureBaseVillageBerries();
+    const patchAdded=ensureCountrysideBerries();
     const centered=centerCameraOnHomeBase();
-    return {added,centered};
+    return {added,patchAdded,centered};
   }
   function baseVillageBerryStats(){
     return townCenters().map(tc=>{
@@ -332,7 +388,7 @@
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.9-worker-accessible-base-berries',
+    version:'battlefield-ecology-v1.10-large-army-base-berries',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
@@ -364,6 +420,10 @@
     refreshBaseVillageAccess,
     ensureBaseVillageBerries,
     baseVillageBerryStats,
+    countrysideBerryStats,
+    countrysideBerryPatches:countrysideSites.length,
+    countrysideBerryPerSite:countrysidePerSite,
+    countrysideBerryAmount,
     resourceBuildingExclusion:true,
     resourceRoadExclusion:true,
     ironRiverbankExclusion:true,
@@ -372,6 +432,6 @@
   global.__BATTLEFIELD_ECOLOGY_V1__=api;
   nrts.subsystems.register('battlefield-ecology',api,{
     phase:'architecture-v2.1',legacyBridge:false,
-    responsibility:'collision-safe tree and berry placement with five visible, directly worker-accessible 2D berry bushes per starting Town Center, refreshed only after reset completion'
+    responsibility:'collision-safe harvestable large-army food with ten village berry bushes per Town Center and nine distant food patches; regenerate only on battle reset'
   });
 })(window);
