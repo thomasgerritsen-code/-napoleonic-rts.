@@ -77,8 +77,25 @@
     }
     return resumed;
   }
-  // Desktop: selecting workers and right-clicking the incomplete building is a
-  // contextual BUILD order rather than a generic move into the footprint.
+  // Desktop: browsers may swallow the contextmenu event after another game's
+  // right-mouse gesture listener has handled pointer release. Handle a simple
+  // right-button release as well; the existing right-drag implementation stops
+  // propagation for a genuine facing drag, so those orders remain untouched.
+  function resumeAtPointer(event){
+    if(buildMode)return false;
+    const point=screenToWorld(event.clientX,event.clientY);
+    const b=buildingAt(point.x,point.y,'france');
+    if(!unfinishedFriendlyBuilding(b))return false;
+    if(![...selectedUnits].some(u=>u.type==='worker'&&!u.dead&&u.side==='france'))return false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    sendSelectedWorkersToBuild(b);
+    return true;
+  }
+  canvas.addEventListener('mouseup',event=>{
+    if(event.button===2)resumeAtPointer(event);
+  },true);
+  // Contextmenu remains a fallback for platforms that do not dispatch mouseup.
   canvas.addEventListener('contextmenu',event=>{
     if(buildMode)return;
     const point=screenToWorld(event.clientX,event.clientY);
