@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.54
+# Napoleonic RTS — v1.3.55
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.55 — GPU-daken zonder verlies van bouwvoortgang (update 307)
+
+De **bestaande** 2D-daken van speelbare gebouwen worden nu op desktop met WebGL2 één keer per uniek daktype, afmeting, kamp en bouwfase vastgelegd als GPU-textuur. Herhaalde gebouwen worden in één GPU-batch weergegeven; bij opnieuw tekenen worden de texturen hergebruikt. De originele planzicht-dakvormen, schoorstenen en dakpannen blijven exact dezelfde Canvas-tekenbron gebruiken.
+
+**Selectierand, bouw-/productievoortgang en schadebalk** blijven live op het oorspronkelijke 2D-canvas boven op het GPU-dak en reageren direct op veranderingen in de simulatie. Dorpshuizen en hun tuinen worden niet aangepast. De AI, hitboxes, beweging, gebouwenplaatsing en andere regels veranderen niet. Mobiel en sterk ingezoomde beelden gebruiken Canvas2D. Als GPU-rendering ontbreekt, terugvalt of uitgeschakeld is (`?gpuBuildings=off`), tekent de oorspronkelijke gebouwenrenderer alles. De GPU-gebouwenmodule heeft eigen upload-/regebruik-/fallbackstatistieken.
 
 ## v1.3.54 — natuurlijke grondstoffen op de GPU (update 306)
 
