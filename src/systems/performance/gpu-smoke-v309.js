@@ -1,5 +1,6 @@
 'use strict';
-// v309: translucent 2D WebGL2 overlay for pooled black-powder smoke.
+// v311: translucent 2D WebGL2 overlay for pooled smoke AND the original
+// musket/cannon projectile positions. No additional GPU context or simulation.
 // Uses the actual combat event clock, seeded billows and integrated wind;
 // game physics, flashes, hits, projectiles and mobile Canvas rendering stay put.
 (function installGpuSmokeV309(root){
@@ -23,7 +24,8 @@
   const STRIDE=9,MAX=2500;
   const instances=new Float32Array(MAX*STRIDE);
   const stats={frames:0,drawCalls:0,billows:0,lastBillows:0,
-    clouds:0,shaderFailures:0,canvasFallbacks:0,clearFrames:0};
+    clouds:0,shaderFailures:0,canvasFallbacks:0,clearFrames:0,
+    projectileDraws:0,lastProjectiles:0,projectileFrames:0};
   function active(){return !!gl&&!mobile&&!disabledByQuery&&!lost&&!failed;}
   function updateVisibility(){layer.style.display=active()?'block':'none';}
   if(!mobile&&!disabledByQuery){
@@ -73,7 +75,8 @@
       'void main(){',
       '  float rr=length(local);',
       '  float feather=1.0-smoothstep(.64,1.0,rr);',
-      '  float a=feather*tint.a;',
+      '  // Opacity > 1 is a hard-centered projectile dot, not smoke.',
+      '  float a=tint.a>1.5 ? 1.0-smoothstep(.76,1.0,rr) : feather*tint.a;',
       '  if(a<.001)discard;',
       '  color=vec4(tint.rgb,a);',
       '}'
@@ -122,7 +125,7 @@
       const top=camera.y-innerHeight/(2*zoom)-160;
       const bottom=camera.y+innerHeight/(2*zoom)+160;
       let count=0,clouds=0;
-      function add(x,y,rx,ry,angle,hex,alpha){
+      function add(x,y,rx,ry,angle,hex,alpha,projectile=false){
         if(count>=MAX||alpha<=0||!Number.isFinite(x)||!Number.isFinite(y))return;
         const rgb=hexToRGB(hex);
         const i=count*STRIDE;
@@ -130,7 +133,7 @@
         instances[i+2]=rx;instances[i+3]=ry;
         instances[i+4]=angle;
         instances[i+5]=rgb[0];instances[i+6]=rgb[1];instances[i+7]=rgb[2];
-        instances[i+8]=Math.min(1,Math.max(0,alpha));
+        instances[i+8]=projectile?2.0:Math.min(1,Math.max(0,alpha));
         count++;
       }
       for(const e of events){
@@ -179,6 +182,25 @@
             3.8+age*10,2.4+age*7,e.facing+.35,colors.pan,.24*p.panIntensity);
         }
       }
+      // v311: the same instanced shader draws real, visible shot positions
+      // after smoke billows. Canvas projectile drawing is skipped ONLY when
+      // this existing transparent GPU overlay is active. Physics still owns
+      // the canonical projectile array, collision and damage.
+      const smokeBillows=count;
+      let gpuProjectiles=0;
+      if(typeof projectiles!=='undefined'){
+        for(const p of projectiles){
+          if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
+          const r=p.artillery?3.2:1.8;
+          if(p.x+r<left||p.x-r>right||p.y+r<top||p.y-r>bottom)continue;
+          if(count>=MAX)break;
+          add(p.x,p.y,r,r,0,p.artillery?'#202020':'#f0dfaa',1,true);
+          gpuProjectiles++;
+        }
+      }
+      stats.lastProjectiles=gpuProjectiles;
+      stats.projectileDraws+=gpuProjectiles;
+      if(gpuProjectiles)stats.projectileFrames++;
       if(count){
         gl.useProgram(program);gl.bindVertexArray(vao);
         gl.bindBuffer(gl.ARRAY_BUFFER,instanceBuffer);
@@ -190,9 +212,9 @@
         gl.disable(gl.DEPTH_TEST);
         gl.drawArraysInstanced(gl.TRIANGLES,0,6,count);
         gl.disable(gl.BLEND);gl.bindVertexArray(null);
-        stats.drawCalls++;stats.billows+=count;
+        stats.drawCalls++;stats.billows+=smokeBillows;
       }else stats.clearFrames++;
-      stats.frames++;stats.clouds+=clouds;stats.lastBillows=count;
+      stats.frames++;stats.clouds+=clouds;stats.lastBillows=smokeBillows;
       return true;
     }catch(_error){
       failed=true;stats.shaderFailures++;updateVisibility();
@@ -209,11 +231,20 @@
     program=null;vao=null;vertexBuffer=null;instanceBuffer=null;
     updateVisibility();
   });
+  // There is no second rasterized projectile layer when GPU smoke is visible.
+  // On phone, WebGL errors, disabled GPU smoke or absent WebGL2, the original
+  // Canvas projectile painter continues unchanged.
+  const drawProjectileCanvasV311=drawProjectile;
+  drawProjectile=function drawProjectileBatchedV311(p){
+    if(active())return;
+    return drawProjectileCanvasV311.apply(this,arguments);
+  };
   root.NRTS?.events?.on?.('game:reset',()=>{
     if(active()){gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);}
   });
   const api=Object.freeze({
-    version:'309.0',twoDOnly:true,ownOverlayCanvas:true,
+    version:'311.0',twoDOnly:true,ownOverlayCanvas:true,
+    projectileDotsOnSameGPUContext:true,ballisticsUnchanged:true,
     retainsWindIntegration:true,retainsCombatEvents:true,
     mobileCanvasFallback:true,active,draw,
     metrics:()=>({...stats,active:active(),mobile,disabledByQuery,
@@ -223,6 +254,6 @@
   root.__GPU_SMOKE_V309__=api;
   root.NRTS?.subsystems?.register?.('gpu-smoke-v309',api,{
     phase:'rendering',legacyBridge:false,
-    responsibility:'texture-free GPU black-powder smoke above 2D soldiers, sourced from existing pooled wind-integrated events'
+    responsibility:'existing WebGL2 smoke layer batches live musket/cannon projectiles without another GL context or changing ballistics'
   });
 })(window);
