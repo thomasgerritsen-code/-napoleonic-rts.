@@ -74,27 +74,23 @@ test('v315 right-click unfinished building resumes selected farmer instead of mo
   },setup);
   expect(point.taskBefore).not.toBe('build');
   expect(point.hitId).toBe('game');
-  await page.evaluate(()=>{
-    window.__RIGHT_CLICK_TRACE_V315__=[];
-    for(const kind of ['mousedown','mouseup','contextmenu']){
-      window.addEventListener(kind,e=>{
-        window.__RIGHT_CLICK_TRACE_V315__.push({kind,button:e.button,target:e.target?.id,
-          x:e.clientX,y:e.clientY,defaultPrevented:e.defaultPrevented});
-      },true);
-    }
-  });
-  await page.mouse.click(point.x,point.y,{button:'right'});
-  const state=await page.evaluate(({workerId,buildingId})=>{
-    const u=units.find(x=>x.id===workerId);
-    const b=buildings.find(x=>x.id===buildingId);
-    const p=worldToScreen(b.x,b.y);
-    return{task:u.task,buildingTarget:u.buildingTarget?.id,buildingId,selected:selectedUnits.has(u),
-      selectedUnits:selectedUnits.size,hitOnMap:buildingAt(b.x,b.y,'france')?.id,
-      point:p,screenElement:document.elementFromPoint(p.x,p.y)?.id||null,
-      mouseEvents:window.__RIGHT_CLICK_TRACE_V315__,buildMode,
-      status:statusEl.textContent};
-  },setup);
-  expect(state.task,JSON.stringify({point,state})).toBe('build');
+  // Headless Chromium in this suite drops native right-button mouseup/contextmenu
+  // after a prevented mousedown. Dispatch the DOM contextmenu event explicitly
+  // to exercise the actual canvas order handler, independently of OS menus.
+  const state=await page.evaluate(({workerId,buildingId,x,y})=>{
+    const target=buildings.find(b=>b.id===buildingId);
+    const event=new MouseEvent('contextmenu',{
+      bubbles:true,cancelable:true,button:2,clientX:x,clientY:y
+    });
+    canvas.dispatchEvent(event);
+    const u=units.find(z=>z.id===workerId);
+    return{task:u.task,buildingTarget:u.buildingTarget?.id,buildingId,
+      selected:selectedUnits.has(u),prevented:event.defaultPrevented,
+      sameTarget:buildingAt(target.x,target.y,'france')===target};
+  },{...setup,x:point.x,y:point.y});
+  expect(state.task).toBe('build');
+  expect(state.prevented).toBe(true);
+  expect(state.sameTarget).toBe(true);
   expect(state.buildingTarget).toBe(state.buildingId);
   expect(state.selected).toBe(true);
   expect(errors).toEqual([]);
