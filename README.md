@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.58
+# Napoleonic RTS — v1.3.59
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,14 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.59 — musket- en kanonskogels in bestaande GPU-rookbatch (update 311)
+
+De kleine, zichtbare 2D-projectielen van musketten en kanonnen worden op geschikte desktopbrowsers nu als echte posities uit de bestaande projectielsimulatie getekend in **dezelfde instanced WebGL2-batch als het kruitrook**. Er wordt nadrukkelijk géén nieuwe canvas- of WebGL-context toegevoegd. De stippen worden over de rook heen gerenderd, met dezelfde kleuren en grootte als de voorgaande Canvas-weergave. De rendercode leest uitsluitend de projectielen; geen wijziging aan snelheid, baan, botsingen, trefkansen, schade of AI.
+
+Wanneer de GPU-rooklaag ontbreekt, is uitgeschakeld met `?gpuSmoke=off` / `?gpu=off`, of op mobiel wordt gespeeld, gebruikt de game nog steeds de originele 2D-projectielrenderer. De projectielen worden bij GPU-activering **niet dubbel getekend**. De bestaande kruitrook heeft zijn eigen telling behouden, met aanvullende `projectileDraws`, `lastProjectiles` en `projectileFrames` in `window.__GPU_SMOKE_V309__.metrics()`.
+
+Deze kleine renderwijziging verandert niets aan de nog apart te beoordelen zoomverbetering uit v310.
 
 ## v1.3.58 — vloeiender zoomen op desktop en telefoon (update 310)
 
