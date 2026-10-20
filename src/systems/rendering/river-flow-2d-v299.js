@@ -102,6 +102,16 @@
       bottom:c.y+innerHeight/(2*zoom)+70,
       left:c.x-innerWidth/(2*zoom)-90,
       right:c.x+innerWidth/(2*zoom)+90};
+    // GPU is optional and draws exactly the same flow-field coordinates.
+    // Bridge-pier eddies remain on Canvas for their changing arcs and alpha.
+    const gpu=root.__GPU_RIVER_FLOW_V308__;
+    const batch=gpu?.draw?.(time);
+    if(batch){
+      const wakes=drawWake(time,bounds.top,bounds.bottom);
+      gpu.recordWakes(wakes);
+      lastDraw={visible:batch.visible,wakes,drawCalls:batch.visible+wakes};
+      return lastDraw;
+    }
     let visible=0;
     ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
     // Two sets of coherent small ripples at different scales. Fixed bounded

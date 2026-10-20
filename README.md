@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.55
+# Napoleonic RTS — v1.3.56
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.56 — GPU-rivierstroming met behoud van bochten en brugkolken (update 308)
+
+De eerder bestaande 2D-v299-stromingsberekeningen sturen nu op desktop een **instanced WebGL2-rimpelbatch** aan. Het gaat om dezelfde 7 stroombanen, bocht-afhankelijke snelheid, vertraging langs de oevers en vloeiend bewegende wereldcoördinaten. De statische waterlagen, glooiende oevers, brugposities en eigenlijke water-/wegcollision blijven volledig ongewijzigd.
+
+De kleine kringen rondom brugpijlers blijven op de originele Canvas2D-overlay, zodat hun vorm en zachte alpha in stand blijven. Bij geen WebGL2, op mobiel of met `?gpuWater=off` gebruikt de game de oorspronkelijke Canvas2D-stroming. Belangrijk: de desktop-terreintegelcache tekent nu altijd de bewegende water-overlay ook wanneer die GPU-versnelling niet beschikbaar is. De engine blijft strikt 2D en de simulatie blijft op de CPU. De WebGL2-rimpelbatch is texture-vrij en deelt de GPU-context met terrein, objecten en soldaten.
 
 ## v1.3.55 — GPU-daken zonder verlies van bouwvoortgang (update 307)
 
