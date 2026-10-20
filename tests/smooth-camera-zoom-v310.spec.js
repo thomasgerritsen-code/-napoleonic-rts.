@@ -31,7 +31,7 @@ test('v310 desktop zoom reuses terrain GPU tiles instead of wiping cache every t
       const after=screenToWorld(clientX,clientY);
       return {start,smooth,otherTier,restored,textureUploadsAtZoom,
         cameraZoom:camera.zoom,anchorError:Math.hypot(before.x-after.x,before.y-after.y),
-        version:RTS_VERSION};
+        version:RTS_VERSION_INFO.version};
     });
     expect(result.version).toBe('1.3.58');
     expect(result.start.misses).toBeGreaterThan(0);
