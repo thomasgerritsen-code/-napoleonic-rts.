@@ -23,7 +23,10 @@
     if(d>4)return u.marchingV064?'marching':'moving';
     return'idle';
   }
-  function phase(u,speed=1){return(elapsed*speed+(u.id%11)*.37)*Math.PI*2;}
+  function phase(u,speed=1){
+    const renderTime=global.__NRTS_RENDER_CLOCK_V312__?.simulationTime ?? elapsed;
+    return(renderTime*speed+(u.id%11)*.37)*Math.PI*2;
+  }
   function palette(u){
     if(u.routing)return{coat:'#74736f',turnback:'#8b8983',trousers:'#777773',belt:'#b7b5ad',shako:'#343434',plume:'#777'};
     return u.side==='france'
