@@ -3,7 +3,7 @@ async function openLab(page,portrait=false){
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/graphics-lab/?pixi=off',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.__GRAPHICS_LAB_V319__?.getStats().loaded===6);
+  await page.waitForFunction(()=>window.__GRAPHICS_LAB_V319__?.getStats().loaded===10);
   return errors;
 }
 test('graphics lab loads six real independent SVG assets in isolated 2D scene',async({page})=>{
@@ -17,10 +17,10 @@ test('graphics lab loads six real independent SVG assets in isolated 2D scene',a
       title:document.title,
       old:document.getElementById('old-canvas').style.visibility};
   });
-  expect(state.version).toBe('319.0');
+  expect(state.version).toBe('320.0');
   expect(state.stats.engine).toContain('Canvas 2D');
-  expect(state.stats.loaded).toBe(6);
-  expect(state.stats.sprites).toBe(50);
+  expect(state.stats.loaded).toBe(10);
+  expect(state.stats.sprites).toBe(53);
   expect(state.pixel).toBe(true);
   expect(state.gameCanvas).toBe(false);
   expect(state.assets).toContain('battlefield.svg');
@@ -43,7 +43,7 @@ test('graphics lab old-vs-new comparison and sprite-count controls work',async({
   await page.locator('#count').selectOption('128');
   const news=await page.evaluate(()=>window.__GRAPHICS_LAB_V319__.getStats());
   expect(news.mode).toBe('new');
-  expect(news.sprites).toBe(146);
+  expect(news.sprites).toBe(149);
   await page.locator('#quality').selectOption('quality');
   expect(await page.locator('#resolution').textContent()).toContain('1.5');
   expect(errors).toEqual([]);
@@ -70,6 +70,6 @@ test('portrait mobile can pan, pinch, tap selection and recenter without orders'
   await page.getByRole('button',{name:'Camera centreren'}).click();
   const centered=await page.evaluate(()=>window.__GRAPHICS_LAB_V319__.getStats());
   expect(centered.zoom).toBeCloseTo(initial.zoom,2);
-  expect(centered.loaded).toBe(6);
+  expect(centered.loaded).toBe(10);
   expect(errors).toEqual([]);
 });
