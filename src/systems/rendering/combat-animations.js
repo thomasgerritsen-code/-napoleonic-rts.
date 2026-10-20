@@ -166,6 +166,16 @@
   }
 
   function drawSmoke(){
+    // Keep event pruning and wind authority here, even when the visual layer
+    // is drawn by a separate transparent WebGL2 canvas.
+    for(let i=smokeEvents.length-1;i>=0;i--){
+      const e=smokeEvents[i],age=elapsed-e.born;
+      if(age>=e.life||age<0)smokeEvents.splice(i,1);
+    }
+    const gpu=global.__GPU_SMOKE_V309__;
+    if(gpu?.draw?.(smokeEvents,elapsed,{
+      advanceSmoke,smokeProfile,smokePalette,seededOffset
+    }))return;
     if(!smokeEvents.length)return;
     ctx.save();ctx.lineCap='round';
     const zoom=Math.max(.1,camera.zoom||1);
