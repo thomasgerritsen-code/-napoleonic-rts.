@@ -166,18 +166,27 @@
     instances[i+5]=unit.routing?1:0;
     // Only real physical displacement advances the leg movement. A regiment
     // blocked before a bridge must stand, not march on the spot.
-    const now=Number(elapsed)||0;
+    // Read physical visual displacement over real rendered-frame time.
+    // At 120 Hz multiple draws can share one simulation tick, so elapsed
+    // would produce zero dt and make gait snap between moving and standing.
+    const clock=root.__NRTS_RENDER_CLOCK_V312__;
+    const now=clock ? clock.wallTime : (Number(elapsed)||0);
     const prev=lastMotion.get(unit.id);
     let gait=0;
     if(prev && now>prev.time && now-prev.time<.8){
       const dt=now-prev.time;
       const displacement=Math.hypot(unit.x-prev.x,unit.y-prev.y);
       const speed=displacement/dt;
-      if(speed>1.5 && speed<250 && displacement<30)gait=Math.min(1,speed/75);
+      const target=speed>1.5 && speed<250 && displacement<30
+        ? Math.min(1,speed/75) : 0;
+      // Smooth gait intensity across irregular browser frames; stopping
+      // soldiers ease to standing without feet flickering on/off.
+      gait=(prev.gait||0)+(target-(prev.gait||0))*Math.min(1,dt*16);
       stats.motionSamples++;
     }
-    lastMotion.set(unit.id,{x:unit.x,y:unit.y,time:now});
-    instances[i+6]=(now*1.85+(unit.id%11)*.37)*6.2831853;
+    lastMotion.set(unit.id,{x:unit.x,y:unit.y,time:now,gait});
+    const phaseTime=clock ? clock.simulationTime : (Number(elapsed)||0);
+    instances[i+6]=(phaseTime*1.85+(unit.id%11)*.37)*6.2831853;
     instances[i+7]=gait;
     if(gait>0.05)stats.animatedSoldiers++;
     count++;return true;
