@@ -6,7 +6,7 @@ test('v310 desktop zoom reuses terrain GPU tiles instead of wiping cache every t
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   try{
     await page.goto('/?test=v071',{waitUntil:'networkidle'});
-    await page.waitForFunction(()=>Boolean(__DESKTOP_TERRAIN_TILES_V301__&&__GPU_TERRAIN_V303__));
+    await page.waitForFunction(()=>Boolean(window.__DESKTOP_TERRAIN_TILES_V301__&&window.__GPU_TERRAIN_V303__));
     const result=await page.evaluate(()=>{
       const tiles=__DESKTOP_TERRAIN_TILES_V301__;
       const gpu=__GPU_TERRAIN_V303__;
@@ -56,8 +56,8 @@ test('v310 mobile pinch zoom reprojects cached static 2D map between full snapsh
   page.on('pageerror',e=>errors.push(e.message));
   try{
     await page.goto('/?test=v071',{waitUntil:'networkidle'});
-    await page.waitForFunction(()=>Boolean(__LARGE_ARMY_PERFORMANCE_V1__&&
-      __MOBILE_RENDER_BUDGET_V1__?.state()?.mobile));
+    await page.waitForFunction(()=>Boolean(window.__LARGE_ARMY_PERFORMANCE_V1__&&
+      window.__MOBILE_RENDER_BUDGET_V1__?.state()?.mobile));
     const result=await page.evaluate(()=>{
       const perf=__LARGE_ARMY_PERFORMANCE_V1__;
       camera.zoom=.85;
@@ -87,7 +87,7 @@ test('v310 mobile pinch zoom reprojects cached static 2D map between full snapsh
 
 test('v310 no GPU terrain retains correct zoom / Canvas fallback',async({page})=>{
   await page.goto('/?test=v071&gpu=off',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>Boolean(__DESKTOP_TERRAIN_TILES_V301__&&__GPU_TERRAIN_V303__));
+  await page.waitForFunction(()=>Boolean(window.__DESKTOP_TERRAIN_TILES_V301__&&window.__GPU_TERRAIN_V303__));
   const state=await page.evaluate(()=>{
     const tiles=__DESKTOP_TERRAIN_TILES_V301__;
     camera.zoom=1;tiles.invalidate();draw();
