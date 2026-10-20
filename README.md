@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.56
+# Napoleonic RTS — v1.3.57
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.57 — kruitrook op een eigen transparante GPU-laag (update 309)
+
+De bestaande 2D-kruitrookwolken van musketten, salvo's en kanonnen worden op desktop door één **WebGL2-instanced batch** getekend op een transparant canvas **boven** de soldaten en onder de DOM-bediening. Hierdoor blijft de rook voor de soldaten zichtbaar in plaats van achter het landschap te verdwijnen. De opbouw, levendige pluimen, mondingsstraal, ontwikkelende kleuren, roosterlimiet van 80 wolken en autonome **winddrift** gebruiken dezelfde simulatievrije gebeurtenisgegevens en seeds als de bestaande Canvas2D-rook.
+
+Er wordt geen rookfysica, wapenballistiek, schade, schotlimiet, wegvinding of gamestate verplaatst of aangepast. Schotflitsen, gevallen soldaten, impact-effecten en het uiterlijk op mobiel blijven via de oorspronkelijke 2D-canvasrenderer. Bij ontbrekende WebGL2, contextverlies of `?gpuSmoke=off` (of `?gpu=off`) neemt Canvas2D de rook automatisch over.
 
 ## v1.3.56 — GPU-rivierstroming met behoud van bochten en brugkolken (update 308)
 
