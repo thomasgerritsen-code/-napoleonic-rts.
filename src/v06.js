@@ -277,8 +277,38 @@ function randomRallyPointV06(b) {
 updateBuildings = function updateBuildingsV06(dt) {
   for(const b of buildings){if(b.dead||!b.complete||!b.queue.length)continue;b.production+=dt/b.queue[0].time;if(b.production<1)continue;const item=b.queue[0];if(populationUsed(b.side)+TYPES[item.type].pop>economies[b.side].popCap){b.production=.99;continue;}b.queue.shift();b.production=0;const spawn=openSpawnPointV06(b),u=createUnit(b.side,item.type,spawn.x,spawn.y),rally=randomRallyPointV06(b);u.targetX=rally.x;u.targetY=rally.y;u.spawnSettling=4;u.arrivedAtTarget=false;if(b.side==='france')statusEl.textContent=`${TYPES[item.type].label} is klaar en gaat naar het verzamelpunt.`;else aiPlan=`${TYPES[item.type].label} getraind`;if(u.type==='worker'&&u.side==='britain')autoAssignAIWorkers();}
 };
-function startRallyPlacementV06(){if(!selectedBuilding||!selectedBuilding.complete||!PRODUCTION_BUILDINGS_V06.has(selectedBuilding.type)){statusEl.textContent='Selecteer eerst een productiegebouw.';return;}rallyPlacementBuilding=selectedBuilding;buildMode=null;buildHintEl.textContent='Klik op het terrein voor het verzamelpunt · Esc om te annuleren';buildHintEl.classList.remove('hidden');statusEl.textContent=`Kies verzamelpunt voor ${BUILDINGS[selectedBuilding.type].label}.`;}
-canvas.addEventListener('mouseup',e=>{if(e.button!==0||!rallyPlacementBuilding)return;e.preventDefault();e.stopImmediatePropagation();drag.active=false;const w=screenToWorld(e.clientX,e.clientY);rallyPlacementBuilding.rallyX=Math.max(20,Math.min(WORLD.width-20,w.x));rallyPlacementBuilding.rallyY=Math.max(20,Math.min(WORLD.height-20,w.y));statusEl.textContent=`Verzamelpunt ingesteld voor ${BUILDINGS[rallyPlacementBuilding.type].label}.`;rallyPlacementBuilding=null;buildHintEl.classList.add('hidden');buildHintEl.textContent='Klik op het terrein om te bouwen · Esc om te annuleren';updateHud(true);},true);
+function startRallyPlacementV06(){
+  if(!selectedBuilding||selectedBuilding.dead||selectedBuilding.side!=='france'||
+     !selectedBuilding.complete||!PRODUCTION_BUILDINGS_V06.has(selectedBuilding.type)){
+    statusEl.textContent='Selecteer eerst een eigen productiegebouw.';return;
+  }
+  rallyPlacementBuilding=selectedBuilding;
+  buildMode=null;
+  buildHintEl.textContent='Tik of klik op het terrein voor verzamelpunt · sleep het vlaggetje om te verplaatsen · Esc om te annuleren';
+  buildHintEl.classList.remove('hidden');
+  statusEl.textContent=`Kies verzamelpunt voor ${BUILDINGS[selectedBuilding.type].label}.`;
+}
+// Shared authority for desktop mouse and mobile pointer gestures; changing
+// the existing rally never orders a troop or starts a new building.
+function finishRallyPlacementV06(x,y,building=rallyPlacementBuilding){
+  if(!building||building.dead||building.side!=='france'||!building.complete||
+     !PRODUCTION_BUILDINGS_V06.has(building.type)||!buildings.includes(building))return false;
+  building.rallyX=Math.max(20,Math.min(WORLD.width-20,x));
+  building.rallyY=Math.max(20,Math.min(WORLD.height-20,y));
+  statusEl.textContent=`Verzamelpunt ingesteld voor ${BUILDINGS[building.type].label}.`;
+  rallyPlacementBuilding=null;
+  buildHintEl.classList.add('hidden');
+  buildHintEl.textContent='Klik op het terrein om te bouwen · Esc om te annuleren';
+  actionSignature='';
+  updateHud(true);
+  return true;
+}
+canvas.addEventListener('mouseup',e=>{
+  if(e.button!==0||!rallyPlacementBuilding)return;
+  e.preventDefault();e.stopImmediatePropagation();drag.active=false;
+  const w=screenToWorld(e.clientX,e.clientY);
+  finishRallyPlacementV06(w.x,w.y);
+},true);
 addEventListener('keydown',e=>{if(e.key==='Escape'&&rallyPlacementBuilding){rallyPlacementBuilding=null;buildHintEl.classList.add('hidden');buildHintEl.textContent='Klik op het terrein om te bouwen · Esc om te annuleren';}},true);
 
 const queuePanelV06=document.createElement('aside');queuePanelV06.id='productionQueuePanel';queuePanelV06.className='hud production-queue hidden';queuePanelV06.setAttribute('aria-label','Productiewachtrij');document.getElementById('app').appendChild(queuePanelV06);
