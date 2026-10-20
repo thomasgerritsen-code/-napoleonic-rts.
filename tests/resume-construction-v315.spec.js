@@ -109,14 +109,16 @@ test('v315 mobile one-finger tap on an incomplete farm resumes farmers after a m
       isPrimary:true,clientX:p.x,clientY:p.y};
     canvas.dispatchEvent(new PointerEvent('pointerdown',opts));
     canvas.dispatchEvent(new PointerEvent('pointerup',opts));
-    return{task:u.task,targetId:u.buildingTarget?.id,selected:selectedUnits.has(u),
+    return{task:u.task,targetId:u.buildingTarget?.id,
+      selectedBuildingId:selectedBuilding?.id,workerDeselected:!selectedUnits.has(u),
       food:economies.france.food,wood:economies.france.wood,
       noRepay:economies.france.wood===afterPayment,stillIncomplete:!b.complete,
       mobileOrders:window.__PLAYABILITY_CONTROLS_V1__?.mobile?.stats?.()?.moveOrders??null};
   },setup);
   expect(state.task).toBe('build');
   expect(state.targetId).toBe(setup.buildingId);
-  expect(state.selected).toBe(true);
+  expect(state.selectedBuildingId).toBe(setup.buildingId);
+  expect(state.workerDeselected).toBe(true);
   expect(state.noRepay).toBe(true);
   expect(state.stillIncomplete).toBe(true);
   expect(errors).toEqual([]);
