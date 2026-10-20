@@ -34,7 +34,7 @@ function renderScale(){
    canvas.width=Math.max(1,Math.floor(rect.width*dpr));canvas.height=Math.max(1,Math.floor(rect.height*dpr));
    canvas.style.width=rect.width+'px';canvas.style.height=rect.height+'px';
  }
- if(state.pixi){state.pixi.renderer.resolution=dpr;state.pixi.renderer.resize(rect.width,rect.height);}
+ if(state.pixi){state.pixi.renderer.resize(rect.width,rect.height);}
  if(!state.customZoom)state.zoom=Math.min(1.30,Math.max(.36,Math.min(rect.width/1100,rect.height/650)));
  ui.resolution.textContent=dpr.toFixed(1)+'×';
  repositionPixi();
@@ -144,6 +144,7 @@ async function startPixi(){
      world.addChild(sp);
    }
    state.pixi=app;state.world=world;state.pixiTextures=tex;
+   unitGraphics.Sprite=Sprite;unitGraphics.Graphics=Graphics;
    syncSoldiersPixi(Sprite,Graphics);
    host.appendChild(app.canvas);
    app.canvas.className='pixi-layer';
@@ -224,7 +225,6 @@ function endPointer(e){
      const rect=viewport.getBoundingClientRect();
      const w=screenWorld(e.clientX-rect.left,e.clientY-rect.top);
      state.selected=w.x<715?'france':'britain';
-     if(state.pixi)syncSoldiersPixi(null,(Object.getPrototypeOf(state.selectionOutline?.constructor)||null)); // overridden below
      updateSelection();
    }
    pinch=null;wasGesture=false;
@@ -279,8 +279,9 @@ async function preload(){
  state.engine='Canvas 2D · getextureerd';ui.status.textContent='Sprites geladen · PixiJS wordt getest.';
  renderScale();updateStatus();
  requestAnimationFrame(drawFrame);
- // The full GPU path is optional; Canvas fallback is an actual sprite renderer.
- await startPixi();
+ // The GPU path is optional; ?pixi=off verifies offline Canvas sprite fallback.
+ if(new URLSearchParams(location.search).get('pixi')!=='off')await startPixi();
+ else{state.engine='Canvas 2D · offline sprites';ui.status.textContent='Offline demo: sprites direct op Canvas 2D.';updateStatus();}
 }
 preload().catch(err=>{
  ui.status.textContent='Laden van afbeeldingen mislukt.';
