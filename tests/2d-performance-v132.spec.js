@@ -87,6 +87,7 @@ test('normal play prioritizes viewport-culled 2D rendering with density LOD', as
   expect(lod.living).toBeGreaterThan(360);
   expect(lod.lodDraws).toBeGreaterThan(0);
   expect(lod.lodDraws + lod.fullDraws + lod.culled).toBeGreaterThan(300);
-  expect(lod.terrainInvalidations).toBeGreaterThanOrEqual(1);
+  // Zoom LOD may switch, but a camera zoom must never discard all cached tiles.
+  expect(lod.terrainInvalidations).toBe(0);
   expect(errors).toEqual([]);
 });

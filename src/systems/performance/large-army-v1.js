@@ -16,7 +16,8 @@
   const regimentMembersBeforePerformanceV12 = regimentMembers;
   const renderStats = {
     fullUnits:0,lodUnits:0,culledUnits:0,dprResizes:0,
-    staticTerrainCaptures:0,staticTerrainHits:0,staticTerrainInvalidations:0
+    staticTerrainCaptures:0,staticTerrainHits:0,staticTerrainInvalidations:0,
+    mobileZoomReprojections:0, mobileZoomRefreshes:0
   };
   let livingUnitCount = 0;
   let cameraFrame = { x:0, y:0, halfW:0, halfH:0, zoom:1 };
@@ -33,6 +34,7 @@
 
   let staticTerrainKey = '';
   let staticTerrainCapturedAt = -Infinity;
+  let mobileCapturedPose = null;
 
   const cellKey = (x, y) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
 
@@ -244,6 +246,31 @@
     staticCtx.clearRect(0,0,staticCanvas.width,staticCanvas.height);
   }
 
+  // v310: cheap, visual-only reprojection of the *existing* mobile
+  // static layer between snapshots. This avoids redrawing an entire map
+  // on each pinch pointer event; the simulation and hit testing still use
+  // the real current camera. Force a fresh raster when uncovered borders
+  // or the stored image becomes too stale.
+  function reprojectMobileTerrain(now) {
+    if (!mobileCapturedPose || now - staticTerrainCapturedAt > 95) return false;
+    const scale = camera.zoom / mobileCapturedPose.zoom;
+    if (!Number.isFinite(scale) || scale < .88 || scale > 1.14) return false;
+    const dx = innerWidth * (1 - scale) / 2 +
+      (mobileCapturedPose.x - camera.x) * camera.zoom;
+    const dy = innerHeight * (1 - scale) / 2 +
+      (mobileCapturedPose.y - camera.y) * camera.zoom;
+    const right = dx + innerWidth * scale;
+    const bottom = dy + innerHeight * scale;
+    // Do not let the cached bitmap uncover a visible slice of the world.
+    if (dx > 22 || dy > 22 || right < innerWidth - 22 ||
+        bottom < innerHeight - 22) return false;
+    staticCanvas.style.transformOrigin = '0 0';
+    staticCanvas.style.transform =
+      `translate(${dx}px, ${dy}px) scale(${scale})`;
+    renderStats.mobileZoomReprojections++;
+    return true;
+  }
+
   drawTerrain = function drawTerrainCachedV132() {
     refreshCameraFrame();
     const now = performance.now();
@@ -264,13 +291,23 @@
     const cameraChanged = key !== staticTerrainKey;
     const refreshExpired = now - staticTerrainCapturedAt >= STATIC_TERRAIN_REFRESH_MS;
 
-    if (cameraChanged || refreshExpired) {
+    const mobile = !!global.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile;
+    const preview = mobile && cameraChanged && !refreshExpired &&
+      reprojectMobileTerrain(now);
+    if (preview) {
+      renderStats.staticTerrainHits++;
+    } else if (cameraChanged || refreshExpired) {
       if (cameraChanged && staticTerrainKey) renderStats.staticTerrainInvalidations++;
+      // Reset CSS projection before replacing the cached source pixels.
+      staticCanvas.style.transform = 'none';
       clearStaticTerrain();
       drawStaticTerrainSource();
       staticCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
       staticTerrainKey = key;
       staticTerrainCapturedAt = now;
+      mobileCapturedPose = mobile
+        ? { x:camera.x, y:camera.y, zoom:camera.zoom } : null;
+      if (mobile) renderStats.mobileZoomRefreshes++;
       renderStats.staticTerrainCaptures++;
     } else {
       renderStats.staticTerrainHits++;
@@ -305,6 +342,8 @@
     staticCanvas.style.height = `${innerHeight}px`;
     staticTerrainKey = '';
     staticTerrainCapturedAt = -Infinity;
+    mobileCapturedPose = null;
+    staticCanvas.style.transform = 'none';
     desktopTiles?.invalidate();
     renderStats.dprResizes++;
   }

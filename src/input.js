@@ -27,7 +27,13 @@
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     const before = screenToWorld(e.clientX, e.clientY);
-    camera.zoom = Math.max(0.42, Math.min(1.55, camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1)));
+    // v310: pixel-precise zoom for wheels and trackpads. One native wheel
+    // event may contain only a few pixels; never jump 10% per event.
+    const pixels = e.deltaY * (e.deltaMode === 1 ? 16 :
+      e.deltaMode === 2 ? innerHeight : 1);
+    const bounded = Math.max(-120, Math.min(120, pixels));
+    camera.zoom = Math.max(0.42, Math.min(1.55,
+      camera.zoom * Math.exp(-bounded * .0011)));
     const after = screenToWorld(e.clientX, e.clientY);
     camera.x += before.x - after.x; camera.y += before.y - after.y; clampCamera();
   }, { passive: false });
