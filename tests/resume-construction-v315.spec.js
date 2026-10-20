@@ -64,11 +64,16 @@ test('v315 right-click unfinished building resumes selected farmer instead of mo
   const point=await page.evaluate(({workerId,buildingId})=>{
     const u=units.find(x=>x.id===workerId),b=buildings.find(x=>x.id===buildingId);
     issueMove(b.x+200,b.y+120);
-    camera.x=b.x;camera.y=b.y;clampCamera();
+    // A central, unobscured canvas click tests actual desktop pointer input.
+    // Zooming in ensures the building does not land underneath the HUD.
+    camera.zoom=1.25;camera.x=b.x;camera.y=b.y;clampCamera();
     const p=worldToScreen(b.x,b.y);
-    return {x:p.x,y:p.y,taskBefore:u.task,buildingId:b.id};
+    const target=document.elementFromPoint(p.x,p.y);
+    return {x:p.x,y:p.y,taskBefore:u.task,buildingId:b.id,
+      hitTag:target?.tagName||null,hitId:target?.id||null};
   },setup);
   expect(point.taskBefore).not.toBe('build');
+  expect(point.hitId).toBe('game');
   await page.mouse.click(point.x,point.y,{button:'right'});
   const state=await page.evaluate(({workerId,buildingId})=>{
     const u=units.find(x=>x.id===workerId);
