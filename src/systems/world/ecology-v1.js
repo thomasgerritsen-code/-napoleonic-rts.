@@ -278,7 +278,10 @@
       const [cx,cy]=countrysideSites[siteIndex];
       for(let slot=0;slot<countrysidePerSite;slot++){
         let spot=null;
-        for(let ring=0;ring<10&&!spot;ring++){
+        // Large rivers and dense villages can fill the first few rings.
+        // Search farther within the same countryside district rather than
+        // silently skipping an entire food patch.
+        for(let ring=0;ring<34&&!spot;ring++){
           const radius=65+ring*21;
           for(let step=0;step<24;step++){
             const angle=(slot*.61803398875+siteIndex*.173+step/24)*Math.PI*2;
