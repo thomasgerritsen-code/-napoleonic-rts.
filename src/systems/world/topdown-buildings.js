@@ -24,7 +24,8 @@
     return palettes[Math.floor(hash01(seed) * palettes.length) % palettes.length];
   }
 
-  function drawRoofPlan(w, h, seed, accent, complete = true) {
+  function drawRoofPlan(w, h, seed, accent, complete = true, renderCtx = ctx) {
+    const ctx = renderCtx;
     const [base, light, dark] = roofPalette(seed);
     const eave = Math.max(1.8, Math.min(4.5, Math.min(w, h) * .08));
     const longHorizontal = w >= h;
@@ -177,8 +178,10 @@
     }
   }
 
-  function drawGameplayRoof(w, h, type, sideColor, complete) {
-    drawRoofPlan(w, h, 9000 + w * 31 + h * 17 + String(type).length * 101, null, complete);
+  function drawGameplayRoof(w, h, type, sideColor, complete, renderCtx = ctx) {
+    const ctx = renderCtx;
+    drawRoofPlan(w, h, 9000 + w * 31 + h * 17 + String(type).length * 101,
+      null, complete, ctx);
 
     // Identification is painted on the roof rather than represented as a visible wall block.
     ctx.fillStyle = sideColor;
@@ -193,15 +196,7 @@
     }
   }
 
-  drawBuilding = function drawBuildingTopDown(b) {
-    if (b.dead) return;
-    const side = b.side === 'france' ? COLORS.france : COLORS.britain;
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    ctx.globalAlpha = b.complete ? 1 : .65;
-
-    drawGameplayRoof(b.w, b.h, b.type, side, b.complete);
-
+  function drawGameplayIndicatorsAt(b) {
     if (selectedBuilding === b) {
       ctx.strokeStyle = COLORS.selected;
       ctx.lineWidth = 3 / camera.zoom;
@@ -220,8 +215,46 @@
       ctx.fillStyle = '#d56a58';
       ctx.fillRect(-b.w / 2, -b.h / 2 - 10, b.w * Math.max(0, b.hp / b.maxHp), 4);
     }
+  }
+
+  function paintGameplayRoofOffscreen(b, outputCtx) {
+    if (!b || !outputCtx || b.dead) return false;
+    const side = b.side === 'france' ? COLORS.france : COLORS.britain;
+    drawGameplayRoof(b.w, b.h, b.type, side, b.complete, outputCtx);
+    return true;
+  }
+
+  function drawGameplayIndicatorsOnCanvas(b) {
+    if (!b || b.dead) return;
+    ctx.save();
+    ctx.translate(b.x,b.y);
+    ctx.globalAlpha = b.complete ? 1 : .65;
+    drawGameplayIndicatorsAt(b);
+    ctx.restore();
+  }
+
+  drawBuilding = function drawBuildingTopDown(b) {
+    if (b.dead) return;
+    const side = b.side === 'france' ? COLORS.france : COLORS.britain;
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.globalAlpha = b.complete ? 1 : .65;
+    drawGameplayRoof(b.w,b.h,b.type,side,b.complete);
+    drawGameplayIndicatorsAt(b);
     ctx.restore();
   };
+
+  // Reuse the *same* top-down roof geometry for offscreen GPU atlas sprites.
+  // Selection, HP bars, and build/production progress are still drawn live on
+  // the original 2D canvas and never baked into a cached roof texture.
+  global.__TOPDOWN_BUILDING_V307__ = Object.freeze({
+    paintRoof:paintGameplayRoofOffscreen,
+    drawIndicators:drawGameplayIndicatorsOnCanvas,
+    hasIndicators:b=>selectedBuilding===b || !b.complete ||
+      !!b.queue?.length || b.hp < b.maxHp,
+    exactRoofGeometry:true,
+    dynamicIndicatorsOnCanvas:true
+  });
 
   if (typeof drawHouseV069 === 'function') {
     drawHouseV069 = function drawHouseStrictTopDown(house, index) {
