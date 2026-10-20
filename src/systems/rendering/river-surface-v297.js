@@ -78,12 +78,15 @@
     ctx.save();
     // Sediment apron / vegetation, soft wet mud, light shallow border and
     // deep olive-blue channel. No opaque shoreline stroke or straight dashes.
-    ribbon(RIVER_NAV_HALF_WIDTH_V067+23,'rgba(86,91,64,.20)');
-    ribbon(RIVER_NAV_HALF_WIDTH_V067+13,'rgba(103,94,70,.30)');
-    ribbon(RIVER_NAV_HALF_WIDTH_V067+5,'rgba(91,85,64,.36)');
-    ribbon(RIVER_NAV_HALF_WIDTH_V067-5,'rgba(119,148,130,.91)');
-    ribbon(RIVER_NAV_HALF_WIDTH_V067-15,'rgba(80,128,133,.91)');
-    ribbon(RIVER_NAV_HALF_WIDTH_V067-32,'rgba(52,97,114,.62)');
+    // Historic painterly palette: moss / wet loam on the banks, muted
+    // slate-blue midstream, pale desaturated green shallows. Exactly the same
+    // ribbons, masks and flow mechanics as v297/v299 remain in use.
+    ribbon(RIVER_NAV_HALF_WIDTH_V067+23,'rgba(99,102,74,.22)');
+    ribbon(RIVER_NAV_HALF_WIDTH_V067+13,'rgba(112,101,77,.30)');
+    ribbon(RIVER_NAV_HALF_WIDTH_V067+5,'rgba(86,81,66,.36)');
+    ribbon(RIVER_NAV_HALF_WIDTH_V067-5,'rgba(134,153,138,.87)');
+    ribbon(RIVER_NAV_HALF_WIDTH_V067-15,'rgba(77,119,126,.91)');
+    ribbon(RIVER_NAV_HALF_WIDTH_V067-32,'rgba(48,88,105,.66)');
     // Desktop tiles contain only stationary water color; animate the flow
     // separately over cached terrain every frame. Mobile retains its old path.
     if(!global.__STATIC_TERRAIN_CAPTURE_V301__)drawFlow(typeof elapsed==='number'?elapsed:0);
