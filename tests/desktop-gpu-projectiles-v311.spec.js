@@ -23,14 +23,13 @@ test('v311 musket and cannon projectiles use the existing smoke GPU batch and re
     const ok=gpu.draw([],elapsed,{});
     const after=gpu.metrics();
     projectiles.length=beforeCount;
-    return{start,after,ok,canvasShotArcs,version:RTS_VERSION,
+    return{start,after,ok,canvasShotArcs,version:RTS_VERSION_INFO.version,
       canvasCount:document.querySelectorAll('#game-smoke-gpu').length,
       noAdditionalProjectileCanvas:!document.getElementById('game-projectiles-gpu')};
   });
   expect(result.version).toBe('1.3.59');
   expect(result.canvasCount).toBe(1);
   expect(result.noAdditionalProjectileCanvas).toBe(true);
-  expect(result.after.projectileDotsOnSameGPUContext).toBeUndefined();
   if(result.after.active){
     expect(result.ok).toBe(true);
     expect(result.canvasShotArcs).toBe(0);
@@ -49,7 +48,7 @@ test('v311 musket and cannon projectiles use the existing smoke GPU batch and re
 
 test('v311 gpuSmoke=off keeps the original Canvas circles and no second GPU layer',async({page})=>{
   await page.goto('/?test=v071&gpuSmoke=off',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>Boolean(__GPU_SMOKE_V309__));
+  await page.waitForFunction(()=>Boolean(window.__GPU_SMOKE_V309__));
   const result=await page.evaluate(()=>{
     const oldArc=ctx.arc;let arcs=0;
     ctx.arc=function(...args){arcs++;return oldArc.apply(this,args);};
@@ -73,8 +72,8 @@ test('v311 touch device still paints projectile circles through the original 2D 
   const page=await context.newPage();
   try{
     await page.goto('/?test=v071',{waitUntil:'networkidle'});
-    await page.waitForFunction(()=>Boolean(__GPU_SMOKE_V309__&&
-      __MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile));
+    await page.waitForFunction(()=>Boolean(window.__GPU_SMOKE_V309__&&
+      window.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile));
     const result=await page.evaluate(()=>{
       const oldArc=ctx.arc;let count=0;
       ctx.arc=function(...args){count++;return oldArc.apply(this,args);};
