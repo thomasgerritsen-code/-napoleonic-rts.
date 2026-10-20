@@ -66,7 +66,9 @@ test('v315 right-click unfinished building resumes selected farmer instead of mo
     issueMove(b.x+200,b.y+120);
     // A central, unobscured canvas click tests actual desktop pointer input.
     // Zooming in ensures the building does not land underneath the HUD.
-    camera.zoom=1.25;camera.x=b.x;camera.y=b.y;clampCamera();
+    // Center the test site exactly for the desktop hit assertion. Map-level
+    // camera clamp may shift randomized edge placements outside this viewport.
+    camera.zoom=1.25;camera.x=b.x;camera.y=b.y;
     const p=worldToScreen(b.x,b.y);
     const target=document.elementFromPoint(p.x,p.y);
     return {x:p.x,y:p.y,taskBefore:u.task,buildingId:b.id,
