@@ -254,6 +254,9 @@
       renderStats.staticTerrainCaptures += latest.misses - previous.misses;
       renderStats.staticTerrainHits += latest.hits - previous.hits;
       renderStats.staticTerrainInvalidations += latest.invalidations - previous.invalidations;
+      // v308: animated current is not part of world-aligned terrain tiles.
+      // Always draw its independent overlay, even when the GPU is disabled.
+      global.__RIVER_FLOW_2D_V299__?.draw?.(typeof elapsed==='number'?elapsed:0);
       if (drawAmbientTerrainOverlay) drawAmbientTerrainOverlay();
       return;
     }
@@ -273,6 +276,9 @@
       renderStats.staticTerrainHits++;
     }
 
+    // The fallback desktop cache also omits animated current from its source.
+    if (!global.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile)
+      global.__RIVER_FLOW_2D_V299__?.draw?.(typeof elapsed==='number'?elapsed:0);
     if (drawAmbientTerrainOverlay) drawAmbientTerrainOverlay();
   };
 

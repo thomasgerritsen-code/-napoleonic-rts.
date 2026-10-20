@@ -59,7 +59,7 @@
       'out vec4 color;',
       'void main(){',
       '  // Anti-aliased, tapering centre-strands. No horizontal screen stripes.',
-      '  float taper=smoothstep(1.0,.56,abs(local.x));',
+      '  float taper=1.0-smoothstep(.56,1.0,abs(local.x));',
       '  float slightBend=sin(local.x*2.1)*.14;',
       '  float cross=abs(local.y-slightBend);',
       '  float filament=1.0-smoothstep(.22,.82,cross);',
@@ -115,7 +115,7 @@
         data[i+7]=style;
         count++;
       }
-      for(let i=0;i<BASE_RIPPLES;i++)add(river.sample(i,time),i%4===0?0:0);
+      for(let i=0;i<BASE_RIPPLES;i++)add(river.sample(i,time),0);
       for(let i=0;i<SHALLOW_RIPPLES;i++){
         const w=river.sample(i+1000,time*.78);
         if(Math.abs(w.lane)<.58)continue;
