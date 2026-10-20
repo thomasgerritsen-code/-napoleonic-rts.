@@ -292,6 +292,17 @@
       return;
     }
     mobile.taps++;
+    // Tapping an unfinished building with farmers selected resumes construction
+    // instead of dropping selection or issuing a ghost move order. Without
+    // selected farmers the building is still selectable for its Resume button.
+    const buildingTarget=buildingAt(endWorld.x,endWorld.y,'france');
+    const construction=root.__RESUME_CONSTRUCTION_V315__;
+    if(construction?.unfinished?.(buildingTarget) &&
+      [...selectedUnits].some(u=>!u.dead&&u.type==='worker'&&u.side==='france')){
+      const assigned=construction.resumeSelected(buildingTarget);
+      hint(assigned?'Boeren hervatten bouw':'Boeren bouwen hier al');
+      return;
+    }
     const hit = touchHitAt(clientX, clientY);
     if (hit) {
       const regimentMultiselect = root.__MOBILE_REGIMENT_MULTISELECT_V1__;
