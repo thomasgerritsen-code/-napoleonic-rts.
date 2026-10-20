@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "frameWidth": 96,
+  "frameHeight": 96,
+  "atlasColumns": 6,
+  "atlasRows": 3,
+  "pivot": {
+    "x": 48,
+    "y": 78
+  },
+  "referenceFacing": "screen-right",
+  "states": {
+    "idle": {
+      "frames": 2,
+      "frameMs": 500,
+      "loop": true
+    },
+    "march": {
+      "frames": 6,
+      "frameMs": 110,
+      "loop": true
+    },
+    "aim": {
+      "frames": 2,
+      "frameMs": 260,
+      "loop": false
+    },
+    "fire": {
+      "frames": 3,
+      "frameMs": 95,
+      "loop": false
+    },
+    "reload": {
+      "frames": 4,
+      "frameMs": 425,
+      "loop": false
+    }
+  },
+  "muzzleEvent": {
+    "state": "fire",
+    "frame": 1
+  }
+}
