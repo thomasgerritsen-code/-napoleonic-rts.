@@ -27,7 +27,10 @@ async function site(page,type='house'){
     const afterInterrupt=u.task;
     selectedUnits.clear();selectedBuilding=null;
     actionSignature='';updateHud(true);
-    camera.zoom=1.35;camera.x=b.x;camera.y=b.y;clampCamera();
+    // The harness deliberately centers the site; camera clamping depends on
+    // generated map bounds and can put random house sites outside the test viewport.
+    // The real touchscreen still targets the visible canvas pixel.
+    camera.zoom=1.35;camera.x=b.x;camera.y=b.y;
     const p=worldToScreen(b.x,b.y);
     return{workerId:u.id,buildingId:b.id,x:p.x,y:p.y,afterInterrupt,
       wood:economies.france.wood,woodCost:initialWood-economies.france.wood,
