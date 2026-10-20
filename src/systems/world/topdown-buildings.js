@@ -180,6 +180,27 @@
 
   function drawGameplayRoof(w, h, type, sideColor, complete, renderCtx = ctx) {
     const ctx = renderCtx;
+    if(type==='farm'){
+      // Strict 2D: a tilled rectangular field with alternating cereal rows.
+      // Exact same geometry paints to Canvas and to the GPU-building atlas.
+      ctx.fillStyle=complete?'#82633f':'#746d5b';
+      ctx.fillRect(-w/2,-h/2,w,h);
+      ctx.strokeStyle='rgba(54,45,30,.88)';
+      ctx.lineWidth=2;
+      ctx.strokeRect(-w/2,-h/2,w,h);
+      for(let row=0;row<8;row++){
+        const y=-h/2+9+(row+0.5)*(h-18)/8;
+        ctx.fillStyle=row%2===0?'rgba(56,45,29,.55)':'rgba(110,83,45,.7)';
+        ctx.fillRect(-w/2+8,y-2,w-16,4);
+        if(!complete)continue;
+        ctx.fillStyle=row%3===0?'#aa9b4c':'#c2b369';
+        for(let col=0;col<15;col++){
+          const x=-w/2+11+(col+.5)*(w-22)/15;
+          ctx.fillRect(x-1,y-3,2,6);
+        }
+      }
+      return;
+    }
     drawRoofPlan(w, h, 9000 + w * 31 + h * 17 + String(type).length * 101,
       null, complete, ctx);
 
@@ -197,6 +218,13 @@
   }
 
   function drawGameplayIndicatorsAt(b) {
+    if(b.type==='farm'&&b.complete){
+      const ratio=Math.max(0,Math.min(1,(b.cropStock||0)/Math.max(1,b.cropCapacity||240)));
+      ctx.fillStyle='rgba(34,29,21,.8)';
+      ctx.fillRect(-b.w/2,b.h/2+8,b.w,5);
+      ctx.fillStyle='#d1bb62';
+      ctx.fillRect(-b.w/2,b.h/2+8,b.w*ratio,5);
+    }
     if (selectedBuilding === b) {
       ctx.strokeStyle = COLORS.selected;
       ctx.lineWidth = 3 / camera.zoom;
@@ -250,7 +278,7 @@
   global.__TOPDOWN_BUILDING_V307__ = Object.freeze({
     paintRoof:paintGameplayRoofOffscreen,
     drawIndicators:drawGameplayIndicatorsOnCanvas,
-    hasIndicators:b=>selectedBuilding===b || !b.complete ||
+    hasIndicators:b=>b.type==='farm' || selectedBuilding===b || !b.complete ||
       !!b.queue?.length || b.hp < b.maxHp,
     exactRoofGeometry:true,
     dynamicIndicatorsOnCanvas:true
