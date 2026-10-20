@@ -385,7 +385,7 @@
   }
 
   const api=Object.freeze({
-    version:'battlefield-ecology-v1.10-large-army-berries',
+    version:'battlefield-ecology-v1.10-large-army-base-berries',
     validSpot:validResourceSpot,
     nearestSafe:nearestEcologySpot,
     insideVillage,
