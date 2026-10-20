@@ -21,7 +21,7 @@ test('v309 GPU black powder smoke follows real combat events, drifting wind and 
     const after=gpu.metrics();
     const moved=combat.smokeSnapshot().find(e=>e.born===origin.born);
     return{origin,moved,initial,after,
-      source:combat.smokeStats(),version:RTS_VERSION,
+      source:combat.smokeStats(),version:RTS_VERSION_INFO.version,
       shooterUnchanged:shooter.x===pos.x&&shooter.y===pos.y,
       no3D:!document.querySelector('#battlefield3d'),
       smokeCanvas:document.querySelectorAll('#game-smoke-gpu').length,
