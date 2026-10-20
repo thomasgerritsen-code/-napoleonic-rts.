@@ -5,8 +5,9 @@
 (function installTerrainTilesV301(root) {
   const CACHE_BYTES = 80 * 1024 * 1024;
   const tiles = new Map();
-  const stats = { hits:0, misses:0, evictions:0, invalidations:0, composites:0 };
-  let bytes = 0, profile = '';
+  const stats = { hits:0, misses:0, evictions:0, invalidations:0,
+    composites:0, zoomProfileSwitches:0 };
+  let bytes = 0, profile = '', previousRasterZoom = null;
 
   function invalidate() {
     root.__GPU_TERRAIN_V303__?.invalidate?.();
@@ -14,6 +15,7 @@
     tiles.clear();
     bytes = 0;
     profile = '';
+    previousRasterZoom = null;
   }
 
   function capture(drawBase, tx, ty, tileCss, tilePx, rasterZoom, dpr) {
@@ -52,14 +54,23 @@
 
   function draw(drawBase, outputCtx) {
     const liveZoom = Math.max(.05, camera.zoom);
-    // Reuse tiles while a smoothed zoom changes by less than 0.025.
-    const rasterZoom = Math.max(.05, Math.round(liveZoom * 40) / 40);
+    // v310: stable terrain texture LODs. The previous 0.025 zoom steps
+    // invalidated the *entire* 80 MB tile cache repeatedly during each
+    // mousewheel gesture. Keep four reusable texture levels and only select
+    // a different level after crossing a broad zoom band.
+    const rasterZoom = liveZoom < .64 ? .55 :
+      liveZoom < .91 ? .78 : liveZoom < 1.26 ? 1 : 1.35;
+    if (previousRasterZoom !== null && previousRasterZoom !== rasterZoom)
+      stats.zoomProfileSwitches++;
+    previousRasterZoom = rasterZoom;
     const dpr = canvas.width / Math.max(1, innerWidth);
     // Tiles must always fit on the current scratch canvas.
-    const tileCss = Math.max(1, Math.floor(Math.min(1024, innerWidth, innerHeight)));
+    // Smaller raster chunks cap long synchronous paint stalls on a cache miss.
+    const tileCss = Math.max(1, Math.floor(Math.min(640, innerWidth, innerHeight)));
     const tilePx = Math.max(1, Math.floor(tileCss * dpr));
     const step = tileCss / rasterZoom;
-    const nextProfile = [rasterZoom, dpr.toFixed(5), tileCss,
+    // DPR/viewport changes still invalidate; camera zoom now does NOT.
+    const nextProfile = [dpr.toFixed(5), tileCss,
       canvas.width, canvas.height].join(':');
     if (profile !== nextProfile) {
       invalidate();
@@ -82,7 +93,7 @@
     try {
       for (let ty = y0; ty <= y1; ty++) {
         for (let tx = x0; tx <= x1; tx++) {
-          const key = tx + ':' + ty;
+          const key = rasterZoom + ':' + tx + ':' + ty;
           let tile = tiles.get(key);
           if (tile) {
             tiles.delete(key);
