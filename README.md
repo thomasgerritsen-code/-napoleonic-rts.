@@ -1,4 +1,4 @@
-# Napoleonic RTS — v1.3.57
+# Napoleonic RTS — v1.3.58
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
 
@@ -7,6 +7,12 @@ Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De
 GitHub Pages:
 
 https://thomasgerritsen-code.github.io/-napoleonic-rts./
+
+## v1.3.58 — vloeiender zoomen op desktop en telefoon (update 310)
+
+Tijdens het in- en uitzoomen werden op desktop bij elke 0,025 zoomverschil tientallen grote terreintegels opnieuw gerasterd en bestaande GPU-texturen weggegooid. De cache heeft nu vier grovere, herbruikbare rasterdetailniveaus (met kleinere 640px tegels) zodat de camerazoom binnen een niveau door de GPU wordt geschaald. Zoomwisselingen **maken de volledige cache niet langer leeg**, zolang schermresolutie en DPR gelijk blijven.
+
+Op de telefoon gebruikt de bestaande statische Canvas2D-terreinlaag tussen twee volledige landschapsopnames een zeer korte CSS-transformatie om de camerabeweging/knijpzoom visueel te volgen. De kaart wordt uiterlijk na 95 ms of bij zichtbare kaartranden opnieuw getekend; eenheden, bediening, simulatie, selectie, botsingen en marsorders behouden hun oorspronkelijke actuele posities. Geen extra WebGL-functie of 3D. Muisscroll en trackpad geven nu pixelnauwkeurige kleinere zoomstappen, met behoud van het wereldpunt onder de cursor. Een regressietest controleert hergebruik bij meerdere zoomstappen, mobiele voorlopige weergave en een fallback naar een volledig nieuw terreinbeeld.
 
 ## v1.3.57 — kruitrook op een eigen transparante GPU-laag (update 309)
 
