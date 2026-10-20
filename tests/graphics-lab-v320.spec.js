@@ -1,4 +1,6 @@
 const {test,expect}=require('@playwright/test');
+// Real touchscreen injection requires a touch-enabled context; viewport alone is insufficient.
+test.use({hasTouch:true});
 async function open(page,url='/graphics-lab/?pixi=off'){
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
