@@ -71,7 +71,9 @@ test('v316 real mobile touch resumes original builder after unit selection has b
   expect(later.newValue).toBeGreaterThan(later.old);
   expect(errors).toEqual([]);
 });
-test('v316 mobile touch can resume farm after another soldier was selected',async({page})=>{
+test('v316 mobile portrait touch resumes farm after another soldier was selected',async({page})=>{
+  // Portrait iPhone-style gameplay has a taller HUD and a narrower canvas.
+  await page.setViewportSize({width:390,height:844});
   const errors=await start(page);
   const construction=await site(page,'farm');
   expect(construction.hitId).toBe('game');
