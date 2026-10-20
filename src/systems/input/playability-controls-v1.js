@@ -204,6 +204,16 @@
   function selectedCanMove() {
     return [...selectedUnits].some(u => u && !u.dead);
   }
+  // Only the selected player's completed production building has a draggable
+  // flag. Compare in SCREEN pixels so the target remains finger-sized at zoom.
+  function draggableRallyAt(clientX,clientY){
+    const b=selectedBuilding;
+    if(!b||b.dead||b.side!=='france'||!b.complete||
+       !PRODUCTION_BUILDINGS_V06.has(b.type)||!Number.isFinite(b.rallyX)||
+       !Number.isFinite(b.rallyY))return null;
+    const p=worldToScreen(b.rallyX,b.rallyY);
+    return Math.hypot(clientX-p.x,clientY-(p.y-3))<=30?b:null;
+  }
   function pairMetrics() {
     const pts = [...mobile.pointers.values()].slice(0, 2);
     if (pts.length < 2) return null;
@@ -250,9 +260,13 @@
     const w = screenToWorld(e.clientX, e.clientY);
     mobile.pointers.set(e.pointerId, {
       id: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY,
-      startWorld: w, startHit: touchHitAt(e.clientX, e.clientY), moved: false, multi: false
+      startWorld: w, startHit: touchHitAt(e.clientX, e.clientY),
+      rallyDragBuilding: !buildMode&&!rallyPlacementBuilding?draggableRallyAt(e.clientX,e.clientY):null,
+      moved: false, multi: false
     });
     if (mobile.pointers.size >= 2) beginPinch();
+    else if(rallyPlacementBuilding)hint('Tik op terrein: kies verzamelpunt · 2 vingers: camera');
+    else if(mobile.pointers.get(e.pointerId)?.rallyDragBuilding)hint('Sleep het gele vlaggetje naar het nieuwe verzamelpunt');
     else hint(selectedCanMove() ? 'Tik terrein: verplaats · sleep terrein: richting' : 'Tik unit: selecteer · sleep: vakselectie');
   }
   function onTouchPointerMove(e) {
@@ -267,7 +281,9 @@
       updatePinch();
       return;
     }
-    if (p.moved) hint(selectedCanMove() && !p.startHit ? 'Laat los: verplaats met deze frontrichting' : 'Laat los: selecteer dit gebied');
+    if(p.moved&&p.rallyDragBuilding)hint('Laat los: verzamelpunt verplaatsen');
+    else if (p.moved && !rallyPlacementBuilding)
+      hint(selectedCanMove() && !p.startHit ? 'Laat los: verplaats met deze frontrichting' : 'Laat los: selecteer dit gebied');
   }
   function finishSingleTouch(p, clientX, clientY) {
     const moved = p.moved || Math.hypot(clientX - p.sx, clientY - p.sy) > MOBILE_DRAG_PX;
@@ -275,6 +291,21 @@
     if (buildMode) {
       if (!moved) placeBuilding(buildMode, endWorld.x, endWorld.y);
       hint('Bouwplaats gekozen');
+      return;
+    }
+    // Rally destination placement must take precedence over unit selection,
+    // resume-construction taps and ordinary move orders. The desktop rally
+    // input uses mouseup; this touch pointer route had been missing entirely.
+    if(rallyPlacementBuilding){
+      if(finishRallyPlacementV06(endWorld.x,endWorld.y))hint('Verzamelpunt ingesteld');
+      return;
+    }
+    // Direct one-finger dragging of the selected building's yellow flag is
+    // also supported, without first selecting the 'Verzamelpunt' action.
+    // A mere tap on the flag is NOT a move command.
+    if(p.rallyDragBuilding){
+      if(moved && finishRallyPlacementV06(endWorld.x,endWorld.y,p.rallyDragBuilding))
+        hint('Verzamelpunt verplaatst');
       return;
     }
     // Prioritize unfinished friendly buildings over an ordinary move or
