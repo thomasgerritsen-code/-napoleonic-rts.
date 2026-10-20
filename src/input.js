@@ -143,8 +143,22 @@
     const dt = Math.min(0.033, (now - lastTime) / 1000);
     lastTime = now;
     if (!TEST_MANUAL_SIMULATION) update(dt);
-    if (typeof window.renderStableFrameV1 === 'function') window.renderStableFrameV1(() => draw(), now);
-    else draw();
+    // v312: animation uses the interpolated render clock rather than the
+    // 60 Hz simulation clock. Visual-only: no pathing, combat or speed changes.
+    const fixedDt = typeof V071_FIXED_DT === 'number' ? V071_FIXED_DT : 1 / 60;
+    const alpha = typeof V071_RENDER_ALPHA === 'number'
+      ? Math.max(0, Math.min(1, V071_RENDER_ALPHA)) : 1;
+    window.__NRTS_RENDER_CLOCK_V312__ = {
+      simulationTime: Math.max(0, elapsed - (1 - alpha) * fixedDt),
+      wallTime: now / 1000
+    };
+    try {
+      if (typeof window.renderStableFrameV1 === 'function') window.renderStableFrameV1(() => draw(), now);
+      else draw();
+    } finally {
+      // Direct draw() calls in deterministic regression tests still read elapsed.
+      window.__NRTS_RENDER_CLOCK_V312__ = null;
+    }
     requestAnimationFrame(frame);
   }
 
