@@ -92,8 +92,29 @@
     sendSelectedWorkersToBuild(b);
     return true;
   }
-  canvas.addEventListener('mouseup',event=>{
-    if(event.button===2)resumeAtPointer(event);
+  // Capture at window level, before the game's older unit-order listeners
+  // can consume the right-button release. Distinguish click from right-drag.
+  let rightBuildGesture=null;
+  root.addEventListener('mousedown',event=>{
+    if(event.button!==2||event.target!==canvas||buildMode)return;
+    const p=screenToWorld(event.clientX,event.clientY);
+    const target=buildingAt(p.x,p.y,'france');
+    if(!unfinishedFriendlyBuilding(target))return;
+    rightBuildGesture={x:event.clientX,y:event.clientY,id:target.id,drag:false};
+  },true);
+  root.addEventListener('mousemove',event=>{
+    if(!rightBuildGesture)return;
+    if(Math.hypot(event.clientX-rightBuildGesture.x,
+      event.clientY-rightBuildGesture.y)>12)rightBuildGesture.drag=true;
+  },true);
+  root.addEventListener('mouseup',event=>{
+    if(event.button!==2)return;
+    const gesture=rightBuildGesture;rightBuildGesture=null;
+    if(!gesture||gesture.drag ||
+       Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>12)return;
+    const p=screenToWorld(event.clientX,event.clientY);
+    const b=buildingAt(p.x,p.y,'france');
+    if(b?.id===gesture.id)resumeAtPointer(event);
   },true);
   // Contextmenu remains a fallback for platforms that do not dispatch mouseup.
   canvas.addEventListener('contextmenu',event=>{
