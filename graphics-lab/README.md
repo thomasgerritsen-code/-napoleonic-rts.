@@ -1,3 +1,15 @@
+# Graphics Lab v320 — realistischere tweede proefscene
+
+Naast de oorspronkelijke v319-assets heeft de demonstratie nu:
+- **10 externe assets**: achtergrond, eikenboom, twee kazernes, twee basishoudingen van infanterie, twee alternatieve marsstanden, bevoorradingswagen en wereldvaste gras-/oeverdetails.
+- **Geloofwaardiger stilstand**: regimenten gaan in de demo een stukje vooruit, houden halt, demonstreren vuur en trekken weer terug. Op stilstand bewegen de voeten niet langer schijnbaar door.
+- **Kruitrook**: kleine, in de wind oplopende transparante rookwolken verschijnen uitsluitend tijdens de halte/vuurfase. De rook zit op een eigen 2D-overlay en onderschept nooit touchgebaren. Geen wijziging van de schotfysica in de echte game.
+- **Atmosferisch licht**: uiterst subtiele, vaste sunlight-vignette en materiaaldetails. Op mobiel beperkt het standaard detailniveau de effectieve DPR.
+- **Geen externe afbeeldingsdiensten**: alle graphics komen uit de eigen repo, PixiJS blijft een optionele, vastgepinde GPU-bibliotheek. Zonder Pixi werkt dezelfde uitgebreide demo via Canvas 2D.
+
+De nieuwe soldatenanimatie is een **kleine tweestanden-prototypecyclus**, nog geen anatomisch volledig uitgewerkte 8-richtingen-animatie. De illustraties zijn vectorassets en nog geen fotorealistische prerender-sprites. Voor professionele moderne RTS-kwaliteit blijft betere artproductie de grootste volgende stap.
+
+---
 # Graphics Lab v319 — assetgedreven 2D-proefscene
 
 ## Direct te openen
