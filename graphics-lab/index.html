@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <meta name="theme-color" content="#181d1b"/>
+  <title>Napoleonic RTS · Graphics Lab v319</title>
+  <link rel="stylesheet" href="./style.css?v=319a"/>
+</head>
+<body>
+  <main class="app">
+    <header class="mast">
+      <div class="brand">
+        <span class="crest">⚜</span>
+        <div><small>NAPOLEONIC RTS</small><strong>Graphics Lab <em>v319</em></strong></div>
+      </div>
+      <div class="mast-right">
+        <span class="tag">2D · Painterly realism</span>
+        <a class="game-link" href="../">← Terug naar de game</a>
+      </div>
+    </header>
+    <section id="viewport" class="viewport" aria-label="Interactieve voorbeeldscene van Napoleonic RTS">
+      <div id="scene-host" class="scene-host">
+        <canvas id="detail-canvas" aria-label="Nieuwe getextureerde 2D-voorbeeldscene"></canvas>
+        <canvas id="old-canvas" aria-label="Schematische vergelijking met de oude programmeertekenstijl"></canvas>
+      </div>
+      <div id="gesture" class="gesture" aria-label="Sleep voor camera, knijp voor zoom; tik op een regiment"></div>
+      <aside class="scene-heading">
+        <span class="eyebrow">PROEFSCENE 01 / 1809</span>
+        <h1>De oversteek</h1>
+        <p>Een kleine veldslag bij een stenen brug, met nieuwe grafische assets en een GPU-proefrenderer.</p>
+      </aside>
+      <aside class="stats">
+        <span class="stat"><small>WEERGAVE</small><strong id="engine">Canvas 2D (opstart)</strong></span>
+        <span class="stat"><small>METING</small><strong id="fps">— FPS</strong></span>
+        <span class="stat"><small>OBJECTEN</small><strong id="sprites">—</strong></span>
+        <span class="stat"><small>RESOLUTIE</small><strong id="resolution">—</strong></span>
+      </aside>
+      <div class="legend">
+        <span><i class="dot french"></i> Franse linie</span>
+        <span><i class="dot british"></i> Britse linie</span>
+        <span>🖐 Eén vinger: schuiven · Twee vingers: zoom</span>
+      </div>
+    </section>
+    <section class="toolbar">
+      <div class="left-control">
+        <span class="eyebrow">VISUELE VERGELIJKING</span>
+        <strong id="mode">Nieuw: getextureerde sprites</strong>
+        <small>De oude stijl is een schematische illustratie, niet de bestaande gamecode.</small>
+        <span id="selection" class="selection">Tik een regiment om het te selecteren</span>
+      </div>
+      <div class="actions">
+        <button id="toggle" type="button" class="primary">Toon oude tekenstijl</button>
+        <button id="center" type="button">⦿ Camera centreren</button>
+        <button id="pause" type="button">⏸ Animatie pauzeren</button>
+        <label>Soldaten<select id="count"><option value="32">32</option><option value="64">64</option><option value="128">128</option></select></label>
+        <label>Detail<select id="quality"><option value="balanced">Mobiel / soepel</option><option value="quality">Hoog detail</option></select></label>
+      </div>
+    </section>
+    <footer class="footer">
+      <span id="status">Grafische assets worden geladen…</span>
+      <span>Afzonderlijk prototype · bestaande game ongewijzigd</span>
+    </footer>
+  </main>
+  <script type="module" src="./scene.js?v=319a"></script>
+</body>
+</html>
