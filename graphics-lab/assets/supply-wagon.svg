@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="190" height="160" viewBox="0 0 190 160">
+<defs><linearGradient id="cloth" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d6c39b"/><stop offset="1" stop-color="#847961"/></linearGradient><linearGradient id="wood" x1="0" y1="0" x2="1" y2=".3"><stop stop-color="#ae9069"/><stop offset="1" stop-color="#554732"/></linearGradient></defs>
+<ellipse cx="96" cy="111" rx="82" ry="32" fill="#1c2f24" opacity=".23"/>
+<!-- wheeled ammunition wagon seen from above -->
+<rect x="52" y="27" width="84" height="113" rx="5" fill="#483d2e" transform="translate(6 7)" opacity=".40"/>
+<rect x="48" y="22" width="86" height="112" rx="5" fill="url(#wood)" stroke="#46392d" stroke-width="5"/>
+<rect x="56" y="32" width="70" height="91" fill="#867355" stroke="#bca57d" stroke-width="2"/>
+<path d="M55 44h70M55 64h70M55 83h70M55 102h70" stroke="#564935" stroke-width="3" opacity=".50"/>
+<path d="M61 40l55 76M121 42l-59 73" stroke="#3b3329" stroke-width="4" opacity=".52"/>
+<rect x="24" y="49" width="23" height="54" rx="10" fill="#413a33" stroke="#b6a17a" stroke-width="4"/>
+<rect x="135" y="49" width="23" height="54" rx="10" fill="#413a33" stroke="#b6a17a" stroke-width="4"/>
+<circle cx="35" cy="75" r="8" fill="#988363" stroke="#524836" stroke-width="2"/>
+<circle cx="147" cy="75" r="8" fill="#988363" stroke="#524836" stroke-width="2"/>
+<rect x="76" y="3" width="28" height="31" rx="5" fill="url(#cloth)" stroke="#71654a" stroke-width="3"/>
+<path d="M78 10l24 14M78 25l23 -13" stroke="#f2deb2" stroke-width="2" opacity=".43"/>
+<!-- leather straps and musket cases -->
+<path d="M52 43l79 52M132 43L51 95" stroke="#3e3327" stroke-width="3" opacity=".50"/>
+<circle cx="61" cy="117" r="4" fill="#c7b67d"/><circle cx="119" cy="117" r="4" fill="#c7b67d"/>
+</svg>
