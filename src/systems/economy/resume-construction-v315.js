@@ -59,6 +59,25 @@
     const workers=[...selectedUnits].filter(u=>u.type==='worker' && !u.dead && u.side==='france');
     return sendWorkersToBuild(b,workers);
   }
+  // Mobile fingers rarely land on the exact top-down footprint. The extra
+  // tolerance is measured in SCREEN pixels, so pinch zoom does not change how
+  // hard a field is to tap. Only unfinished player buildings are eligible.
+  function mobileConstructionTarget(wx,wy){
+    const direct=buildingAt(wx,wy,'france');
+    if(unfinishedFriendlyBuilding(direct))return direct;
+    const tolerance=20/Math.max(.42,camera.zoom);
+    let best=null,bestDistance=Infinity;
+    for(const b of buildings){
+      if(!unfinishedFriendlyBuilding(b))continue;
+      const dx=Math.max(0,Math.abs(wx-b.x)-b.w*.5);
+      const dy=Math.max(0,Math.abs(wy-b.y)-b.h*.5);
+      const distance=Math.hypot(dx,dy);
+      if(distance<=tolerance&&distance<bestDistance){
+        best=b;bestDistance=distance;
+      }
+    }
+    return best;
+  }
   function resumePreviouslyAssignedBuilders(b){
     if(!unfinishedFriendlyBuilding(b))return 0;
     const available=availableBuilders(b);
@@ -77,6 +96,23 @@
     }
     return resumed;
   }
+  function resumeMobileAt(wx,wy){
+    const b=mobileConstructionTarget(wx,wy);
+    if(!b)return false;
+    const selected=[...selectedUnits].filter(u=>!u.dead&&u.type==='worker'&&u.side==='france');
+    // Selected farmers take precedence; otherwise recall the original builder.
+    const resumed=selected.length?sendWorkersToBuild(b,selected):resumePreviouslyAssignedBuilders(b);
+    selectedBuilding=b;
+    selectedUnits.clear();
+    actionSignature='';
+    updateHud(true);
+    actionsEl.scrollLeft=0;
+    if(resumed){
+      statusEl.textContent=`Bouw hervat: ${BUILDINGS[b.type]?.label||'gebouw'} · ${Math.floor(b.construction*100)}% gereed.`;
+    }
+    return true; // handled: don't also generate a move/selection order
+  }
+
   // Desktop: browsers may swallow the contextmenu event after another game's
   // right-mouse gesture listener has handled pointer release. Handle a simple
   // right-button release as well; the existing right-drag implementation stops
@@ -131,11 +167,22 @@
   // Works on desktop and mobile: selecting an unfinished building exposes an
   // explicit, no-cost Resume construction action, even after deselecting workers.
   const previousRenderActions=renderDynamicActions;
+  let lastSelectedConstructionId=null;
   renderDynamicActions=function renderConstructionResumeActions(force=false){
     previousRenderActions(force);
     const old=actionsEl.querySelector('[data-action="resume-construction"]');
     const b=selectedBuilding;
-    if(!unfinishedFriendlyBuilding(b)){old?.remove();return;}
+    if(!unfinishedFriendlyBuilding(b)){
+      lastSelectedConstructionId=null;
+      old?.remove();
+      return;
+    }
+    if(lastSelectedConstructionId!==b.id){
+      lastSelectedConstructionId=b.id;
+      // On mobile the toolbar scrolls horizontally. Make sure Resume is not
+      // sitting off-screen behind the game's other build buttons.
+      actionsEl.scrollLeft=0;
+    }
     if(old)return;
     const btn=makeDynamicButton('resume-construction',
       'Hervat bouw<br><small>bestaande bouwplaats · geen extra kosten</small>',
@@ -149,8 +196,9 @@
     resumePreviouslyAssignedBuilders(selectedBuilding);
   });
   const api=Object.freeze({
-    version:'315.0',resumeSelected:sendSelectedWorkersToBuild,
+    version:'316.0',resumeSelected:sendSelectedWorkersToBuild,
     resumePrevious:resumePreviouslyAssignedBuilders,
+    mobileTarget:mobileConstructionTarget,resumeMobileAt,
     resumeWorkers:sendWorkersToBuild,
     unfinished:unfinishedFriendlyBuilding,
     activeBuilderCount:b=>unfinishedFriendlyBuilding(b)?activeBuilders(b).length:0

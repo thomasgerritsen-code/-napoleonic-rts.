@@ -277,6 +277,21 @@
       hint('Bouwplaats gekozen');
       return;
     }
+    // Prioritize unfinished friendly buildings over an ordinary move or
+    // box-selection order. Touch taps often travel 12-28 px on real phones.
+    // This works even if the original farmer is no longer selected.
+    // Two-finger camera gestures were already rejected in onTouchPointerUp.
+    const construction=root.__RESUME_CONSTRUCTION_V315__;
+    const fingerTravel=Math.hypot(clientX-p.sx,clientY-p.sy);
+    if(construction?.resumeMobileAt && fingerTravel<=28){
+      const target=construction.mobileTarget?.(endWorld.x,endWorld.y) ||
+        construction.mobileTarget?.(p.startWorld.x,p.startWorld.y);
+      if(target && construction.resumeMobileAt(target.x,target.y)){
+        mobile.taps++;
+        hint('Bouw hervat · boer keert terug');
+        return;
+      }
+    }
     if (moved) {
       if (selectedCanMove() && !p.startHit) {
         const facing = Math.atan2(endWorld.y - p.startWorld.y, endWorld.x - p.startWorld.x);
@@ -292,17 +307,6 @@
       return;
     }
     mobile.taps++;
-    // Tapping an unfinished building with farmers selected resumes construction
-    // instead of dropping selection or issuing a ghost move order. Without
-    // selected farmers the building is still selectable for its Resume button.
-    const buildingTarget=buildingAt(endWorld.x,endWorld.y,'france');
-    const construction=root.__RESUME_CONSTRUCTION_V315__;
-    if(construction?.unfinished?.(buildingTarget) &&
-      [...selectedUnits].some(u=>!u.dead&&u.type==='worker'&&u.side==='france')){
-      const assigned=construction.resumeSelected(buildingTarget);
-      hint(assigned?'Boeren hervatten bouw':'Boeren bouwen hier al');
-      return;
-    }
     const hit = touchHitAt(clientX, clientY);
     if (hit) {
       const regimentMultiselect = root.__MOBILE_REGIMENT_MULTISELECT_V1__;

@@ -54,7 +54,7 @@ test('v315 selecting unfinished barracks offers no-cost Resume and original buil
   expect(outcome.costUnchanged).toBe(true);
   expect(outcome.progressAfter).toBeGreaterThan(outcome.progressBefore);
   expect(outcome.sameBuilding).toBe(true);
-  expect(outcome.version).toBe('1.3.63');
+  expect(outcome.version).toBe('1.3.64');
   expect(errors).toEqual([]);
 });
 
@@ -66,7 +66,9 @@ test('v315 right-click unfinished building resumes selected farmer instead of mo
     issueMove(b.x+200,b.y+120);
     // A central, unobscured canvas click tests actual desktop pointer input.
     // Zooming in ensures the building does not land underneath the HUD.
-    camera.zoom=1.25;camera.x=b.x;camera.y=b.y;clampCamera();
+    // Center the test site exactly for the desktop hit assertion. Map-level
+    // camera clamp may shift randomized edge placements outside this viewport.
+    camera.zoom=1.25;camera.x=b.x;camera.y=b.y;
     const p=worldToScreen(b.x,b.y);
     const target=document.elementFromPoint(p.x,p.y);
     return {x:p.x,y:p.y,taskBefore:u.task,buildingId:b.id,
@@ -109,14 +111,16 @@ test('v315 mobile one-finger tap on an incomplete farm resumes farmers after a m
       isPrimary:true,clientX:p.x,clientY:p.y};
     canvas.dispatchEvent(new PointerEvent('pointerdown',opts));
     canvas.dispatchEvent(new PointerEvent('pointerup',opts));
-    return{task:u.task,targetId:u.buildingTarget?.id,selected:selectedUnits.has(u),
+    return{task:u.task,targetId:u.buildingTarget?.id,
+      selectedBuildingId:selectedBuilding?.id,workerDeselected:!selectedUnits.has(u),
       food:economies.france.food,wood:economies.france.wood,
       noRepay:economies.france.wood===afterPayment,stillIncomplete:!b.complete,
       mobileOrders:window.__PLAYABILITY_CONTROLS_V1__?.mobile?.stats?.()?.moveOrders??null};
   },setup);
   expect(state.task).toBe('build');
   expect(state.targetId).toBe(setup.buildingId);
-  expect(state.selected).toBe(true);
+  expect(state.selectedBuildingId).toBe(setup.buildingId);
+  expect(state.workerDeselected).toBe(true);
   expect(state.noRepay).toBe(true);
   expect(state.stillIncomplete).toBe(true);
   expect(errors).toEqual([]);
