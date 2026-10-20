@@ -71,7 +71,8 @@
   const BUILDINGS = {
     towncenter: { w: 94, h: 78, hp: 1250, label: 'Town Center', pop: 45 },
     barracks:   { w: 82, h: 60, hp: 850,  label: 'Barracks', cost: { wood: 300 } },
-    house:      { w: 56, h: 50, hp: 450,  label: 'House', cost: { wood: 120 }, pop: 15 }
+    house:      { w: 56, h: 50, hp: 450,  label: 'House', cost: { wood: 120 }, pop: 15 },
+    farm:       { w: 116, h: 88, hp: 450, label: 'Graanakker', cost: { wood: 180 } }
   };
 
   const COLORS = {
