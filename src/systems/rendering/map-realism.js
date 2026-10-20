@@ -6,6 +6,17 @@
   const roadCfg=global.NRTS_CONFIG?.world?.roads?.rendering || {};
   const activeRoads=global.NRTS_ROAD_NETWORK_V7 || ROAD_NETWORK_V066;
   const vegetationRoadPadding=roadCfg.vegetationPadding??10;
+  // One coherent 1800s landscape palette: muted grasses, warmer earth,
+  // dusty wheel-worn roads. These colors are rendered by the SAME terrain
+  // authority on phones and in world-aligned GPU/Canvas tile caches.
+  const painterlyPalette=Object.freeze({
+    meadow:'#6d7959', meadowLight:'rgba(183,174,113,.11)',
+    meadowShade:'rgba(48,77,48,.13)', dryEarth:'rgba(162,125,78,.105)',
+    chalk:'rgba(225,207,158,.065)',
+    roadMain:'rgba(184,158,116,.94)',
+    roadSecondary:'rgba(164,135,98,.88)',
+    roadTrack:'rgba(138,110,77,.81)'
+  });
 
   function seeded(seed){let s=seed>>>0;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
   function visibleBounds(margin=0){
@@ -72,6 +83,29 @@
     });
   }
 
+  // Fixed world-space, translucent brush stamps are far more natural than
+  // uniform tile noise. Each one is generated once and clipped to the camera
+  // viewport, so pan/zoom or tile-cache boundaries cannot make it shimmer.
+  const painterlyBrush=[];
+  const meadowTufts=[];
+  {
+    const local=seeded(1817);
+    for(let i=0;i<1550;i++){
+      painterlyBrush.push({
+        x:local()*WORLD.width,y:local()*WORLD.height,
+        rx:12+local()*48,ry:4+local()*19,
+        angle:(local()-.5)*1.35,tone:i%5
+      });
+    }
+    for(let i=0;i<1650;i++){
+      meadowTufts.push({
+        x:local()*WORLD.width,y:local()*WORLD.height,
+        h:2.5+local()*4.7,s:1.5+local()*2.8,
+        warm:local()>.68
+      });
+    }
+  }
+
   // Decorative woodland canopy is separate from harvestable tree resources.
   // Keep those background crowns clear of river channels and bridge decks too.
   function dryCanopy(x,y,radius=0){
@@ -100,12 +134,24 @@
 
   const roadRenderData=activeRoads.map(road=>{
     let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-    const path=new Path2D();
-    road.points.forEach((p,i)=>{
+    const path=new Path2D(),leftRut=new Path2D(),rightRut=new Path2D();
+    const points=road.points||[];
+    const off=Math.max(3.5,road.width*(roadCfg.rutFraction??.19));
+    points.forEach((p,i)=>{
       if(i===0)path.moveTo(p.x,p.y);else path.lineTo(p.x,p.y);
+      const prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)];
+      const dx=next.x-prev.x,dy=next.y-prev.y,d=Math.hypot(dx,dy)||1;
+      const nx=-dy/d,ny=dx/d;
+      if(i===0){
+        leftRut.moveTo(p.x+nx*off,p.y+ny*off);
+        rightRut.moveTo(p.x-nx*off,p.y-ny*off);
+      }else{
+        leftRut.lineTo(p.x+nx*off,p.y+ny*off);
+        rightRut.lineTo(p.x-nx*off,p.y-ny*off);
+      }
       minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);
     });
-    return{road,path,minX,minY,maxX,maxY};
+    return{road,path,leftRut,rightRut,minX,minY,maxX,maxY};
   });
 
   const junctions=[];
@@ -122,12 +168,39 @@
   }
 
   function drawGround(bounds){
-    ctx.fillStyle='#687b52';ctx.fillRect(bounds.left,bounds.top,bounds.width,bounds.height);
+    ctx.fillStyle=painterlyPalette.meadow;
+    ctx.fillRect(bounds.left,bounds.top,bounds.width,bounds.height);
+    ctx.save();
+    for(const mark of painterlyBrush){
+      if(!pointVisible(bounds,mark.x,mark.y,70))continue;
+      ctx.fillStyle=mark.tone===0?painterlyPalette.dryEarth:
+        mark.tone===1?painterlyPalette.meadowShade:
+        mark.tone===2?painterlyPalette.chalk:painterlyPalette.meadowLight;
+      ctx.beginPath();
+      ctx.ellipse(mark.x,mark.y,mark.rx,mark.ry,mark.angle,0,Math.PI*2);
+      ctx.fill();
+    }
     for(const mark of groundMarks){
       if(!pointVisible(bounds,mark.x,mark.y,4))continue;
-      ctx.fillStyle=mark.light?'rgba(188,178,126,.07)':'rgba(96,117,72,.18)';
+      ctx.fillStyle=mark.light?'rgba(216,203,151,.085)':'rgba(48,74,47,.18)';
       ctx.beginPath();ctx.arc(mark.x,mark.y,mark.r,0,Math.PI*2);ctx.fill();
     }
+    // A sparse, handcrafted grass hatch reads like drybrush at high zoom.
+    // It is drawn UNDER fields, water and roads, never on top of those assets.
+    ctx.lineWidth=.9;
+    for(const tuft of meadowTufts){
+      if(!pointVisible(bounds,tuft.x,tuft.y,8))continue;
+      ctx.strokeStyle=tuft.warm?'rgba(190,182,116,.24)':'rgba(48,76,48,.28)';
+      ctx.beginPath();
+      ctx.moveTo(tuft.x-tuft.s,tuft.y+1);
+      ctx.lineTo(tuft.x-tuft.s*.38,tuft.y-tuft.h*.58);
+      ctx.moveTo(tuft.x,tuft.y+1);
+      ctx.lineTo(tuft.x+tuft.s*.13,tuft.y-tuft.h);
+      ctx.moveTo(tuft.x+tuft.s,tuft.y+1);
+      ctx.lineTo(tuft.x+tuft.s*.78,tuft.y-tuft.h*.65);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
   function drawFields(bounds){
     fields.forEach((f,index)=>{
@@ -161,8 +234,8 @@
     ctx.restore();
   }
 
-  function roadSurfaceColor(road){return road.roadClass==='chaussee'?'rgba(191,174,134,.91)':road.roadClass==='secondary'?'rgba(163,136,95,.84)':'rgba(137,102,67,.75)';}
-  function roadShoulderColor(road){return road.roadClass==='track'?'rgba(90,69,48,.25)':'rgba(72,61,44,.34)';}
+  function roadSurfaceColor(road){return road.roadClass==='chaussee'?painterlyPalette.roadMain:road.roadClass==='secondary'?painterlyPalette.roadSecondary:painterlyPalette.roadTrack;}
+  function roadShoulderColor(road){return road.roadClass==='track'?'rgba(83,67,48,.20)':'rgba(91,73,51,.28)';}
   function roadVisible(data,bounds,margin=40){return data.maxX>=bounds.left-margin&&data.minX<=bounds.right+margin&&data.maxY>=bounds.top-margin&&data.minY<=bounds.bottom+margin;}
 
   function drawRoadNetworkBlended(bounds){
@@ -179,15 +252,23 @@
       ctx.beginPath();ctx.arc(j.x,j.y,radius,0,Math.PI*2);ctx.fill();
     }
 
-    const rutFraction=roadCfg.rutFraction??.19;
+    // The brighter inner earth and actual tangent-aligned wagon ruts are
+    // separate translucent layers, never geometry/collision changes.
     for(const data of visibleRoads){
       const road=data.road;
-      if(road.roadClass==='track')ctx.setLineDash([18,10]);else ctx.setLineDash([]);
-      ctx.strokeStyle='rgba(91,70,47,.24)';ctx.lineWidth=1.7;
-      const off=Math.max(3.5,road.width*rutFraction);
-      ctx.save();ctx.translate(0,-off);ctx.stroke(data.path);ctx.restore();
-      ctx.save();ctx.translate(0,off);ctx.stroke(data.path);ctx.restore();
-      ctx.setLineDash([]);ctx.strokeStyle='rgba(229,216,177,.13)';ctx.lineWidth=1;ctx.stroke(data.path);
+      ctx.setLineDash([]);
+      ctx.strokeStyle='rgba(229,211,166,.12)';
+      ctx.lineWidth=Math.max(3,road.width*.37);
+      ctx.stroke(data.path);
+      ctx.setLineDash(road.roadClass==='track'?[13,11]:[]);
+      ctx.strokeStyle='rgba(80,62,46,.31)';
+      ctx.lineWidth=1.65;
+      ctx.stroke(data.leftRut);
+      ctx.stroke(data.rightRut);
+      ctx.setLineDash([]);
+      ctx.strokeStyle='rgba(232,217,173,.12)';
+      ctx.lineWidth=.85;
+      ctx.stroke(data.path);
     }
     ctx.restore();
   }
@@ -209,7 +290,7 @@
   };
 
   const api=Object.freeze({
-    version:'map-realism-v2.4-road-clearance',
+    version:'map-realism-v2.5-painterly-historic',
     fieldCount:fields.length,
     preservesNavigation:true,
     roadCount:activeRoads.length,
@@ -219,6 +300,12 @@
     blendedJunctions:true,
     viewportCulling:true,
     precomputedGroundMarks:true,
+    painterlyTerrain:true,
+    painterlyPalette,
+    brushStampCount:painterlyBrush.length,
+    meadowTuftCount:meadowTufts.length,
+    worldAnchoredBrushwork:true,
+    roadRutsTangentAligned:true,
     precomputedRoadPaths:true,
     precomputedJunctions:true,
     precomputedFieldRows:true,
