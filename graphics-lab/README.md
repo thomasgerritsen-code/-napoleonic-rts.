@@ -1,3 +1,11 @@
+# Graphics Lab — v321 animatiecontroller (opt-in)
+
+`/graphics-lab/?sprites=atlas` gebruikt de nieuwe deterministische
+infanterie-animatiecontroller en rasteratlas-lader (`render/`). Zolang er geen
+goedgekeurde atlassen zijn, valt de demo netjes terug op de SVG-soldaten.
+Zonder vlag blijft alles v320. Zie `docs/graphics-lab-v321-animation-controller.md`.
+
+---
 # Graphics Lab v320 — realistischere tweede proefscene
 
 Naast de oorspronkelijke v319-assets heeft de demonstratie nu:

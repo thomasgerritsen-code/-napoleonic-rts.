@@ -50,6 +50,11 @@ function selectFocusedTests(files) {
     if (file === 'src/systems/rendering/map-realism.js' || file === 'src/systems/rendering/map-ambient-motion.js' || file === 'src/systems/performance/large-army-v1.js' || file === 'tests/2d-performance-v132.spec.js') add2DPerformance();
     if (file === 'src/assets/musketeer-sprite-v1.js' || file === 'src/systems/rendering/musketeer-sprites-v1.js' || file === 'tests/musketeer-sprites-v1.spec.js') addMusketeerSprites();
     if (file === 'index.html' || file === 'style.css') add2DPerformance();
+    if (file.startsWith('graphics-lab/')) {
+      for (const spec of ['tests/graphics-lab-v319.spec.js', 'tests/graphics-lab-v320.spec.js', 'tests/graphics-lab-v321-atlas.spec.js']) {
+        if (fs.existsSync(spec)) selected.add(spec);
+      }
+    }
 
     if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') selected.add('tests/foundation-v071.spec.js');
     if (file === 'src/foundation/runtime.js' || file === 'src/foundation/config.js' || file === 'src/systems/world/api.js' || file === 'src/systems/navigation/api.js' || file === 'src/systems/movement/api.js' || file === 'tests/architecture-v21.spec.js') addArchitectureV21();
