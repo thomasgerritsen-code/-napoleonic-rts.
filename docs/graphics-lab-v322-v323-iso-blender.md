@@ -215,3 +215,28 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   `pack-iso-atlas.py` pakt ze als `fro/frd/fre/bro/brd/bre_iso_<rol>_atlas`.
 - **Lab** (v328): de officier loopt voorop, de vaandeldrager in het midden en de
   tamboer achteraan. Bij **Vuur!** geven ze het commando; ze worden niet geraakt.
+
+---
+
+# v329 — van colonne naar linie, gaten sluiten
+
+- Soldaten hebben nu een eigen positie en lopen (2,2 m/s, met hun eigen
+  pasteller voor de marsframes) naar een plaats (rang, rot) in de opstelling van
+  hun regiment:
+  - **colonne**: 4 rotten breed, volgt de weg exact;
+  - **linie**: bij **Vuur!** ontplooit elk regiment rond zijn midden, met het
+    front naar de vijand. Frans 3 rijen diep, Brits 2. Rotten worden van links
+    naar rechts verdeeld naar ieders positie over het front, rijen naar afstand
+    tot de vijand, zodat niemand door het hele regiment hoeft te lopen.
+- **Rangvuur**: pas als het hele regiment staat, opent de voorste rij het vuur,
+  de volgende rij(en) 0,8 s later.
+- **Gaten sluiten**: valt een man, dan stapt de man achter hem in hetzelfde rot
+  naar voren (enzovoort), zodat gaten naar achteren schuiven.
+- **Voorwaarts mars** vormt weer een colonne; de mannen lopen eerst naar hun
+  plaats en volgen daarna de weg.
+- Officier op de rechterflank, vaandeldrager net achter de voorste rij in het
+  midden, tamboer achter de linie.
+- `getStats()` toont `formations`, `deployed`, `shooters` en `frontGaps`.
+- **Tests**: ontplooien in linie (met lopende soldaten), rangvuur waarbij eerst
+  een deel en daarna alle 64 musketten vuren, geen marsframes tijdens het vuren,
+  nul gaten in de voorste rij na treffers, en terug naar colonne.

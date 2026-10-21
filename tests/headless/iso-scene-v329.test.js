@@ -28,7 +28,7 @@ for (const prefix of ['fr', 'br', 'fr2', 'br2', 'fr3', 'br3']) {
     });
   };
 
-  test(`v328 ${prefix} infantry atlas: 8 directions x 17 drill frames with muzzle points`, () => {
+  test(`v329 ${prefix} infantry atlas: 8 directions x 17 drill frames with muzzle points`, () => {
     const sheet = load('infantry');
     checkSheet(sheet, [['idle', 2], ['march', 6], ['aim', 2], ['fire', 3], ['reload', 4]], 2992);
     for (const d of DIRS) {
@@ -40,13 +40,13 @@ for (const prefix of ['fr', 'br', 'fr2', 'br2', 'fr3', 'br3']) {
     assert.deepEqual({state: sheet.meta.muzzle.state, frame: sheet.meta.muzzle.frame}, config.muzzleEvent);
   });
 
-  test(`v328 ${prefix} fallen atlas: three falls x 4 frames in 8 directions`, () => {
+  test(`v329 ${prefix} fallen atlas: three falls x 4 frames in 8 directions`, () => {
     checkSheet(load('fallen'), [['die', 4], ['diefwd', 4], ['dieside', 4]], 2112);
   });
 }
 
 for (const [key, role] of [['fro', 'officer'], ['frd', 'drummer'], ['fre', 'ensign'], ['bro', 'officer'], ['brd', 'drummer'], ['bre', 'ensign']]) {
-  test(`v328 ${key} ${role} atlas: idle, march and command in 8 directions, 176x160 cells`, () => {
+  test(`v329 ${key} ${role} atlas: idle, march and command in 8 directions, 176x160 cells`, () => {
     const sheet = JSON.parse(fs.readFileSync(path.join(dir, `${key}_iso_${role}_atlas.json`), 'utf8'));
     const png = fs.readFileSync(path.join(dir, sheet.meta.image));
     assert.equal(png.readUInt32BE(16), 1760);
@@ -63,7 +63,7 @@ for (const [key, role] of [['fro', 'officer'], ['frd', 'drummer'], ['fre', 'ensi
   });
 }
 
-test('v328 iso provenance is original and explicitly not yet approved for the game', () => {
+test('v329 iso provenance is original and explicitly not yet approved for the game', () => {
   const p = JSON.parse(fs.readFileSync(path.join(dir, 'provenance.json'), 'utf8'));
   assert.equal(p.sourceType, 'original');
   assert.equal(p.reviewedForUse, false);
@@ -73,7 +73,7 @@ test('v328 iso provenance is original and explicitly not yet approved for the ga
 const isoDir = path.resolve(__dirname, '../../graphics-lab/assets/iso');
 const layout = JSON.parse(fs.readFileSync(path.join(isoDir, 'layout.json'), 'utf8'));
 
-test('v328 every layout prop has a rendered sprite whose PNG matches props.json', () => {
+test('v329 every layout prop has a rendered sprite whose PNG matches props.json', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(isoDir, 'props/props.json'), 'utf8'));
   assert.ok(layout.props.length > 30);
   for (const p of layout.props) {
@@ -86,7 +86,7 @@ test('v328 every layout prop has a rendered sprite whose PNG matches props.json'
   }
 });
 
-test('v328 Blender terrain exists and no prop stands on the marching road', () => {
+test('v329 Blender terrain exists and no prop stands on the marching road', () => {
   const jpg = fs.readFileSync(path.join(isoDir, layout.ground.image));
   assert.equal(jpg.readUInt16BE(0), 0xffd8, 'JPEG');
   const r = layout.road, apothem = r.radius * Math.cos(Math.PI / 8);
