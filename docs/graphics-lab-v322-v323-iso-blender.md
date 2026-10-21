@@ -381,3 +381,14 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   vallen. Daarna galopperen ze terug naar hun plaats.
 - `getStats()` toont `riders`, `ridersDrawn`, `cavStates`, `cavCharge`,
   `riderFalls` en `sabreHits`.
+
+## v335c — realistischer paard
+
+- Paard opnieuw opgebouwd: borst, schoft, lagere rug en ronde achterhand met
+  dij- en schouderspieren; gebogen hals met kam en manen; hoofd voorwaarts en
+  omlaag gedragen (schedel, ganaches, smalle neus, muil met neusgaten, oren,
+  ogen, kuif, hoofdstel en bit); benen met onderarm/schenkel, knie en hak,
+  dunne pijpen met pezen, kogels, schuine koten en hoeven; zwarte onderbenen,
+  manen en staart bij bruine en zwarte paarden; smallere, langere staart.
+- Zadel: zadelkleed over rug en flanken met boord en punt, gevormd zadel met
+  voor- en achterboog, holsters en grijze mantelrol.
