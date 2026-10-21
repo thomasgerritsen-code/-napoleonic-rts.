@@ -1,5 +1,5 @@
-// Graphics Lab v327 — isometric scene: Blender-rendered soldiers in three looks (march, aim, fire,
-// reload, three falls),
+// Graphics Lab v328 — isometric scene: Blender-rendered soldiers in three looks (march, aim, fire,
+// reload, three falls) led by an officer, drummer and ensign,
 // buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
 (function(){
@@ -131,17 +131,23 @@ function units(){
      if(state.dead.has(prefix+':'+i))continue;
      out.push({side,prefix,look:lookOf(prefix,i),id:i,key:prefix+':'+i,gx:p.x+nx*file*spacing,gy:p.y+ny*file*spacing,dir:dirIndex(p.dx,p.dy)});
    }
+   // Officer leads, the colour marches in the middle, the drummer at the rear.
+   const ranks=Math.ceil(state.perSide/files);
+   for(const [role,back,lateral] of [['officer',-2.2,0],['ensign',(ranks/2-0.5)*gap,0],['drummer',ranks*gap+0.4,1.2]]){
+     const p=along(state.travelled+offset-back),nx=-p.dy,ny=p.dx;
+     out.push({side,prefix,role,look:prefix+ROLE_KEYS[role],key:prefix+':'+role,gx:p.x+nx*lateral,gy:p.y+ny*lateral,dir:dirIndex(p.dx,p.dy)});
+   }
  });
  // A firing line turns to face the enemy regiment's centre.
  if(state.firing){
-   const centre=side=>{const l=out.filter(u=>u.side===side);return{x:l.reduce((a,u)=>a+u.gx,0)/l.length,y:l.reduce((a,u)=>a+u.gy,0)/l.length};};
+   const centre=side=>{const l=out.filter(u=>u.side===side&&!u.role);return{x:l.reduce((a,u)=>a+u.gx,0)/l.length,y:l.reduce((a,u)=>a+u.gy,0)/l.length};};
    const c={france:centre('britain'),britain:centre('france')};
    for(const u of out){const t=c[u.side];u.dir=dirIndex(t.x-u.gx,t.y-u.gy);}
    // Bands by distance to the enemy: the nearest third fires first.
    if(!state.bands){
      state.bands=new Map();
      for(const side of ['france','britain']){
-       const t=c[side],l=out.filter(u=>u.side===side).sort((a,b)=>Math.hypot(a.gx-t.x,a.gy-t.y)-Math.hypot(b.gx-t.x,b.gy-t.y));
+       const t=c[side],l=out.filter(u=>u.side===side&&!u.role).sort((a,b)=>Math.hypot(a.gx-t.x,a.gy-t.y)-Math.hypot(b.gx-t.x,b.gy-t.y));
        l.forEach((u,i)=>state.bands.set(u.key,Math.floor(i*BANDS/l.length)));
      }
    }
@@ -153,6 +159,12 @@ function units(){
 // clock; marching keeps the distance-driven cadence so nobody walks in place.
 function frameFor(u){
  const d=DIRS[u.dir];
+ if(u.role){
+   // Command pose while the regiment fires: sword raised, charge beaten, colour raised.
+   if(state.firing)return 'command_'+d+'|'+(Math.floor(state.time/0.45)%2);
+   if(state.halted)return 'idle_'+d+'|'+(Math.floor(state.time/0.6)%2);
+   return 'march_'+d+'|'+Math.floor((state.travelled%MARCH.strideM)/MARCH.strideM*MARCH.frames)%MARCH.frames;
+ }
  const c=state.controller;
  if(c){
    const band=state.bands?state.bands.get(u.key)||0:0;
@@ -238,7 +250,7 @@ function draw(now){
  const fallen=[...state.dead.values()].map(d=>({...d,fallen:true,...project(d.gx,d.gy)}));
  const list=alive.map(u=>({...u,...project(u.gx,u.gy)})).concat(fallen,state.props).sort((a,b)=>a.y-b.y);
  state.animStates={};
- state.drawn=0;state.propsDrawn=0;
+ state.drawn=0;state.propsDrawn=0;state.rolesDrawn=0;
  for(const u of list){
    if(u.sprite){const p=u.sprite;ctx.drawImage(p.image,u.x-p.pivot.x*k,u.y-p.pivot.y*k,p.w*k,p.h*k);state.propsDrawn++;continue;}
    const atlas=state.atlases[u.look]||state.atlases[u.prefix];if(!atlas)continue;
@@ -250,6 +262,7 @@ function draw(now){
    }
    const [anim,f]=frameFor(u).split('|');
    drawSprite(atlas,anim,Number(f),u.x,u.y,k);
+   if(u.role){state.rolesDrawn++;continue;}
    (state.lookSet||(state.lookSet=new Set())).add(u.look);state.looksDrawn=state.lookSet.size;
    const st=anim.split('_')[0];state.animStates[st]=(state.animStates[st]||0)+1;
    state.directionsSeen.add(u.dir);state.drawn++;
@@ -308,8 +321,8 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'327.0',state,
- getStats:()=>({loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
+window.__GRAPHICS_LAB_ISO__={version:'328.0',state,
+ getStats:()=>({loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
    animStates:{...(state.animStates||{})},smoke:state.smoke.length,volleys:state.volleys,shots:state.shots,
@@ -322,8 +335,12 @@ paintGround();resize();
 const loadController=()=>loadJson('./assets/sprites/unit-animation-config.json').then(cfg=>{
  state.controller=NRTSInfantryAnimation.createInfantryAnimationController(cfg);});
 const ATLAS_KEYS=['fr','br'].flatMap(p=>LOOKS.map(l=>p+l));
-Promise.all([Promise.all(ATLAS_KEYS.map(loadAtlas)),loadController(),loadScene().catch(err=>{console.warn('Iso terrein/gebouwen fallback:',err);})]).then(([atlases])=>{
- state.atlases=Object.fromEntries(ATLAS_KEYS.map((key,i)=>[key,atlases[i]]));
+// Officer, drummer and ensign atlases: idle, march and command in taller cells.
+const ROLE_KEYS={officer:'o',drummer:'d',ensign:'e'};
+const ROLE_ATLASES=['fr','br'].flatMap(p=>Object.entries(ROLE_KEYS).map(([role,k])=>[p+k,role]));
+const loadRole=([key,role])=>loadSheet(key,role,['idle','march','command']).then(sheet=>({...sheet,fallen:sheet}));
+Promise.all([Promise.all([...ATLAS_KEYS.map(loadAtlas),...ROLE_ATLASES.map(loadRole)]),loadController(),loadScene().catch(err=>{console.warn('Iso terrein/gebouwen fallback:',err);})]).then(([atlases])=>{
+ state.atlases=Object.fromEntries([...ATLAS_KEYS,...ROLE_ATLASES.map(([key])=>key)].map((key,i)=>[key,atlases[i]]));
  ui.status.textContent=state.terrain?'Blender-scène geladen · soldaten, gebouwen en terrein':'Blender-soldaten geladen · eenvoudig terrein';
 }).catch(err=>{
  ui.status.textContent='Atlassen konden niet laden.';console.error(err);

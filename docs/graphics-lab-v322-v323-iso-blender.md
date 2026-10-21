@@ -195,3 +195,23 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   sneuvelen), samen ongeveer 8 MB.
 - **Lab** (v327): elke soldaat krijgt via een vaste hash zijn eigen uiterlijk, ook
   als hij sneuvelt. `getStats().looks` telt de zichtbare varianten.
+
+---
+
+# v328 — officier, tamboer en vaandeldrager
+
+- Nieuw script `scripts/render-iso-roles.py` hergebruikt het fuseliersmodel
+  (camera, zon, rig, kleuren), verbergt musket en bepakking en voegt per rol
+  eigen uitrusting toe:
+  - **officier**: gouden epauletten, ringkraag, goudband op de shako (Brits:
+    karmozijnrode sjerp), getrokken sabel;
+  - **tamboer**: tressen en chevrons (Brits: buff jas in omgekeerde kleuren),
+    trom met hoepels en trommelstokken;
+  - **vaandeldrager**: Franse adelaar met vaandel model 1804, Britse Union-vlag;
+    de golvende vlag is een onderverdeeld vlak met kleuren per vlakje.
+- Per rol en natie: stilstaan 2, marcheren 6 en commando 2 frames (sabel
+  geheven, charge slaan, vaandel geheven) in 8 richtingen. Cellen 176×160 met
+  voetanker (88,140), zodat een geheven vaandel past (atlas 1760×1280).
+  `pack-iso-atlas.py` pakt ze als `fro/frd/fre/bro/brd/bre_iso_<rol>_atlas`.
+- **Lab** (v328): de officier loopt voorop, de vaandeldrager in het midden en de
+  tamboer achteraan. Bij **Vuur!** geven ze het commando; ze worden niet geraakt.
