@@ -7,11 +7,11 @@ async function open(page){
   return errors;
 }
 const frames=page=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
-test('v332 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
+test('v333 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
   const errors=await open(page);
   await frames(page);
   const s=await page.evaluate(()=>({...window.__GRAPHICS_LAB_ISO__.getStats(),version:window.__GRAPHICS_LAB_ISO__.version}));
-  expect(s.version).toBe('332.0');
+  expect(s.version).toBe('333.0');
   // Five looks per nation (incl. grenadiers and voltigeurs), all on the field.
   expect(s.loaded).toBe(16);
   // Officer, drummer and ensign lead each regiment.
@@ -25,7 +25,7 @@ test('v332 iso scene loads both Blender atlases and draws every soldier',async({
   expect(await page.locator('#iso-status').textContent()).toContain('gebouwen en terrein');
   expect(errors).toEqual([]);
 });
-test('v332 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
+test('v333 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
   const errors=await open(page);
   const seen=await page.evaluate(async()=>{
     const api=window.__GRAPHICS_LAB_ISO__,step=()=>new Promise(r=>requestAnimationFrame(r));
@@ -58,7 +58,7 @@ const advance=(page,seconds)=>page.evaluate(async seconds=>{
     const s=api.getStats();for(const k of Object.keys(s.animStates))seen[k]=1;smoke=Math.max(smoke,s.smoke);die=Math.max(die,s.animStates.die||0);}
   return{seen:Object.keys(seen).sort(),smoke,die,stats:api.getStats()};
 },seconds);
-test('v332 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
+test('v333 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.misfireChance=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -81,7 +81,7 @@ test('v332 Vuur! deploys both columns into line, then the ranks fire in turn onc
   expect((await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).firing).toBe(false);
   expect(errors).toEqual([]);
 });
-test('v332 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
+test('v333 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=1;s.woundedShare=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -110,7 +110,7 @@ test('v332 casualties fall, the rank behind closes up, the fallen stay and Herst
   expect(after.drawn).toBe(64);
   expect(errors).toEqual([]);
 });
-test('v332 French front rank kneels, some muskets misfire and smoke hangs over the line',async({page})=>{
+test('v333 French front rank kneels, some muskets misfire and smoke hangs over the line',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.misfireChance=0.5;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -124,7 +124,7 @@ test('v332 French front rank kneels, some muskets misfire and smoke hangs over t
   expect(r.stats.missing).toBe(0);
   expect(errors).toEqual([]);
 });
-test('v332 men at rest look around, set their shako or lean on the musket',async({page})=>{
+test('v333 men at rest look around, set their shako or lean on the musket',async({page})=>{
   const errors=await open(page);
   await page.getByRole('button',{name:'Halt'}).click();
   const r=await advance(page,16);
@@ -146,7 +146,7 @@ const CHARGE_RUN=`(async()=>{
     if(s.charge==='rout'&&routAt===null)routAt=i;if(routAt!==null&&i-routAt>260)break;}
   return{phases,seen:Object.keys(seen).sort(),maxGone,stats:api.getStats()};
 })()`;
-test('v332 Bajonet! charges, the front ranks fight, the beaten side routs and the victors cheer',async({page})=>{
+test('v333 Bajonet! charges, the front ranks fight, the beaten side routs and the victors cheer',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   await page.getByRole('button',{name:'Bajonet!'}).click();
@@ -166,7 +166,7 @@ test('v332 Bajonet! charges, the front ranks fight, the beaten side routs and th
   expect(after.drawn).toBe(64);
   expect(errors).toEqual([]);
 });
-test('v332 the wounded go down and crawl to the rear',async({page})=>{
+test('v333 the wounded go down and crawl to the rear',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=1;s.woundedShare=1;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -180,9 +180,32 @@ test('v332 the wounded go down and crawl to the rear',async({page})=>{
   expect(r.stats.animStates.crawl+(r.stats.animStates.die||0)).toBe(total);
   expect(errors).toEqual([]);
 });
+test('v333 sound is off by default; switched on, shots, drums and commands play',async({page})=>{
+  const errors=await open(page);
+  const off=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats().sound);
+  expect(off.on).toBe(false);
+  expect(off.context).toBe('none');
+  await page.getByRole('button',{name:'Geluid uit'}).click();
+  await expect(page.locator('#iso-sound')).toHaveAttribute('aria-pressed','true');
+  // Marching column: the drummers beat the step.
+  const march=await advance(page,2);
+  expect(march.stats.sound.on).toBe(true);
+  expect(march.stats.sound.drums).toBeGreaterThan(3);
+  await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
+  await page.getByRole('button',{name:'Vuur!'}).click();
+  await page.evaluate(DEPLOY);
+  const r=await advance(page,3);
+  // One spoken fire command per regiment, a report for every shot (or merged into one).
+  expect(r.stats.sound.commands).toBeGreaterThanOrEqual(2);
+  expect(r.stats.sound.shots+r.stats.sound.merged).toBeGreaterThanOrEqual(r.stats.shots);
+  await page.getByRole('button',{name:'Geluid aan'}).click();
+  const quiet=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats().sound);
+  expect(quiet.on).toBe(false);
+  expect(errors).toEqual([]);
+});
 test.describe('phone',()=>{
   test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-  test('v332 iso scene pinch-zooms on a phone',async({page})=>{
+  test('v333 iso scene pinch-zooms on a phone',async({page})=>{
     const errors=await open(page);
     const before=(await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).zoom;
     const r=await page.locator('#iso-view').boundingBox();

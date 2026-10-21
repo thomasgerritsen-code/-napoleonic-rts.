@@ -1,4 +1,4 @@
-// Graphics Lab v332 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v333 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -7,7 +7,8 @@
 const view=document.getElementById('iso-view'),canvas=document.getElementById('iso-canvas'),ctx=canvas.getContext('2d');
 const ui={status:document.getElementById('iso-status'),halt:document.getElementById('iso-halt'),
  pause:document.getElementById('iso-pause'),center:document.getElementById('iso-center'),count:document.getElementById('iso-count'),
- fire:document.getElementById('iso-fire'),reset:document.getElementById('iso-reset'),charge:document.getElementById('iso-charge')};
+ fire:document.getElementById('iso-fire'),reset:document.getElementById('iso-reset'),charge:document.getElementById('iso-charge'),
+ sound:document.getElementById('iso-sound')};
 // Sprite contract from scripts/render-iso-infantry.py: 41.3 px per metre, cell
 // size and feet pivot come from the atlas meta; camera elevation 30° squashes
 // the ground by sin(30°)=0.5.
@@ -151,6 +152,17 @@ const IDLE_EXTRAS=[['look',4,0.45],['adjust',4,0.38],['lean',2,1.4]];
 // the victors cheer. Some casualties are only wounded and crawl to the rear.
 const CHARGE={speed:3.0,contact:1.3,melee:4.5,strikeEvery:0.4,rout:3.6,cheer:4,stride:1.8,routStride:1.6};
 const CRAWL={time:7,speed:0.3,frameS:0.32};
+// Sound (iso-audio.js): shots and drums are panned to where they happen on screen.
+const audio=window.NRTSIsoAudio?window.NRTSIsoAudio.create():null;
+const COMMANDS={
+ fire:{fr:['Apprêtez armes! Joue! Feu!','fr-FR'],br:['Make ready! Present! Fire!','en-GB']},
+ charge:{fr:['En avant! À la baïonnette!','fr-FR'],br:['Steady, lads! Hold the line!','en-GB']},
+ cheer:{fr:["Vive l'Empereur!",'fr-FR'],br:['Huzzah! Huzzah!','en-GB']}};
+const command=(prefix,kind)=>{if(audio){const [text,lang]=COMMANDS[kind][prefix];audio.say(text,lang);}};
+function ear(x,y){
+ const hw=view.clientWidth/2||1,hh=view.clientHeight/2||1,dx=(x-state.camX)*state.zoom/hw,dy=(y-state.camY)*state.zoom/hh;
+ return[Math.max(-1,Math.min(1,dx)),Math.max(0,1-Math.hypot(dx,dy)*0.45)];
+}
 const groundVec=d=>({x:Math.cos(-d*Math.PI/4),y:Math.sin(-d*Math.PI/4)});
 const REGIMENTS=[{side:'france',prefix:'fr',lineRanks:3,start:0},{side:'britain',prefix:'br',lineRanks:2,start:0.5}];
 const slotKey=(r,f)=>r+','+f;
@@ -266,14 +278,14 @@ function updateRegiments(){
    }
    for(const st of reg.staff)walkTo(st,staffTarget(reg,st.role),dt,snap);
    if(reg.reforming&&spread<0.3)reg.reforming=false;
-   if(reg.formation==='line'&&reg.readyAt===null&&walking===0)reg.readyAt=state.time;
+   if(reg.formation==='line'&&reg.readyAt===null&&walking===0){reg.readyAt=state.time;if(state.firing)command(reg.prefix,'fire');}
  });
 }
 
 // Charge phases: form (both lines stand) -> advance -> melee -> rout.
 function updateCharge(dt){
  const ch=state.charge,regs=state.regiments,att=regs[ch.attacker],def=regs[1-ch.attacker];
- if(ch.phase==='form'&&att.readyAt!==null&&def.readyAt!==null){ch.phase='advance';ch.at=state.time;}
+ if(ch.phase==='form'&&att.readyAt!==null&&def.readyAt!==null){ch.phase='advance';ch.at=state.time;regs.forEach(r=>command(r.prefix,'charge'));}
  if(ch.phase==='advance'){
    const L=att.line,E=def.line,gap=(E.cx-L.cx)*L.nx+(E.cy-L.cy)*L.ny;
    // Within a millimetre counts as contact (the last step lands on it exactly, up to rounding).
@@ -295,7 +307,7 @@ function updateCharge(dt){
    if(state.time>=ch.at+CHARGE.melee){
      const alive=regs.map(r=>aliveMen(r).length);
      ch.loser=alive[ch.attacker]>=alive[1-ch.attacker]?1-ch.attacker:ch.attacker;
-     ch.phase='rout';ch.at=state.time;
+     ch.phase='rout';ch.at=state.time;command(regs[1-ch.loser].prefix,'cheer');
    }
  }
 }
@@ -311,6 +323,22 @@ function flee(reg,dt){
    m.gx+=dx*v*dt;m.gy+=dy*v*dt;m.walk+=v*dt;m.moving=true;m.dir=dirIndex(dx,dy);
    if(Math.max(Math.abs(m.gx),Math.abs(m.gy))>GROUND*0.85)m.gone=true;
  }
+}
+
+// Drummers beat the march (and the pas de charge, faster) while their regiment moves.
+function beatDrums(){
+ if(!audio||!audio.isOn())return;
+ state.regiments.forEach((reg,i)=>{
+   const ch=state.charge,charging=ch&&ch.phase==='advance'&&i===ch.attacker;
+   const moving=charging||(!state.halted&&!state.firing)||reg.reforming;
+   const drummer=reg.staff.find(s=>s.role==='drummer');
+   if(!moving||!drummer||drummer.gone){reg.drumAt=null;return;}
+   const every=charging?0.28:0.5;
+   if(reg.drumAt==null)reg.drumAt=state.time;
+   if(state.time<reg.drumAt)return;
+   const p=project(drummer.gx,drummer.gy);reg.beat=(reg.beat||0)+1;
+   audio.drum(ear(p.x,p.y)[0],reg.beat%4===1);reg.drumAt=state.time+every;
+ });
 }
 
 function units(){
@@ -352,8 +380,8 @@ function frameFor(u){
    // The French front rank kneels to aim and fire; nobody kneels to reload.
    const kneel=reg.formation==='line'&&reg.lineRanks===3&&u.slot.r===0;
    for(const e of r.events)if(e.type==='muzzle'){
-     if(mem.misfire&&!kneel){state.misfires++;continue;}
-     spawnSmoke(u,kneel);shoot(u);
+     if(mem.misfire&&!kneel){state.misfires++;if(audio)audio.misfire(...ear(u.x,u.y));continue;}
+     spawnSmoke(u,kneel);shoot(u);if(audio)audio.shot(...ear(u.x,u.y));
    }
    if(!u.moving&&r.state!=='march'){
      if(kneel&&(r.state==='aim'||r.state==='fire'))return 'k'+r.state+'_'+d+'|'+r.frame;
@@ -480,7 +508,7 @@ function draw(now){
  const k=S/SPRITE_PX_PER_M;
  // Soldiers and props share one painter's order by their ground point.
  const alive=units();
- resolveHits(alive);
+ resolveHits(alive);beatDrums();
  const fallen=[...state.dead.values()].map(d=>{
    const p=crawled(d);return{...d,fallen:true,...project(d.gx+p.x,d.gy+p.y)};});
  const list=alive.filter(u=>!u.dead).map(u=>({...u,...project(u.gx,u.gy)})).concat(fallen,state.props).sort((a,b)=>a.y-b.y);
@@ -576,12 +604,17 @@ ui.reset.addEventListener('click',()=>{setFire(false);resetBattle();});
 ui.halt.addEventListener('click',()=>setHalt(!state.halted));
 ui.fire.addEventListener('click',()=>setFire(!state.firing));
 ui.charge.addEventListener('click',setCharge);
+ui.sound.addEventListener('click',()=>{
+ if(!audio)return;
+ const on=audio.setOn(!audio.isOn());
+ ui.sound.textContent=on?'🔊 Geluid aan':'🔇 Geluid uit';ui.sound.setAttribute('aria-pressed',String(on));
+});
 ui.pause.addEventListener('click',()=>{state.paused=!state.paused;ui.pause.textContent=state.paused?'▶ Hervatten':'⏸ Pauzeren';});
 ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom=false;resize();});
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'332.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'333.0',state,
  getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -592,6 +625,7 @@ window.__GRAPHICS_LAB_ISO__={version:'332.0',state,
    deployed:state.regiments?state.regiments.filter(r=>r.readyAt!==null).length:0,
    shooters:state.shooters?state.shooters.size:0,misfires:state.misfires,bank:state.bank.length,
    kneeling:state.animStates?(state.animStates.kaim||0)+(state.animStates.kfire||0):0,
+   sound:audio?audio.stats():null,
    charge:state.charge?state.charge.phase:null,loser:state.charge&&state.charge.loser!==null?['fr','br'][state.charge.loser]:null,
    gone:state.regiments?state.regiments.reduce((n,r)=>n+r.men.filter(m=>m.gone).length,0):0,
    wounded:[...state.dead.values()].filter(d=>d.wounded).length,

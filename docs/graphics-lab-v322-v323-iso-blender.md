@@ -301,3 +301,22 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   neer en kruipt zo'n 2 m naar achteren (`crawl`), daarna blijft hij liggen.
 - `getStats()` toont `charge` (fase), `loser`, `gone` en `wounded`; de
   reviewstrook bovenaan doorloopt nu alle houdingen.
+
+---
+
+# v333 — geluid
+
+- Nieuwe knop **Geluid** (standaard uit; de AudioContext ontstaat pas na de
+  klik). Alles wordt gesynthetiseerd in `graphics-lab/iso-audio.js`, zonder
+  geluidsbestanden:
+  - **musketschot**: ruisknal met lage dreun en nagalm, links/rechts gepand
+    naar waar de schutter op het scherm staat en zachter verder weg; schoten
+    binnen 60 ms worden na 6 samengevoegd, zodat een salvo niet clipt;
+  - **ketsschot**: klik en kort gesis, geen knal;
+  - **trommels**: de tamboer slaat de pas zolang zijn regiment marcheert, en
+    sneller (pas de charge) tijdens de bajonetcharge;
+  - **commando’s** via spraaksynthese: Frans (fr-FR) „Apprêtez armes! Joue!
+    Feu!”, „En avant! À la baïonnette!”, „Vive l’Empereur!”; Brits (en-GB)
+    „Make ready! Present! Fire!”, „Steady, lads!”, „Huzzah!”.
+- `getStats().sound` telt schoten, samengevoegde schoten, ketsschoten,
+  trommelslagen en commando’s.
