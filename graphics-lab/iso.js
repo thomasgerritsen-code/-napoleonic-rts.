@@ -1,4 +1,4 @@
-// Graphics Lab v324 — isometric scene: Blender-rendered soldiers (march, aim, fire, reload),
+// Graphics Lab v325 — isometric scene: Blender-rendered soldiers (march, aim, fire, reload, fall),
 // buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
 (function(){
@@ -6,16 +6,20 @@
 const view=document.getElementById('iso-view'),canvas=document.getElementById('iso-canvas'),ctx=canvas.getContext('2d');
 const ui={status:document.getElementById('iso-status'),halt:document.getElementById('iso-halt'),
  pause:document.getElementById('iso-pause'),center:document.getElementById('iso-center'),count:document.getElementById('iso-count'),
- fire:document.getElementById('iso-fire')};
+ fire:document.getElementById('iso-fire'),reset:document.getElementById('iso-reset')};
 // Sprite contract from scripts/render-iso-infantry.py: 41.3 px per metre, cell
 // size and feet pivot come from the atlas meta; camera elevation 30° squashes
 // the ground by sin(30°)=0.5.
 const SPRITE_PX_PER_M=128/3.1,SQUASH=0.5,S=20;
 const DIRS=['e','se','s','sw','w','nw','n','ne'];
 const MARCH={frames:6,strideM:1.5},IDLE={frames:2,frameMs:500},SPEED=1.3;
+// Rolling fire: front, middle and rear bands start this far apart. Each shot
+// has a small chance to drop an enemy soldier, who then plays the fall.
+const BAND_DELAY=0.8,BANDS=3,HIT_CHANCE=0.05,HIT_DELAY=0.25,DIE_FRAME=0.17;
 const ROAD_R=14,GROUND=48,TILE=2;
 const state={zoom:1,customZoom:false,camX:0,camY:0,time:0,last:performance.now(),paused:false,halted:false,
- travelled:0,perSide:32,atlases:{},ground:null,terrain:null,props:[],firing:false,controller:null,smoke:[],volleys:0,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
+ travelled:0,perSide:32,atlases:{},ground:null,terrain:null,props:[],firing:false,controller:null,smoke:[],volleys:0,
+ fireStart:0,bands:null,dead:new Map(),hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
 
 // Ground coordinates (metres) -> unzoomed screen pixels.
 const project=(gx,gy)=>({x:gx*S,y:-gy*SQUASH*S});
@@ -91,7 +95,7 @@ function loadAtlas(prefix){
    new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('ontbrekende PNG '+prefix));im.src=base+'.png';})
  ]).then(([sheet,image])=>{
    if(sheet.meta.size.w!==image.naturalWidth||sheet.meta.size.h!==image.naturalHeight)throw new Error(prefix+': PNG-maat wijkt af');
-   for(const d of DIRS)for(const s of ['idle','march','aim','fire','reload'])if(!sheet.animations[s+'_'+d])throw new Error(prefix+': animatie ontbreekt '+s+'_'+d);
+   for(const d of DIRS)for(const s of ['idle','march','aim','fire','reload','die'])if(!sheet.animations[s+'_'+d])throw new Error(prefix+': animatie ontbreekt '+s+'_'+d);
    if(!sheet.meta.muzzle||!sheet.meta.cell||!sheet.meta.pivot)throw new Error(prefix+': atlas-meta onvolledig');
    return{sheet,image};
  });
@@ -110,7 +114,8 @@ function units(){
      const rank=Math.floor(i/files),file=i%files-(files-1)/2;
      const p=along(state.travelled+offset-rank*gap);
      const nx=-p.dy,ny=p.dx;
-     out.push({side,prefix,id:i,gx:p.x+nx*file*spacing,gy:p.y+ny*file*spacing,dir:dirIndex(p.dx,p.dy)});
+     if(state.dead.has(prefix+':'+i))continue;
+     out.push({side,prefix,id:i,key:prefix+':'+i,gx:p.x+nx*file*spacing,gy:p.y+ny*file*spacing,dir:dirIndex(p.dx,p.dy)});
    }
  });
  // A firing line turns to face the enemy regiment's centre.
@@ -118,6 +123,14 @@ function units(){
    const centre=side=>{const l=out.filter(u=>u.side===side);return{x:l.reduce((a,u)=>a+u.gx,0)/l.length,y:l.reduce((a,u)=>a+u.gy,0)/l.length};};
    const c={france:centre('britain'),britain:centre('france')};
    for(const u of out){const t=c[u.side];u.dir=dirIndex(t.x-u.gx,t.y-u.gy);}
+   // Bands by distance to the enemy: the nearest third fires first.
+   if(!state.bands){
+     state.bands=new Map();
+     for(const side of ['france','britain']){
+       const t=c[side],l=out.filter(u=>u.side===side).sort((a,b)=>Math.hypot(a.gx-t.x,a.gy-t.y)-Math.hypot(b.gx-t.x,b.gy-t.y));
+       l.forEach((u,i)=>state.bands.set(u.key,Math.floor(i*BANDS/l.length)));
+     }
+   }
  }
  return out;
 }
@@ -128,8 +141,10 @@ function frameFor(u){
  const d=DIRS[u.dir];
  const c=state.controller;
  if(c){
-   const r=c.update(u.prefix+':'+u.id,state.time*1000,{moving:!state.halted,fireOrder:state.firing});
-   for(const e of r.events)if(e.type==='muzzle')spawnSmoke(u);
+   const band=state.bands?state.bands.get(u.key)||0:0;
+   const ordered=state.firing&&state.time>=state.fireStart+band*BAND_DELAY;
+   const r=c.update(u.key,state.time*1000,{moving:!state.halted,fireOrder:ordered});
+   for(const e of r.events)if(e.type==='muzzle'){spawnSmoke(u);shoot(u);}
    if(r.state!=='march')return r.state+'_'+d+'|'+r.frame;
  }else if(state.halted){
    return 'idle_'+d+'|'+Math.floor((state.time*1000+u.id*137)/IDLE.frameMs)%IDLE.frames;
@@ -147,6 +162,26 @@ function spawnSmoke(u){
  if(state.smoke.length>600)state.smoke.splice(0,state.smoke.length-600);
  const seed=hash(u.id+state.volleys*97,u.prefix==='fr'?1:2);
  state.smoke.push({x,y,born:state.time,life:4.5+seed*2,size:.55+seed*.5,seed});
+}
+
+// A musket ball may drop a random soldier of the other side a moment later.
+function shoot(u){
+ state.shots++;
+ if(hash(state.shots*31+u.id,u.prefix==='fr'?7:11)>=state.hitChance)return;
+ const enemy=u.prefix==='fr'?'br':'fr',alive=[];
+ for(let i=0;i<state.perSide;i++)if(!state.dead.has(enemy+':'+i))alive.push(i);
+ if(alive.length<=2)return;
+ const id=alive[Math.floor(hash(state.shots,u.id+3)*alive.length)];
+ state.hits.push({key:enemy+':'+id,at:state.time+HIT_DELAY});
+}
+
+function resolveHits(list){
+ state.hits=state.hits.filter(h=>{
+   if(state.time<h.at)return true;
+   const u=list.find(v=>v.key===h.key);
+   if(u&&!state.dead.has(h.key))state.dead.set(h.key,{prefix:u.prefix,side:u.side,id:u.id,gx:u.gx,gy:u.gy,dir:u.dir,t0:state.time});
+   return false;
+ });
 }
 
 function drawSmoke(){
@@ -181,12 +216,21 @@ function draw(now){
  else if(state.ground)ctx.drawImage(state.ground.canvas,-state.ground.w/2,-state.ground.h/2);
  const k=S/SPRITE_PX_PER_M;
  // Soldiers and props share one painter's order by their ground point.
- const list=units().map(u=>({...u,...project(u.gx,u.gy)})).concat(state.props).sort((a,b)=>a.y-b.y);
+ const alive=units();
+ resolveHits(alive);
+ const fallen=[...state.dead.values()].map(d=>({...d,fallen:true,...project(d.gx,d.gy)}));
+ const list=alive.map(u=>({...u,...project(u.gx,u.gy)})).concat(fallen,state.props).sort((a,b)=>a.y-b.y);
  state.animStates={};
  state.drawn=0;state.propsDrawn=0;
  for(const u of list){
    if(u.sprite){const p=u.sprite;ctx.drawImage(p.image,u.x-p.pivot.x*k,u.y-p.pivot.y*k,p.w*k,p.h*k);state.propsDrawn++;continue;}
    const atlas=state.atlases[u.prefix];if(!atlas)continue;
+   if(u.fallen){
+     // The fall plays once; the last frame stays on the field.
+     const f=Math.min(3,Math.floor(Math.max(0,state.time-u.t0)/DIE_FRAME));
+     drawSprite(atlas,'die_'+DIRS[u.dir],f,u.x,u.y,k);
+     state.animStates.die=(state.animStates.die||0)+1;continue;
+   }
    const [anim,f]=frameFor(u).split('|');
    drawSprite(atlas,anim,Number(f),u.x,u.y,k);
    const st=anim.split('_')[0];state.animStates[st]=(state.animStates[st]||0)+1;
@@ -204,7 +248,7 @@ function drawCompass(dpr){
  ctx.setTransform(dpr,0,0,dpr,0,0);
  ctx.fillStyle='rgba(20,24,22,.62)';ctx.fillRect(8,8,size*8+8,size*.95+8);
  // Cycles the full drill so every state can be reviewed in all directions.
- const drill=[['march',6,110],['aim',2,260],['fire',3,140],['reload',4,425]];
+ const drill=[['march',6,110],['aim',2,260],['fire',3,140],['reload',4,425],['die',4,300]];
  const total=drill.reduce((s,[,n,ms])=>s+n*ms,0);let t=(state.time*1000)%total,anim='march',f=0;
  for(const [name,n,ms] of drill){if(t<n*ms){anim=name;f=Math.floor(t/ms);break;}t-=n*ms;}
  DIRS.forEach((d,i)=>drawSprite(a,anim+'_'+d,f,12+size*(i+.5),12+size*.85,size/cell));
@@ -229,19 +273,30 @@ view.addEventListener('wheel',e=>{e.preventDefault();const r=view.getBoundingCli
  state.zoom=Math.min(3,Math.max(.35,state.zoom*Math.exp(-e.deltaY*.001)));
  state.camX=a.x-(x-r.width/2)/state.zoom;state.camY=a.y-(y-r.height/2)/state.zoom;state.customZoom=true;},{passive:false});
 function setHalt(h){state.halted=h;if(!h)setFire(false);ui.halt.textContent=h?'▶ Voorwaarts mars':'✋ Halt';}
-function setFire(f){state.firing=f;if(f&&!state.halted)setHalt(true);ui.fire.textContent=f?'✋ Staakt het vuren':'🔥 Vuur!';}
+function setFire(f){
+ state.firing=f;if(f&&!state.halted)setHalt(true);
+ if(f){state.fireStart=state.time;state.bands=null;}
+ ui.fire.textContent=f?'✋ Staakt het vuren':'🔥 Vuur!';
+}
+function resetBattle(){
+ state.dead.clear();state.hits=[];state.smoke=[];state.bands=null;state.shots=0;state.volleys=0;
+ if(state.controller)state.controller.reset();
+}
+ui.reset.addEventListener('click',()=>{setFire(false);resetBattle();});
 ui.halt.addEventListener('click',()=>setHalt(!state.halted));
 ui.fire.addEventListener('click',()=>setFire(!state.firing));
 ui.pause.addEventListener('click',()=>{state.paused=!state.paused;ui.pause.textContent=state.paused?'▶ Hervatten':'⏸ Pauzeren';});
 ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom=false;resize();});
-ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);});
+ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'324.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'325.0',state,
  getStats:()=>({loaded:Object.keys(state.atlases).length,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
-   animStates:{...(state.animStates||{})},smoke:state.smoke.length,volleys:state.volleys,
+   animStates:{...(state.animStates||{})},smoke:state.smoke.length,volleys:state.volleys,shots:state.shots,
+   fallen:{fr:[...state.dead.keys()].filter(k=>k.startsWith('fr')).length,br:[...state.dead.keys()].filter(k=>k.startsWith('br')).length},
+   bands:state.bands?new Set(state.bands.values()).size:0,
    muzzleEvents:state.controller?state.controller.metrics().muzzleEvents:0})};
 
 paintGround();resize();

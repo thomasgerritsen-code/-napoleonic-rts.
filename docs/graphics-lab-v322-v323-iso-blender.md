@@ -137,3 +137,27 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   controllerconfig) en `tests/graphics-lab-iso-v324.spec.js` (één salvo geeft
   precies 64 schoten, richten/vuren/herladen zichtbaar, geen marsframes,
   rook aanwezig, vuren staken).
+
+---
+
+# v325 — vuren per rang en getroffen soldaten
+
+- **Valanimatie** (`die`, 4 frames) in `scripts/render-iso-infantry.py`
+  (tabel `DIE`): geraakt en achterover geslagen, door de knieën, vallen met de
+  armen omhoog, liggen met het musket langs het lichaam. Een extra draaipunt
+  `fall` tussen voeten en heupen laat het hele lichaam om de voeten kantelen.
+  `fall_twist()` kiest per kijkrichting een draai (±25–70°), zodat een liggende
+  soldaat nooit precies in de kijkrichting ligt en nooit buiten de cel valt.
+- **Atlas** per natie nu 8 × 21 frames (3696×1024).
+- **Lab** (`iso.html`, v325):
+  - *Lopend vuur*: bij **Vuur!** worden beide regimenten in drie banden
+    verdeeld op afstand tot de vijand; de voorste band vuurt eerst, de volgende
+    0,8 s en 1,6 s later, daarna houdt elke band zijn eigen ritme.
+  - *Treffers*: elk schot heeft 5 % kans (`state.hitChance`) om na 0,25 s een
+    willekeurige soldaat van de tegenpartij te laten vallen (deterministische
+    hash, minstens 3 overlevenden). De val speelt eenmaal; het laatste frame
+    blijft liggen, ook als het regiment weer gaat marcheren.
+  - **↺ Herstel** brengt alle soldaten terug en ruimt rook op.
+- **Tests**: één lopend salvo geeft precies 64 schoten in drie banden zonder
+  doden (`hitChance = 0`); met `hitChance = 1` vallen soldaten, blijven ze
+  liggen na de mars en herstelt **Herstel** alles.

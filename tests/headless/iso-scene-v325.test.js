@@ -7,17 +7,17 @@ const dir = path.resolve(__dirname, '../../graphics-lab/assets/sprites/iso');
 const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
 
 for (const prefix of ['fr', 'br']) {
-  test(`v324 ${prefix} iso atlas: 8 directions x 17 drill frames in 176x128 cells with muzzle points`, () => {
+  test(`v325 ${prefix} iso atlas: 8 directions x 21 drill frames in 176x128 cells with muzzle points`, () => {
     const sheet = JSON.parse(fs.readFileSync(path.join(dir, `${prefix}_iso_infantry_atlas.json`), 'utf8'));
     const png = fs.readFileSync(path.join(dir, sheet.meta.image));
-    assert.equal(png.readUInt32BE(16), 2992);
+    assert.equal(png.readUInt32BE(16), 3696);
     assert.equal(png.readUInt32BE(20), 1024);
     assert.equal(png[25], 6, 'RGBA PNG');
-    assert.deepEqual(sheet.meta.size, {w: 2992, h: 1024});
+    assert.deepEqual(sheet.meta.size, {w: 3696, h: 1024});
     assert.deepEqual(sheet.meta.cell, {w: 176, h: 128});
     assert.deepEqual(sheet.meta.directions, DIRS);
-    assert.equal(Object.keys(sheet.frames).length, 136);
-    const states = [['idle', 2], ['march', 6], ['aim', 2], ['fire', 3], ['reload', 4]];
+    assert.equal(Object.keys(sheet.frames).length, 168);
+    const states = [['idle', 2], ['march', 6], ['aim', 2], ['fire', 3], ['reload', 4], ['die', 4]];
     DIRS.forEach((d, row) => {
       const names = states.flatMap(([s, n]) => {
         assert.equal(sheet.animations[s + '_' + d].length, n, `${s}_${d}`);
@@ -35,7 +35,7 @@ for (const prefix of ['fr', 'br']) {
   });
 }
 
-test('v324 iso provenance is original and explicitly not yet approved for the game', () => {
+test('v325 iso provenance is original and explicitly not yet approved for the game', () => {
   const p = JSON.parse(fs.readFileSync(path.join(dir, 'provenance.json'), 'utf8'));
   assert.equal(p.sourceType, 'original');
   assert.equal(p.reviewedForUse, false);
@@ -45,7 +45,7 @@ test('v324 iso provenance is original and explicitly not yet approved for the ga
 const isoDir = path.resolve(__dirname, '../../graphics-lab/assets/iso');
 const layout = JSON.parse(fs.readFileSync(path.join(isoDir, 'layout.json'), 'utf8'));
 
-test('v324 every layout prop has a rendered sprite whose PNG matches props.json', () => {
+test('v325 every layout prop has a rendered sprite whose PNG matches props.json', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(isoDir, 'props/props.json'), 'utf8'));
   assert.ok(layout.props.length > 30);
   for (const p of layout.props) {
@@ -58,7 +58,7 @@ test('v324 every layout prop has a rendered sprite whose PNG matches props.json'
   }
 });
 
-test('v324 Blender terrain exists and no prop stands on the marching road', () => {
+test('v325 Blender terrain exists and no prop stands on the marching road', () => {
   const jpg = fs.readFileSync(path.join(isoDir, layout.ground.image));
   assert.equal(jpg.readUInt16BE(0), 0xffd8, 'JPEG');
   const r = layout.road, apothem = r.radius * Math.cos(Math.PI / 8);

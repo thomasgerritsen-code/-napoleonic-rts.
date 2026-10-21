@@ -3,7 +3,7 @@
 
 Builds an original, script-generated 1809 line fusilier from primitives (no
 third-party model), poses it per frame and renders 8 directions x (2 idle +
-6 march + 2 aim + 3 fire + 4 reload) frames with the shared iso camera and sun (iso_blender_common.py).
+6 march + 2 aim + 3 fire + 4 reload + 4 die) frames with the shared iso camera and sun (iso_blender_common.py).
 The same rig produces the French and the British soldier; only uniform
 details and colours differ.
 
@@ -29,7 +29,7 @@ from iso_blender_common import (SPRITE_PX_PER_M, camera, empty, material, part, 
 FRAME_W, FRAME_H = 176, 128   # output cell, px (wide enough for a levelled musket)
 PIVOT = (88, 108)             # feet on screen, px
 DIRECTIONS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]  # clockwise on screen
-STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4)]
+STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4), ("die", 4)]
 
 PALETTES = {
     "france": {
@@ -63,7 +63,9 @@ def build_soldier(side: str) -> dict:
     british = side == "britain"
 
     root = empty("root")
-    hips = empty("hips", root, (0, 0, 0.95))
+    # The whole body topples about the feet through this pivot when hit.
+    fall = empty("fall", root)
+    hips = empty("hips", fall, (0, 0, 0.95))
     torso = empty("torso", hips)
     # Coat body with a slightly fuller chest, collar and short tails.
     part("box", (0.36, 0.23, 0.56), (0, 0, 0.29), M["coat"], torso, name="coat")
@@ -152,7 +154,7 @@ def build_soldier(side: str) -> dict:
     flash = part("ball", (0.11, 1, 1, 1.9), (0, 0.032, MUZZLE_Z + 0.2), glow("#ffc45c", 7), musket, name="flash")
     flame = part("cyl", (0.06, 0.32, 0.0), (0, 0.032, MUZZLE_Z + 0.36), glow("#ff7f24", 6), musket, name="flame")
     pan = part("ball", (0.05,), (0.04, 0.03, 0.44), glow("#ffd27a", 6), musket, name="panflash")
-    return {"root": root, "hips": hips, "torso": torso, "joints": joints, "musket": musket,
+    return {"root": root, "fall": fall, "hips": hips, "torso": torso, "joints": joints, "musket": musket,
             "ramrod": ramrod, "flash": [flash, flame], "pan": pan}
 
 
@@ -192,13 +194,33 @@ DRILL = {
 }
 
 
+# Hit and fall backwards with a twist (fraction of the per-direction twist),
+# so a body never lies straight along the view direction: (fall tilt, twist, lift, hips height, thigh, knee,
+# right/left shoulder (x, y), elbow, torso lean, musket placement).
+DIE = [
+    (12, 0.0, 0.0, 0.95, 0, -4, (-40, 24), (20, -34), 34, -22, ((-0.24, 0.14, -0.1), (-46, -6, 0))),
+    (16, 0.3, 0.0, 0.74, 34, -66, (4, 14), (8, -18), 22, 14, ((-0.2, 0.22, -0.3), (-62, 0, 10))),
+    (54, 0.7, 0.04, 0.84, 18, -36, (118, 26), (96, -30), 30, 6, ((-0.3, 0.12, -0.38), (-100, 0, 30))),
+    # Lying: arms flung sideways, musket alongside the body towards the feet.
+    (86, 1.0, 0.16, 0.95, 4, -10, (112, 48), (36, -64), 12, 0, ((-0.44, 0.06, 0.5), (180, 0, 8))),
+]
+
+
+def fall_twist(direction: int) -> float:
+    """Twist (deg) that keeps the fallen body as level across the screen as possible."""
+    def cost(t):
+        head = math.radians(-45 * direction + 180 + t)
+        return abs(math.sin(head)) + 0.004 * abs(t)
+    return min((-70, -55, -40, -25, 25, 40, 55, 70), key=cost)
+
+
 def place(obj, placement):
     loc, rot = placement
     obj.location = loc
     obj.rotation_euler = Euler([math.radians(a) for a in rot])
 
 
-def pose(rig: dict, state: str, frame: int, frames: int) -> None:
+def pose(rig: dict, state: str, frame: int, frames: int, direction: int = 0) -> None:
     sh_r, el_r, th_r, kn_r = rig["joints"]["R"]
     sh_l, el_l, th_l, kn_l = rig["joints"]["L"]
     rad = math.radians
@@ -207,6 +229,22 @@ def pose(rig: dict, state: str, frame: int, frames: int) -> None:
     rig["pan"].hide_render = True
     rig["ramrod"].hide_render = True
     rig["torso"].rotation_euler = Euler((0, 0, 0))
+    rig["fall"].rotation_euler = Euler((0, 0, 0))
+    rig["fall"].location.z = 0
+    if state == "die":
+        tilt, twist, lift, hips_z, thigh, knee, (rx, ry), (lx, ly), elbow, lean, musket = DIE[frame]
+        rig["fall"].rotation_euler = Euler((rad(tilt), 0, rad(twist * fall_twist(direction))))
+        rig["fall"].location.z = lift
+        rig["hips"].location.z = hips_z
+        for th, kn in ((th_r, kn_r), (th_l, kn_l)):
+            th.rotation_euler = Euler((rad(thigh), 0, 0))
+            kn.rotation_euler = Euler((rad(knee), 0, 0))
+        sh_r.rotation_euler = Euler((rad(rx), rad(ry), 0))
+        sh_l.rotation_euler = Euler((rad(lx), rad(ly), 0))
+        el_r.rotation_euler = el_l.rotation_euler = Euler((rad(elbow), 0, 0))
+        rig["torso"].rotation_euler = Euler((rad(lean), 0, 0))
+        place(rig["musket"], musket)
+        return
     if state in DRILL:
         musket, (rx, ry, re), (lx, ly, le), lean, flash, ram = DRILL[state][frame]
         place(rig["musket"], musket)
@@ -282,7 +320,7 @@ def main(argv: list[str]) -> int:
             if args.states and state not in args.states:
                 continue
             for f in range(frames):
-                pose(rig, state, f, frames)
+                pose(rig, state, f, frames, d)
                 bpy.context.view_layer.update()
                 if state == "fire" and f == 1:
                     # Screen pixel of the muzzle, so the lab spawns smoke exactly there.

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Pack the isometric Blender infantry frames into one atlas per nation.
 
-Layout: 8 rows (directions e, se, s, sw, w, nw, n, ne) x 17 columns
-(idle 2, march 6, aim 2, fire 3, reload 4), 176x128 px cells -> 2992x1024
+Layout: 8 rows (directions e, se, s, sw, w, nw, n, ne) x 21 columns
+(idle 2, march 6, aim 2, fire 3, reload 4, die 4), 176x128 px cells -> 3696x1024
 RGBA PNG plus a Pixi-compatible JSON. The renderer's muzzle.json (screen
 pixel of the muzzle on the firing frame, per direction) is copied into the
 JSON so the lab spawns smoke at the barrel. Optional --preview writes
@@ -26,7 +26,7 @@ CELL_W, CELL_H = 176, 128
 PIVOT = {"x": 88, "y": 108}
 ALPHA_FLOOR = 16  # render/denoise speckle below ~6% opacity is cleared
 DIRECTIONS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]
-STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4)]
+STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4), ("die", 4)]
 SIDES = {"france": "fr", "britain": "br"}
 
 
