@@ -3,7 +3,8 @@
 
 Same camera, sun and 30° view as the infantry (render-iso-infantry.py).
 - horse: procedural body, neck, head, mane, tail and four two-jointed legs,
-  saddle with a coloured shabraque, bridle and rolled cloak; coat colours bay
+  shaped saddle on a draped shabraque with lace border, bridle, holsters and
+  rolled cloak; coat colours bay
   (variant 1) and black / grey (variant 2);
 - rider: the fusilier body as a chasseur à cheval (French green with red) or a
   light dragoon (British blue with buff), without pack or musket, with a sabre.
@@ -62,6 +63,34 @@ def hide_tree(obj, hidden=True) -> None:
         hide_tree(child, hidden)
 
 
+def draped(name, rx, rz, angle, y0, y1, mat, parent, point=0.0, zc=0.2):
+    """Cloth sheet following the horse's back: an elliptic arc from -angle to +angle
+    (degrees from the top) around the barrel axis, from y0 (rear) to y1; the rear
+    edge comes to a point `point` metres further back at the lower corners."""
+    rows, cols = 6, 16
+    verts, faces = [], []
+    for i in range(rows + 1):
+        u = i / rows
+        for j in range(cols + 1):
+            a = math.radians(-angle + 2 * angle * j / cols)
+            edge = abs(j / cols - 0.5) * 2
+            y = y0 - point * edge if i == 0 else y0 + (y1 - y0) * u
+            verts.append((rx * math.sin(a), y, zc + rz * math.cos(a)))
+    for i in range(rows):
+        for j in range(cols):
+            k = i * (cols + 1) + j
+            faces.append((k, k + 1, k + cols + 2, k + cols + 1))
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, [], faces)
+    mesh.materials.append(mat)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    for poly in mesh.polygons:
+        poly.use_smooth = True
+    obj.parent = parent
+    return obj
+
+
 def build_horse(side: str, variant: int) -> dict:
     coat_hex, dark_hex = GREY if (side == "britain" and variant == 2) else COATS[variant]
     coat = material(coat_hex, 0.55, pattern="skin")
@@ -93,19 +122,22 @@ def build_horse(side: str, variant: int) -> dict:
     part("box", (0.24, 0.02, 0.03), (0, 0.02, 0.06), leather, head, name="browband")
     part("box", (0.17, 0.17, 0.03), (0, 0, 0.43), leather, head, name="noseband")
     part("box", (0.012, 0.012, 0.7), (0, 0.18, 0.2), leather, neck, rot=(-25, 0, 0), name="reins")
-    tail = empty("tail", body, (0, -0.86, 0.36), (165, 0, 0))
-    part("cyl", (0.1, 0.8, 0.05), (0, 0, 0.4), dark, tail, name="tailmesh", segments=12)
-    # Saddle on a shabraque with a lace border, holsters and a rolled cloak.
-    part("box", (0.72, 1.0, 0.03), (0, -0.05, 0.56), lace, body, name="shabraque_lace")
-    part("box", (0.68, 0.94, 0.035), (0, -0.05, 0.565), cloth, body, name="shabraque")
-    # Shabraque falls over the flanks behind the rider's legs, pointed at the back.
-    for x in (0.355, -0.355):
-        part("box", (0.02, 0.55, 0.32), (x, -0.32, 0.42), cloth, body, rot=(0, 0, 0), name="shabraque_side")
-        part("box", (0.022, 0.57, 0.035), (x, -0.32, 0.27), lace, body, name="shabraque_border")
-    part("box", (0.36, 0.5, 0.1), (0, -0.02, 0.62), leather, body, name="saddle")
-    part("cyl", (0.08, 0.5), (0, -0.45, 0.66), cloth, body, rot=(0, 90, 0), name="cloak")
-    for x in (0.16, -0.16):
-        part("cyl", (0.05, 0.22), (x, 0.38, 0.6), leather, body, rot=(-60, 0, 0), name="holster")
+    tail = empty("tail", body, (0, -0.86, 0.36), (170, 0, 0))
+    part("cyl", (0.06, 0.18, 0.09), (0, 0, 0.08), dark, tail, name="tailroot", segments=12)
+    part("cyl", (0.11, 0.62, 0.05), (0, 0, 0.47), dark, tail, name="tailmesh", segments=12)
+    # Saddle cloth (shabraque) draped over the back and down the flanks, with a
+    # lace border and a pointed rear corner; a shaped saddle, rolled cloak and holsters.
+    draped("shabraque_lace", 0.352, 0.386, 74, -0.66, 0.16, lace, body, point=0.1)
+    draped("shabraque", 0.356, 0.39, 70, -0.63, 0.13, cloth, body, point=0.1)
+    part("box", (0.3, 0.42, 0.05), (0, -0.03, 0.6), leather, body, name="saddle")
+    part("box", (0.24, 0.07, 0.13), (0, 0.2, 0.64), leather, body, rot=(-15, 0, 0), name="pommel")
+    part("box", (0.3, 0.06, 0.15), (0, -0.26, 0.65), leather, body, rot=(12, 0, 0), name="cantle")
+    for x in (0.3, -0.3):
+        part("box", (0.02, 0.3, 0.28), (x, 0.0, 0.47), leather, body, rot=(0, math.copysign(18, x), 0), name="flap")
+    part("cyl", (0.065, 0.5), (0, -0.37, 0.67), material("#a9a59c", 0.85, pattern="cloth"), body, rot=(0, 90, 0),
+         name="cloak")
+    for x in (0.2, -0.2):
+        part("cyl", (0.045, 0.2), (x, 0.36, 0.55), leather, body, rot=(-60, 0, 0), name="holster")
     legs = {}
     for key, (x, y) in LEGS.items():
         hip = empty("hip" + key, body, (x, y, 0.02 - HIP_Z + HIP_Z))
@@ -185,7 +217,7 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
     fall.location = (0, 0, 0)
     neck.rotation_euler = Euler((rad(-38), 0, 0))
     head.rotation_euler = Euler((rad(128), 0, 0))
-    tail.rotation_euler = Euler((rad(165), 0, 0))
+    tail.rotation_euler = Euler((rad(170), 0, 0))
     for key in LEGS:
         leg(horse, key, 0, 0)
     sh_r, el_r, th_r, kn_r = rider["joints"]["R"]
@@ -205,7 +237,7 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
     if state == "idle":
         # Head lowered and raised, tail swish.
         neck.rotation_euler = Euler((rad((-38, -46)[frame]), 0, 0))
-        tail.rotation_euler = Euler((rad(165), rad((-10, 10)[frame]), 0))
+        tail.rotation_euler = Euler((rad(170), rad((-10, 10)[frame]), 0))
         leg(horse, "HL", 4, 6, -4)
         return
     if state == "walk":
@@ -221,7 +253,7 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
         body.rotation_euler = Euler((rad(pitch), 0, 0))
         body.location = (0, 0, HIP_Z + 0.06 * max(0.0, math.sin(t * math.tau + 1.2)))
         neck.rotation_euler = Euler((rad(-28 - 8 * math.sin(t * math.tau)), 0, 0))
-        tail.rotation_euler = Euler((rad(135), 0, 0))
+        tail.rotation_euler = Euler((rad(140), 0, 0))
         # Rider leans forward, sabre levelled at the enemy.
         torso.rotation_euler = Euler((rad(22 - pitch), 0, 0))
         sh_r.rotation_euler = Euler((rad(92), rad(4), 0))
