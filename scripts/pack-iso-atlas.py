@@ -18,6 +18,9 @@ each per nation: idle 2, march 6, command 2 in taller 176x160 cells (feet at
 with muzzle point, roll 4) in 256x176 cells with the axle at 128,112 -> 1792x1408,
 and the gunners in two 176x128 sheets: gunner (idle, ram, load, aim, ready,
 touch, haul) and gunner2 (march and the three falls) -> 3168x1024 each.
+Cavalry (render-iso-cavalry.py, horse and rider, two coat colours per nation)
+in 224x192 cells with the hooves' centre at 112,152: cavalry (idle, walk,
+gallop) -> 3136x1536 and cavfight (slash, rear, die) -> 2016x1536.
 Optional --preview writes review sheets on a grass tone.
 
   python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof \
@@ -65,6 +68,9 @@ ROLES = {"officer": "o", "drummer": "d", "ensign": "e"}
 ROLE_STATES = [("idle", 2), ("march", 6), ("command", 2)]
 ROLE_CELL = (176, 160)
 ROLE_PIVOT = {"x": 88, "y": 140}
+CAV_CELL, CAV_PIVOT = (224, 192), {"x": 112, "y": 152}
+CAVALRY = {"cavalry": [("idle", 2), ("walk", 6), ("gallop", 6)], "cavfight": [("slash", 3), ("rear", 2), ("die", 4)]}
+CAV_SIDES = {side + v: prefix + "c" + v for side, prefix in (("france", "fr"), ("britain", "br")) for v in ("", "2")}
 # Artillery: kind -> (folder piece, sprite letter, states, cell, pivot)
 ARTILLERY = {
     "gun": ("gun", "g", [("idle", 1), ("fire", 2), ("roll", 4)], (256, 176), {"x": 128, "y": 112}),
@@ -116,6 +122,8 @@ def pack(frames_dir: Path, side: str, kind: str) -> tuple[bytes, dict, int]:
     if kind in ROLES:
         return pack_cells(frames_dir / "roles" / f"{side}_{kind}", SIDES[side] + ROLES[kind], kind,
                           ROLE_STATES, ROLE_CELL, ROLE_PIVOT)
+    if kind in CAVALRY:
+        return pack_cells(frames_dir / "cavalry" / side, CAV_SIDES[side], kind, CAVALRY[kind], CAV_CELL, CAV_PIVOT)
     if kind in ARTILLERY:
         piece, letter, states, cell, pivot = ARTILLERY[kind]
         folder = frames_dir / "artillery" / f"{side}_{piece}"
@@ -164,7 +172,7 @@ def pack_cells(folder: Path, prefix: str, kind: str, states, cell, pivot) -> tup
     if len(digests) != len(frames):
         raise PngError(f"{prefix} {kind}: pixel-identical frames found")
     source = ("render-iso-roles.py" if kind in ROLES else "render-iso-artillery.py" if kind in ARTILLERY
-              else "render-iso-infantry.py")
+              else "render-iso-cavalry.py" if kind in CAVALRY else "render-iso-infantry.py")
     meta = {"image": f"{prefix}_iso_{kind}_atlas.png", "size": {"w": w, "h": h},
             "scale": "1", "cell": {"w": cw, "h": ch}, "directions": DIRECTIONS, "pivot": pivot,
             "source": f"scripts/{source} (Blender, original procedural model)"}
@@ -198,9 +206,12 @@ def main(argv: list[str]) -> int:
         jobs = [(side, kind) for side in SIDES for kind in SHEETS]
         jobs += [(side, role) for side in ("france", "britain") for role in ROLES]
         jobs += [(side, kind) for side in ("france", "britain") for kind in ARTILLERY]
+        jobs += [(side, kind) for side in CAV_SIDES for kind in CAVALRY]
         if args.only:
-            jobs = [(s, k) for s, k in jobs if (s in args.only and k not in ROLES and k not in ARTILLERY)
-                    or (k in ROLES and "roles" in args.only) or (k in ARTILLERY and "artillery" in args.only)]
+            special = {**dict.fromkeys(ROLES, "roles"), **dict.fromkeys(ARTILLERY, "artillery"),
+                       **dict.fromkeys(CAVALRY, "cavalry")}
+            jobs = [(s, k) for s, k in jobs if (k in special and special[k] in args.only)
+                    or (k not in special and s in args.only)]
         for side, kind in jobs:
             atlas, sheet, w = pack(Path(args.frames), side, kind)
             out = Path(args.out)

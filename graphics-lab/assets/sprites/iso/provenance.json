@@ -1,9 +1,9 @@
 {
-  "assetId": "iso-scene-v334",
+  "assetId": "iso-scene-v335",
   "sourceType": "original",
   "author": "Claude Code via scripts/render-iso-infantry.py, commissioned by the repository owner",
   "usageRights": "Original script-generated Blender models (soldiers, buildings, trees, terrain) and renders; no third-party models, textures or animations; full rights of the repository owner",
-  "sourceRef": "scripts/iso_blender_common.py, render-iso-infantry.py, render-iso-props.py, render-iso-ground.py (Blender 5.2 bpy, Cycles CPU) + pack-iso-atlas.py, render-iso-roles.py, render-iso-artillery.py",
+  "sourceRef": "scripts/iso_blender_common.py, render-iso-infantry.py, render-iso-props.py, render-iso-ground.py (Blender 5.2 bpy, Cycles CPU) + pack-iso-atlas.py, render-iso-roles.py, render-iso-artillery.py, render-iso-cavalry.py",
   "reviewedForUse": false,
   "reviewNote": "Graphics Lab only; awaiting human visual review before any use in the game",
   "camera": {
@@ -142,6 +142,32 @@
         "diefwd": 4,
         "dieside": 4
       }
+    }
+  },
+  "cavalry": {
+    "cell": {
+      "w": 224,
+      "h": 192
+    },
+    "pivot": {
+      "x": 112,
+      "y": 152
+    },
+    "states": {
+      "idle": 2,
+      "walk": 6,
+      "gallop": 6,
+      "slash": 3,
+      "rear": 2,
+      "die": 4
+    },
+    "variants": {
+      "1": "bay horse",
+      "2": "black horse (France) / grey horse (Britain)"
+    },
+    "riders": {
+      "france": "chasseur \u00e0 cheval",
+      "britain": "light dragoon"
     }
   }
 }

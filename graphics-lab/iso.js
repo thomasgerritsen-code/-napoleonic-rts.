@@ -1,4 +1,4 @@
-// Graphics Lab v334 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v335 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -7,7 +7,7 @@
 const view=document.getElementById('iso-view'),canvas=document.getElementById('iso-canvas'),ctx=canvas.getContext('2d');
 const ui={status:document.getElementById('iso-status'),halt:document.getElementById('iso-halt'),
  pause:document.getElementById('iso-pause'),center:document.getElementById('iso-center'),count:document.getElementById('iso-count'),
- fire:document.getElementById('iso-fire'),reset:document.getElementById('iso-reset'),charge:document.getElementById('iso-charge'),
+ fire:document.getElementById('iso-fire'),reset:document.getElementById('iso-reset'),charge:document.getElementById('iso-charge'),cav:document.getElementById('iso-cav'),
  sound:document.getElementById('iso-sound')};
 // Sprite contract from scripts/render-iso-infantry.py: 41.3 px per metre, cell
 // size and feet pivot come from the atlas meta; camera elevation 30° squashes
@@ -21,7 +21,7 @@ const BAND_DELAY=0.8,HIT_CHANCE=0.05,HIT_DELAY=0.25,DIE_FRAME=0.17;
 const ROAD_R=14,GROUND=48,TILE=2;
 const state={zoom:1,customZoom:false,camX:0,camY:0,time:0,last:performance.now(),paused:false,halted:false,
  travelled:0,perSide:32,atlases:{},ground:null,terrain:null,props:[],firing:false,controller:null,smoke:[],volleys:0,
- fireStart:0,regiments:null,simTime:0,dead:new Map(),batteries:null,balls:[],cannonShots:0,ballHits:0,charge:null,woundedShare:0.3,drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
+ fireStart:0,regiments:null,simTime:0,dead:new Map(),batteries:null,squadrons:null,cavCharge:null,deadRiders:[],riderFalls:0,sabreHits:0,balls:[],cannonShots:0,ballHits:0,charge:null,woundedShare:0.3,drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
 
 // Ground coordinates (metres) -> unzoomed screen pixels.
 const project=(gx,gy)=>({x:gx*S,y:-gy*SQUASH*S});
@@ -87,7 +87,7 @@ async function loadScene(){
  const sprites={};
  await Promise.all(Object.entries(manifest.props).map(async([kind,meta])=>{sprites[kind]={...meta,image:await loadImage('./assets/iso/props/'+meta.image)};}));
  state.terrain={image,scale:S/layout.ground.pxPerM};
- state.props=layout.props.filter(p=>sprites[p.type]).map(p=>({...p,sprite:sprites[p.type],...project(p.x,p.y)}));
+ state.props=layout.props.filter(p=>sprites[p.type]).map(p=>({...p,gx:p.x,gy:p.y,sprite:sprites[p.type],...project(p.x,p.y)}));
 }
 
 // Each nation has an infantry atlas (drill) and a fallen atlas (three falls).
@@ -178,6 +178,28 @@ const CREW_SPOTS={
  rest:[[1.25,0.75,[-1,0]],[-1.25,0.75,[1,0]],[0.75,-2.45,[0,1]],[0.85,-0.45,[-1,0]]],
  ram:[0.35,2.55,[-1,0]],load:[-0.75,1.75,[1,0]],aim:[0.15,-2.6,[0,1]],
  haul:[[0.95,0.15,[0,1]],[-0.95,0.15,[0,1]]]};
+// --- Cavalry ------------------------------------------------------------------
+// Each regiment has a squadron of six light horse in two ranks. On the march
+// they ride behind the guns; in line they stand on the left flank. Cavalerie!
+// sends the French squadron at the British line: a walk, then the gallop, a
+// short melee of sabre cuts with rearing horses, then they rally back.
+// Buildings a charge rides around (ground radius in metres).
+const OBSTACLE_R={farmhouse:5,barn:6,cottage:4,barracks_fr:6,barracks_br:6};
+// First building on the straight ride from c to e, and a point to ride round it on the near side.
+function detour(c,e){
+ const dx=e.x-c.x,dy=e.y-c.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
+ let best=null;
+ for(const p of state.props){
+   const R=OBSTACLE_R[p.type];if(!R)continue;
+   const along=(p.gx-c.x)*ux+(p.gy-c.y)*uy;if(along<0||along>len)continue;
+   const side=(p.gx-c.x)*-uy+(p.gy-c.y)*ux;
+   if(Math.abs(side)>R+1.5||(best&&along>best.along))continue;
+   const s=side>0?-1:1;best={along,x:p.gx-uy*s*(R+3.5),y:p.gy+ux*s*(R+3.5)};
+ }
+ return best;
+}
+const SQUAD={ranks:2,files:3,walk:3.2,gallop:7.5,stride:2.4,gallopStride:3.6,walkFor:1.2,contact:1.2,
+ melee:3.2,cutEvery:0.45,cutChance:0.35,cutReach:1.6,fallChance:0.18,fallWithin:6,dieFrame:0.22};
 const REGIMENTS=[{side:'france',prefix:'fr',lineRanks:3,start:0},{side:'britain',prefix:'br',lineRanks:2,start:0.5}];
 const slotKey=(r,f)=>r+','+f;
 
@@ -279,6 +301,7 @@ function updateRegiments(){
  const [fr,br]=state.regiments,centres=[centreOf(fr),centreOf(br)];
  if(state.charge)updateCharge(dt);
  updateBatteries(dt);
+ updateSquadrons(dt);
  state.regiments.forEach((reg,i)=>{
    if((state.firing||state.charge)&&reg.formation!=='line')formLine(reg,centres[1-i]);
    else if(!state.halted&&reg.formation!=='column')formColumn(reg);
@@ -517,6 +540,101 @@ function crewFrame(m){
  }
 }
 
+function buildSquadrons(){
+ state.squadrons=state.regiments.map(reg=>{
+   const riders=[];
+   for(let r=0;r<SQUAD.ranks;r++)for(let f=0;f<SQUAD.files;f++){
+     const id=r*SQUAD.files+f,look=reg.prefix+'c'+(hash(id+3,reg.prefix==='fr'?51:53)<0.5?'':'2');
+     riders.push({side:reg.side,prefix:reg.prefix,rider:true,id,r,f,look,key:reg.prefix+':cav'+id,gx:0,gy:0,walk:0,
+       dir:0,moving:false,placed:false,act:'idle',gait:'walk',forceWalk:false});
+   }
+   return{reg,riders};
+ });
+}
+// A rider's place: in the column behind the guns, or on the line's left flank.
+function riderHome(reg,m){
+ if(reg.formation!=='line'){
+   const ranks=Math.ceil(aliveMen(reg).length/COLUMN.files);
+   return columnTarget(reg,ranks*COLUMN.gap+GUN.trail+GUN.spacing+4+m.r*2.8,(m.f-1)*1.4);
+ }
+ const L=reg.line,u=-((L.files-1)/2*LINE.spacing+GUN.flank+3.5+m.f*1.5),v=-1-m.r*2.6;
+ return{x:L.cx+L.tx*u+L.nx*v,y:L.cy+L.ty*u+L.ny*v,dir:dirIndex(L.nx,L.ny)};
+}
+const liveRiders=sq=>sq.riders.filter(m=>!m.dead);
+function updateSquadrons(dt){
+ if(!state.squadrons)buildSquadrons();
+ const ch=state.cavCharge;
+ state.squadrons.forEach((sq,i)=>{
+   const reg=sq.reg,charging=ch&&i===0,marching=reg.formation==='column'&&!state.halted;
+   if(!charging){
+     for(const m of liveRiders(sq)){
+       walkTo(m,riderHome(reg,m),dt,false,SQUAD.walk);
+       m.act='idle';m.gait='walk';m.forceWalk=marching;
+     }
+     return;
+   }
+   const enemy=state.regiments[1],E=centreOf(enemy),C=centreOf({men:liveRiders(sq).map(m=>({gx:m.gx,gy:m.gy}))});
+   if(!ch.aim){const l=Math.hypot(E.x-C.x,E.y-C.y)||1;ch.aim={x:(E.x-C.x)/l,y:(E.y-C.y)/l};ch.via=detour(C,E);}
+   // Ride round a building first, then straight at the enemy.
+   if(ch.via&&Math.hypot(ch.via.x-C.x,ch.via.y-C.y)<2.5){
+     ch.via=null;const l=Math.hypot(E.x-C.x,E.y-C.y)||1;ch.aim={x:(E.x-C.x)/l,y:(E.y-C.y)/l};
+   }
+   const A=ch.aim,T={x:-A.y,y:A.x},face=dirIndex(A.x,A.y),via=ch.via&&ch.phase!=='melee'&&ch.phase!=='rally'?ch.via:null;
+   const since=state.time-ch.at;
+   if(ch.phase==='walk'&&since>=SQUAD.walkFor){ch.phase='gallop';ch.at=state.time;}
+   let arrived=0;
+   for(const m of liveRiders(sq)){
+     m.forceWalk=false;
+     if(ch.phase==='rally'){
+       const h=riderHome(reg,m);walkTo(m,h,dt,false,SQUAD.gallop*0.8);m.gait='gallop';m.act='idle';
+       if(!m.moving)arrived++;continue;
+     }
+     const goal=via||E,back=via?m.r*2.2:SQUAD.contact+0.4+m.r*2.2;
+     const t={x:goal.x-A.x*back+T.x*(m.f-1)*1.5,y:goal.y-A.y*back+T.y*(m.f-1)*1.5,dir:face};
+     if(ch.phase==='melee'){walkTo(m,t,dt,false,SQUAD.walk);meleeRider(m,ch);continue;}
+     walkTo(m,t,dt,false,ch.phase==='walk'?SQUAD.walk:SQUAD.gallop);
+     m.gait=ch.phase==='walk'?'walk':'gallop';m.act='idle';
+     // Some riders are brought down by musketry as they close.
+     if(ch.phase==='gallop'&&!via&&Math.hypot(t.x-m.gx,t.y-m.gy)<SQUAD.fallWithin&&hash(m.id+ch.count*13,77)<SQUAD.fallChance){
+       m.dead=true;state.riderFalls++;
+       state.deadRiders.push({look:m.look,prefix:m.prefix,gx:m.gx,gy:m.gy,dir:m.dir,t0:state.time});continue;
+     }
+     if(!m.moving)arrived++;
+   }
+   const alive=liveRiders(sq).length;
+   if(ch.phase==='gallop'&&!ch.via&&(arrived>=alive||since>12)){ch.phase='melee';ch.at=state.time;}
+   else if(ch.phase==='melee'&&since>=SQUAD.melee){ch.phase='rally';ch.at=state.time;}
+   else if(ch.phase==='rally'&&(arrived>=alive||since>10)){state.cavCharge=null;ui.cav.disabled=false;}
+   if(ch.phase==='gallop'&&audio&&state.time>=(ch.hoofAt||0)){
+     const p=project(C.x,C.y);audio.hooves(...ear(p.x,p.y));ch.hoofAt=state.time+0.11;
+   }
+ });
+}
+// In the melee each rider cuts at the nearest enemy now and then; some horses rear.
+function meleeRider(m,ch){
+ const beat=Math.floor((state.time-ch.at)/SQUAD.cutEvery);
+ m.act=hash(m.id+ch.count*7,beat%3+90)<0.25?'rear':'slash';
+ if(m.lastCut===beat)return;
+ m.lastCut=beat;
+ if(hash(m.id*31+beat,ch.count+97)>=SQUAD.cutChance)return;
+ let best=null,bestD=SQUAD.cutReach;
+ for(const e of aliveMen(state.regiments[1])){
+   if(state.hits.some(h=>h.key===e.key))continue;
+   const d=Math.hypot(e.gx-m.gx,e.gy-m.gy);if(d<bestD){best=e;bestD=d;}
+ }
+ if(best){state.sabreHits++;state.hits.push({key:best.key,at:state.time+0.1,seed:7000+state.sabreHits});}
+}
+function riderFrame(u){
+ const d=DIRS[u.dir],seed=hash(u.id,u.prefix==='fr'?61:63);
+ if(u.moving||u.forceWalk){
+   const stride=u.gait==='gallop'?SQUAD.gallopStride:SQUAD.stride;
+   return u.gait+'_'+d+'|'+Math.floor((u.walk%stride)/stride*6)%6;
+ }
+ if(u.act==='slash')return 'slash_'+d+'|'+Math.floor(state.time/0.18+seed*3)%3;
+ if(u.act==='rear')return 'rear_'+d+'|'+Math.floor(state.time/0.3)%2;
+ return 'idle_'+d+'|'+Math.floor(state.time/0.7+seed*2)%2;
+}
+
 function units(){
  updateRegiments();
  return state.regiments.flatMap(reg=>[...aliveMen(reg),...reg.staff.filter(s=>!s.gone)]);
@@ -690,14 +808,22 @@ function draw(now){
  const fallen=[...state.dead.values()].map(d=>{
    const p=crawled(d);return{...d,fallen:true,...project(d.gx+p.x,d.gy+p.y)};});
  const battery=(state.batteries||[]).flatMap(g=>[g,...g.crew]).map(u=>({...u,...project(u.gx,u.gy)}));
- const list=alive.filter(u=>!u.dead).map(u=>({...u,...project(u.gx,u.gy)})).concat(battery,fallen,state.props).sort((a,b)=>a.y-b.y);
- state.animStates={};state.crewStates={};
+ const horse=(state.squadrons||[]).flatMap(sq=>liveRiders(sq)).map(u=>({...u,...project(u.gx,u.gy)}))
+   .concat(state.deadRiders.map(d=>({...d,deadRider:true,...project(d.gx,d.gy)})));
+ const list=alive.filter(u=>!u.dead).map(u=>({...u,...project(u.gx,u.gy)})).concat(battery,horse,fallen,state.props).sort((a,b)=>a.y-b.y);
+ state.animStates={};state.crewStates={};state.cavStates={};state.ridersDrawn=0;
  state.drawn=0;state.propsDrawn=0;state.rolesDrawn=0;state.gunsDrawn=0;state.crewDrawn=0;
  for(const u of list){
    if(u.sprite){const p=u.sprite;ctx.drawImage(p.image,u.x-p.pivot.x*k,u.y-p.pivot.y*k,p.w*k,p.h*k);state.propsDrawn++;continue;}
    if(u.gun){
      const a=state.atlases[u.prefix+'g'];if(!a)continue;
      const [an,f]=gunFrame(u).split('|');drawSprite(a,an,Number(f),u.x,u.y,k);state.gunsDrawn++;continue;
+   }
+   if(u.rider||u.deadRider){
+     const a=state.atlases[u.look]||state.atlases[u.prefix+'c'];if(!a)continue;
+     const [an,f]=u.deadRider?['die_'+DIRS[u.dir],Math.min(3,Math.floor((state.time-u.t0)/SQUAD.dieFrame))]:riderFrame(u).split('|');
+     drawSprite(a,an,Number(f),u.x,u.y,k);
+     const st=an.split('_')[0];state.cavStates[st]=(state.cavStates[st]||0)+1;if(u.rider)state.ridersDrawn++;continue;
    }
    if(u.gunner){
      const a=state.atlases[u.prefix+'a'];if(!a)continue;
@@ -764,7 +890,7 @@ view.addEventListener('pointerup',up);view.addEventListener('pointercancel',up);
 view.addEventListener('wheel',e=>{e.preventDefault();const r=view.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,a=toWorld(x,y);
  state.zoom=Math.min(3,Math.max(.35,state.zoom*Math.exp(-e.deltaY*.001)));
  state.camX=a.x-(x-r.width/2)/state.zoom;state.camY=a.y-(y-r.height/2)/state.zoom;state.customZoom=true;},{passive:false});
-function setHalt(h){state.halted=h;if(!h){setFire(false);state.charge=null;ui.charge.disabled=false;}ui.halt.textContent=h?'▶ Voorwaarts mars':'✋ Halt';}
+function setHalt(h){state.halted=h;if(!h){setFire(false);state.charge=null;ui.charge.disabled=false;state.cavCharge=null;ui.cav.disabled=false;}ui.halt.textContent=h?'▶ Voorwaarts mars':'✋ Halt';}
 // Offset of a wounded man who has crawled toward his own rear (his sprite direction).
 function crawled(d){
  if(!d.wounded)return{x:0,y:0};
@@ -777,6 +903,15 @@ function setCharge(){
  state.charge={phase:'form',at:state.time,attacker:0,loser:null,strikes:0};
  ui.charge.disabled=true;
 }
+// Cavalerie!: trumpet, "Chargez!", and the French squadron goes in.
+function setCavCharge(){
+ if(state.cavCharge||!state.squadrons)return;
+ if(!state.halted)setHalt(true);
+ state.cavCharge={phase:'walk',at:state.time,count:(state.cavCount=(state.cavCount||0)+1),aim:null};
+ ui.cav.disabled=true;
+ if(audio){const sq=liveRiders(state.squadrons[0]),p=sq.length?project(sq[0].gx,sq[0].gy):{x:0,y:0};
+   audio.trumpet(ear(p.x,p.y)[0]);audio.say('Chargez!','fr-FR');}
+}
 function setFire(f){
  if(f&&state.charge)return;
  state.firing=f;if(f&&!state.halted)setHalt(true);
@@ -788,12 +923,14 @@ function resetBattle(){
  state.dead.clear();state.hits=[];state.smoke=[];state.bank=[];state.drill=new Map();state.misfires=0;
  state.shots=0;state.volleys=0;state.regiments=null;state.shooters=null;
  state.batteries=null;state.balls=[];state.cannonShots=0;state.ballHits=0;
+ state.squadrons=null;state.cavCharge=null;state.deadRiders=[];state.riderFalls=0;state.sabreHits=0;ui.cav.disabled=false;
  if(state.controller)state.controller.reset();
 }
 ui.reset.addEventListener('click',()=>{setFire(false);resetBattle();});
 ui.halt.addEventListener('click',()=>setHalt(!state.halted));
 ui.fire.addEventListener('click',()=>setFire(!state.firing));
 ui.charge.addEventListener('click',setCharge);
+ui.cav.addEventListener('click',setCavCharge);
 ui.sound.addEventListener('click',()=>{
  if(!audio)return;
  const on=audio.setOn(!audio.isOn());
@@ -804,7 +941,7 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'334.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'335.0',state,
  getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -818,6 +955,9 @@ window.__GRAPHICS_LAB_ISO__={version:'334.0',state,
    sound:audio?audio.stats():null,
    guns:state.batteries?state.batteries.length:0,gunsDrawn:state.gunsDrawn||0,crewDrawn:state.crewDrawn||0,
    crewStates:{...(state.crewStates||{})},cannonShots:state.cannonShots,balls:state.balls.length,ballHits:state.ballHits,
+   riders:state.squadrons?state.squadrons.reduce((n,sq)=>n+liveRiders(sq).length,0):0,ridersDrawn:state.ridersDrawn||0,
+   cavStates:{...(state.cavStates||{})},cavCharge:state.cavCharge?state.cavCharge.phase:null,
+   riderFalls:state.riderFalls,sabreHits:state.sabreHits,
    recoiled:state.batteries?state.batteries.filter(g=>g.recoil>0.5).length:0,
    charge:state.charge?state.charge.phase:null,loser:state.charge&&state.charge.loser!==null?['fr','br'][state.charge.loser]:null,
    gone:state.regiments?state.regiments.reduce((n,r)=>n+r.men.filter(m=>m.gone).length,0):0,
@@ -838,6 +978,10 @@ const loadRole=([key,role])=>loadSheet(key,role,['idle','march','command']).then
 // Base looks and staff first so the scene starts quickly; the other looks
 // stream in afterwards (soldiers use the base look until theirs has arrived).
 const firstKeys=['fr','br'];
+// Cavalry: two coat colours per nation, a riding and a fighting sheet each.
+const CAV_KEYS=['frc','frc2','brc','brc2'];
+const loadCav=key=>Promise.all([loadSheet(key,'cavalry',['idle','walk','gallop']),
+ loadSheet(key,'cavfight',['slash','rear','die'])]).then(indexAtlas);
 // Batteries: one gun atlas and two gunner sheets per nation, streamed in with the extra looks.
 const loadGun=p=>loadSheet(p+'g','gun',['idle','fire','roll']).then(s=>{
  if(!s.sheet.meta.muzzle)throw new Error(p+': kanon zonder mondingspunten');return indexAtlas([s]);});
@@ -847,7 +991,8 @@ Promise.all([Promise.all([...firstKeys.map(loadAtlas),...ROLE_ATLASES.map(loadRo
  [...firstKeys,...ROLE_ATLASES.map(([key])=>key)].forEach((key,i)=>{state.atlases[key]=atlases[i];});
  ui.status.textContent=state.terrain?'Blender-scène geladen · soldaten, gebouwen en terrein':'Blender-soldaten geladen · eenvoudig terrein';
  return Promise.all([...ATLAS_KEYS.filter(k=>!firstKeys.includes(k)).map(key=>loadAtlas(key).then(a=>{state.atlases[key]=a;})),
-   ...['fr','br'].flatMap(p=>[loadGun(p).then(a=>{state.atlases[p+'g']=a;}),loadCrew(p).then(a=>{state.atlases[p+'a']=a;})])]);
+   ...['fr','br'].flatMap(p=>[loadGun(p).then(a=>{state.atlases[p+'g']=a;}),loadCrew(p).then(a=>{state.atlases[p+'a']=a;})]),
+   ...CAV_KEYS.map(key=>loadCav(key).then(a=>{state.atlases[key]=a;}))]);
 }).catch(err=>{
  ui.status.textContent='Atlassen konden niet laden.';console.error(err);
 });

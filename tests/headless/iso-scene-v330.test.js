@@ -141,3 +141,16 @@ for (const prefix of ['fr', 'br']) {
     }
   });
 }
+
+for (const key of ['frc', 'frc2', 'brc', 'brc2']) {
+  test(`v335 ${key} cavalry atlases: walk, gallop, slash, rear and fall in 8 directions`, () => {
+    const sheets = {cavalry: [[['idle', 2], ['walk', 6], ['gallop', 6]], 3136], cavfight: [[['slash', 3], ['rear', 2], ['die', 4]], 2016]};
+    for (const [kind, [states, width]] of Object.entries(sheets)) {
+      const sheet = JSON.parse(fs.readFileSync(path.join(dir, `${key}_iso_${kind}_atlas.json`), 'utf8'));
+      assert.deepEqual(imageSize(path.join(dir, sheet.meta.image)), {w: width, h: 1536, alpha: true});
+      assert.deepEqual(sheet.meta.cell, {w: 224, h: 192});
+      assert.deepEqual(sheet.meta.pivot, {x: 112, y: 152});
+      for (const d of DIRS) for (const [state, n] of states) assert.equal(sheet.animations[`${state}_${d}`].length, n, `${kind} ${state}_${d}`);
+    }
+  });
+}

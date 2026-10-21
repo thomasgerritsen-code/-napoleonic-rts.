@@ -353,3 +353,31 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
 - **Geluid**: kanonsknal met lange, lage rommel.
 - `getStats()` toont `guns`, `gunsDrawn`, `crewDrawn`, `crewStates`,
   `cannonShots`, `balls`, `ballHits` en `recoiled`.
+
+---
+
+# v335 — cavalerie
+
+- **Model** (`scripts/render-iso-cavalry.py`): een procedureel paard (romp,
+  borst, kruis, hals, hoofd met oren en hoofdstel, manen, staart en vier
+  benen met twee gewrichten en hoeven), zadel op een gekleurde schabrak met
+  boord, holsters en opgerolde mantel. Vachtkleuren: bruin (look 1) en zwart
+  (Frans) of schimmel (Brits) als look 2.
+- **Ruiter**: het fuselierlichaam als *chasseur à cheval* (groen met rood) of
+  *light dragoon* (blauw met buff, grijze overall), met rijlaarzen, sabel en
+  schede; zit met de benen om het paard.
+- **Toestanden** (224×192-cellen, hoeven in 112,152): rust 2, stap 6
+  (viertakt), galop 6 (met zweeffase en meedeinende romp), sabelhouw 3,
+  steigeren 2 en sneuvelen 4 (paard en ruiter vallen samen om, weg van de
+  camera zodat ze in de cel blijven). Atlassen `frc/frc2/brc/brc2_iso_cavalry`
+  (3136×1536) en `_cavfight` (2016×1536).
+- **Lab**: elk regiment heeft een eskadron van zes ruiters in twee gelederen,
+  dat in colonne achter de kanonnen rijdt en in linie op de linkerflank staat.
+  **Cavalerie!** (trompetsignaal en „Chargez!”) stuurt het Franse eskadron op de
+  Britse linie af: 1,2 s stap, dan galop (7,5 m/s, hoefgedreun); staat er een
+  gebouw op de route, dan rijdt het eskadron er via een tussenpunt omheen. Onderweg kan
+  een ruiter door het geweervuur vallen. Bij de vijand volgt 3,2 s man tegen
+  man: sabelhouwen en steigerende paarden, en wie binnen bereik staat kan
+  vallen. Daarna galopperen ze terug naar hun plaats.
+- `getStats()` toont `riders`, `ridersDrawn`, `cavStates`, `cavCharge`,
+  `riderFalls` en `sabreHits`.

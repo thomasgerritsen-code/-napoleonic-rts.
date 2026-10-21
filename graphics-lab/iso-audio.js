@@ -1,12 +1,12 @@
-// Graphics Lab v333/v334 — synthesised battle sounds for the isometric scene:
-// musket shots, cannon, misfires, drums and spoken commands. Everything is generated with
+// Graphics Lab v333–v335 — synthesised battle sounds for the isometric scene:
+// musket shots, cannon, misfires, drums, hooves, trumpet and spoken commands. Everything is generated with
 // WebAudio (no sound files); commands use the browser's speech synthesis.
 // Off by default; the AudioContext is only created after a click.
 (function(){
 'use strict';
 function create(){
  let ctx=null,noise=null,master=null,on=false;
- const stats={shots:0,merged:0,misfires:0,drums:0,commands:0,cannon:0};
+ const stats={shots:0,merged:0,misfires:0,drums:0,commands:0,cannon:0,hooves:0,trumpets:0};
  // Shots in the same 60 ms window share one louder report instead of stacking.
  let windowAt=-1,windowCount=0;
  const MAX_PER_WINDOW=6;
@@ -57,6 +57,28 @@ function create(){
    burst({at,pan,gain:v,decay:2.6,freq:170,q:0.4,type:'lowpass',rate:0.6});
    thump({at,pan,gain:v,from:72,to:26,decay:0.9});
  }
+ // Galloping horses: a soft, low drumming of hooves.
+ function hooves(pan,near){
+   if(!on||!ctx)return;
+   stats.hooves++;
+   const at=ctx.currentTime;
+   for(let i=0;i<3;i++)thump({at:at+i*0.03+Math.random()*0.02,pan,gain:(0.12+0.15*near)*(1-i*0.25),from:120,to:60,decay:0.08});
+ }
+ // Cavalry trumpet: the four notes of the charge on a bright brass-like tone.
+ function trumpet(pan){
+   if(!on||!ctx)return;
+   stats.trumpets++;
+   const notes=[392,523.25,659.25,783.99,659.25,783.99],len=[0.16,0.16,0.16,0.32,0.16,0.5];
+   let at=ctx.currentTime+0.02;
+   notes.forEach((f,i)=>{
+     const o=ctx.createOscillator(),filter=ctx.createBiquadFilter(),g=ctx.createGain();
+     o.type='sawtooth';o.frequency.value=f;filter.type='lowpass';filter.frequency.value=2400;
+     g.gain.setValueAtTime(0.0001,at);g.gain.exponentialRampToValueAtTime(0.16,at+0.03);
+     g.gain.setValueAtTime(0.16,at+len[i]-0.04);g.gain.exponentialRampToValueAtTime(0.0001,at+len[i]);
+     o.connect(filter);filter.connect(g);g.connect(panner(pan));o.start(at);o.stop(at+len[i]+0.02);
+     at+=len[i]+0.03;
+   });
+ }
  // Flash in the pan: a click and a short fizz, no report.
  function misfire(pan,near){
    if(!on||!ctx)return;
@@ -87,7 +109,7 @@ function create(){
    else{try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(_){}}
    return on;
  }
- return{shot,cannon,misfire,drum,say,setOn,isOn:()=>on,ready:()=>!!ctx,stats:()=>({...stats,on,context:ctx?ctx.state:'none'})};
+ return{shot,cannon,hooves,trumpet,misfire,drum,say,setOn,isOn:()=>on,ready:()=>!!ctx,stats:()=>({...stats,on,context:ctx?ctx.state:'none'})};
 }
 window.NRTSIsoAudio={create};
 })();
