@@ -1,0 +1,12 @@
+{
+  "assetId": "iso-line-infantry-proof-v322",
+  "sourceType": "original",
+  "author": "Claude Code via scripts/render-iso-infantry.py, commissioned by the repository owner",
+  "usageRights": "Original script-generated Blender model and renders; no third-party models, textures or animations; full rights of the repository owner",
+  "sourceRef": "scripts/render-iso-infantry.py (Blender 5.2 bpy, Cycles CPU, 48 samples) + scripts/pack-iso-atlas.py",
+  "reviewedForUse": false,
+  "reviewNote": "Graphics Lab proof only; awaiting human visual review before any use in the game",
+  "camera": {"projection": "orthographic", "elevationDeg": 30, "frame": 128, "pivot": {"x": 64, "y": 104}},
+  "directions": ["e", "se", "s", "sw", "w", "nw", "n", "ne"],
+  "states": {"idle": 2, "march": 6}
+}

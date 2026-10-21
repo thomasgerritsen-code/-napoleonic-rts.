@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <meta name="theme-color" content="#181d1b"/>
+  <title>Napoleonic RTS · Isometrische proef v322</title>
+  <link rel="stylesheet" href="./style.css?v=320a"/>
+  <style>
+    .iso-view{position:relative;flex:1;min-height:max(360px,60dvh);overflow:hidden;background:#5d6b45;touch-action:none}
+    .iso-view canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .iso-panel{position:absolute;left:12px;bottom:12px;max-width:min(560px,calc(100% - 24px));
+      background:rgba(20,24,22,.78);color:#efe7d2;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.4;pointer-events:none}
+    .iso-panel strong{color:#f0d488}
+    @media(max-width:720px){.iso-panel{font-size:11px;padding:7px 9px;left:8px;bottom:8px}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="mast">
+      <div class="brand">
+        <span class="crest">⚜</span>
+        <div><small>NAPOLEONIC RTS</small><strong>Isometrische proef <em>v322</em></strong></div>
+      </div>
+      <div class="mast-right">
+        <span class="tag">Blender → 2D-sprites · 8 richtingen</span>
+        <a class="game-link" href="./">← Graphics Lab</a>
+      </div>
+    </header>
+    <section id="iso-view" class="iso-view" aria-label="Isometrische proefscene: sleep om te schuiven, knijp of scroll om te zoomen">
+      <canvas id="iso-canvas"></canvas>
+      <div class="iso-panel">
+        <strong>Proef:</strong> soldaten zijn vooraf in Blender gerenderd vanuit één eigen 3D-model,
+        met vaste camera (30°) en zon, in 8 richtingen. Het regiment loopt een achthoekige route zodat
+        elke richting te zien is. Dit is een technische proef, nog geen afgewerkte kunst.
+      </div>
+    </section>
+    <section class="toolbar">
+      <div class="left-control">
+        <span class="eyebrow">ISOMETRISCH PERSPECTIEF</span>
+        <strong id="iso-status">Atlassen worden geladen…</strong>
+        <small>Eigen procedureel Blender-model · geen externe assets</small>
+      </div>
+      <div class="actions">
+        <button id="iso-halt" type="button" class="primary">✋ Halt</button>
+        <button id="iso-pause" type="button">⏸ Pauzeren</button>
+        <button id="iso-center" type="button">⦿ Centreren</button>
+        <label>Soldaten<select id="iso-count"><option value="16">2 × 16</option><option value="32" selected>2 × 32</option><option value="64">2 × 64</option></select></label>
+      </div>
+    </section>
+  </main>
+  <script src="./iso.js?v=322a"></script>
+</body>
+</html>

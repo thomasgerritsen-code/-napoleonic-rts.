@@ -1,3 +1,10 @@
+# Graphics Lab — v322 isometrische Blender-proef
+
+`/graphics-lab/iso.html`: soldaten vooraf gerenderd in Blender vanuit één eigen
+3D-model, in 8 richtingen en een schuine 30°-camera. Zie
+`docs/graphics-lab-v322-iso-blender-proof.md`.
+
+---
 # Graphics Lab — v321 animatiecontroller (opt-in)
 
 `/graphics-lab/?sprites=atlas` gebruikt de nieuwe deterministische
