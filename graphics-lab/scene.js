@@ -402,7 +402,7 @@ window.__GRAPHICS_LAB_V319__={
    engine:state.engine,fps:state.fps,sprites:sceneObjects(),
    zoom:state.zoom,mode:state.mode,quality:state.quality,loaded:Object.keys(imgs).length,
    realism:state.realism,stage:state.stage,staticTroopsDoNotMarch:true,animatedSmoke:true,layerCount:2,
-   frenchReviewEnabled:useFrenchReview,frenchReviewLoaded:!!frenchReview,
+   frenchReviewEnabled:useFrenchReview,frenchReviewLoaded:!!frenchReview&&Object.keys(imgs).length===files.length,
    frenchReviewApproved:false,frenchFrameCount:frenchReview?.poseCount||0,
    frenchHeadsRepaired:!!frenchReview?.headsRepaired,
    frenchHeadCount:frenchReview?.repairedHeadCount||0,
