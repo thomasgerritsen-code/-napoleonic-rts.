@@ -240,3 +240,26 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
 - **Tests**: ontplooien in linie (met lopende soldaten), rangvuur waarbij eerst
   een deel en daarna alle 64 musketten vuren, geen marsframes tijdens het vuren,
   nul gaten in de voorste rij na treffers, en terug naar colonne.
+
+---
+
+# v330 — scherpere sprites, compagnieën, nieuwe houdingen, WebP
+
+- **Supersampling**: elk frame wordt 2× zo groot gerenderd en met
+  premultiplied alpha teruggeschaald (`--supersample 2`), waardoor randen,
+  knopen en bajonetten scherper zijn. De soldaten blijven even groot.
+- **Compagnieën**: look 4 zijn grenadiers (Frans: rode epauletten en pluim;
+  Brits: wings en witte pluim), look 5 voltigeurs / de Britse light company
+  (gele of groene pluim). In het lab staat 1/8 van elk regiment op de rechter-
+  flank als grenadier en 1/8 op de linkerflank als lichte compagnie.
+- **Nieuwe toestanden** in drie extra atlassen per look:
+  - `combat`: knielend richten (2) en vuren (3, met mondingspunt), ketsschot (3),
+    bajonetcharge (6), bajonetstoot (3);
+  - `morale`: vluchten (6), gewond kruipen (4), juichen (2);
+  - `idlex`: rondkijken (4), sjako rechtzetten (4), op musket leunen (2).
+- **WebP**: alle atlassen en gebouwen/bomen zijn lossy WebP (q90, alpha
+  verliesvrij-kwaliteit). De JSON noemt het bestand (`meta.image`), dus de
+  lader hoeft het formaat niet te kennen.
+- **Lazy loading**: de basislook per land en de staf laden eerst; de scène
+  start meteen en de andere looks stromen daarna binnen (tot dan gebruiken
+  soldaten de basislook).

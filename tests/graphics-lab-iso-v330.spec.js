@@ -3,20 +3,20 @@ async function open(page){
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/graphics-lab/iso.html',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.__GRAPHICS_LAB_ISO__?.getStats().loaded===12);
+  await page.waitForFunction(()=>window.__GRAPHICS_LAB_ISO__?.getStats().loaded===16);
   return errors;
 }
 const frames=page=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
-test('v329 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
+test('v330 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
   const errors=await open(page);
   await frames(page);
   const s=await page.evaluate(()=>({...window.__GRAPHICS_LAB_ISO__.getStats(),version:window.__GRAPHICS_LAB_ISO__.version}));
-  expect(s.version).toBe('329.0');
-  // Three looks per nation, all of them on the field.
-  expect(s.loaded).toBe(12);
+  expect(s.version).toBe('330.0');
+  // Five looks per nation (incl. grenadiers and voltigeurs), all on the field.
+  expect(s.loaded).toBe(16);
   // Officer, drummer and ensign lead each regiment.
   expect(s.roles).toBe(6);
-  expect(s.looks).toBe(6);
+  expect(s.looks).toBe(10);
   expect(s.terrain).toBe(true);
   expect(s.props).toBeGreaterThan(30);
   expect(s.propsDrawn).toBe(s.props);
@@ -25,7 +25,7 @@ test('v329 iso scene loads both Blender atlases and draws every soldier',async({
   expect(await page.locator('#iso-status').textContent()).toContain('gebouwen en terrein');
   expect(errors).toEqual([]);
 });
-test('v329 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
+test('v330 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
   const errors=await open(page);
   const seen=await page.evaluate(async()=>{
     const api=window.__GRAPHICS_LAB_ISO__,step=()=>new Promise(r=>requestAnimationFrame(r));
@@ -58,7 +58,7 @@ const advance=(page,seconds)=>page.evaluate(async seconds=>{
     const s=api.getStats();for(const k of Object.keys(s.animStates))seen[k]=1;smoke=Math.max(smoke,s.smoke);die=Math.max(die,s.animStates.die||0);}
   return{seen:Object.keys(seen).sort(),smoke,die,stats:api.getStats()};
 },seconds);
-test('v329 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
+test('v330 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -81,7 +81,7 @@ test('v329 Vuur! deploys both columns into line, then the ranks fire in turn onc
   expect((await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).firing).toBe(false);
   expect(errors).toEqual([]);
 });
-test('v329 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
+test('v330 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=1;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -112,7 +112,7 @@ test('v329 casualties fall, the rank behind closes up, the fallen stay and Herst
 });
 test.describe('phone',()=>{
   test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-  test('v329 iso scene pinch-zooms on a phone',async({page})=>{
+  test('v330 iso scene pinch-zooms on a phone',async({page})=>{
     const errors=await open(page);
     const before=(await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).zoom;
     const r=await page.locator('#iso-view').boundingBox();

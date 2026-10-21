@@ -1,5 +1,5 @@
 {
-  "assetId": "iso-scene-v328",
+  "assetId": "iso-scene-v330",
   "sourceType": "original",
   "author": "Claude Code via scripts/render-iso-infantry.py, commissioned by the repository owner",
   "usageRights": "Original script-generated Blender models (soldiers, buildings, trees, terrain) and renders; no third-party models, textures or animations; full rights of the repository owner",
@@ -36,7 +36,18 @@
     "reload": 4,
     "die": 4,
     "diefwd": 4,
-    "dieside": 4
+    "dieside": 4,
+    "kaim": 2,
+    "kfire": 3,
+    "misfire": 3,
+    "charge": 6,
+    "thrust": 3,
+    "rout": 6,
+    "crawl": 4,
+    "cheer": 2,
+    "look": 4,
+    "adjust": 4,
+    "lean": 2
   },
   "covers": [
     "graphics-lab/assets/sprites/iso/*",
@@ -54,12 +65,31 @@
       "die",
       "diefwd",
       "dieside"
+    ],
+    "combat": [
+      "kaim",
+      "kfire",
+      "misfire",
+      "charge",
+      "thrust"
+    ],
+    "morale": [
+      "rout",
+      "crawl",
+      "cheer"
+    ],
+    "idlex": [
+      "look",
+      "adjust",
+      "lean"
     ]
   },
   "variants": {
     "1": "base",
     "2": "campaign overalls, oilcloth shako cover, moustache",
-    "3": "brown blanket roll, mess tin, sideburns"
+    "3": "brown blanket roll, mess tin, sideburns",
+    "4": "grenadier company (French red epaulettes and plume, British wings and white plume)",
+    "5": "voltigeurs / British light company (yellow or green plume)"
   },
   "roles": {
     "officer": [
@@ -77,5 +107,9 @@
       "march",
       "command"
     ]
+  },
+  "rendering": {
+    "supersample": 2,
+    "format": "lossy WebP q90 with lossless-quality alpha (Pillow)"
   }
 }

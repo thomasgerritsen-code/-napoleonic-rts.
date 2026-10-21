@@ -6,13 +6,21 @@ const path = require('node:path');
 const dir = path.resolve(__dirname, '../../graphics-lab/assets/sprites/iso');
 const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
 
-for (const prefix of ['fr', 'br', 'fr2', 'br2', 'fr3', 'br3']) {
+// Width/height of a PNG or a WebP (VP8X, as written by Pillow for lossy+alpha).
+function imageSize(file) {
+  const buf = fs.readFileSync(file);
+  if (buf.toString('ascii', 1, 4) === 'PNG') return {w: buf.readUInt32BE(16), h: buf.readUInt32BE(20), alpha: buf[25] === 6};
+  assert.equal(buf.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(buf.toString('ascii', 8, 12), 'WEBP');
+  assert.equal(buf.toString('ascii', 12, 16), 'VP8X', 'extended WebP with alpha');
+  return {w: buf.readUIntLE(24, 3) + 1, h: buf.readUIntLE(27, 3) + 1, alpha: (buf[20] & 0x10) !== 0};
+}
+
+for (const prefix of ['fr', 'br', 'fr2', 'br2', 'fr3', 'br3', 'fr4', 'br4', 'fr5', 'br5']) {
   const load = kind => JSON.parse(fs.readFileSync(path.join(dir, `${prefix}_iso_${kind}_atlas.json`), 'utf8'));
   const checkSheet = (sheet, states, width) => {
-    const png = fs.readFileSync(path.join(dir, sheet.meta.image));
-    assert.equal(png.readUInt32BE(16), width);
-    assert.equal(png.readUInt32BE(20), 1024);
-    assert.equal(png[25], 6, 'RGBA PNG');
+    assert.match(sheet.meta.image, /\.webp$/);
+    assert.deepEqual(imageSize(path.join(dir, sheet.meta.image)), {w: width, h: 1024, alpha: true});
     assert.deepEqual(sheet.meta.size, {w: width, h: 1024});
     assert.deepEqual(sheet.meta.cell, {w: 176, h: 128});
     assert.deepEqual(sheet.meta.directions, DIRS);
@@ -28,7 +36,7 @@ for (const prefix of ['fr', 'br', 'fr2', 'br2', 'fr3', 'br3']) {
     });
   };
 
-  test(`v329 ${prefix} infantry atlas: 8 directions x 17 drill frames with muzzle points`, () => {
+  test(`v330 ${prefix} infantry atlas: 8 directions x 17 drill frames with muzzle points`, () => {
     const sheet = load('infantry');
     checkSheet(sheet, [['idle', 2], ['march', 6], ['aim', 2], ['fire', 3], ['reload', 4]], 2992);
     for (const d of DIRS) {
@@ -40,17 +48,30 @@ for (const prefix of ['fr', 'br', 'fr2', 'br2', 'fr3', 'br3']) {
     assert.deepEqual({state: sheet.meta.muzzle.state, frame: sheet.meta.muzzle.frame}, config.muzzleEvent);
   });
 
-  test(`v329 ${prefix} fallen atlas: three falls x 4 frames in 8 directions`, () => {
+  test(`v330 ${prefix} fallen atlas: three falls x 4 frames in 8 directions`, () => {
     checkSheet(load('fallen'), [['die', 4], ['diefwd', 4], ['dieside', 4]], 2112);
+  });
+
+  test(`v330 ${prefix} combat atlas: kneeling fire with muzzle points, misfire, charge, thrust`, () => {
+    const sheet = load('combat');
+    checkSheet(sheet, [['kaim', 2], ['kfire', 3], ['misfire', 3], ['charge', 6], ['thrust', 3]], 2992);
+    assert.equal(sheet.meta.muzzle.state, 'kfire');
+    for (const d of DIRS) {
+      const m = sheet.meta.muzzle.px[d];
+      assert.ok(m.x > 0 && m.x < 176 && m.y > 0 && m.y < 128, `kneeling muzzle ${d} inside the cell`);
+    }
+  });
+
+  test(`v330 ${prefix} morale and idle atlases: rout, crawl, cheer / look, adjust, lean`, () => {
+    checkSheet(load('morale'), [['rout', 6], ['crawl', 4], ['cheer', 2]], 2112);
+    checkSheet(load('idlex'), [['look', 4], ['adjust', 4], ['lean', 2]], 1760);
   });
 }
 
 for (const [key, role] of [['fro', 'officer'], ['frd', 'drummer'], ['fre', 'ensign'], ['bro', 'officer'], ['brd', 'drummer'], ['bre', 'ensign']]) {
-  test(`v329 ${key} ${role} atlas: idle, march and command in 8 directions, 176x160 cells`, () => {
+  test(`v330 ${key} ${role} atlas: idle, march and command in 8 directions, 176x160 cells`, () => {
     const sheet = JSON.parse(fs.readFileSync(path.join(dir, `${key}_iso_${role}_atlas.json`), 'utf8'));
-    const png = fs.readFileSync(path.join(dir, sheet.meta.image));
-    assert.equal(png.readUInt32BE(16), 1760);
-    assert.equal(png.readUInt32BE(20), 1280);
+    assert.deepEqual(imageSize(path.join(dir, sheet.meta.image)), {w: 1760, h: 1280, alpha: true});
     assert.deepEqual(sheet.meta.cell, {w: 176, h: 160});
     assert.deepEqual(sheet.meta.pivot, {x: 88, y: 140});
     DIRS.forEach((d, row) => {
@@ -63,7 +84,7 @@ for (const [key, role] of [['fro', 'officer'], ['frd', 'drummer'], ['fre', 'ensi
   });
 }
 
-test('v329 iso provenance is original and explicitly not yet approved for the game', () => {
+test('v330 iso provenance is original and explicitly not yet approved for the game', () => {
   const p = JSON.parse(fs.readFileSync(path.join(dir, 'provenance.json'), 'utf8'));
   assert.equal(p.sourceType, 'original');
   assert.equal(p.reviewedForUse, false);
@@ -73,20 +94,21 @@ test('v329 iso provenance is original and explicitly not yet approved for the ga
 const isoDir = path.resolve(__dirname, '../../graphics-lab/assets/iso');
 const layout = JSON.parse(fs.readFileSync(path.join(isoDir, 'layout.json'), 'utf8'));
 
-test('v329 every layout prop has a rendered sprite whose PNG matches props.json', () => {
+test('v330 every layout prop has a rendered WebP sprite whose size matches props.json', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(isoDir, 'props/props.json'), 'utf8'));
   assert.ok(layout.props.length > 30);
   for (const p of layout.props) {
     const meta = manifest.props[p.type];
     assert.ok(meta, `sprite for ${p.type}`);
-    const png = fs.readFileSync(path.join(isoDir, 'props', meta.image));
-    assert.equal(png.readUInt32BE(16), meta.w, `${p.type} width`);
-    assert.equal(png.readUInt32BE(20), meta.h, `${p.type} height`);
+    assert.match(meta.image, /\.webp$/);
+    const size = imageSize(path.join(isoDir, 'props', meta.image));
+    assert.equal(size.w, meta.w, `${p.type} width`);
+    assert.equal(size.h, meta.h, `${p.type} height`);
     assert.ok(meta.pivot.x > 0 && meta.pivot.x < meta.w && meta.pivot.y > 0 && meta.pivot.y < meta.h);
   }
 });
 
-test('v329 Blender terrain exists and no prop stands on the marching road', () => {
+test('v330 Blender terrain exists and no prop stands on the marching road', () => {
   const jpg = fs.readFileSync(path.join(isoDir, layout.ground.image));
   assert.equal(jpg.readUInt16BE(0), 0xffd8, 'JPEG');
   const r = layout.road, apothem = r.radius * Math.cos(Math.PI / 8);

@@ -1,6 +1,6 @@
-// Graphics Lab v329 — isometric scene: Blender-rendered soldiers in three looks (march, aim, fire,
-// reload, three falls) led by an officer, drummer and ensign, deploying from column into line,
-// buildings, trees and terrain.
+// Graphics Lab v330 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
+// deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
 (function(){
 'use strict';
@@ -92,26 +92,40 @@ async function loadScene(){
 // Each nation has an infantry atlas (drill) and a fallen atlas (three falls).
 const FALLS=['die','diefwd','dieside'];
 function loadSheet(prefix,kind,states){
- const base='./assets/sprites/iso/'+prefix+'_iso_'+kind+'_atlas';
- return Promise.all([
-   fetch(base+'.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('ontbrekende atlas '+prefix+' '+kind);return r.json();}),
-   loadImage(base+'.png')
- ]).then(([sheet,image])=>{
-   if(sheet.meta.size.w!==image.naturalWidth||sheet.meta.size.h!==image.naturalHeight)throw new Error(prefix+': PNG-maat wijkt af');
-   for(const d of DIRS)for(const s of states)if(!sheet.animations[s+'_'+d])throw new Error(prefix+': animatie ontbreekt '+s+'_'+d);
-   if(!sheet.meta.cell||!sheet.meta.pivot)throw new Error(prefix+': atlas-meta onvolledig');
-   return{sheet,image};
- });
+ const dir='./assets/sprites/iso/';
+ return fetch(dir+prefix+'_iso_'+kind+'_atlas.json',{cache:'no-cache'})
+   .then(r=>{if(!r.ok)throw new Error('ontbrekende atlas '+prefix+' '+kind);return r.json();})
+   // The JSON names the image (WebP since v330), so formats can change without code changes.
+   .then(sheet=>loadImage(dir+sheet.meta.image).then(image=>{
+     if(sheet.meta.size.w!==image.naturalWidth||sheet.meta.size.h!==image.naturalHeight)throw new Error(prefix+': atlasmaat wijkt af');
+     for(const d of DIRS)for(const s of states)if(!sheet.animations[s+'_'+d])throw new Error(prefix+': animatie ontbreekt '+s+'_'+d);
+     if(!sheet.meta.cell||!sheet.meta.pivot)throw new Error(prefix+': atlas-meta onvolledig');
+     return{sheet,image};
+   }));
 }
-// Three looks per nation (atlas prefixes fr, fr2, fr3 / br, br2, br3), fixed
-// per soldier so the same man keeps his face, trousers and kit.
+// Looks per nation: 1-3 vary face, trousers and kit, 4 grenadiers, 5 voltigeurs
+// (British light company). Fixed per soldier so the same man keeps his look.
 const LOOKS=['','2','3'];
-const lookOf=(prefix,id)=>prefix+LOOKS[Math.floor(hash(id+11,prefix==='fr'?3:5)*LOOKS.length)];
+const COMPANY_SHARE=1/8;
+const lookOf=(prefix,id)=>{
+ const elite=Math.max(1,Math.round(state.perSide*COMPANY_SHARE));
+ if(id<elite)return prefix+'4';
+ if(id>=state.perSide-elite)return prefix+'5';
+ return prefix+LOOKS[Math.floor(hash(id+11,prefix==='fr'?3:5)*LOOKS.length)];
+};
+// Every look has five sheets; animations are looked up across them by name.
+const SHEETS={infantry:['idle','march','aim','fire','reload'],fallen:FALLS,
+ combat:['kaim','kfire','misfire','charge','thrust'],morale:['rout','crawl','cheer'],idlex:['look','adjust','lean']};
+function indexAtlas(parts){
+ const byAnim=new Map();
+ for(const part of parts)for(const anim of Object.keys(part.sheet.animations))byAnim.set(anim,part);
+ return{...parts[0],byAnim};
+}
 function loadAtlas(prefix){
- return Promise.all([loadSheet(prefix,'infantry',['idle','march','aim','fire','reload']),loadSheet(prefix,'fallen',FALLS)])
-   .then(([drill,fallen])=>{
-     if(!drill.sheet.meta.muzzle)throw new Error(prefix+': mondingspunten ontbreken');
-     return{...drill,fallen};
+ return Promise.all(Object.entries(SHEETS).map(([kind,states])=>loadSheet(prefix,kind,states)))
+   .then(parts=>{
+     if(!parts[0].sheet.meta.muzzle||!parts[2].sheet.meta.muzzle)throw new Error(prefix+': mondingspunten ontbreken');
+     const atlas=indexAtlas(parts);atlas.combat=parts[2];return atlas;
    });
 }
 
@@ -273,7 +287,7 @@ function frameFor(u){
 
 // Powder smoke puffs born at the rendered muzzle pixel, drifting downwind.
 function spawnSmoke(u){
- const atlas=state.atlases[u.look];if(!atlas)return;
+ const atlas=state.atlases[u.look]||state.atlases[u.prefix];if(!atlas)return;
  const m=atlas.sheet.meta,px=m.muzzle.px[DIRS[u.dir]],k=S/SPRITE_PX_PER_M;
  const x=u.x+(px.x-m.pivot.x)*k,y=u.y+(px.y-m.pivot.y)*k;
  if(u.id===0)state.volleys++;
@@ -335,7 +349,7 @@ function drawSmoke(){
 }
 
 function drawSprite(atlas,anim,f,x,y,k){
- const src=atlas.sheet.animations[anim]?atlas:atlas.fallen;
+ const src=atlas.byAnim.get(anim);if(!src)return;
  const name=src.sheet.animations[anim][f],fr=src.sheet.frames[name].frame,p=src.sheet.meta.pivot;
  ctx.drawImage(src.image,fr.x,fr.y,fr.w,fr.h,x-p.x*k,y-p.y*k,fr.w*k,fr.h*k);
 }
@@ -428,7 +442,7 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'329.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'330.0',state,
  getStats:()=>({loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -445,14 +459,19 @@ window.__GRAPHICS_LAB_ISO__={version:'329.0',state,
 paintGround();resize();
 const loadController=()=>loadJson('./assets/sprites/unit-animation-config.json').then(cfg=>{
  state.controller=NRTSInfantryAnimation.createInfantryAnimationController(cfg);});
-const ATLAS_KEYS=['fr','br'].flatMap(p=>LOOKS.map(l=>p+l));
+const ALL_LOOKS=['','2','3','4','5'];
+const ATLAS_KEYS=['fr','br'].flatMap(p=>ALL_LOOKS.map(l=>p+l));
 // Officer, drummer and ensign atlases: idle, march and command in taller cells.
 const ROLE_KEYS={officer:'o',drummer:'d',ensign:'e'};
 const ROLE_ATLASES=['fr','br'].flatMap(p=>Object.entries(ROLE_KEYS).map(([role,k])=>[p+k,role]));
-const loadRole=([key,role])=>loadSheet(key,role,['idle','march','command']).then(sheet=>({...sheet,fallen:sheet}));
-Promise.all([Promise.all([...ATLAS_KEYS.map(loadAtlas),...ROLE_ATLASES.map(loadRole)]),loadController(),loadScene().catch(err=>{console.warn('Iso terrein/gebouwen fallback:',err);})]).then(([atlases])=>{
- state.atlases=Object.fromEntries([...ATLAS_KEYS,...ROLE_ATLASES.map(([key])=>key)].map((key,i)=>[key,atlases[i]]));
+const loadRole=([key,role])=>loadSheet(key,role,['idle','march','command']).then(sheet=>indexAtlas([sheet]));
+// Base looks and staff first so the scene starts quickly; the other looks
+// stream in afterwards (soldiers use the base look until theirs has arrived).
+const firstKeys=['fr','br'];
+Promise.all([Promise.all([...firstKeys.map(loadAtlas),...ROLE_ATLASES.map(loadRole)]),loadController(),loadScene().catch(err=>{console.warn('Iso terrein/gebouwen fallback:',err);})]).then(([atlases])=>{
+ [...firstKeys,...ROLE_ATLASES.map(([key])=>key)].forEach((key,i)=>{state.atlases[key]=atlases[i];});
  ui.status.textContent=state.terrain?'Blender-scène geladen · soldaten, gebouwen en terrein':'Blender-soldaten geladen · eenvoudig terrein';
+ return Promise.all(ATLAS_KEYS.filter(k=>!firstKeys.includes(k)).map(key=>loadAtlas(key).then(a=>{state.atlases[key]=a;})));
 }).catch(err=>{
  ui.status.textContent='Atlassen konden niet laden.';console.error(err);
 });
