@@ -147,7 +147,7 @@ function syncSoldiersPixi(Sprite,Graphics,Texture){
    const initial=review?state.frenchPixiTextures.fr_line_idle_01:
      frame[u.team==='france'?'infantry-france.svg':'infantry-britain.svg'];
    const sp=new Sprite(initial);
-   sp.anchor.set(review?.5:.5,review?.8125:.5);sp.position.set(u.x,u.y);
+   sp.anchor.set(0.5,review ? 0.8125 : 0.5);sp.position.set(u.x,u.y);
    sp.width=review?FR_REVIEW_DISPLAY_SIZE:29;
    sp.height=review?FR_REVIEW_DISPLAY_SIZE:39;
    sp.rotation=review?0:u.team==='france'?Math.PI/2:-Math.PI/2;
@@ -188,7 +188,8 @@ async function startPixi(){
      const sp=new Sprite(tex['supply-wagon.svg']);sp.anchor.set(.5);sp.width=190*w.s;sp.height=160*w.s;
      sp.position.set(w.x,w.y);world.addChild(sp);
    }
-   state.pixi=app;state.world=world;state.pixiTextures=tex;
+   // Finish optional atlas preparation before exposing the GPU backend:
+   // an incomplete Pixi boot must still fall back cleanly to Canvas.
    if(useFrenchReview&&frenchReview){
      const atlas=await Assets.load('./assets/sprites/infantry/france/fr_line_infantry_atlas.png');
      state.frenchPixiTextures={};
@@ -198,6 +199,7 @@ async function startPixi(){
          frame:new Rectangle(f.x,f.y,f.w,f.h)});
      }
    }
+   state.pixi=app;state.world=world;state.pixiTextures=tex;
    unitGraphics.Sprite=Sprite;unitGraphics.Graphics=Graphics;
    syncSoldiersPixi(Sprite,Graphics);
    host.appendChild(app.canvas);
