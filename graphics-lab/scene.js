@@ -15,6 +15,11 @@ const files=['battlefield.svg','oak.svg','barracks-france.svg','barracks-britain
 // Explicit opt-in: image review is not a claim of art approval.
 const useFrenchReview=new URLSearchParams(location.search).get('sprites')==='review';
 let frenchReview=null;
+const reviewControls=document.getElementById('atlas-review-controls');
+const reviewTime=document.getElementById('atlas-review-time');
+const reviewPose=document.getElementById('atlas-review-pose');
+const reviewSize=document.getElementById('atlas-review-size');
+if(reviewControls)reviewControls.hidden=!useFrenchReview;
 const imgs={},treePositions=[[115,135,.92],[200,670,.85],[372,92,.78],[480,160,.73],[540,773,.95],
  [941,103,.86],[1110,122,.76],[1323,128,.95],[1255,750,.85],[1380,655,.84],
  [1088,830,.72],[250,810,.8],[1254,285,.78],[465,665,.75],[890,823,.67]];
@@ -24,7 +29,7 @@ const wagons=[{x:448,y:174,s:.57},{x:1159,y:757,s:.56}];
 const sceneObjects=()=>soldiers.length+treePositions.length+buildings.length+wagons.length+2;
 const state={mode:'new',count:32,quality:'balanced',zoom:1,camX:745,camY:452,
  fps:0,frames:0,frameClock:0,engine:'Canvas 2D (opstart)',selected:null,
- realism:true,stage:'oprukken',renderLayers:0,
+ realism:true,stage:'oprukken',renderLayers:0,reviewSpriteSize:48,
  pixi:null,world:null,soldiers:[],pixiTrees:[],last:performance.now(),time:0,paused:false};
 const soldiers=[];
 const random=(n)=>{let x=(Math.imul(n+1234,1664525)+1013904223)>>>0;return x/4294967296};
@@ -121,7 +126,7 @@ function painter(ctx,now,stylized=false){
      ctx.strokeStyle='#eee2c4';ctx.lineWidth=1;ctx.stroke();
    }else if(useFrenchReview&&u.team==='france'&&frenchReview){
      const chosen=pickFrenchPose(cycle,state.time,u.phase);
-     canvasFrame(ctx,frenchReview,chosen,pose.x,pose.y,pose.facing===-1);
+     canvasFrame(ctx,frenchReview,chosen,pose.x,pose.y,pose.facing===-1,state.reviewSpriteSize);
    }else{
      const key='infantry-'+u.team+(pose.stepping?'-march':'')+'.svg',size=29;
      ctx.save();ctx.translate(pose.x,pose.y);
@@ -149,8 +154,8 @@ function syncSoldiersPixi(Sprite,Graphics,Texture){
      frame[u.team==='france'?'infantry-france.svg':'infantry-britain.svg'];
    const sp=new Sprite(initial);
    sp.anchor.set(0.5,review ? 0.8125 : 0.5);sp.position.set(u.x,u.y);
-   sp.width=review?FR_REVIEW_DISPLAY_SIZE:29;
-   sp.height=review?FR_REVIEW_DISPLAY_SIZE:39;
+   sp.width=review?state.reviewSpriteSize:29;
+   sp.height=review?state.reviewSpriteSize:39;
    sp.rotation=review?0:u.team==='france'?Math.PI/2:-Math.PI/2;
    world.addChild(sp);
    state.soldiers.push(sp);
@@ -270,6 +275,13 @@ function drawFrame(now){
  }
  const cycle=formationCycle();
  state.stage=cycle.stage;
+ if(useFrenchReview&&reviewPose&&reviewTime){
+   const pose=pickFrenchPose(cycle,state.time,0);
+   reviewPose.textContent=pose.state+' · '+(pose.index+1)+'/'+
+     ({idle:2,march:6,aim:2,fire:3,reload:4}[pose.state])+
+     ' · '+state.time.toFixed(2)+'s';
+   if(document.activeElement!==reviewTime)reviewTime.value=String(state.time%20);
+ }
  if(state.mode==='old'){painter(oldCtx,now,true);}
  else if(!state.pixi&&Object.keys(imgs).length===files.length)painter(detailCtx,now,false);
  if(state.pixi){
@@ -281,7 +293,12 @@ function drawFrame(now){
        state.pixiTextures[name];
      if(p.texture!==tex)p.texture=tex;
      p.x=pose.x;p.y=pose.y;
-     if(french){p.rotation=0;p.scale.x=Math.abs(p.scale.x)*(pose.facing===1?1:-1);}
+     if(french){
+       p.rotation=0;
+       p.width=state.reviewSpriteSize;
+       p.height=state.reviewSpriteSize;
+       p.scale.x=Math.abs(p.scale.x)*(pose.facing===1?1:-1);
+     }
      else p.rotation=pose.facing===1?Math.PI/2:-Math.PI/2;
    }
    if(state.selectionOutline)state.selectionOutline.x=(state.selected==='france'?1:-1)*cycle.advance;
@@ -361,6 +378,16 @@ document.getElementById('center').addEventListener('click',()=>{
 document.getElementById('pause').addEventListener('click',e=>{
  state.paused=!state.paused;e.currentTarget.textContent=state.paused?'▶ Animatie starten':'⏸ Animatie pauzeren';
 });
+if(useFrenchReview&&reviewTime&&reviewSize){
+ reviewTime.addEventListener('input',()=>{
+   state.time=Number(reviewTime.value);
+   state.paused=true;
+   document.getElementById('pause').textContent='▶ Animatie starten';
+ });
+ reviewSize.addEventListener('change',()=>{
+   state.reviewSpriteSize=Number(reviewSize.value);
+ });
+}
 ui.count.addEventListener('change',()=>{
  state.count=Number(ui.count.value);buildUnits(state.count);
  if(state.pixi&&unitGraphics.Graphics&&unitGraphics.Sprite)syncSoldiersPixi(unitGraphics.Sprite,unitGraphics.Graphics);
@@ -375,6 +402,7 @@ window.__GRAPHICS_LAB_V319__={
    realism:state.realism,stage:state.stage,staticTroopsDoNotMarch:true,animatedSmoke:true,layerCount:2,
    frenchReviewEnabled:useFrenchReview,frenchReviewLoaded:!!frenchReview,
    frenchReviewApproved:false,frenchFrameCount:frenchReview?.poseCount||0,
+   reviewSpriteSize:state.reviewSpriteSize,reviewTimelineVisible:useFrenchReview,
    frenchReviewPose:useFrenchReview?pickFrenchPose(formationCycle(),state.time,0):null
  })};
 async function preload(){
