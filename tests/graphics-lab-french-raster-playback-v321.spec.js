@@ -59,5 +59,5 @@ test('legacy graphics lab is still default; no atlas is loaded without opt-in',a
  const s=await page.evaluate(()=>window.__GRAPHICS_LAB_V319__.getStats());
  expect(s.frenchReviewEnabled).toBe(false);
  expect(s.frenchReviewLoaded).toBe(false);
- expect(s.version).toBe('320.0');
+ expect(await page.evaluate(()=>window.__GRAPHICS_LAB_V319__.version)).toBe('320.0');
 });
