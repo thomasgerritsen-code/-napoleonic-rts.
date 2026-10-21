@@ -74,7 +74,7 @@ def build_soldier(side: str, variant: int = 1) -> dict:
     look = dict(VARIANTS[variant])
     if side == "britain" and "breeches" in look:
         look.update(breeches="#5f646b", gaiter="#585d63")
-    p = {**PALETTES[side], **COMMON, **{k: v for k, v in look.items() if isinstance(v, str)}}
+    p = {**PALETTES[side], **COMMON, **{k: v for k, v in look.items() if isinstance(v, str) and k != "company"}}
     M = {k: material(v) for k, v in p.items()}
     M["skin"] = material(p["skin"], 0.6, pattern="skin")
     M["hair"] = material(p["hair"], 0.7, pattern="skin")
@@ -357,7 +357,7 @@ def pose_extra(rig: dict, state: str, frame: int, frames: int, direction: int = 
         # Flash in the pan, no shot: the man lowers his musket and looks at the lock.
         place(musket, (PRESENT, PRESENT, LOWER)[frame])
         set_arms(rig, ((72, 22, 48), (70, 22, 50), (52, 20, 60))[frame], ((84, -14, 12), (82, -14, 14), (66, -12, 30))[frame])
-        torso.rotation_euler = Euler((rad((5, 2, 8)[frame]), 0, 0))
+        torso.rotation_euler = Euler((rad((5, 2, 0)[frame]), 0, 0))
         head.rotation_euler = Euler((rad((0, 6, 14)[frame]), 0, rad((0, 8, 18)[frame])))
         set_legs(rig, (-14, -6), (9, -8), 0.94)
         if frame == 0:
@@ -389,12 +389,15 @@ def pose_extra(rig: dict, state: str, frame: int, frames: int, direction: int = 
     if state == "crawl":
         # Wounded, crawling on the belly with the musket left behind.
         hide_render_tree(musket, True)
-        # Turned so the body lies across the screen, like the falls.
-        rig["fall"].rotation_euler = Euler((rad(-84), 0, rad(fall_twist(direction, 0))))
-        rig["fall"].location.z = 0.14
+        # Prone along the crawl direction (the lab moves him that way).
+        rig["fall"].rotation_euler = Euler((rad(-84), 0, 0))
+        # Centre the prone body on the feet pivot so it stays inside the cell.
+        # plus 0.6 m further from the camera (screen up) so the feet-side reach clears the cell bottom.
+        h = math.radians(-45 * direction - 90)
+        rig["fall"].location = (0.6 * math.sin(h), -0.95 + 0.6 * math.cos(h), 0.14)
         reach = math.sin(t * math.tau)
         set_legs(rig, (15 + 20 * reach, -40 - 25 * max(0, reach)), (15 - 20 * reach, -40 - 25 * max(0, -reach)), 0.95)
-        set_arms(rig, (150 + 25 * reach, 25, 40 - 20 * reach), (150 - 25 * reach, -25, 40 + 20 * reach))
+        set_arms(rig, (125 + 20 * reach, 30, 50 - 20 * reach), (125 - 20 * reach, -30, 50 + 20 * reach))
         head.rotation_euler = Euler((rad(-30), 0, 0))
         return True
     if state == "cheer":
@@ -446,7 +449,7 @@ def pose(rig: dict, state: str, frame: int, frames: int, direction: int = 0) -> 
     rig["torso"].rotation_euler = Euler((0, 0, 0))
     rig["head"].rotation_euler = Euler((0, 0, 0))
     rig["fall"].rotation_euler = Euler((0, 0, 0))
-    rig["fall"].location.z = 0
+    rig["fall"].location = (0, 0, 0)
     if rig.get("armed", True):
         for name in ("butt", "stock", "barrel", "lock", "band", "sling", "bayonet"):
             for obj in rig["musket"].children:
