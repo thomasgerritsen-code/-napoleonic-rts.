@@ -1,4 +1,4 @@
-// Graphics Lab v333 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v334 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -21,7 +21,7 @@ const BAND_DELAY=0.8,HIT_CHANCE=0.05,HIT_DELAY=0.25,DIE_FRAME=0.17;
 const ROAD_R=14,GROUND=48,TILE=2;
 const state={zoom:1,customZoom:false,camX:0,camY:0,time:0,last:performance.now(),paused:false,halted:false,
  travelled:0,perSide:32,atlases:{},ground:null,terrain:null,props:[],firing:false,controller:null,smoke:[],volleys:0,
- fireStart:0,regiments:null,simTime:0,dead:new Map(),charge:null,woundedShare:0.3,drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
+ fireStart:0,regiments:null,simTime:0,dead:new Map(),batteries:null,balls:[],cannonShots:0,ballHits:0,charge:null,woundedShare:0.3,drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
 
 // Ground coordinates (metres) -> unzoomed screen pixels.
 const project=(gx,gy)=>({x:gx*S,y:-gy*SQUASH*S});
@@ -164,6 +164,20 @@ function ear(x,y){
  return[Math.max(-1,Math.min(1,dx)),Math.max(0,1-Math.hypot(dx,dy)*0.45)];
 }
 const groundVec=d=>({x:Math.cos(-d*Math.PI/4),y:Math.sin(-d*Math.PI/4)});
+// --- Artillery ----------------------------------------------------------------
+// Each regiment has two guns. On the march they are run along behind the
+// column; when the regiment deploys they go to the flanks of the line, one
+// each side. While the regiment fires, each gun's crew works the drill: #1
+// sponges and rams, #2 loads the cartridge, #3 lays the gun with the handspike,
+// #4 fires it with the linstock. The gun recoils, #3 and #4 run it back up, and
+// the round shot grazes and bounces through the enemy ranks.
+const GUN={speed:2,flank:3,trail:3.2,spacing:4.5,cycle:8,fireAt:5.3,recoil:0.9,recoilTime:0.2,haulFrom:6,haulTo:7.6,stagger:2.7,
+ ballSpeed:30,muzzle:1.45,muzzleH:1.0,lethalH:1.7,reach:0.45,maxHits:4,rest:3};
+// Crew places in gun coordinates: [right of the axle, forward of it, facing [right, forward]].
+const CREW_SPOTS={
+ rest:[[1.25,0.75,[-1,0]],[-1.25,0.75,[1,0]],[0.75,-2.45,[0,1]],[0.85,-0.45,[-1,0]]],
+ ram:[0.35,2.55,[-1,0]],load:[-0.75,1.75,[1,0]],aim:[0.15,-2.6,[0,1]],
+ haul:[[0.95,0.15,[0,1]],[-0.95,0.15,[0,1]]]};
 const REGIMENTS=[{side:'france',prefix:'fr',lineRanks:3,start:0},{side:'britain',prefix:'br',lineRanks:2,start:0.5}];
 const slotKey=(r,f)=>r+','+f;
 
@@ -264,6 +278,7 @@ function updateRegiments(){
  const dt=Math.max(0,Math.min(0.25,state.time-state.simTime));state.simTime=state.time;
  const [fr,br]=state.regiments,centres=[centreOf(fr),centreOf(br)];
  if(state.charge)updateCharge(dt);
+ updateBatteries(dt);
  state.regiments.forEach((reg,i)=>{
    if((state.firing||state.charge)&&reg.formation!=='line')formLine(reg,centres[1-i]);
    else if(!state.halted&&reg.formation!=='column')formColumn(reg);
@@ -339,6 +354,167 @@ function beatDrums(){
    const p=project(drummer.gx,drummer.gy);reg.beat=(reg.beat||0)+1;
    audio.drum(ear(p.x,p.y)[0],reg.beat%4===1);reg.drumAt=state.time+every;
  });
+}
+
+function buildBatteries(){
+ state.batteries=state.regiments.flatMap(reg=>[0,1].map(i=>{
+   const {side,prefix}=reg,key=prefix+':gun'+i,h=gunTarget(reg,i);
+   const gun={side,prefix,gun:true,key,index:i,home:{x:h.x,y:h.y},gx:h.x,gy:h.y,dir:h.dir,recoil:0,roll:0,
+     rolling:false,moving:false,clock:-i*GUN.stagger,t:-1,fired:-1};
+   gun.crew=[0,1,2,3].map(n=>({side,prefix,gunner:true,num:n+1,key:key+':'+(n+1),gx:h.x,gy:h.y,walk:0,dir:gun.dir,
+     moving:false,placed:false,act:'idle',t:-1}));
+   return gun;
+ }));
+}
+// Where a gun belongs: behind the column, or on its flank of the line facing the enemy.
+function gunTarget(reg,i){
+ const ranks=Math.ceil(aliveMen(reg).length/COLUMN.files);
+ if(reg.formation!=='line')return columnTarget(reg,ranks*COLUMN.gap+GUN.trail+i*GUN.spacing,0);
+ const L=reg.line,u=(i?-1:1)*((L.files-1)/2*LINE.spacing+GUN.flank);
+ return{x:L.cx+L.tx*u,y:L.cy+L.ty*u,dir:dirIndex(L.nx,L.ny)};
+}
+// Gun-local point (right, forward) in ground metres; from the home spot or the recoiled gun.
+function gunPoint(g,lx,ly,fromHome){
+ const F=groundVec(g.dir),o=fromHome?g.home:{x:g.gx,y:g.gy};
+ return{x:o.x+F.y*lx+F.x*ly,y:o.y-F.x*lx+F.y*ly};
+}
+const gunFacing=(g,[fx,fy])=>{const F=groundVec(g.dir);return dirIndex(F.y*fx+F.x*fy,-F.x*fx+F.y*fy);};
+
+function updateBatteries(dt){
+ if(!state.batteries)buildBatteries();
+ for(const g of state.batteries){
+   const reg=state.regiments[g.prefix==='fr'?0:1],enemy=state.regiments[g.prefix==='fr'?1:0],c=centreOf(enemy);
+   // Run the gun to its place (wheels turning); it only works once it stands there.
+   const goal=gunTarget(reg,g.index),dx=goal.x-g.home.x,dy=goal.y-g.home.y,dist=Math.hypot(dx,dy);
+   g.moving=dist>0.15;
+   if(g.moving){
+     const step=Math.min(dist,GUN.speed*dt);
+     g.home.x+=dx/dist*step;g.home.y+=dy/dist*step;g.roll+=step;g.dir=dirIndex(dx,dy);
+     g.clock=Math.min(g.clock,-g.index*GUN.stagger);g.recoil=0;g.rolling=true;g.t=-1;
+     g.gx=g.home.x;g.gy=g.home.y;
+     moveCrew(g,dt);continue;
+   }
+   if(state.firing)g.clock+=dt;
+   const t=state.firing&&g.clock>=0?g.clock%GUN.cycle:-1,cycle=Math.floor(g.clock/GUN.cycle);
+   g.t=t;
+   if(t<0&&!state.firing)g.dir=goal.dir;
+   // The gun is laid on the enemy between shots.
+   if(t>=0&&t<0.6&&aliveMen(enemy).length)g.dir=dirIndex(c.x-g.home.x,c.y-g.home.y);
+   if(t>=GUN.fireAt&&g.fired!==cycle){g.fired=cycle;fireGun(g,c);}
+   // Recoil on the shot, then the crew runs the gun back up.
+   const before=g.recoil;
+   g.recoil=t<GUN.fireAt?0:t<GUN.haulFrom?GUN.recoil*Math.min(1,(t-GUN.fireAt)/GUN.recoilTime)
+     :t<GUN.haulTo?GUN.recoil*(1-(t-GUN.haulFrom)/(GUN.haulTo-GUN.haulFrom)):0;
+   g.rolling=t>=GUN.haulFrom&&t<GUN.haulTo;
+   if(g.rolling)g.roll+=Math.abs(before-g.recoil);
+   const F=groundVec(g.dir);g.gx=g.home.x-F.x*g.recoil;g.gy=g.home.y-F.y*g.recoil;
+   g.crew.forEach((m,n)=>{
+     let spot=CREW_SPOTS.rest[n],act=n===3?'ready':'idle',onGun=false;
+     if(n===0&&t>=0&&t<3.0){spot=CREW_SPOTS.ram;if(t>=1.4)act='ram';}
+     // #2 steps up to the muzzle only to load; at the shot both stand clear by the wheels.
+     if(n===1&&t>=0.3&&t<1.6){spot=CREW_SPOTS.load;if(t>=0.6&&t<1.4)act='load';}
+     if(n===2&&t>=3.0&&t<4.4){spot=CREW_SPOTS.aim;act='aim';}
+     if(n===3&&t>=5.0&&t<5.8)act='touch';
+     if((n===2||n===3)&&g.rolling){spot=CREW_SPOTS.haul[n-2];act='haul';onGun=true;}
+     const p=gunPoint(g,spot[0],spot[1],!onGun);
+     walkTo(m,{x:p.x,y:p.y,dir:gunFacing(g,spot[2])},dt,false);
+     m.act=act;m.t=t;
+   });
+ }
+}
+
+// On the move #3 and #4 push at the wheels and #1 and #2 walk beside the trail.
+const MOVE_SPOTS=[[0.9,-1.3,[0,1]],[-0.9,-1.3,[0,1]],[0.95,0.15,[0,1]],[-0.95,0.15,[0,1]]];
+function moveCrew(g,dt){
+ g.crew.forEach((m,n)=>{
+   const [lx,ly,face]=MOVE_SPOTS[n],p=gunPoint(g,lx,ly,true);
+   walkTo(m,{x:p.x,y:p.y,dir:gunFacing(g,face)},dt,false,GUN.speed*1.6);
+   m.act=n<2?'march':'haul';m.t=-1;
+ });
+}
+
+function fireGun(g,c){
+ state.cannonShots++;
+ const atlas=state.atlases[g.prefix+'g'],F=groundVec(g.dir),p=project(g.gx,g.gy);
+ if(atlas){
+   const m=atlas.sheet.meta,px=m.muzzle.px[DIRS[g.dir]],k=S/SPRITE_PX_PER_M;
+   const x=p.x+(px.x-m.pivot.x)*k,y=p.y+(px.y-m.pivot.y)*k;
+   // A cannon throws out a big rolling cloud ahead of the muzzle.
+   for(let i=0;i<6;i++){
+     const seed=hash(state.cannonShots*7+i,g.prefix==='fr'?3:5);
+     state.smoke.push({x:x+F.x*S*i*0.5,y:y-F.y*S*SQUASH*i*0.5,born:state.time,life:7+seed*3,size:1.5+seed*1.3,seed});
+   }
+   state.bank.push({x,y,born:state.time,seed:hash(state.cannonShots,9)});
+   if(audio)audio.cannon(...ear(x,y));
+ }
+ // Round shot: first graze just short of the enemy line, then ever lower bounces.
+ const dx=c.x-g.gx,dy=c.y-g.gy,D=Math.hypot(dx,dy)||1,first=Math.max(4,D-GUN.muzzle-2.5);
+ const hops=[[0,first,0.9],[first,first+6,0.8],[first+6,first+10,0.4],[first+10,first+12.5,0.15]];
+ state.balls.push({side:g.prefix,x0:g.gx+F.x*GUN.muzzle,y0:g.gy+F.y*GUN.muzzle,ux:dx/D,uy:dy/D,born:state.time,
+   hops,end:first+18,grazed:0,hits:0,hit:new Set()});
+}
+
+// Ball position along its path: ground point and height above it.
+function ballAt(b){
+ const s=Math.min(b.end,(state.time-b.born)*GUN.ballSpeed);
+ let h=0;
+ b.hops.forEach(([a,e,peak],i)=>{
+   if(s<a||s>=e)return;
+   const u=(s-a)/(e-a);h=4*peak*u*(1-u)+(i===0?GUN.muzzleH*(1-u):0);
+ });
+ return{s,h,x:b.x0+b.ux*s,y:b.y0+b.uy*s};
+}
+function updateBalls(){
+ state.balls=state.balls.filter(b=>{
+   const p=ballAt(b);
+   // Each graze throws up a puff of earth.
+   while(b.grazed<b.hops.length&&p.s>=b.hops[b.grazed][1]){
+     const e=b.hops[b.grazed][1],q=project(b.x0+b.ux*e,b.y0+b.uy*e);
+     state.smoke.push({x:q.x,y:q.y,born:state.time,life:1.6,size:.6,seed:hash(b.grazed,state.cannonShots),dust:true});
+     b.grazed++;
+   }
+   if(p.h<GUN.lethalH&&b.hits<GUN.maxHits){
+     const enemy=state.regiments[b.side==='fr'?1:0];
+     for(const m of aliveMen(enemy)){
+       if(b.hit.has(m.key)||Math.hypot(m.gx-p.x,m.gy-p.y)>GUN.reach)continue;
+       b.hit.add(m.key);b.hits++;state.ballHits++;
+       state.hits.push({key:m.key,at:state.time,seed:5000+state.ballHits});
+       if(b.hits>=GUN.maxHits)break;
+     }
+   }
+   return state.time-b.born<b.end/GUN.ballSpeed+GUN.rest;
+ });
+}
+function drawBalls(){
+ for(const b of state.balls){
+   const p=ballAt(b),g=project(p.x,p.y),y=g.y-p.h*0.866*S;
+   ctx.fillStyle='rgba(20,20,16,.3)';ctx.beginPath();ctx.ellipse(g.x,g.y,2.4,1.2,0,0,Math.PI*2);ctx.fill();
+   if(p.s<b.end){
+     // Motion streak behind a flying ball.
+     const back=project(p.x-b.ux*0.8,p.y-b.uy*0.8);
+     ctx.strokeStyle='rgba(40,38,34,.35)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(back.x,back.y-p.h*0.866*S);ctx.lineTo(g.x,y);ctx.stroke();
+   }
+   ctx.fillStyle='#1d1c1a';ctx.beginPath();ctx.arc(g.x,y,2.1,0,Math.PI*2);ctx.fill();
+ }
+}
+function gunFrame(g){
+ const d=DIRS[g.dir],since=g.t-GUN.fireAt;
+ if(g.t>=0&&since>=0&&since<0.4)return 'fire_'+d+'|'+(since<0.09?0:1);
+ if(g.rolling||g.moving)return 'roll_'+d+'|'+Math.floor(g.roll/0.1)%4;
+ return 'idle_'+d+'|0';
+}
+function crewFrame(m){
+ const d=DIRS[m.dir],t=m.t,beat=(period,n)=>Math.floor(state.time/period+m.num*0.37)%n;
+ if(m.moving||m.act==='march')return 'march_'+d+'|'+Math.floor((m.walk%MARCH.strideM)/MARCH.strideM*MARCH.frames)%MARCH.frames;
+ switch(m.act){
+   case 'ram':return 'ram_'+d+'|'+Math.floor((t-1.4)/0.2)%4;
+   case 'load':return 'load_'+d+'|'+(t<1.0?0:1);
+   case 'aim':return 'aim_'+d+'|'+Math.floor((t-3.0)/0.35)%2;
+   case 'touch':return 'touch_'+d+'|'+(t<GUN.fireAt?0:1);
+   case 'haul':return 'haul_'+d+'|'+beat(0.18,4);
+   case 'ready':return 'ready_'+d+'|'+beat(0.8,2);
+   default:return 'idle_'+d+'|'+beat(0.6,2);
+ }
 }
 
 function units(){
@@ -480,9 +656,11 @@ function drawSmoke(){
    const x=p.x+age*9+Math.sin(age*.9+p.seed*6)*3,y=p.y-age*7-10*f;
    const g=ctx.createRadialGradient(x,y,0,x,y,r);
    const a=(1-f)*(age<.12?age/.12:1);
-   g.addColorStop(0,`rgba(236,232,222,${(.55*a).toFixed(3)})`);
-   g.addColorStop(.55,`rgba(214,212,204,${(.32*a).toFixed(3)})`);
-   g.addColorStop(1,'rgba(200,200,196,0)');
+   // Earth thrown up by a grazing ball is brown; powder smoke is off-white.
+   const [c0,c1,c2]=p.dust?['150,128,96','136,116,88','120,104,80']:['236,232,222','214,212,204','200,200,196'];
+   g.addColorStop(0,`rgba(${c0},${(.55*a).toFixed(3)})`);
+   g.addColorStop(.55,`rgba(${c1},${(.32*a).toFixed(3)})`);
+   g.addColorStop(1,`rgba(${c2},0)`);
    ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(x,y,r,r*.82,0,0,Math.PI*2);ctx.fill();
  }
 }
@@ -508,14 +686,24 @@ function draw(now){
  const k=S/SPRITE_PX_PER_M;
  // Soldiers and props share one painter's order by their ground point.
  const alive=units();
- resolveHits(alive);beatDrums();
+ updateBalls();resolveHits(alive);beatDrums();
  const fallen=[...state.dead.values()].map(d=>{
    const p=crawled(d);return{...d,fallen:true,...project(d.gx+p.x,d.gy+p.y)};});
- const list=alive.filter(u=>!u.dead).map(u=>({...u,...project(u.gx,u.gy)})).concat(fallen,state.props).sort((a,b)=>a.y-b.y);
- state.animStates={};
- state.drawn=0;state.propsDrawn=0;state.rolesDrawn=0;
+ const battery=(state.batteries||[]).flatMap(g=>[g,...g.crew]).map(u=>({...u,...project(u.gx,u.gy)}));
+ const list=alive.filter(u=>!u.dead).map(u=>({...u,...project(u.gx,u.gy)})).concat(battery,fallen,state.props).sort((a,b)=>a.y-b.y);
+ state.animStates={};state.crewStates={};
+ state.drawn=0;state.propsDrawn=0;state.rolesDrawn=0;state.gunsDrawn=0;state.crewDrawn=0;
  for(const u of list){
    if(u.sprite){const p=u.sprite;ctx.drawImage(p.image,u.x-p.pivot.x*k,u.y-p.pivot.y*k,p.w*k,p.h*k);state.propsDrawn++;continue;}
+   if(u.gun){
+     const a=state.atlases[u.prefix+'g'];if(!a)continue;
+     const [an,f]=gunFrame(u).split('|');drawSprite(a,an,Number(f),u.x,u.y,k);state.gunsDrawn++;continue;
+   }
+   if(u.gunner){
+     const a=state.atlases[u.prefix+'a'];if(!a)continue;
+     const [an,f]=crewFrame(u).split('|');drawSprite(a,an,Number(f),u.x,u.y,k);state.crewDrawn++;
+     const st=an.split('_')[0];state.crewStates[st]=(state.crewStates[st]||0)+1;continue;
+   }
    const atlas=state.atlases[u.look]||state.atlases[u.prefix];if(!atlas)continue;
    if(u.fallen){
      // The fall plays once; the last frame stays on the field. The wounded
@@ -536,6 +724,7 @@ function draw(now){
    const st=anim.split('_')[0];state.animStates[st]=(state.animStates[st]||0)+1;
    state.directionsSeen.add(u.dir);state.drawn++;
  }
+ drawBalls();
  drawSmoke();
  drawSmokeBank();
  drawCompass(dpr);
@@ -598,6 +787,7 @@ function resetBattle(){
  state.charge=null;ui.charge.disabled=false;
  state.dead.clear();state.hits=[];state.smoke=[];state.bank=[];state.drill=new Map();state.misfires=0;
  state.shots=0;state.volleys=0;state.regiments=null;state.shooters=null;
+ state.batteries=null;state.balls=[];state.cannonShots=0;state.ballHits=0;
  if(state.controller)state.controller.reset();
 }
 ui.reset.addEventListener('click',()=>{setFire(false);resetBattle();});
@@ -614,7 +804,7 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'333.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'334.0',state,
  getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -626,6 +816,9 @@ window.__GRAPHICS_LAB_ISO__={version:'333.0',state,
    shooters:state.shooters?state.shooters.size:0,misfires:state.misfires,bank:state.bank.length,
    kneeling:state.animStates?(state.animStates.kaim||0)+(state.animStates.kfire||0):0,
    sound:audio?audio.stats():null,
+   guns:state.batteries?state.batteries.length:0,gunsDrawn:state.gunsDrawn||0,crewDrawn:state.crewDrawn||0,
+   crewStates:{...(state.crewStates||{})},cannonShots:state.cannonShots,balls:state.balls.length,ballHits:state.ballHits,
+   recoiled:state.batteries?state.batteries.filter(g=>g.recoil>0.5).length:0,
    charge:state.charge?state.charge.phase:null,loser:state.charge&&state.charge.loser!==null?['fr','br'][state.charge.loser]:null,
    gone:state.regiments?state.regiments.reduce((n,r)=>n+r.men.filter(m=>m.gone).length,0):0,
    wounded:[...state.dead.values()].filter(d=>d.wounded).length,
@@ -645,10 +838,16 @@ const loadRole=([key,role])=>loadSheet(key,role,['idle','march','command']).then
 // Base looks and staff first so the scene starts quickly; the other looks
 // stream in afterwards (soldiers use the base look until theirs has arrived).
 const firstKeys=['fr','br'];
+// Batteries: one gun atlas and two gunner sheets per nation, streamed in with the extra looks.
+const loadGun=p=>loadSheet(p+'g','gun',['idle','fire','roll']).then(s=>{
+ if(!s.sheet.meta.muzzle)throw new Error(p+': kanon zonder mondingspunten');return indexAtlas([s]);});
+const loadCrew=p=>Promise.all([loadSheet(p+'a','gunner',['idle','ram','load','aim','ready','touch','haul']),
+ loadSheet(p+'a','gunner2',['march','die','diefwd','dieside'])]).then(indexAtlas);
 Promise.all([Promise.all([...firstKeys.map(loadAtlas),...ROLE_ATLASES.map(loadRole)]),loadController(),loadScene().catch(err=>{console.warn('Iso terrein/gebouwen fallback:',err);})]).then(([atlases])=>{
  [...firstKeys,...ROLE_ATLASES.map(([key])=>key)].forEach((key,i)=>{state.atlases[key]=atlases[i];});
  ui.status.textContent=state.terrain?'Blender-scène geladen · soldaten, gebouwen en terrein':'Blender-soldaten geladen · eenvoudig terrein';
- return Promise.all(ATLAS_KEYS.filter(k=>!firstKeys.includes(k)).map(key=>loadAtlas(key).then(a=>{state.atlases[key]=a;})));
+ return Promise.all([...ATLAS_KEYS.filter(k=>!firstKeys.includes(k)).map(key=>loadAtlas(key).then(a=>{state.atlases[key]=a;})),
+   ...['fr','br'].flatMap(p=>[loadGun(p).then(a=>{state.atlases[p+'g']=a;}),loadCrew(p).then(a=>{state.atlases[p+'a']=a;})])]);
 }).catch(err=>{
  ui.status.textContent='Atlassen konden niet laden.';console.error(err);
 });

@@ -320,3 +320,36 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
     „Make ready! Present! Fire!”, „Steady, lads!”, „Huzzah!”.
 - `getStats().sound` telt schoten, samengevoegde schoten, ketsschoten,
   trommelslagen en commando’s.
+
+---
+
+# v334 — artillerie
+
+- **Model** (`scripts/render-iso-artillery.py`): een 6-ponder op affuit (Frans
+  Gribeauval-olijfgroen, Brits grijs), bronzen loop met versterkingsringen,
+  dolfijnen en cascabel, wielen met 12 spaken en ijzeren band, emmer onder de
+  staart. Toestanden: rust 1, vuren 2 (mondingsvuur, opslaande loop), rollen 4
+  (wielen draaien) in 256×176-cellen, as op de grond in (128,112);
+  `muzzle.json` geeft per richting de mondingspixel.
+- **Kanonniers**: het fuselierlichaam in artillerie-uniform (Frans blauw met rood,
+  rode epauletten; Brits blauw met rode kraag en opslagen, gele tressen, witte
+  broek), zonder ransel en geweer. Toestanden met eigen gereedschap: rust,
+  wissen/stampen (wisser-stamper), laden (kardoes), richten (handspaak),
+  gereed en afvuren (lontstok), terugduwen, marcheren en de drie vallen.
+- **Atlassen**: `frg/brg_iso_gun` (1792×1408) en `fra/bra_iso_gunner` +
+  `gunner2` (elk 3168×1024).
+- **Lab**: elk regiment heeft twee stukken met elk vier man. In colonne worden
+  ze achter het regiment aan geduwd (#3 en #4 aan de wielen, #1 en #2 lopen
+  naast de staart); bij het ontplooien gaan ze naar de flanken van de linie,
+  één aan elke kant, en vuren pas als ze staan. Bij
+  **Vuur!** werkt elke ploeg de dril af (cyclus 8 s, het tweede stuk 2,7 s later):
+  #1 wist en stampt voor de monding, #2 laadt de kardoes, #3 richt met de
+  handspaak achter de staart, #4 vuurt met de lontstok. Het stuk slaat 0,9 m
+  terug; #3 en #4 duwen het daarna weer naar voren (wielen draaien mee). Een
+  grote rookwolk rolt voor de monding uit en voedt de rookbank.
+- **Kogel**: eerste stuit vlak vóór de vijandelijke linie, daarna steeds lagere
+  sprongen met een stofwolkje bij elke stuit, en uitrollen. Waar de kogel lager
+  dan 1,7 m door de rijen gaat, vallen tot vier man.
+- **Geluid**: kanonsknal met lange, lage rommel.
+- `getStats()` toont `guns`, `gunsDrawn`, `crewDrawn`, `crewStates`,
+  `cannonShots`, `balls`, `ballHits` en `recoiled`.

@@ -14,7 +14,11 @@ direction) goes into the infantry (standing fire) and combat (kneeling fire)
 JSON so the lab spawns smoke at the barrel. --webp writes lossy WebP with
 alpha (needs Pillow) instead of PNG. Officer, drummer and ensign (render-iso-roles.py) get one atlas
 each per nation: idle 2, march 6, command 2 in taller 176x160 cells (feet at
-88,140) -> 1760x1280. Optional --preview writes review sheets on a grass tone.
+88,140) -> 1760x1280. Artillery (render-iso-artillery.py): the gun (idle 1, fire 2
+with muzzle point, roll 4) in 256x176 cells with the axle at 128,112 -> 1792x1408,
+and the gunners in two 176x128 sheets: gunner (idle, ram, load, aim, ready,
+touch, haul) and gunner2 (march and the three falls) -> 3168x1024 each.
+Optional --preview writes review sheets on a grass tone.
 
   python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof \
     --out graphics-lab/assets/sprites/iso
@@ -61,6 +65,13 @@ ROLES = {"officer": "o", "drummer": "d", "ensign": "e"}
 ROLE_STATES = [("idle", 2), ("march", 6), ("command", 2)]
 ROLE_CELL = (176, 160)
 ROLE_PIVOT = {"x": 88, "y": 140}
+# Artillery: kind -> (folder piece, sprite letter, states, cell, pivot)
+ARTILLERY = {
+    "gun": ("gun", "g", [("idle", 1), ("fire", 2), ("roll", 4)], (256, 176), {"x": 128, "y": 112}),
+    "gunner": ("gunner", "a", [("idle", 2), ("ram", 4), ("load", 2), ("aim", 2), ("ready", 2), ("touch", 2),
+                               ("haul", 4)], (CELL_W, CELL_H), PIVOT),
+    "gunner2": ("gunner", "a", [("march", 6), ("die", 4), ("diefwd", 4), ("dieside", 4)], (CELL_W, CELL_H), PIVOT),
+}
 
 
 def downsample(rgba: bytes, w: int, h: int, n: int) -> bytes:
@@ -105,6 +116,16 @@ def pack(frames_dir: Path, side: str, kind: str) -> tuple[bytes, dict, int]:
     if kind in ROLES:
         return pack_cells(frames_dir / "roles" / f"{side}_{kind}", SIDES[side] + ROLES[kind], kind,
                           ROLE_STATES, ROLE_CELL, ROLE_PIVOT)
+    if kind in ARTILLERY:
+        piece, letter, states, cell, pivot = ARTILLERY[kind]
+        folder = frames_dir / "artillery" / f"{side}_{piece}"
+        atlas, sheet, w = pack_cells(folder, SIDES[side] + letter, kind, states, cell, pivot)
+        if kind == "gun":
+            muzzle = json.loads((folder / "muzzle.json").read_text())["fire"]
+            if sorted(muzzle) != sorted(DIRECTIONS):
+                raise PngError(f"{side}: gun muzzle.json must list all 8 directions")
+            sheet["meta"]["muzzle"] = {"state": "fire", "frame": 0, "px": muzzle}
+        return atlas, sheet, w
     atlas, sheet, w = pack_cells(frames_dir / side, SIDES[side], kind, SHEETS[kind], (CELL_W, CELL_H), PIVOT)
     if kind in MUZZLE_STATE:
         state = MUZZLE_STATE[kind]
@@ -142,7 +163,8 @@ def pack_cells(folder: Path, prefix: str, kind: str, states, cell, pivot) -> tup
         animations.setdefault(f"{state}_{d}", []).append(name)
     if len(digests) != len(frames):
         raise PngError(f"{prefix} {kind}: pixel-identical frames found")
-    source = "render-iso-roles.py" if kind in ROLES else "render-iso-infantry.py"
+    source = ("render-iso-roles.py" if kind in ROLES else "render-iso-artillery.py" if kind in ARTILLERY
+              else "render-iso-infantry.py")
     meta = {"image": f"{prefix}_iso_{kind}_atlas.png", "size": {"w": w, "h": h},
             "scale": "1", "cell": {"w": cw, "h": ch}, "directions": DIRECTIONS, "pivot": pivot,
             "source": f"scripts/{source} (Blender, original procedural model)"}
@@ -175,8 +197,10 @@ def main(argv: list[str]) -> int:
     try:
         jobs = [(side, kind) for side in SIDES for kind in SHEETS]
         jobs += [(side, role) for side in ("france", "britain") for role in ROLES]
+        jobs += [(side, kind) for side in ("france", "britain") for kind in ARTILLERY]
         if args.only:
-            jobs = [(s, k) for s, k in jobs if s in args.only or (k in ROLES and "roles" in args.only)]
+            jobs = [(s, k) for s, k in jobs if (s in args.only and k not in ROLES and k not in ARTILLERY)
+                    or (k in ROLES and "roles" in args.only) or (k in ARTILLERY and "artillery" in args.only)]
         for side, kind in jobs:
             atlas, sheet, w = pack(Path(args.frames), side, kind)
             out = Path(args.out)

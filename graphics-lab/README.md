@@ -1,4 +1,4 @@
-# Graphics Lab — v333 isometrische Blender-scène
+# Graphics Lab — v334 isometrische Blender-scène
 
 `/graphics-lab/iso.html`: soldaten vooraf gerenderd in Blender vanuit één eigen
 3D-model (vijf uiterlijken per leger incl. grenadiers en voltigeurs, 2× supersampled en als WebP, met officier, tamboer en vaandeldrager; ontplooien van colonne in linie) in 8 richtingen (marcheren, richten, vuren, herladen, drie manieren van vallen), plus gebouwen, bomen en terrein in dezelfde 30°-camera. Zie

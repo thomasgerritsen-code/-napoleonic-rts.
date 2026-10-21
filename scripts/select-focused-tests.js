@@ -51,7 +51,7 @@ function selectFocusedTests(files) {
     if (file === 'src/assets/musketeer-sprite-v1.js' || file === 'src/systems/rendering/musketeer-sprites-v1.js' || file === 'tests/musketeer-sprites-v1.spec.js') addMusketeerSprites();
     if (file === 'index.html' || file === 'style.css') add2DPerformance();
     if (file.startsWith('graphics-lab/')) {
-      for (const spec of ['tests/graphics-lab-v319.spec.js', 'tests/graphics-lab-v320.spec.js', 'tests/graphics-lab-v321-atlas.spec.js', 'tests/graphics-lab-iso-v333.spec.js']) {
+      for (const spec of ['tests/graphics-lab-v319.spec.js', 'tests/graphics-lab-v320.spec.js', 'tests/graphics-lab-v321-atlas.spec.js', 'tests/graphics-lab-iso-v334.spec.js']) {
         if (fs.existsSync(spec)) selected.add(spec);
       }
     }

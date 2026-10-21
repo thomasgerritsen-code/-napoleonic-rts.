@@ -1,9 +1,9 @@
 {
-  "assetId": "iso-scene-v330",
+  "assetId": "iso-scene-v334",
   "sourceType": "original",
   "author": "Claude Code via scripts/render-iso-infantry.py, commissioned by the repository owner",
   "usageRights": "Original script-generated Blender models (soldiers, buildings, trees, terrain) and renders; no third-party models, textures or animations; full rights of the repository owner",
-  "sourceRef": "scripts/iso_blender_common.py, render-iso-infantry.py, render-iso-props.py, render-iso-ground.py (Blender 5.2 bpy, Cycles CPU) + pack-iso-atlas.py, render-iso-roles.py",
+  "sourceRef": "scripts/iso_blender_common.py, render-iso-infantry.py, render-iso-props.py, render-iso-ground.py (Blender 5.2 bpy, Cycles CPU) + pack-iso-atlas.py, render-iso-roles.py, render-iso-artillery.py",
   "reviewedForUse": false,
   "reviewNote": "Graphics Lab only; awaiting human visual review before any use in the game",
   "camera": {
@@ -111,5 +111,37 @@
   "rendering": {
     "supersample": 2,
     "format": "lossy WebP q90 with lossless-quality alpha (Pillow)"
+  },
+  "artillery": {
+    "gun": {
+      "cell": {
+        "w": 256,
+        "h": 176
+      },
+      "pivot": {
+        "x": 128,
+        "y": 112
+      },
+      "states": {
+        "idle": 1,
+        "fire": 2,
+        "roll": 4
+      }
+    },
+    "gunner": {
+      "states": {
+        "idle": 2,
+        "ram": 4,
+        "load": 2,
+        "aim": 2,
+        "ready": 2,
+        "touch": 2,
+        "haul": 4,
+        "march": 6,
+        "die": 4,
+        "diefwd": 4,
+        "dieside": 4
+      }
+    }
   }
 }

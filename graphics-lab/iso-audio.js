@@ -1,12 +1,12 @@
-// Graphics Lab v333 — synthesised battle sounds for the isometric scene: musket
-// shots, misfires, drums and spoken commands. Everything is generated with
+// Graphics Lab v333/v334 — synthesised battle sounds for the isometric scene:
+// musket shots, cannon, misfires, drums and spoken commands. Everything is generated with
 // WebAudio (no sound files); commands use the browser's speech synthesis.
 // Off by default; the AudioContext is only created after a click.
 (function(){
 'use strict';
 function create(){
  let ctx=null,noise=null,master=null,on=false;
- const stats={shots:0,merged:0,misfires:0,drums:0,commands:0};
+ const stats={shots:0,merged:0,misfires:0,drums:0,commands:0,cannon:0};
  // Shots in the same 60 ms window share one louder report instead of stacking.
  let windowAt=-1,windowCount=0;
  const MAX_PER_WINDOW=6;
@@ -24,7 +24,7 @@ function create(){
  }
  const panner=pan=>{const p=ctx.createStereoPanner?ctx.createStereoPanner():ctx.createGain();if(p.pan)p.pan.value=Math.max(-1,Math.min(1,pan));p.connect(master);return p;};
  function burst({at,pan,gain,decay,freq,q,type='bandpass',rate=1}){
-   const src=ctx.createBufferSource();src.buffer=noise;src.playbackRate.value=rate;
+   const src=ctx.createBufferSource();src.buffer=noise;src.loop=true;src.playbackRate.value=rate;
    const f=ctx.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;
    const g=ctx.createGain();g.gain.setValueAtTime(0.0001,at);g.gain.exponentialRampToValueAtTime(gain,at+0.004);
    g.gain.exponentialRampToValueAtTime(0.0001,at+decay);
@@ -47,6 +47,15 @@ function create(){
    burst({at,pan,gain:v,decay:0.38,freq:900+Math.random()*500,q:0.7,rate:0.8+Math.random()*0.4});
    burst({at,pan,gain:v*0.5,decay:1.1,freq:260,q:0.5,type:'lowpass'});
    thump({at,pan,gain:v*0.6,from:90,to:38,decay:0.25});
+ }
+ // Field gun: a sharp crack over a long, low boom that rolls away.
+ function cannon(pan,near){
+   if(!on||!ctx)return;
+   stats.cannon++;
+   const at=ctx.currentTime,v=0.5+0.5*near;
+   burst({at,pan,gain:v*0.8,decay:0.22,freq:1100,q:0.6});
+   burst({at,pan,gain:v,decay:2.6,freq:170,q:0.4,type:'lowpass',rate:0.6});
+   thump({at,pan,gain:v,from:72,to:26,decay:0.9});
  }
  // Flash in the pan: a click and a short fizz, no report.
  function misfire(pan,near){
@@ -78,7 +87,7 @@ function create(){
    else{try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(_){}}
    return on;
  }
- return{shot,misfire,drum,say,setOn,isOn:()=>on,ready:()=>!!ctx,stats:()=>({...stats,on,context:ctx?ctx.state:'none'})};
+ return{shot,cannon,misfire,drum,say,setOn,isOn:()=>on,ready:()=>!!ctx,stats:()=>({...stats,on,context:ctx?ctx.state:'none'})};
 }
 window.NRTSIsoAudio={create};
 })();

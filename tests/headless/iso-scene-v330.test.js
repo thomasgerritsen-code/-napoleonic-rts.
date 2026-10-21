@@ -118,3 +118,26 @@ test('v330 Blender terrain exists and no prop stands on the marching road', () =
     assert.ok(fromRing > r.width / 2 + 0.5, `${p.type} at ${p.x},${p.y} blocks the road`);
   }
 });
+
+for (const prefix of ['fr', 'br']) {
+  test(`v334 ${prefix} artillery atlases: gun with muzzle points, gunner drill and falls`, () => {
+    const load = name => JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+    const gun = load(`${prefix}g_iso_gun_atlas.json`);
+    assert.deepEqual(imageSize(path.join(dir, gun.meta.image)), {w: 1792, h: 1408, alpha: true});
+    assert.deepEqual(gun.meta.cell, {w: 256, h: 176});
+    assert.deepEqual(gun.meta.pivot, {x: 128, y: 112});
+    assert.equal(gun.meta.muzzle.state, 'fire');
+    for (const d of DIRS) {
+      for (const [state, n] of [['idle', 1], ['fire', 2], ['roll', 4]]) assert.equal(gun.animations[`${state}_${d}`].length, n);
+      const m = gun.meta.muzzle.px[d];
+      assert.ok(m.x > 0 && m.x < 256 && m.y > 0 && m.y < 176, `muzzle ${d} inside the cell`);
+    }
+    const sheets = {gunner: [['idle', 2], ['ram', 4], ['load', 2], ['aim', 2], ['ready', 2], ['touch', 2], ['haul', 4]],
+      gunner2: [['march', 6], ['die', 4], ['diefwd', 4], ['dieside', 4]]};
+    for (const [kind, states] of Object.entries(sheets)) {
+      const sheet = load(`${prefix}a_iso_${kind}_atlas.json`);
+      assert.deepEqual(imageSize(path.join(dir, sheet.meta.image)), {w: 3168, h: 1024, alpha: true});
+      for (const d of DIRS) for (const [state, n] of states) assert.equal(sheet.animations[`${state}_${d}`].length, n, `${kind} ${state}_${d}`);
+    }
+  });
+}
