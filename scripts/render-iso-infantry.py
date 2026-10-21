@@ -218,7 +218,7 @@ def build_soldier(side: str, variant: int = 1) -> dict:
     flame = part("cyl", (0.06, 0.32, 0.0), (0, 0.032, MUZZLE_Z + 0.36), glow("#ff7f24", 6), musket, name="flame")
     pan = part("ball", (0.05,), (0.04, 0.03, 0.44), glow("#ffd27a", 6), musket, name="panflash")
     return {"root": root, "fall": fall, "hips": hips, "torso": torso, "head": head, "joints": joints, "musket": musket,
-            "ramrod": ramrod, "flash": [flash, flame], "pan": pan}
+            "ramrod": ramrod, "flash": [flash, flame], "pan": pan, "company": company}
 
 
 def glow(hex_color: str, strength: float):
@@ -391,14 +391,17 @@ def pose_extra(rig: dict, state: str, frame: int, frames: int, direction: int = 
         hide_render_tree(musket, True)
         # Prone along the crawl direction (the lab moves him that way).
         rig["fall"].rotation_euler = Euler((rad(-84), 0, 0))
-        # Centre the prone body on the feet pivot so it stays inside the cell.
-        # plus 0.6 m further from the camera (screen up) so the feet-side reach clears the cell bottom.
+        # Centre the prone body on the feet pivot so it stays inside the cell,
+        # plus 0.6 m further from the camera (screen up) so the feet clear the cell bottom.
         h = math.radians(-45 * direction - 90)
         rig["fall"].location = (0.6 * math.sin(h), -0.95 + 0.6 * math.cos(h), 0.14)
         reach = math.sin(t * math.tau)
         set_legs(rig, (15 + 20 * reach, -40 - 25 * max(0, reach)), (15 - 20 * reach, -40 - 25 * max(0, -reach)), 0.95)
         set_arms(rig, (125 + 20 * reach, 30, 50 - 20 * reach), (125 - 20 * reach, -30, 50 + 20 * reach))
-        head.rotation_euler = Euler((rad(-30), 0, 0))
+        # Head turns side to side and the body pulls forward, so the two
+        # mid-stroke frames (reach 0) differ.
+        head.rotation_euler = Euler((rad(-30), 0, rad(10 * math.cos(t * math.tau))))
+        torso.rotation_euler.y += rad(6 * math.cos(t * math.tau))
         return True
     if state == "cheer":
         place(musket, RAM)
@@ -473,6 +476,23 @@ def pose(rig: dict, state: str, frame: int, frames: int, direction: int = 0) -> 
         el_r.rotation_euler = el_l.rotation_euler = Euler((rad(elbow), 0, 0))
         rig["torso"].rotation_euler = Euler((rad(lean), 0, 0))
         place(rig["musket"], musket)
+        if rig.get("company"):
+            # The tall company plume would reach past the cell side on the
+            # diagonal falls: slide the body (more as it goes down) away from
+            # the side the head ends up on (read from the last frame).
+            sides = rig.setdefault("fall_side", {})
+            if (state, direction) not in sides:
+                if frame != frames - 1:
+                    pose(rig, state, frames - 1, frames, direction)
+                    pose(rig, state, frame, frames, direction)
+                    return
+                bpy.context.view_layer.update()
+                head_x = rig["head"].matrix_world.translation.x - rig["root"].matrix_world.translation.x
+                sides[(state, direction)] = math.copysign(1, head_x)
+            wx = -0.25 * sides[(state, direction)] * frame / (frames - 1)
+            h = rad(-45 * direction - 90)
+            rig["fall"].location.x = wx * math.cos(h)
+            rig["fall"].location.y = -wx * math.sin(h)
         return
     if state in DRILL:
         musket, (rx, ry, re), (lx, ly, le), lean, flash, ram = DRILL[state][frame]
