@@ -31,7 +31,8 @@ SHEETS = {
     "infantry": [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4)],
     "fallen": [("die", 4), ("diefwd", 4), ("dieside", 4)],
 }
-SIDES = {"france": "fr", "britain": "br"}
+# Folder -> sprite prefix; folders 2 and 3 hold the alternative soldier looks.
+SIDES = {"france": "fr", "britain": "br", "france2": "fr2", "britain2": "br2", "france3": "fr3", "britain3": "br3"}
 
 
 def frame_names(prefix: str, states) -> list[tuple[str, str, int, int]]:

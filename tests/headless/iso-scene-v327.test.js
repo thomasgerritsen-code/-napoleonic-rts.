@@ -6,7 +6,7 @@ const path = require('node:path');
 const dir = path.resolve(__dirname, '../../graphics-lab/assets/sprites/iso');
 const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
 
-for (const prefix of ['fr', 'br']) {
+for (const prefix of ['fr', 'br', 'fr2', 'br2', 'fr3', 'br3']) {
   const load = kind => JSON.parse(fs.readFileSync(path.join(dir, `${prefix}_iso_${kind}_atlas.json`), 'utf8'));
   const checkSheet = (sheet, states, width) => {
     const png = fs.readFileSync(path.join(dir, sheet.meta.image));
@@ -28,7 +28,7 @@ for (const prefix of ['fr', 'br']) {
     });
   };
 
-  test(`v326 ${prefix} infantry atlas: 8 directions x 17 drill frames with muzzle points`, () => {
+  test(`v327 ${prefix} infantry atlas: 8 directions x 17 drill frames with muzzle points`, () => {
     const sheet = load('infantry');
     checkSheet(sheet, [['idle', 2], ['march', 6], ['aim', 2], ['fire', 3], ['reload', 4]], 2992);
     for (const d of DIRS) {
@@ -40,12 +40,12 @@ for (const prefix of ['fr', 'br']) {
     assert.deepEqual({state: sheet.meta.muzzle.state, frame: sheet.meta.muzzle.frame}, config.muzzleEvent);
   });
 
-  test(`v326 ${prefix} fallen atlas: three falls x 4 frames in 8 directions`, () => {
+  test(`v327 ${prefix} fallen atlas: three falls x 4 frames in 8 directions`, () => {
     checkSheet(load('fallen'), [['die', 4], ['diefwd', 4], ['dieside', 4]], 2112);
   });
 }
 
-test('v326 iso provenance is original and explicitly not yet approved for the game', () => {
+test('v327 iso provenance is original and explicitly not yet approved for the game', () => {
   const p = JSON.parse(fs.readFileSync(path.join(dir, 'provenance.json'), 'utf8'));
   assert.equal(p.sourceType, 'original');
   assert.equal(p.reviewedForUse, false);
@@ -55,7 +55,7 @@ test('v326 iso provenance is original and explicitly not yet approved for the ga
 const isoDir = path.resolve(__dirname, '../../graphics-lab/assets/iso');
 const layout = JSON.parse(fs.readFileSync(path.join(isoDir, 'layout.json'), 'utf8'));
 
-test('v326 every layout prop has a rendered sprite whose PNG matches props.json', () => {
+test('v327 every layout prop has a rendered sprite whose PNG matches props.json', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(isoDir, 'props/props.json'), 'utf8'));
   assert.ok(layout.props.length > 30);
   for (const p of layout.props) {
@@ -68,7 +68,7 @@ test('v326 every layout prop has a rendered sprite whose PNG matches props.json'
   }
 });
 
-test('v326 Blender terrain exists and no prop stands on the marching road', () => {
+test('v327 Blender terrain exists and no prop stands on the marching road', () => {
   const jpg = fs.readFileSync(path.join(isoDir, layout.ground.image));
   assert.equal(jpg.readUInt16BE(0), 0xffd8, 'JPEG');
   const r = layout.road, apothem = r.radius * Math.cos(Math.PI / 8);

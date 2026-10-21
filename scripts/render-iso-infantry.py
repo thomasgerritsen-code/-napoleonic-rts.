@@ -50,8 +50,24 @@ COMMON = {"skin": "#d6a27c", "wood": "#6a4322", "steel": "#a8aeb3", "shoe": "#12
           "box": "#161616", "canvas": "#d9d1b8", "canteen": "#6f8197"}
 
 
-def build_soldier(side: str) -> dict:
-    p = {**PALETTES[side], **COMMON}
+# Three looks per nation so a regiment is not a row of clones: skin, hair,
+# facial hair, height and the colour of the rolled blanket/greatcoat.
+VARIANTS = {
+    1: {},
+    # Campaign overalls instead of breeches and gaiters, oilcloth shako cover.
+    2: {"skin": "#bf8a62", "hair": "#1f1712", "roll": "#5d6a7e", "height": 0.96, "moustache": True,
+        "breeches": "#8a8070", "gaiter": "#7d7465", "cover": True},
+    # Brown blanket roll with a tin mess kettle on the pack.
+    3: {"skin": "#e2b793", "hair": "#a5713a", "roll": "#6b5b47", "sideburns": True,
+        "messtin": True},
+}
+
+
+def build_soldier(side: str, variant: int = 1) -> dict:
+    look = dict(VARIANTS[variant])
+    if side == "britain" and "breeches" in look:
+        look.update(breeches="#5f646b", gaiter="#585d63")
+    p = {**PALETTES[side], **COMMON, **{k: v for k, v in look.items() if isinstance(v, str)}}
     M = {k: material(v) for k, v in p.items()}
     M["skin"] = material(p["skin"], 0.6, pattern="skin")
     M["hair"] = material(p["hair"], 0.7, pattern="skin")
@@ -64,6 +80,7 @@ def build_soldier(side: str) -> dict:
     british = side == "britain"
 
     root = empty("root")
+    root.scale = (look.get("height", 1.0),) * 3
     # The whole body topples about the feet through this pivot when hit.
     fall = empty("fall", root)
     hips = empty("hips", fall, (0, 0, 0.95))
@@ -103,26 +120,40 @@ def build_soldier(side: str) -> dict:
     for x in (0.1, -0.1):
         part("box", (0.03, 0.012, 0.3), (x, -0.26, 0.38), M["belt"], torso, name="packstrap")
     part("cyl", (0.058, 0.33), (0, -0.175, 0.58), M["roll"], torso, rot=(0, 90, 0), name="roll")
+    if look.get("messtin"):
+        part("cyl", (0.07, 0.09), (0, -0.2, 0.67), material("#c9ccc8", 0.3, 0.8, pattern="plain"), torso, name="messtin")
     part("cyl", (0.078, 0.075), (0, 0, 0.6), M["collar"], torso, name="collar")
 
     head = empty("head", torso, (0, 0, 0.72))
     part("ball", (0.104, 1, 1.02, 1.05), (0, 0.01, 0), M["skin"], head, name="face")
     part("ball", (0.106, 1, 0.95, 0.9), (0, -0.025, 0.02), M["hair"], head, name="hair")
     part("cyl", (0.022, 0.05, 0.004), (0, 0.115, -0.01), M["skin"], head, rot=(-90, 0, 0), name="nose", segments=8)
+    if look.get("moustache"):
+        part("box", (0.07, 0.025, 0.018), (0, 0.105, -0.045), M["hair"], head, name="moustache")
+    if look.get("sideburns"):
+        for x in (0.095, -0.095):
+            part("box", (0.02, 0.05, 0.07), (x, 0.03, -0.02), M["hair"], head, name="sideburn")
     for x in (0.1, -0.1):
         part("ball", (0.022,), (x, 0, 0), M["skin"], head, name="ear", segments=8)
-    part("cyl", (0.097, 0.2, 0.112), (0, 0, 0.16), M["shako"], head, name="shako")
-    part("cyl", (0.114, 0.02), (0, 0, 0.265), M["shako"], head, name="lid")
-    part("box", (0.13, 0.06, 0.014), (0, 0.1, 0.075), M["shako"], head, rot=(-12, 0, 0), name="visor")
-    part("box", (0.075, 0.012, 0.075), (0, 0.108, 0.16), M["plate"], head, rot=(0, 45, 0), name="plate")
-    for x in (0.1, -0.1):
-        part("box", (0.01, 0.03, 0.1), (x * 1.02, -0.005, 0.04), M["plate"], head, rot=(10, 0, 0), name="chinscale")
-    if british:
-        part("cyl", (0.022, 0.13, 0.03), (-0.05, 0.08, 0.33), M["pompom"], head, name="plume")
-        part("box", (0.16, 0.01, 0.025), (0, 0.11, 0.24), M["turnback"], head, name="band")
+    if look.get("cover"):
+        # Campaign oilcloth cover: glossy black, hides plate, cords and pompom.
+        oil = material("#121212", 0.28, pattern="plain")
+        part("cyl", (0.1, 0.21, 0.115), (0, 0, 0.165), oil, head, name="shako")
+        part("cyl", (0.117, 0.02), (0, 0, 0.272), oil, head, name="lid")
+        part("box", (0.13, 0.06, 0.014), (0, 0.1, 0.075), M["shako"], head, rot=(-12, 0, 0), name="visor")
     else:
-        part("ball", (0.038,), (0, 0.06, 0.3), M["pompom"], head, name="pompom")
-        part("box", (0.012, 0.012, 0.09), (0.06, 0.1, 0.12), M["belt"], head, rot=(0, 40, 0), name="cord")
+        part("cyl", (0.097, 0.2, 0.112), (0, 0, 0.16), M["shako"], head, name="shako")
+        part("cyl", (0.114, 0.02), (0, 0, 0.265), M["shako"], head, name="lid")
+        part("box", (0.13, 0.06, 0.014), (0, 0.1, 0.075), M["shako"], head, rot=(-12, 0, 0), name="visor")
+        part("box", (0.075, 0.012, 0.075), (0, 0.108, 0.16), M["plate"], head, rot=(0, 45, 0), name="plate")
+        for x in (0.1, -0.1):
+            part("box", (0.01, 0.03, 0.1), (x * 1.02, -0.005, 0.04), M["plate"], head, rot=(10, 0, 0), name="chinscale")
+        if british:
+            part("cyl", (0.022, 0.13, 0.03), (-0.05, 0.08, 0.33), M["pompom"], head, name="plume")
+            part("box", (0.16, 0.01, 0.025), (0, 0.11, 0.24), M["turnback"], head, name="band")
+        else:
+            part("ball", (0.038,), (0, 0.06, 0.3), M["pompom"], head, name="pompom")
+            part("box", (0.012, 0.012, 0.09), (0.06, 0.1, 0.12), M["belt"], head, rot=(0, 40, 0), name="cord")
 
     joints = {}
     for sign, key in ((1, "R"), (-1, "L")):
@@ -319,6 +350,7 @@ def pose(rig: dict, state: str, frame: int, frames: int, direction: int = 0) -> 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--side", choices=sorted(PALETTES), required=True)
+    ap.add_argument("--variant", type=int, choices=sorted(VARIANTS), default=1)
     ap.add_argument("--out", default="art/frames/iso-proof")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--states", nargs="*", help="render only these states (review)")
@@ -328,10 +360,12 @@ def main(argv: list[str]) -> int:
     camera(FRAME_W, FRAME_H, SPRITE_PX_PER_M, PIVOT)
     # Small shadow catcher under the feet: its edge stays inside the frame.
     shadow_catcher("ground", [(0.2 + 0.85 * math.cos(a / 24 * math.tau), 0.05 + 0.85 * math.sin(a / 24 * math.tau)) for a in range(24)])
-    rig = build_soldier(args.side)
-    out = Path(args.out).resolve() / args.side
+    rig = build_soldier(args.side, args.variant)
+    # Variant 1 keeps the original names; others get their own folder/prefix.
+    suffix = "" if args.variant == 1 else str(args.variant)
+    out = Path(args.out).resolve() / (args.side + suffix)
     out.mkdir(parents=True, exist_ok=True)
-    prefix = "fr" if args.side == "france" else "br"
+    prefix = ("fr" if args.side == "france" else "br") + suffix
     muzzle = {}
     for d, name in enumerate(DIRECTIONS):
         # Model faces +Y; screen direction d is clockwise from east.

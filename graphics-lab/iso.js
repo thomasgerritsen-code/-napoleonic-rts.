@@ -1,4 +1,5 @@
-// Graphics Lab v326 — isometric scene: Blender-rendered soldiers (march, aim, fire, reload, three falls),
+// Graphics Lab v327 — isometric scene: Blender-rendered soldiers in three looks (march, aim, fire,
+// reload, three falls),
 // buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
 (function(){
@@ -102,6 +103,10 @@ function loadSheet(prefix,kind,states){
    return{sheet,image};
  });
 }
+// Three looks per nation (atlas prefixes fr, fr2, fr3 / br, br2, br3), fixed
+// per soldier so the same man keeps his face, trousers and kit.
+const LOOKS=['','2','3'];
+const lookOf=(prefix,id)=>prefix+LOOKS[Math.floor(hash(id+11,prefix==='fr'?3:5)*LOOKS.length)];
 function loadAtlas(prefix){
  return Promise.all([loadSheet(prefix,'infantry',['idle','march','aim','fire','reload']),loadSheet(prefix,'fallen',FALLS)])
    .then(([drill,fallen])=>{
@@ -124,7 +129,7 @@ function units(){
      const p=along(state.travelled+offset-rank*gap);
      const nx=-p.dy,ny=p.dx;
      if(state.dead.has(prefix+':'+i))continue;
-     out.push({side,prefix,id:i,key:prefix+':'+i,gx:p.x+nx*file*spacing,gy:p.y+ny*file*spacing,dir:dirIndex(p.dx,p.dy)});
+     out.push({side,prefix,look:lookOf(prefix,i),id:i,key:prefix+':'+i,gx:p.x+nx*file*spacing,gy:p.y+ny*file*spacing,dir:dirIndex(p.dx,p.dy)});
    }
  });
  // A firing line turns to face the enemy regiment's centre.
@@ -164,7 +169,7 @@ function frameFor(u){
 
 // Powder smoke puffs born at the rendered muzzle pixel, drifting downwind.
 function spawnSmoke(u){
- const atlas=state.atlases[u.prefix];if(!atlas)return;
+ const atlas=state.atlases[u.look];if(!atlas)return;
  const m=atlas.sheet.meta,px=m.muzzle.px[DIRS[u.dir]],k=S/SPRITE_PX_PER_M;
  const x=u.x+(px.x-m.pivot.x)*k,y=u.y+(px.y-m.pivot.y)*k;
  if(u.id===0)state.volleys++;
@@ -190,7 +195,7 @@ function resolveHits(list){
    const u=list.find(v=>v.key===h.key);
    // Each casualty falls one of three ways (deterministic per shot).
    const fall=FALLS[Math.floor(hash(h.seed,u?u.id+17:0)*FALLS.length)];
-   if(u&&!state.dead.has(h.key))state.dead.set(h.key,{prefix:u.prefix,side:u.side,id:u.id,gx:u.gx,gy:u.gy,dir:u.dir,t0:state.time,fall});
+   if(u&&!state.dead.has(h.key))state.dead.set(h.key,{prefix:u.prefix,look:u.look,side:u.side,id:u.id,gx:u.gx,gy:u.gy,dir:u.dir,t0:state.time,fall});
    return false;
  });
 }
@@ -236,7 +241,7 @@ function draw(now){
  state.drawn=0;state.propsDrawn=0;
  for(const u of list){
    if(u.sprite){const p=u.sprite;ctx.drawImage(p.image,u.x-p.pivot.x*k,u.y-p.pivot.y*k,p.w*k,p.h*k);state.propsDrawn++;continue;}
-   const atlas=state.atlases[u.prefix];if(!atlas)continue;
+   const atlas=state.atlases[u.look]||state.atlases[u.prefix];if(!atlas)continue;
    if(u.fallen){
      // The fall plays once; the last frame stays on the field.
      const f=Math.min(3,Math.floor(Math.max(0,state.time-u.t0)/DIE_FRAME));
@@ -245,6 +250,7 @@ function draw(now){
    }
    const [anim,f]=frameFor(u).split('|');
    drawSprite(atlas,anim,Number(f),u.x,u.y,k);
+   (state.lookSet||(state.lookSet=new Set())).add(u.look);state.looksDrawn=state.lookSet.size;
    const st=anim.split('_')[0];state.animStates[st]=(state.animStates[st]||0)+1;
    state.directionsSeen.add(u.dir);state.drawn++;
  }
@@ -302,8 +308,8 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'326.0',state,
- getStats:()=>({loaded:Object.keys(state.atlases).length,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
+window.__GRAPHICS_LAB_ISO__={version:'327.0',state,
+ getStats:()=>({loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
    animStates:{...(state.animStates||{})},smoke:state.smoke.length,volleys:state.volleys,shots:state.shots,
@@ -315,8 +321,9 @@ window.__GRAPHICS_LAB_ISO__={version:'326.0',state,
 paintGround();resize();
 const loadController=()=>loadJson('./assets/sprites/unit-animation-config.json').then(cfg=>{
  state.controller=NRTSInfantryAnimation.createInfantryAnimationController(cfg);});
-Promise.all([loadAtlas('fr'),loadAtlas('br'),loadController(),loadScene().catch(err=>{console.warn('Iso terrein/gebouwen fallback:',err);})]).then(([fr,br])=>{
- state.atlases={fr,br};
+const ATLAS_KEYS=['fr','br'].flatMap(p=>LOOKS.map(l=>p+l));
+Promise.all([Promise.all(ATLAS_KEYS.map(loadAtlas)),loadController(),loadScene().catch(err=>{console.warn('Iso terrein/gebouwen fallback:',err);})]).then(([atlases])=>{
+ state.atlases=Object.fromEntries(ATLAS_KEYS.map((key,i)=>[key,atlases[i]]));
  ui.status.textContent=state.terrain?'Blender-scène geladen · soldaten, gebouwen en terrein':'Blender-soldaten geladen · eenvoudig terrein';
 }).catch(err=>{
  ui.status.textContent='Atlassen konden niet laden.';console.error(err);

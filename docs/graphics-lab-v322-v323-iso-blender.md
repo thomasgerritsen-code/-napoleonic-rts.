@@ -179,3 +179,19 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   van de drie vallen; `getStats().fallKinds` toont welke voorkomen.
 - **Tests**: beide atlassen per natie, en een treffertest die minstens twee
   verschillende valvarianten verwacht.
+
+---
+
+# v327 — drie uiterlijken per leger
+
+- `VARIANTS` in `scripts/render-iso-infantry.py` (`--variant 1|2|3`):
+  1. het oorspronkelijke model;
+  2. veldtenue: donkere huid, zwart haar en snor, iets kleiner (0,96), grijsbruine
+     veldbroek (Brits: donkergrijs) in plaats van kniebroek met slobkousen, en een
+     zwart wasdoek over de shako zonder plaat of pompon;
+  3. lichte huid, rossig haar met bakkebaarden, bruine deken en een tinnen
+     eetketel op de ransel.
+- Atlassen per variant: `fr`, `fr2`, `fr3`, `br`, `br2`, `br3` (exercitie +
+  sneuvelen), samen ongeveer 8 MB.
+- **Lab** (v327): elke soldaat krijgt via een vaste hash zijn eigen uiterlijk, ook
+  als hij sneuvelt. `getStats().looks` telt de zichtbare varianten.
