@@ -57,12 +57,30 @@
         <label>Soldaten<select id="count"><option value="32">32</option><option value="64">64</option><option value="128">128</option></select></label>
         <label>Detail<select id="quality"><option value="balanced">Mobiel / soepel</option><option value="quality">Hoog detail</option></select></label>
       </div>
+      <section id="atlas-review-controls" hidden aria-label="Franse rasteranimatie frame-analyse">
+        <div class="review-head"><strong>Franse infanterie — animatiecontrole</strong>
+          <span>CONCEPT · niet goedgekeurd voor de gewone game</span></div>
+        <div class="review-actions">
+          <label class="review-scrub">Tijdlijn (0–20 sec)
+            <input id="atlas-review-time" type="range" min="0" max="19.9" step="0.05" value="0"/>
+          </label>
+          <output id="atlas-review-pose" for="atlas-review-time">march · frame 1</output>
+          <label>Spritegrootte
+            <select id="atlas-review-size">
+              <option value="24">24 px (game)</option>
+              <option value="36">36 px</option>
+              <option value="48" selected>48 px (detail)</option>
+            </select>
+          </label>
+        </div>
+      </section>
     </section>
     <footer class="footer">
       <span id="status">Grafische assets worden geladen…</span>
       <span>Afzonderlijk prototype · bestaande game ongewijzigd</span>
     </footer>
   </main>
+  <script src="./render/french-atlas-review-v321.js?v=321r"></script>
   <script type="module" src="./scene.js?v=320a"></script>
 </body>
 </html>

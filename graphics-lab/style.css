@@ -26,3 +26,25 @@
  radial-gradient(ellipse at 45% 40%,transparent 35%,rgba(26,28,26,.22) 100%);
  mix-blend-mode:multiply
 }
+
+/* Opt-in sprite-frame reviewer; hidden for ordinary v320 demos. */
+#atlas-review-controls[hidden]{display:none}
+#atlas-review-controls{flex:1 0 100%;display:flex;align-items:center;flex-wrap:wrap;gap:16px;
+ border-top:1px solid rgba(212,189,139,.23);padding-top:12px}
+#atlas-review-controls .review-head{display:flex;flex-direction:column;gap:3px;min-width:195px}
+#atlas-review-controls .review-head strong{font-size:13px;color:#e8ddc5}
+#atlas-review-controls .review-head span{font-size:10px;color:#f1bb8d}
+#atlas-review-controls .review-actions{display:flex;gap:18px;align-items:end;flex:1;flex-wrap:wrap}
+#atlas-review-controls label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:#d0c2a1}
+#atlas-review-controls .review-scrub{min-width:170px;flex:1}
+#atlas-review-time{width:100%;accent-color:#d2ae70;min-height:27px;touch-action:pan-y}
+#atlas-review-pose{color:#dfc483;font-weight:700;min-width:118px;font-size:12px}
+#atlas-review-size{min-height:34px;padding:7px 9px;border-radius:6px;border:1px solid #786c54;
+ background:#303b34;color:#f0e9d9}
+@media(max-width:720px){
+ #atlas-review-controls{padding-top:8px;gap:6px}
+ #atlas-review-controls .review-head{min-width:100%}
+ #atlas-review-controls .review-actions{gap:7px}
+ #atlas-review-controls .review-scrub{min-width:130px}
+ #atlas-review-pose{min-width:84px;font-size:10px}
+}

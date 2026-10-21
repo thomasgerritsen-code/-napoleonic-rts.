@@ -1,3 +1,41 @@
+## v321 conceptreview: Franse hoofden zichtbaar
+
+De raster-PNG in de concept-PR had een lege, donkere hals onder de sjako:
+het leek alsof alle Franse soldaten geen hoofd hadden.
+
+De optionele reviewmodus corrigeert **alle 17 frames eenmaal bij het laden
+van de atlas** en geeft hetzelfde beeld door aan Canvas2D en Pixi/WebGL.
+Dit is een tijdelijke, reproduceerbare correctie van de rasterpixels,
+geen onzichtbaar extra spelelement of aangepaste gameplay.
+
+- `/graphics-lab/?sprites=review&pixi=off` — Franse hoofden zichtbaar;
+  ook de tijdlijn en 24/36/48px-keuze voor een grondige controle.
+- `/graphics-lab/?sprites=review&heads=original&pixi=off` — originele
+  foutieve atlas tonen voor vergelijking.
+- `/graphics-lab/?pixi=off` — gewone v320-demo: alles zoals voorheen.
+
+De gezichten zijn bewust eenvoudige pixelcorrecties, **niet de definitieve
+hoogwaardige Napoleontische head-art**. Historische nauwkeurigheid,
+camerahoek, animatieconsistentie en andere anatomie moeten nog beoordeeld
+worden. Daarom blijft `reviewedForUse:false` en is de PR een draft.
+
+---
+# v321 Franse rasteranimation review (conceptbranch)
+
+De `graphics-lab/` blijft standaard **v320** en toont de bewezen oorspronkelijke SVG's.
+In deze conceptbranch met de Franse 17-frame PNG-atlas is er een **opt-in vergelijking**:
+
+- `/graphics-lab/?sprites=review`: Franse PNG-soldaten afspelen via PixiJS (indien beschikbaar), Britse SVG's ongewijzigd.
+- `/graphics-lab/?sprites=review&pixi=off`: dezelfde Franse rasterposes via Canvas2D (offline / geen CDN).
+- `/graphics-lab/?pixi=off`: terug naar de originele v320-uiterlijk.
+- `?sprites=review` is **geen publieke release**: zolang dit niet naar main gemerged is, heeft de gewone GitHub Pages URL nog geen toegang tot die bestanden.
+
+Franse animatie (review): idle 2, march 6, aim 2, fire 3, reload 4. De gedeelde framecontroller selecteert per toestand op één klok; het grondanker blijft (48,78). De renderer toont rasterframes op een virtueel 48×48-pixelvlak terwijl de gebruikte figuur minder groot is. Animatiekwaliteit is nog een open reviewpunt: **AI-figuurverschillen, anatomie en niet-consequent bovenaanzicht**. `reviewedForUse: false` blijft staan. De Britse soldaten krijgen geen onechte Franse textures.
+
+Vergelijk de loopcyclus bij echte telefoongrootte, 64 en 128 soldaten, en controleer gefixeerde animatiestanden; geef pas daarna kunstvrijgave. Productiegameplay, routes en brugcollision blijven onaangetast.
+
+---
+
 # Graphics Lab v320 — realistischere tweede proefscene
 
 Naast de oorspronkelijke v319-assets heeft de demonstratie nu:
