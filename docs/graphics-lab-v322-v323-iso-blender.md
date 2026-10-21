@@ -104,3 +104,36 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   geen object op de marsroute.
 - `tests/graphics-lab-iso-v323.spec.js`: terrein en alle objecten getekend,
   8 richtingen, pauze/halt, knijpzoom op telefoon.
+
+---
+
+# v324 — richten, vuren en herladen in 8 richtingen
+
+- **Exercitie** in `scripts/render-iso-infantry.py` (tabel `DRILL`), volgens het
+  1809-ritme *apprêtez armes – joue – feu – chargez*:
+  - richten (2): musket rechtop voor de borst, daarna aangelegd aan de
+    rechterschouder;
+  - vuren (3): kruit flitst op de pan, schot met mondingsvuur en terugslag,
+    musket zakt;
+  - herladen (4): halve haan bij de heup, laadstok in de loop (kolf op de
+    grond, arm omhoog), laadstok aangedrukt, terug naar de schouder.
+  Schiethouding: rechtervoet achter, knieën licht gebogen.
+- **Cellen** 176×128 px (anker 88,108) zodat een horizontaal musket met
+  bajonet en mondingsvuur nooit wordt afgesneden. Per natie één atlas van
+  2992×1024 (8 richtingen × 17 frames). De PNG-hulpmodule accepteert daarvoor
+  nu afbeeldingen tot 2048×2048 pixels.
+- **Mondingspunt**: de renderer schrijft per richting de schermpixel van de loop
+  op het schotframe naar `muzzle.json`; de packer zet die in `meta.muzzle` van
+  de atlas. Het schotframe (vuurframe 2) valt samen met `muzzleEvent` uit
+  `unit-animation-config.json`, wat een headless test bewaakt.
+- **Lab** (`iso.html`, v324): de deterministische v321-controller stuurt
+  stilstaan/richten/vuren/herladen op de lab-klok; marcheren blijft gekoppeld
+  aan de afgelegde afstand. Knop **Vuur!**: regimenten houden halt, draaien naar
+  het midden van de vijand en vuren gelijktijdig salvo's. Elke `muzzle`-
+  gebeurtenis zet een rookwolk op de mondingspixel die met de wind meedrijft en
+  vervaagt. De strook bovenin toont de hele exercitie in alle 8 richtingen.
+- **Tests**: `tests/headless/iso-scene-v324.test.js` (17 frames × 8 richtingen,
+  celindeling, mondingspunten binnen de cel, overeenstemming met de
+  controllerconfig) en `tests/graphics-lab-iso-v324.spec.js` (één salvo geeft
+  precies 64 schoten, richten/vuren/herladen zichtbaar, geen marsframes,
+  rook aanwezig, vuren staken).

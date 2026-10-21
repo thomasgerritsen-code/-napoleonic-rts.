@@ -7,26 +7,35 @@ const dir = path.resolve(__dirname, '../../graphics-lab/assets/sprites/iso');
 const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
 
 for (const prefix of ['fr', 'br']) {
-  test(`v323 ${prefix} iso atlas: 8 directions x (2 idle + 6 march) in 128 px cells`, () => {
+  test(`v324 ${prefix} iso atlas: 8 directions x 17 drill frames in 176x128 cells with muzzle points`, () => {
     const sheet = JSON.parse(fs.readFileSync(path.join(dir, `${prefix}_iso_infantry_atlas.json`), 'utf8'));
     const png = fs.readFileSync(path.join(dir, sheet.meta.image));
-    assert.equal(png.readUInt32BE(16), 1024);
+    assert.equal(png.readUInt32BE(16), 2992);
     assert.equal(png.readUInt32BE(20), 1024);
     assert.equal(png[25], 6, 'RGBA PNG');
-    assert.deepEqual(sheet.meta.size, {w: 1024, h: 1024});
+    assert.deepEqual(sheet.meta.size, {w: 2992, h: 1024});
+    assert.deepEqual(sheet.meta.cell, {w: 176, h: 128});
     assert.deepEqual(sheet.meta.directions, DIRS);
-    assert.equal(Object.keys(sheet.frames).length, 64);
+    assert.equal(Object.keys(sheet.frames).length, 136);
+    const states = [['idle', 2], ['march', 6], ['aim', 2], ['fire', 3], ['reload', 4]];
     DIRS.forEach((d, row) => {
-      assert.equal(sheet.animations['idle_' + d].length, 2);
-      assert.equal(sheet.animations['march_' + d].length, 6);
-      [...sheet.animations['idle_' + d], ...sheet.animations['march_' + d]].forEach((name, col) => {
-        assert.deepEqual(sheet.frames[name].frame, {x: col * 128, y: row * 128, w: 128, h: 128});
+      const names = states.flatMap(([s, n]) => {
+        assert.equal(sheet.animations[s + '_' + d].length, n, `${s}_${d}`);
+        return sheet.animations[s + '_' + d];
       });
+      names.forEach((name, col) => {
+        assert.deepEqual(sheet.frames[name].frame, {x: col * 176, y: row * 128, w: 176, h: 128});
+      });
+      const m = sheet.meta.muzzle.px[d];
+      assert.ok(m.x > 0 && m.x < 176 && m.y > 0 && m.y < 128, `muzzle ${d} inside the cell`);
     });
+    // The lab's v321 controller fires on fire frame index 1; the atlas must agree.
+    const config = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../graphics-lab/assets/sprites/unit-animation-config.json'), 'utf8'));
+    assert.deepEqual({state: sheet.meta.muzzle.state, frame: sheet.meta.muzzle.frame}, config.muzzleEvent);
   });
 }
 
-test('v323 iso provenance is original and explicitly not yet approved for the game', () => {
+test('v324 iso provenance is original and explicitly not yet approved for the game', () => {
   const p = JSON.parse(fs.readFileSync(path.join(dir, 'provenance.json'), 'utf8'));
   assert.equal(p.sourceType, 'original');
   assert.equal(p.reviewedForUse, false);
@@ -36,7 +45,7 @@ test('v323 iso provenance is original and explicitly not yet approved for the ga
 const isoDir = path.resolve(__dirname, '../../graphics-lab/assets/iso');
 const layout = JSON.parse(fs.readFileSync(path.join(isoDir, 'layout.json'), 'utf8'));
 
-test('v323 every layout prop has a rendered sprite whose PNG matches props.json', () => {
+test('v324 every layout prop has a rendered sprite whose PNG matches props.json', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(isoDir, 'props/props.json'), 'utf8'));
   assert.ok(layout.props.length > 30);
   for (const p of layout.props) {
@@ -49,7 +58,7 @@ test('v323 every layout prop has a rendered sprite whose PNG matches props.json'
   }
 });
 
-test('v323 Blender terrain exists and no prop stands on the marching road', () => {
+test('v324 Blender terrain exists and no prop stands on the marching road', () => {
   const jpg = fs.readFileSync(path.join(isoDir, layout.ground.image));
   assert.equal(jpg.readUInt16BE(0), 0xffd8, 'JPEG');
   const r = layout.road, apothem = r.radius * Math.cos(Math.PI / 8);

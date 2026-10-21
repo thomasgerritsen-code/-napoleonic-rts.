@@ -3,7 +3,7 @@
 
 Builds an original, script-generated 1809 line fusilier from primitives (no
 third-party model), poses it per frame and renders 8 directions x (2 idle +
-6 march) frames with the shared iso camera and sun (iso_blender_common.py).
+6 march + 2 aim + 3 fire + 4 reload) frames with the shared iso camera and sun (iso_blender_common.py).
 The same rig produces the French and the British soldier; only uniform
 details and colours differ.
 
@@ -14,21 +14,22 @@ Then pack with scripts/pack-iso-atlas.py.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from pathlib import Path
 
 import bpy
-from mathutils import Euler
+from mathutils import Euler, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from iso_blender_common import (SPRITE_PX_PER_M, camera, empty, material, part,  # noqa: E402
-                                setup_render, shadow_catcher)
+                                screen_up, setup_render, shadow_catcher)
 
-FRAME = 128              # output cell, px
-PIVOT = (64, 108)        # feet on screen, px
+FRAME_W, FRAME_H = 176, 128   # output cell, px (wide enough for a levelled musket)
+PIVOT = (88, 108)             # feet on screen, px
 DIRECTIONS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]  # clockwise on screen
-STATES = [("idle", 2), ("march", 6)]
+STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4)]
 
 PALETTES = {
     "france": {
@@ -137,7 +138,7 @@ def build_soldier(side: str) -> dict:
         joints[key] = (sh, el, th, kn)
 
     # Shouldered musket on the left: butt in the left hand, barrel past the shoulder.
-    musket = empty("musket", torso, (-0.25, 0.1, -0.05), (-22, -6, 0))
+    musket = empty("musket", torso, *CARRY)
     part("box", (0.045, 0.1, 0.3), (0, 0, 0.15), M["wood"], musket, name="butt")
     part("cyl", (0.024, 0.95, 0.018), (0, 0.01, 0.75), M["wood"], musket, name="stock")
     part("cyl", (0.011, 1.05), (0, 0.032, 0.85), M["steel"], musket, name="barrel")
@@ -146,14 +147,92 @@ def build_soldier(side: str) -> dict:
         part("cyl", (0.027, 0.022), (0, 0.015, z), M["steel"], musket, name="band")
     part("box", (0.008, 0.012, 0.8), (0, -0.03, 0.55), M["belt"], musket, rot=(4, 0, 0), name="sling")
     part("cyl", (0.009, 0.34, 0.002), (0, 0.04, 1.5), M["steel"], musket, name="bayonet")
-    return {"root": root, "hips": hips, "torso": torso, "joints": joints}
+    # Ramrod drawn above the muzzle while loading; muzzle flash only on firing.
+    ramrod = part("cyl", (0.007, 0.9), (0, 0.032, 1.75), M["steel"], musket, name="ramrod")
+    flash = part("ball", (0.11, 1, 1, 1.9), (0, 0.032, MUZZLE_Z + 0.2), glow("#ffc45c", 7), musket, name="flash")
+    flame = part("cyl", (0.06, 0.32, 0.0), (0, 0.032, MUZZLE_Z + 0.36), glow("#ff7f24", 6), musket, name="flame")
+    pan = part("ball", (0.05,), (0.04, 0.03, 0.44), glow("#ffd27a", 6), musket, name="panflash")
+    return {"root": root, "hips": hips, "torso": torso, "joints": joints, "musket": musket,
+            "ramrod": ramrod, "flash": [flash, flame], "pan": pan}
+
+
+def glow(hex_color: str, strength: float):
+    m = material(hex_color, 0.5, pattern="plain")
+    bsdf = m.node_tree.nodes["Principled BSDF"]
+    bsdf.inputs["Emission Color"].default_value = bsdf.inputs["Base Color"].default_value
+    bsdf.inputs["Emission Strength"].default_value = strength
+    return m
+
+
+MUZZLE_Z = 1.375
+# Musket placements on the torso: (location, rotation degrees).
+CARRY = ((-0.25, 0.1, -0.05), (-22, -6, 0))
+READY = ((0.02, 0.22, -0.2), (-12, 0, 8))          # vertical before the chest
+PRESENT = ((0.1, 0.0, 0.47), (-87, 0, 4))          # levelled at the right shoulder
+RECOIL = ((0.1, -0.04, 0.5), (-80, 0, 4))
+LOWER = ((0.06, 0.1, 0.3), (-58, 0, 6))
+PRIME = ((0.0, 0.18, -0.12), (-48, 0, 10))         # half-cock at the waist
+RAM = ((-0.04, 0.26, -0.93), (-8, 0, 0))           # butt on the ground
+SHOULDER = ((-0.16, 0.16, -0.12), (-6, -4, 0))
+
+# Per state and frame: musket placement, right/left shoulder + elbow (deg),
+# torso lean, flash, ramrod offset along the barrel (None = stowed).
+DRILL = {
+    "aim": [(READY, (38, 18, 70), (52, -12, 55), 2, 0, None),
+            (PRESENT, (72, 22, 48), (84, -14, 12), 4, 0, None)],
+    # The big flash sits on fire frame 2: unit-animation-config's muzzleEvent.
+    # Frame 1: priming powder flashes in the pan (flash code 3), then the shot.
+    "fire": [(PRESENT, (72, 22, 48), (84, -14, 12), 5, 3, None),
+             (RECOIL, (66, 22, 50), (80, -14, 16), -3, 2, None),
+             (LOWER, (52, 20, 60), (66, -12, 30), 0, 0, None)],
+    "reload": [(PRIME, (44, 18, 78), (48, -10, 42), 6, 0, None),
+               (RAM, (150, 10, 30), (40, -16, 38), 3, 0, 0.0),
+               (RAM, (122, 12, 52), (40, -16, 38), 3, 0, -0.42),
+               (SHOULDER, (30, 14, 70), (24, -10, 46), 1, 0, None)],
+}
+
+
+def place(obj, placement):
+    loc, rot = placement
+    obj.location = loc
+    obj.rotation_euler = Euler([math.radians(a) for a in rot])
 
 
 def pose(rig: dict, state: str, frame: int, frames: int) -> None:
     sh_r, el_r, th_r, kn_r = rig["joints"]["R"]
     sh_l, el_l, th_l, kn_l = rig["joints"]["L"]
     rad = math.radians
-    # Left arm holds the musket butt in every pose.
+    for obj in rig["flash"]:
+        obj.hide_render = True
+    rig["pan"].hide_render = True
+    rig["ramrod"].hide_render = True
+    rig["torso"].rotation_euler = Euler((0, 0, 0))
+    if state in DRILL:
+        musket, (rx, ry, re), (lx, ly, le), lean, flash, ram = DRILL[state][frame]
+        place(rig["musket"], musket)
+        sh_r.rotation_euler = Euler((rad(rx), rad(ry), 0))
+        el_r.rotation_euler = Euler((rad(re), 0, 0))
+        sh_l.rotation_euler = Euler((rad(lx), rad(ly), 0))
+        el_l.rotation_euler = Euler((rad(le), 0, 0))
+        rig["torso"].rotation_euler = Euler((rad(lean), 0, 0))
+        # Firing stance: right foot drawn back, knees soft.
+        rig["hips"].location.z = 0.94
+        th_r.rotation_euler = Euler((rad(-14), 0, 0))
+        th_l.rotation_euler = Euler((rad(9), 0, 0))
+        kn_r.rotation_euler = Euler((rad(-6), 0, 0))
+        kn_l.rotation_euler = Euler((rad(-8), 0, 0))
+        if flash == 3:
+            rig["pan"].hide_render = False
+        elif flash:
+            for obj in rig["flash"]:
+                obj.hide_render = False
+                obj.scale = (1, 1, 1) if flash == 2 else (0.55, 0.55, 0.55)
+        if ram is not None:
+            rig["ramrod"].hide_render = False
+            rig["ramrod"].location.z = 1.75 + ram
+        return
+    place(rig["musket"], CARRY)
+    # Left arm holds the musket butt while carrying.
     sh_l.rotation_euler = Euler((rad(18), rad(-8), 0))
     el_l.rotation_euler = Euler((rad(42), 0, 0))
     if state == "idle":
@@ -184,25 +263,36 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--side", choices=sorted(PALETTES), required=True)
     ap.add_argument("--out", default="art/frames/iso-proof")
     ap.add_argument("--samples", type=int, default=64)
+    ap.add_argument("--states", nargs="*", help="render only these states (review)")
     args = ap.parse_args(argv)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     setup_render(args.samples)
-    camera(FRAME, FRAME, SPRITE_PX_PER_M, PIVOT)
+    camera(FRAME_W, FRAME_H, SPRITE_PX_PER_M, PIVOT)
     # Small shadow catcher under the feet: its edge stays inside the frame.
     shadow_catcher("ground", [(0.2 + 0.85 * math.cos(a / 24 * math.tau), 0.05 + 0.85 * math.sin(a / 24 * math.tau)) for a in range(24)])
     rig = build_soldier(args.side)
     out = Path(args.out).resolve() / args.side
     out.mkdir(parents=True, exist_ok=True)
     prefix = "fr" if args.side == "france" else "br"
+    muzzle = {}
     for d, name in enumerate(DIRECTIONS):
         # Model faces +Y; screen direction d is clockwise from east.
         rig["root"].rotation_euler = Euler((0, 0, math.radians(-45 * d - 90)))
         for state, frames in STATES:
+            if args.states and state not in args.states:
+                continue
             for f in range(frames):
                 pose(rig, state, f, frames)
                 bpy.context.view_layer.update()
+                if state == "fire" and f == 1:
+                    # Screen pixel of the muzzle, so the lab spawns smoke exactly there.
+                    p = rig["musket"].matrix_world @ Vector((0, 0.032, MUZZLE_Z))
+                    muzzle[name] = {"x": round(PIVOT[0] + p.x * SPRITE_PX_PER_M, 1),
+                                    "y": round(PIVOT[1] - screen_up(p) * SPRITE_PX_PER_M, 1)}
                 bpy.context.scene.render.filepath = str(out / f"{prefix}_iso_{state}_{name}_{f + 1:02d}.png")
                 bpy.ops.render.render(write_still=True)
+    if muzzle:
+        (out / "muzzle.json").write_text(json.dumps(muzzle, indent=1) + "\n")
     print(f"{args.side}: {len(DIRECTIONS) * sum(n for _, n in STATES)} frames -> {out}")
     return 0
 
