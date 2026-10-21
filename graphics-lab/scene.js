@@ -197,7 +197,9 @@ async function startPixi(){
    // Finish optional atlas preparation before exposing the GPU backend:
    // an incomplete Pixi boot must still fall back cleanly to Canvas.
    if(useFrenchReview&&frenchReview){
-     const atlas=await Assets.load('./assets/sprites/infantry/france/fr_line_infantry_atlas.png');
+     // Both GPU and Canvas render exactly the same corrected raster cells.
+     // Texture source is the once-repaired atlas canvas, NOT the headless PNG.
+     const atlas=Texture.from(frenchReview.image);
      state.frenchPixiTextures={};
      for(const [name,details] of Object.entries(frenchReview.meta.frames)){
        const f=details.frame;
@@ -212,7 +214,7 @@ async function startPixi(){
    app.canvas.className='pixi-layer';
    detailed.style.display='none';
    state.engine='PixiJS 8 · WebGL GPU';
-   ui.status.textContent=useFrenchReview?'FRANSE ATLAS-PROEF (NIET GOEDGEKEURD) · PixiJS actief':'PixiJS actief — GPU-sprites geladen.';
+   ui.status.textContent=useFrenchReview?'FRANSE ATLAS-PROEF (MET HOOFDEN; NIET GOEDGEKEURD) · PixiJS actief':'PixiJS actief — GPU-sprites geladen.';
    renderScale();
  }catch(e){
    state.engine='Canvas 2D · fallback';
@@ -402,6 +404,8 @@ window.__GRAPHICS_LAB_V319__={
    realism:state.realism,stage:state.stage,staticTroopsDoNotMarch:true,animatedSmoke:true,layerCount:2,
    frenchReviewEnabled:useFrenchReview,frenchReviewLoaded:!!frenchReview,
    frenchReviewApproved:false,frenchFrameCount:frenchReview?.poseCount||0,
+   frenchHeadsRepaired:!!frenchReview?.headsRepaired,
+   frenchHeadCount:frenchReview?.repairedHeadCount||0,
    reviewSpriteSize:state.reviewSpriteSize,reviewTimelineVisible:useFrenchReview,
    frenchReviewPose:useFrenchReview?pickFrenchPose(formationCycle(),state.time,0):null
  })};
