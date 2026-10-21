@@ -1,4 +1,5 @@
-import {loadFrenchPreview,pickFrenchPose,canvasFrame,FR_REVIEW_DISPLAY_SIZE} from './render/french-atlas-review-v321.js';
+// Exposed by the audited classic-script helper loaded before scene.js.
+const {loadFrenchPreview,pickFrenchPose,canvasFrame,FR_REVIEW_DISPLAY_SIZE}=window.__FRENCH_ATLAS_REVIEW_V321__;
 // Napoleonic RTS Graphics Lab — isolated visual proof-of-concept (v319).
 // No game simulation, no shared globals or changes to the playable game.
 const W=1440,H=900,host=document.getElementById('scene-host'),viewport=document.getElementById('viewport');
