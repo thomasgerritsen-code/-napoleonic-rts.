@@ -9,8 +9,9 @@ const expected={idle:2,march:6,aim:2,fire:3,reload:4};
 function frameState(cycle){
   if(cycle.walking)return'march';
   if(cycle.phase>=4&&cycle.phase<6)return'aim';
-  if(cycle.phase>=6&&cycle.phase<8.5)return'fire';
-  if(cycle.phase>=8.5&&cycle.phase<11)return'reload';
+  // One actual 3-frame volley (285 ms), not 2.5s of a frozen fire pose.
+  if(cycle.phase>=6&&cycle.phase<6.285)return'fire';
+  if(cycle.phase>=6.285&&cycle.phase<9)return'reload';
   return'idle';
 }
 function pickFrenchPose(cycle,time,phase=0){
@@ -20,7 +21,7 @@ function pickFrenchPose(cycle,time,phase=0){
   const local=state==='march'?time+offset:
     state==='aim'?cycle.phase-4:
     state==='fire'?cycle.phase-6:
-    state==='reload'?cycle.phase-8.5:cycle.phase>=16?cycle.phase-16:0;
+    state==='reload'?cycle.phase-6.285:cycle.phase>=16?cycle.phase-16:0;
   const ms={march:110,idle:500,aim:260,fire:95,reload:425}[state];
   const n=Math.floor(Math.max(0,local)*1000/ms);
   const index=state==='idle'||state==='march'?n%count:Math.min(count-1,n);
@@ -53,20 +54,20 @@ async function loadFrenchPreview(){
   }
   return {image,meta,poseCount:17,approved:false};
 }
-function canvasFrame(ctx,review,pose,worldX,worldY,flip=false){
+function canvasFrame(ctx,review,pose,worldX,worldY,flip=false,displaySize=FR_REVIEW_DISPLAY_SIZE){
   const data=review.meta.frames[pose.key].frame;
-  const scale=FR_REVIEW_DISPLAY_SIZE/FR_REVIEW_FRAME_W;
+  const scale=displaySize/FR_REVIEW_FRAME_W;
   const left=worldX-FR_REVIEW_PIVOT.x*scale;
   const top=worldY-FR_REVIEW_PIVOT.y*scale;
   if(flip){
     ctx.save();ctx.translate(worldX,worldY);ctx.scale(-1,1);
     ctx.drawImage(review.image,data.x,data.y,data.w,data.h,
       -FR_REVIEW_PIVOT.x*scale,-FR_REVIEW_PIVOT.y*scale,
-      FR_REVIEW_DISPLAY_SIZE,FR_REVIEW_DISPLAY_SIZE);
+      displaySize,displaySize);
     ctx.restore();
   }else{
     ctx.drawImage(review.image,data.x,data.y,data.w,data.h,
-      left,top,FR_REVIEW_DISPLAY_SIZE,FR_REVIEW_DISPLAY_SIZE);
+      left,top,displaySize,displaySize);
   }
 }
 
