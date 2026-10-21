@@ -2,10 +2,14 @@
 """Render a light cavalryman (horse and rider) for the Graphics Lab iso scene.
 
 Same camera, sun and 30° view as the infantry (render-iso-infantry.py).
-- horse: procedural body, neck, head, mane, tail and four two-jointed legs,
-  shaped saddle on a draped shabraque with lace border, bridle, holsters and
-  rolled cloak; coat colours bay
-  (variant 1) and black / grey (variant 2);
+- horse: procedural anatomy — chest, withers, barrel and rounded hindquarters
+  with haunch and shoulder muscles, an arched neck with crest and mane, a head
+  carried forward and down (cranium, cheeks, tapering face, muzzle, nostrils,
+  ears, eyes, forelock, bridle and bit), legs with forearm/gaskin, knee and
+  hock, slim cannons with tendons, fetlocks, sloping pasterns and hooves, and
+  black points on bays and blacks; a shaped saddle on a draped shabraque with
+  lace border, holsters and rolled cloak; coat colours bay (variant 1) and
+  black / grey (variant 2);
 - rider: the fusilier body as a chasseur à cheval (French green with red) or a
   light dragoon (British blue with buff), without pack or musket, with a sabre.
 States in 8 directions, 224x192 cells with the hooves' centre at (112,152):
@@ -55,6 +59,7 @@ STRIPPED = ("pack", "packstrap", "roll", "messtin", "cartridge", "canteen", "tuf
             "scabbard")
 LEGS = {"FR": (0.16, 0.5), "FL": (-0.16, 0.5), "HR": (0.16, -0.55), "HL": (-0.16, -0.55)}
 HIP_Z = 1.02
+HEAD_TILT = -112   # head relative to the neck, degrees about X
 
 
 def hide_tree(obj, hidden=True) -> None:
@@ -102,54 +107,97 @@ def build_horse(side: str, variant: int) -> dict:
     lace = material(colours["lace"], 0.7, pattern="plain")
     steel = material("#c7ccd0", 0.25, 0.9, pattern="plain")
 
+    # Black points (lower legs, mane, tail) on bays and blacks; a grey keeps its coat.
+    points = coat if coat_hex == GREY[0] else dark
     root = empty("root")
     fall = empty("fall", root)          # whole horse and rider topple through this
     body = empty("body", fall, (0, 0, HIP_Z))   # pitch (gallop/rear) about the hips
-    part("ball", (0.36, 0.9, 2.05, 1.0), (0, 0.0, 0.2), coat, body, name="barrel", segments=24)
-    part("ball", (0.33,), (0, 0.55, 0.18), coat, body, name="chestball", segments=20)
-    part("ball", (0.34,), (0, -0.55, 0.22), coat, body, name="rump", segments=20)
-    # Neck and head, with an empty so the head can toss.
-    neck = empty("neck", body, (0, 0.72, 0.36), (-38, 0, 0))
-    part("cyl", (0.19, 0.72, 0.12), (0, 0, 0.32), coat, neck, name="neckmesh", segments=18)
-    part("box", (0.05, 0.12, 0.7), (0, -0.1, 0.34), dark, neck, rot=(4, 0, 0), name="mane")
-    head = empty("head", neck, (0, 0.02, 0.68), (128, 0, 0))
-    part("cyl", (0.11, 0.6, 0.075), (0, 0, 0.27), coat, head, name="headmesh", segments=16)
-    for x in (0.06, -0.06):
-        part("cyl", (0.03, 0.13, 0.0), (x, -0.07, -0.02), coat, head, rot=(-150, 0, 0), name="ear", segments=8)
-        part("ball", (0.022,), (x * 1.5, 0.05, 0.12), material("#111111", 0.3, pattern="plain"), head, name="eye",
+    # Trunk: chest and shoulders, barrel, withers and the rounder hindquarters.
+    part("ball", (0.33, 0.85, 1.9, 1.0), (0, 0.0, 0.12), coat, body, name="barrel", segments=28)
+    part("ball", (0.3, 0.86, 1.0, 1.2), (0, 0.5, 0.12), coat, body, rot=(-18, 0, 0), name="chestball", segments=24)
+    part("ball", (0.13, 1.0, 2.1, 1.0), (0, 0.32, 0.43), coat, body, rot=(-12, 0, 0), name="withers", segments=16)
+    part("ball", (0.33, 0.92, 1.12, 1.0), (0, -0.48, 0.2), coat, body, name="rump", segments=24)
+    for x in (0.16, -0.16):
+        # Hind thigh muscle and the point of the shoulder.
+        part("ball", (0.14, 1.0, 1.5, 2.1), (x, -0.56, -0.02), coat, body, rot=(14, 0, 0), name="haunch", segments=16)
+        part("ball", (0.12, 1.0, 1.2, 1.6), (x, 0.56, 0.02), coat, body, rot=(-20, 0, 0), name="shoulder", segments=16)
+    # Arched neck with a crest and a mane falling to the right.
+    neck = empty("neck", body, (0, 0.6, 0.36), (-38, 0, 0))
+    part("cyl", (0.2, 0.78, 0.115), (0, 0, 0.34), coat, neck, name="neckmesh", segments=20)
+    part("ball", (0.1, 0.8, 1.0, 4.0), (0, -0.07, 0.38), coat, neck, rot=(5, 0, 0), name="crest", segments=14)
+    for i in range(7):
+        part("box", (0.03, 0.06, 0.13), (0.035, -0.12 + i * 0.006, 0.08 + i * 0.1), points, neck,
+             rot=(4, 18 + (i % 2) * 8, 0), name="mane")
+    # Head: cranium, cheeks, a long tapering face and the muzzle with nostrils.
+    # Head carried forward and down (face about 55° below horizontal): its +z runs
+    # from the poll to the muzzle, -y is the front of the face, +y the jaw side.
+    head = empty("head", neck, (0, 0.0, 0.74), (HEAD_TILT, 0, 0))
+    part("ball", (0.11, 1.0, 1.05, 1.15), (0, 0.0, 0.05), coat, head, name="cranium", segments=16)
+    part("ball", (0.12, 0.85, 1.1, 1.15), (0, 0.045, 0.14), coat, head, name="cheek", segments=16)
+    part("ball", (0.08, 0.95, 1.0, 2.6), (0, -0.03, 0.32), coat, head, name="face", segments=16)
+    part("ball", (0.075, 1.0, 1.0, 0.95), (0, 0.0, 0.5), points if coat_hex != GREY[0] else coat, head,
+         name="muzzle", segments=14)
+    for x in (0.04, -0.04):
+        part("ball", (0.017,), (x, -0.05, 0.53), material("#0e0c0b", 0.4, pattern="plain"), head, name="nostril",
              segments=8)
-    # Bridle: browband, noseband and reins hanging toward the rider's hands.
-    part("box", (0.24, 0.02, 0.03), (0, 0.02, 0.06), leather, head, name="browband")
-    part("box", (0.17, 0.17, 0.03), (0, 0, 0.43), leather, head, name="noseband")
-    part("box", (0.012, 0.012, 0.7), (0, 0.18, 0.2), leather, neck, rot=(-25, 0, 0), name="reins")
-    tail = empty("tail", body, (0, -0.86, 0.36), (170, 0, 0))
-    part("cyl", (0.06, 0.18, 0.09), (0, 0, 0.08), dark, tail, name="tailroot", segments=12)
-    part("cyl", (0.11, 0.62, 0.05), (0, 0, 0.47), dark, tail, name="tailmesh", segments=12)
+    for x in (0.055, -0.055):
+        part("cyl", (0.032, 0.15, 0.004), (x, -0.02, -0.09), coat, head, rot=(-150, math.copysign(10, x), 0),
+             name="ear", segments=8)
+        part("ball", (0.02,), (x * 1.6, -0.02, 0.1), material("#111111", 0.3, pattern="plain"), head, name="eye",
+             segments=8)
+    part("box", (0.05, 0.03, 0.1), (0, -0.08, 0.02), points, head, rot=(20, 0, 0), name="forelock")
+    # Bridle: headpiece, browband, noseband, bit and the reins to the rider's hands.
+    part("box", (0.24, 0.02, 0.03), (0, -0.03, 0.0), leather, head, name="browband")
+    part("box", (0.17, 0.16, 0.03), (0, -0.005, 0.4), leather, head, name="noseband")
+    for x in (0.1, -0.1):
+        part("box", (0.012, 0.012, 0.42), (x, 0.0, 0.22), leather, head, name="cheekpiece")
+    part("cyl", (0.012, 0.2), (0, 0.03, 0.47), material("#9aa0a4", 0.3, 0.8, pattern="plain"), head, rot=(0, 90, 0),
+         name="bit")
+    part("box", (0.012, 0.012, 0.7), (0, 0.17, 0.22), leather, neck, rot=(-25, 0, 0), name="reins")
+    # Tail: dock from the croup, then a full switch that tapers to the tips.
+    tail = empty("tail", body, (0, -0.84, 0.4), (170, 0, 0))
+    part("cyl", (0.055, 0.24, 0.045), (0, 0, 0.1), points if coat_hex != GREY[0] else dark, tail, name="tailroot",
+         segments=12)
+    part("ball", (0.075, 0.9, 0.75, 4.6), (0, 0.02, 0.52), dark, tail, name="tailmesh", segments=14)
+    part("ball", (0.05, 1.0, 1.0, 3.0), (0, -0.02, 0.85), dark, tail, rot=(6, 0, 0), name="tailtip", segments=10)
     # Saddle cloth (shabraque) draped over the back and down the flanks, with a
     # lace border and a pointed rear corner; a shaped saddle, rolled cloak and holsters.
-    draped("shabraque_lace", 0.352, 0.386, 74, -0.66, 0.16, lace, body, point=0.1)
-    draped("shabraque", 0.356, 0.39, 70, -0.63, 0.13, cloth, body, point=0.1)
-    part("box", (0.3, 0.42, 0.05), (0, -0.03, 0.6), leather, body, name="saddle")
-    part("box", (0.24, 0.07, 0.13), (0, 0.2, 0.64), leather, body, rot=(-15, 0, 0), name="pommel")
-    part("box", (0.3, 0.06, 0.15), (0, -0.26, 0.65), leather, body, rot=(12, 0, 0), name="cantle")
-    for x in (0.3, -0.3):
-        part("box", (0.02, 0.3, 0.28), (x, 0.0, 0.47), leather, body, rot=(0, math.copysign(18, x), 0), name="flap")
-    part("cyl", (0.065, 0.5), (0, -0.37, 0.67), material("#a9a59c", 0.85, pattern="cloth"), body, rot=(0, 90, 0),
+    draped("shabraque_lace", 0.296, 0.352, 74, -0.66, 0.16, lace, body, point=0.1, zc=0.12)
+    draped("shabraque", 0.3, 0.356, 70, -0.63, 0.13, cloth, body, point=0.1, zc=0.12)
+    part("box", (0.28, 0.42, 0.05), (0, -0.03, 0.49), leather, body, name="saddle")
+    part("box", (0.22, 0.07, 0.13), (0, 0.2, 0.53), leather, body, rot=(-15, 0, 0), name="pommel")
+    part("box", (0.28, 0.06, 0.15), (0, -0.26, 0.54), leather, body, rot=(12, 0, 0), name="cantle")
+    for x in (0.26, -0.26):
+        part("box", (0.02, 0.3, 0.28), (x, 0.0, 0.36), leather, body, rot=(0, math.copysign(18, x), 0), name="flap")
+    part("cyl", (0.065, 0.48), (0, -0.37, 0.56), material("#a9a59c", 0.85, pattern="cloth"), body, rot=(0, 90, 0),
          name="cloak")
-    for x in (0.2, -0.2):
-        part("cyl", (0.045, 0.2), (x, 0.36, 0.55), leather, body, rot=(-60, 0, 0), name="holster")
+    for x in (0.18, -0.18):
+        part("cyl", (0.045, 0.2), (x, 0.38, 0.44), leather, body, rot=(-60, 0, 0), name="holster")
     legs = {}
     for key, (x, y) in LEGS.items():
-        hip = empty("hip" + key, body, (x, y, 0.02 - HIP_Z + HIP_Z))
-        part("cyl", (0.1, 0.5, 0.065), (0, 0, -0.25), coat, hip, name="upperleg", segments=12)
-        knee = empty("knee" + key, hip, (0, 0, -0.5))
-        part("cyl", (0.05, 0.4, 0.04), (0, 0, -0.2), dark if key[0] == "F" else coat, knee, name="cannon", segments=10)
-        part("ball", (0.055,), (0, 0, -0.02), coat, knee, name="joint", segments=10)
-        fetlock = empty("fetlock" + key, knee, (0, 0, -0.4))
-        part("cyl", (0.045, 0.08, 0.04), (0, 0.01, -0.04), dark, fetlock, name="pastern", segments=10)
-        part("cyl", (0.06, 0.07, 0.065), (0, 0.025, -0.085), hoof, fetlock, name="hoof", segments=12)
+        fore = key[0] == "F"
+        # Pivot at the elbow / stifle; the legs reach the ground with the hooves flat.
+        hip = empty("hip" + key, body, (x, y, -0.08 if fore else -0.06))
+        # Hind legs: the gaskin slopes back to the hock, the cannon stands upright.
+        slope = 0 if fore else 18
+        rest = empty("rest" + key, hip, (0, 0, 0), (-slope, 0, 0))
+        upper = 0.42 if fore else 0.43
+        part("cyl", (0.088 if fore else 0.1, upper, 0.055), (0, 0, -upper / 2), coat, rest, name="upperleg", segments=14)
+        knee = empty("knee" + key, rest, (0, 0, -upper))
+        straight = empty("straight" + key, knee, (0, 0, 0), (slope, 0, 0))
+        part("ball", (0.052, 1.1, 0.95, 1.0), (0, 0.005, 0), points if not fore else coat, straight, name="joint",
+             segments=12)
+        if not fore:
+            part("ball", (0.04,), (0, -0.06, 0.03), coat, straight, name="hockpoint", segments=10)
+        cannon = 0.35 if fore else 0.38
+        part("cyl", (0.04, cannon, 0.036), (0, -0.006, -cannon / 2), points, straight, name="cannon", segments=12)
+        part("box", (0.03, 0.03, cannon * 0.8), (0, -0.03, -cannon / 2), points, straight, name="tendon")
+        fetlock = empty("fetlock" + key, straight, (0, 0, -cannon))
+        part("ball", (0.048, 1.0, 1.1, 0.9), (0, -0.01, 0), points, fetlock, name="fetlockjoint", segments=12)
+        part("cyl", (0.036, 0.15, 0.04), (0, 0.04, -0.065), points, fetlock, rot=(30, 0, 0), name="pastern", segments=12)
+        part("cyl", (0.05, 0.08, 0.066), (0, 0.085, -0.13), hoof, fetlock, name="hoof", segments=14)
         legs[key] = (hip, knee, fetlock)
-    saddle = empty("saddle", body, (0, -0.02, 0.67))
+    saddle = empty("saddle", body, (0, -0.02, 0.56))
     return {"root": root, "fall": fall, "body": body, "neck": neck, "head": head, "tail": tail, "legs": legs,
             "saddle": saddle, "steel": steel, "leather": leather}
 
@@ -216,15 +264,15 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
     fall.rotation_euler = Euler((0, 0, 0))
     fall.location = (0, 0, 0)
     neck.rotation_euler = Euler((rad(-38), 0, 0))
-    head.rotation_euler = Euler((rad(128), 0, 0))
+    head.rotation_euler = Euler((rad(HEAD_TILT), 0, 0))
     tail.rotation_euler = Euler((rad(170), 0, 0))
     for key in LEGS:
         leg(horse, key, 0, 0)
     sh_r, el_r, th_r, kn_r = rider["joints"]["R"]
     sh_l, el_l, th_l, kn_l = rider["joints"]["L"]
     # Seat: thighs forward and apart around the horse, lower legs down along its flanks.
-    th_r.rotation_euler = Euler((rad(58), rad(-34), 0))
-    th_l.rotation_euler = Euler((rad(58), rad(34), 0))
+    th_r.rotation_euler = Euler((rad(58), rad(-22), 0))
+    th_l.rotation_euler = Euler((rad(58), rad(22), 0))
     kn_r.rotation_euler = kn_l.rotation_euler = Euler((rad(-78), 0, 0))
     rider["hips"].location.z = 0.95
     # Left hand holds the reins; sabre sloped against the right shoulder.
