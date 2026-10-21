@@ -3,7 +3,7 @@
 
 Builds an original, script-generated 1809 line fusilier from primitives (no
 third-party model), poses it per frame and renders 8 directions x (2 idle +
-6 march + 2 aim + 3 fire + 4 reload + 4 die) frames with the shared iso camera and sun (iso_blender_common.py).
+6 march + 2 aim + 3 fire + 4 reload + 3 x 4 fall) frames with the shared iso camera and sun (iso_blender_common.py).
 The same rig produces the French and the British soldier; only uniform
 details and colours differ.
 
@@ -29,7 +29,8 @@ from iso_blender_common import (SPRITE_PX_PER_M, camera, empty, material, part, 
 FRAME_W, FRAME_H = 176, 128   # output cell, px (wide enough for a levelled musket)
 PIVOT = (88, 108)             # feet on screen, px
 DIRECTIONS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]  # clockwise on screen
-STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4), ("die", 4)]
+STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4),
+          ("die", 4), ("diefwd", 4), ("dieside", 4)]
 
 PALETTES = {
     "france": {
@@ -194,23 +195,39 @@ DRILL = {
 }
 
 
-# Hit and fall backwards with a twist (fraction of the per-direction twist),
-# so a body never lies straight along the view direction: (fall tilt, twist, lift, hips height, thigh, knee,
-# right/left shoulder (x, y), elbow, torso lean, musket placement).
-DIE = [
-    (12, 0.0, 0.0, 0.95, 0, -4, (-40, 24), (20, -34), 34, -22, ((-0.24, 0.14, -0.1), (-46, -6, 0))),
-    (16, 0.3, 0.0, 0.74, 34, -66, (4, 14), (8, -18), 22, 14, ((-0.2, 0.22, -0.3), (-62, 0, 10))),
-    (54, 0.7, 0.04, 0.84, 18, -36, (118, 26), (96, -30), 30, 6, ((-0.3, 0.12, -0.38), (-100, 0, 30))),
-    # Lying: arms flung sideways, musket alongside the body towards the feet.
-    (86, 1.0, 0.16, 0.95, 4, -10, (112, 48), (36, -64), 12, 0, ((-0.44, 0.06, 0.5), (180, 0, 8))),
-]
+# Three ways to fall, each four frames. Per frame: (tilt, twist fraction, lift,
+# hips height, thigh, knee, right/left shoulder (x, y), elbow, torso lean,
+# musket placement). "axis" is the topple axis (x: backwards/forwards, y: onto
+# the right side) and "head" the ground angle the head ends up pointing to,
+# relative to the facing; fall_twist() turns that so the body lies across the
+# screen. Final poses keep the arms down: no corpse lies with its arms raised.
+DEATHS = {
+    "die": {"axis": "x", "head": 180, "frames": [   # shot in the chest, falls back
+        (12, 0.0, 0.0, 0.95, 0, -4, (-40, 24), (20, -34), 34, -22, ((-0.24, 0.14, -0.1), (-46, -6, 0))),
+        (16, 0.3, 0.0, 0.74, 34, -66, (4, 14), (8, -18), 22, 14, ((-0.2, 0.22, -0.3), (-62, 0, 10))),
+        (54, 0.7, 0.04, 0.84, 18, -36, (62, 30), (46, -30), 30, 6, ((-0.3, 0.12, -0.38), (-100, 0, 30))),
+        (86, 1.0, 0.16, 0.95, 4, -10, (14, 24), (10, -26), 18, 0, ((-0.44, 0.06, 0.5), (180, 0, 8))),
+    ]},
+    "diefwd": {"axis": "x", "head": 0, "frames": [    # doubles over, crumples on his face
+        (-6, 0.0, 0.0, 0.93, 0, -10, (30, 10), (30, -10), 50, 28, ((-0.2, 0.25, -0.2), (-40, 0, 10))),
+        (-12, 0.3, 0.0, 0.7, 40, -75, (20, 10), (15, -10), 40, 30, ((-0.15, 0.4, -0.5), (-70, 0, 10))),
+        (-50, 0.7, 0.03, 0.8, 20, -40, (70, 20), (70, -20), 20, 10, ((0.36, 0.18, 0.3), (150, 0, 15))),
+        (-86, 1.0, 0.14, 0.95, 2, -12, (10, 30), (25, -35), 35, 0, ((0.46, 0.0, 0.5), (180, 0, -8))),
+    ]},
+    "dieside": {"axis": "y", "head": -90, "frames": [  # hit in the shoulder, spins onto his side
+        (8, 0.0, 0.0, 0.95, 0, -6, (-20, 30), (40, -10), 30, -6, ((-0.25, 0.15, -0.1), (-40, -6, 0))),
+        (18, 0.3, 0.0, 0.78, 30, -60, (40, 20), (30, -10), 50, 8, ((-0.3, 0.3, -0.45), (-80, 0, 15))),
+        (55, 0.7, 0.04, 0.82, 45, -70, (60, 30), (50, -20), 60, 12, ((-0.4, 0.35, -0.3), (-95, 0, 30))),
+        (86, 1.0, 0.17, 0.95, 55, -90, (70, 20), (60, -10), 80, 15, ((-0.1, 0.42, 0.3), (180, 0, 0))),
+    ]},
+}
 
 
-def fall_twist(direction: int) -> float:
+def fall_twist(direction: int, head: float = 180) -> float:
     """Twist (deg) that keeps the fallen body as level across the screen as possible."""
     def cost(t):
-        head = math.radians(-45 * direction + 180 + t)
-        return abs(math.sin(head)) + 0.004 * abs(t)
+        angle = math.radians(-45 * direction + head + t)
+        return abs(math.sin(angle)) + 0.004 * abs(t)
     return min((-70, -55, -40, -25, 25, 40, 55, 70), key=cost)
 
 
@@ -231,9 +248,12 @@ def pose(rig: dict, state: str, frame: int, frames: int, direction: int = 0) -> 
     rig["torso"].rotation_euler = Euler((0, 0, 0))
     rig["fall"].rotation_euler = Euler((0, 0, 0))
     rig["fall"].location.z = 0
-    if state == "die":
-        tilt, twist, lift, hips_z, thigh, knee, (rx, ry), (lx, ly), elbow, lean, musket = DIE[frame]
-        rig["fall"].rotation_euler = Euler((rad(tilt), 0, rad(twist * fall_twist(direction))))
+    if state in DEATHS:
+        death = DEATHS[state]
+        tilt, twist, lift, hips_z, thigh, knee, (rx, ry), (lx, ly), elbow, lean, musket = death["frames"][frame]
+        turn = rad(twist * fall_twist(direction, death["head"]))
+        topple = (rad(tilt), 0, turn) if death["axis"] == "x" else (0, rad(tilt), turn)
+        rig["fall"].rotation_euler = Euler(topple)
         rig["fall"].location.z = lift
         rig["hips"].location.z = hips_z
         for th, kn in ((th_r, kn_r), (th_l, kn_l)):

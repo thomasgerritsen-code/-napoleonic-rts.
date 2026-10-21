@@ -161,3 +161,21 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
 - **Tests**: één lopend salvo geeft precies 64 schoten in drie banden zonder
   doden (`hitChance = 0`); met `hitChance = 1` vallen soldaten, blijven ze
   liggen na de mars en herstelt **Herstel** alles.
+
+---
+
+# v326 — drie manieren van sneuvelen
+
+- `DEATHS` in `scripts/render-iso-infantry.py` vervangt de enkele val door drie
+  varianten van elk 4 frames, allemaal met de armen omlaag in de eindhouding:
+  - `die` — in de borst geraakt, valt achterover, armen langs het lichaam;
+  - `diefwd` — klapt dubbel, zakt door de knieën en valt op zijn gezicht;
+  - `dieside` — in de schouder geraakt, draait weg en ligt opgekruld op zijn zij.
+  `fall_twist(direction, head)` houdt per variant en kijkrichting het lichaam
+  dwars op het scherm.
+- **Twee atlassen per natie**: `*_iso_infantry_atlas` (exercitie, 2992×1024)
+  en `*_iso_fallen_atlas` (3 × 4 valframes, 2112×1024).
+- **Lab** (v326): per gesneuvelde soldaat kiest een deterministische hash een
+  van de drie vallen; `getStats().fallKinds` toont welke voorkomen.
+- **Tests**: beide atlassen per natie, en een treffertest die minstens twee
+  verschillende valvarianten verwacht.

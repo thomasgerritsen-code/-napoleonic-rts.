@@ -408,102 +408,6 @@
     "y": 0.84375
    }
   },
-  "fr_iso_die_e_01": {
-   "frame": {
-    "x": 2992,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_e_02": {
-   "frame": {
-    "x": 3168,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_e_03": {
-   "frame": {
-    "x": 3344,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_e_04": {
-   "frame": {
-    "x": 3520,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
   "fr_iso_idle_se_01": {
    "frame": {
     "x": 0,
@@ -891,102 +795,6 @@
   "fr_iso_reload_se_04": {
    "frame": {
     "x": 2816,
-    "y": 128,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_se_01": {
-   "frame": {
-    "x": 2992,
-    "y": 128,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_se_02": {
-   "frame": {
-    "x": 3168,
-    "y": 128,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_se_03": {
-   "frame": {
-    "x": 3344,
-    "y": 128,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_se_04": {
-   "frame": {
-    "x": 3520,
     "y": 128,
     "w": 176,
     "h": 128
@@ -1416,102 +1224,6 @@
     "y": 0.84375
    }
   },
-  "fr_iso_die_s_01": {
-   "frame": {
-    "x": 2992,
-    "y": 256,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_s_02": {
-   "frame": {
-    "x": 3168,
-    "y": 256,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_s_03": {
-   "frame": {
-    "x": 3344,
-    "y": 256,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_s_04": {
-   "frame": {
-    "x": 3520,
-    "y": 256,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
   "fr_iso_idle_sw_01": {
    "frame": {
     "x": 0,
@@ -1899,102 +1611,6 @@
   "fr_iso_reload_sw_04": {
    "frame": {
     "x": 2816,
-    "y": 384,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_sw_01": {
-   "frame": {
-    "x": 2992,
-    "y": 384,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_sw_02": {
-   "frame": {
-    "x": 3168,
-    "y": 384,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_sw_03": {
-   "frame": {
-    "x": 3344,
-    "y": 384,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_sw_04": {
-   "frame": {
-    "x": 3520,
     "y": 384,
     "w": 176,
     "h": 128
@@ -2424,102 +2040,6 @@
     "y": 0.84375
    }
   },
-  "fr_iso_die_w_01": {
-   "frame": {
-    "x": 2992,
-    "y": 512,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_w_02": {
-   "frame": {
-    "x": 3168,
-    "y": 512,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_w_03": {
-   "frame": {
-    "x": 3344,
-    "y": 512,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_w_04": {
-   "frame": {
-    "x": 3520,
-    "y": 512,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
   "fr_iso_idle_nw_01": {
    "frame": {
     "x": 0,
@@ -2907,102 +2427,6 @@
   "fr_iso_reload_nw_04": {
    "frame": {
     "x": 2816,
-    "y": 640,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_nw_01": {
-   "frame": {
-    "x": 2992,
-    "y": 640,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_nw_02": {
-   "frame": {
-    "x": 3168,
-    "y": 640,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_nw_03": {
-   "frame": {
-    "x": 3344,
-    "y": 640,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_nw_04": {
-   "frame": {
-    "x": 3520,
     "y": 640,
     "w": 176,
     "h": 128
@@ -3432,102 +2856,6 @@
     "y": 0.84375
    }
   },
-  "fr_iso_die_n_01": {
-   "frame": {
-    "x": 2992,
-    "y": 768,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_n_02": {
-   "frame": {
-    "x": 3168,
-    "y": 768,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_n_03": {
-   "frame": {
-    "x": 3344,
-    "y": 768,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_n_04": {
-   "frame": {
-    "x": 3520,
-    "y": 768,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
   "fr_iso_idle_ne_01": {
    "frame": {
     "x": 0,
@@ -3935,102 +3263,6 @@
     "x": 0.5,
     "y": 0.84375
    }
-  },
-  "fr_iso_die_ne_01": {
-   "frame": {
-    "x": 2992,
-    "y": 896,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_ne_02": {
-   "frame": {
-    "x": 3168,
-    "y": 896,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_ne_03": {
-   "frame": {
-    "x": 3344,
-    "y": 896,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
-  },
-  "fr_iso_die_ne_04": {
-   "frame": {
-    "x": 3520,
-    "y": 896,
-    "w": 176,
-    "h": 128
-   },
-   "rotated": false,
-   "trimmed": false,
-   "sourceSize": {
-    "w": 176,
-    "h": 128
-   },
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 176,
-    "h": 128
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.84375
-   }
   }
  },
  "animations": {
@@ -4061,12 +3293,6 @@
    "fr_iso_reload_e_03",
    "fr_iso_reload_e_04"
   ],
-  "die_e": [
-   "fr_iso_die_e_01",
-   "fr_iso_die_e_02",
-   "fr_iso_die_e_03",
-   "fr_iso_die_e_04"
-  ],
   "idle_se": [
    "fr_iso_idle_se_01",
    "fr_iso_idle_se_02"
@@ -4093,12 +3319,6 @@
    "fr_iso_reload_se_02",
    "fr_iso_reload_se_03",
    "fr_iso_reload_se_04"
-  ],
-  "die_se": [
-   "fr_iso_die_se_01",
-   "fr_iso_die_se_02",
-   "fr_iso_die_se_03",
-   "fr_iso_die_se_04"
   ],
   "idle_s": [
    "fr_iso_idle_s_01",
@@ -4127,12 +3347,6 @@
    "fr_iso_reload_s_03",
    "fr_iso_reload_s_04"
   ],
-  "die_s": [
-   "fr_iso_die_s_01",
-   "fr_iso_die_s_02",
-   "fr_iso_die_s_03",
-   "fr_iso_die_s_04"
-  ],
   "idle_sw": [
    "fr_iso_idle_sw_01",
    "fr_iso_idle_sw_02"
@@ -4159,12 +3373,6 @@
    "fr_iso_reload_sw_02",
    "fr_iso_reload_sw_03",
    "fr_iso_reload_sw_04"
-  ],
-  "die_sw": [
-   "fr_iso_die_sw_01",
-   "fr_iso_die_sw_02",
-   "fr_iso_die_sw_03",
-   "fr_iso_die_sw_04"
   ],
   "idle_w": [
    "fr_iso_idle_w_01",
@@ -4193,12 +3401,6 @@
    "fr_iso_reload_w_03",
    "fr_iso_reload_w_04"
   ],
-  "die_w": [
-   "fr_iso_die_w_01",
-   "fr_iso_die_w_02",
-   "fr_iso_die_w_03",
-   "fr_iso_die_w_04"
-  ],
   "idle_nw": [
    "fr_iso_idle_nw_01",
    "fr_iso_idle_nw_02"
@@ -4225,12 +3427,6 @@
    "fr_iso_reload_nw_02",
    "fr_iso_reload_nw_03",
    "fr_iso_reload_nw_04"
-  ],
-  "die_nw": [
-   "fr_iso_die_nw_01",
-   "fr_iso_die_nw_02",
-   "fr_iso_die_nw_03",
-   "fr_iso_die_nw_04"
   ],
   "idle_n": [
    "fr_iso_idle_n_01",
@@ -4259,12 +3455,6 @@
    "fr_iso_reload_n_03",
    "fr_iso_reload_n_04"
   ],
-  "die_n": [
-   "fr_iso_die_n_01",
-   "fr_iso_die_n_02",
-   "fr_iso_die_n_03",
-   "fr_iso_die_n_04"
-  ],
   "idle_ne": [
    "fr_iso_idle_ne_01",
    "fr_iso_idle_ne_02"
@@ -4291,18 +3481,12 @@
    "fr_iso_reload_ne_02",
    "fr_iso_reload_ne_03",
    "fr_iso_reload_ne_04"
-  ],
-  "die_ne": [
-   "fr_iso_die_ne_01",
-   "fr_iso_die_ne_02",
-   "fr_iso_die_ne_03",
-   "fr_iso_die_ne_04"
   ]
  },
  "meta": {
   "image": "fr_iso_infantry_atlas.png",
   "size": {
-   "w": 3696,
+   "w": 2992,
    "h": 1024
   },
   "scale": "1",
@@ -4324,6 +3508,7 @@
    "x": 88,
    "y": 108
   },
+  "source": "scripts/render-iso-infantry.py (Blender, original procedural model)",
   "muzzle": {
    "state": "fire",
    "frame": 1,
@@ -4361,7 +3546,6 @@
      "y": 31.9
     }
    }
-  },
-  "source": "scripts/render-iso-infantry.py (Blender, original procedural model)"
+  }
  }
 }

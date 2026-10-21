@@ -1,4 +1,4 @@
-// Graphics Lab v325 — isometric scene: Blender-rendered soldiers (march, aim, fire, reload, fall),
+// Graphics Lab v326 — isometric scene: Blender-rendered soldiers (march, aim, fire, reload, three falls),
 // buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
 (function(){
@@ -88,17 +88,26 @@ async function loadScene(){
  state.props=layout.props.filter(p=>sprites[p.type]).map(p=>({...p,sprite:sprites[p.type],...project(p.x,p.y)}));
 }
 
-function loadAtlas(prefix){
- const base='./assets/sprites/iso/'+prefix+'_iso_infantry_atlas';
+// Each nation has an infantry atlas (drill) and a fallen atlas (three falls).
+const FALLS=['die','diefwd','dieside'];
+function loadSheet(prefix,kind,states){
+ const base='./assets/sprites/iso/'+prefix+'_iso_'+kind+'_atlas';
  return Promise.all([
-   fetch(base+'.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('ontbrekende atlas '+prefix);return r.json();}),
-   new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('ontbrekende PNG '+prefix));im.src=base+'.png';})
+   fetch(base+'.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('ontbrekende atlas '+prefix+' '+kind);return r.json();}),
+   loadImage(base+'.png')
  ]).then(([sheet,image])=>{
    if(sheet.meta.size.w!==image.naturalWidth||sheet.meta.size.h!==image.naturalHeight)throw new Error(prefix+': PNG-maat wijkt af');
-   for(const d of DIRS)for(const s of ['idle','march','aim','fire','reload','die'])if(!sheet.animations[s+'_'+d])throw new Error(prefix+': animatie ontbreekt '+s+'_'+d);
-   if(!sheet.meta.muzzle||!sheet.meta.cell||!sheet.meta.pivot)throw new Error(prefix+': atlas-meta onvolledig');
+   for(const d of DIRS)for(const s of states)if(!sheet.animations[s+'_'+d])throw new Error(prefix+': animatie ontbreekt '+s+'_'+d);
+   if(!sheet.meta.cell||!sheet.meta.pivot)throw new Error(prefix+': atlas-meta onvolledig');
    return{sheet,image};
  });
+}
+function loadAtlas(prefix){
+ return Promise.all([loadSheet(prefix,'infantry',['idle','march','aim','fire','reload']),loadSheet(prefix,'fallen',FALLS)])
+   .then(([drill,fallen])=>{
+     if(!drill.sheet.meta.muzzle)throw new Error(prefix+': mondingspunten ontbreken');
+     return{...drill,fallen};
+   });
 }
 
 function resize(){
@@ -172,14 +181,16 @@ function shoot(u){
  for(let i=0;i<state.perSide;i++)if(!state.dead.has(enemy+':'+i))alive.push(i);
  if(alive.length<=2)return;
  const id=alive[Math.floor(hash(state.shots,u.id+3)*alive.length)];
- state.hits.push({key:enemy+':'+id,at:state.time+HIT_DELAY});
+ state.hits.push({key:enemy+':'+id,at:state.time+HIT_DELAY,seed:state.shots});
 }
 
 function resolveHits(list){
  state.hits=state.hits.filter(h=>{
    if(state.time<h.at)return true;
    const u=list.find(v=>v.key===h.key);
-   if(u&&!state.dead.has(h.key))state.dead.set(h.key,{prefix:u.prefix,side:u.side,id:u.id,gx:u.gx,gy:u.gy,dir:u.dir,t0:state.time});
+   // Each casualty falls one of three ways (deterministic per shot).
+   const fall=FALLS[Math.floor(hash(h.seed,u?u.id+17:0)*FALLS.length)];
+   if(u&&!state.dead.has(h.key))state.dead.set(h.key,{prefix:u.prefix,side:u.side,id:u.id,gx:u.gx,gy:u.gy,dir:u.dir,t0:state.time,fall});
    return false;
  });
 }
@@ -200,8 +211,9 @@ function drawSmoke(){
 }
 
 function drawSprite(atlas,anim,f,x,y,k){
- const name=atlas.sheet.animations[anim][f],fr=atlas.sheet.frames[name].frame,p=atlas.sheet.meta.pivot;
- ctx.drawImage(atlas.image,fr.x,fr.y,fr.w,fr.h,x-p.x*k,y-p.y*k,fr.w*k,fr.h*k);
+ const src=atlas.sheet.animations[anim]?atlas:atlas.fallen;
+ const name=src.sheet.animations[anim][f],fr=src.sheet.frames[name].frame,p=src.sheet.meta.pivot;
+ ctx.drawImage(src.image,fr.x,fr.y,fr.w,fr.h,x-p.x*k,y-p.y*k,fr.w*k,fr.h*k);
 }
 
 function draw(now){
@@ -228,7 +240,7 @@ function draw(now){
    if(u.fallen){
      // The fall plays once; the last frame stays on the field.
      const f=Math.min(3,Math.floor(Math.max(0,state.time-u.t0)/DIE_FRAME));
-     drawSprite(atlas,'die_'+DIRS[u.dir],f,u.x,u.y,k);
+     drawSprite(atlas,u.fall+'_'+DIRS[u.dir],f,u.x,u.y,k);
      state.animStates.die=(state.animStates.die||0)+1;continue;
    }
    const [anim,f]=frameFor(u).split('|');
@@ -248,7 +260,7 @@ function drawCompass(dpr){
  ctx.setTransform(dpr,0,0,dpr,0,0);
  ctx.fillStyle='rgba(20,24,22,.62)';ctx.fillRect(8,8,size*8+8,size*.95+8);
  // Cycles the full drill so every state can be reviewed in all directions.
- const drill=[['march',6,110],['aim',2,260],['fire',3,140],['reload',4,425],['die',4,300]];
+ const drill=[['march',6,110],['aim',2,260],['fire',3,140],['reload',4,425],['die',4,300],['diefwd',4,300],['dieside',4,300]];
  const total=drill.reduce((s,[,n,ms])=>s+n*ms,0);let t=(state.time*1000)%total,anim='march',f=0;
  for(const [name,n,ms] of drill){if(t<n*ms){anim=name;f=Math.floor(t/ms);break;}t-=n*ms;}
  DIRS.forEach((d,i)=>drawSprite(a,anim+'_'+d,f,12+size*(i+.5),12+size*.85,size/cell));
@@ -290,13 +302,14 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'325.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'326.0',state,
  getStats:()=>({loaded:Object.keys(state.atlases).length,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
    animStates:{...(state.animStates||{})},smoke:state.smoke.length,volleys:state.volleys,shots:state.shots,
    fallen:{fr:[...state.dead.keys()].filter(k=>k.startsWith('fr')).length,br:[...state.dead.keys()].filter(k=>k.startsWith('br')).length},
    bands:state.bands?new Set(state.bands.values()).size:0,
+   fallKinds:[...new Set([...state.dead.values()].map(d=>d.fall))].sort(),
    muzzleEvents:state.controller?state.controller.metrics().muzzleEvents:0})};
 
 paintGround();resize();

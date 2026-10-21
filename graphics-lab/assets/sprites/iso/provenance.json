@@ -1,5 +1,5 @@
 {
-  "assetId": "iso-scene-v325",
+  "assetId": "iso-scene-v326",
   "sourceType": "original",
   "author": "Claude Code via scripts/render-iso-infantry.py, commissioned by the repository owner",
   "usageRights": "Original script-generated Blender models (soldiers, buildings, trees, terrain) and renders; no third-party models, textures or animations; full rights of the repository owner",
@@ -34,10 +34,26 @@
     "aim": 2,
     "fire": 3,
     "reload": 4,
-    "die": 4
+    "die": 4,
+    "diefwd": 4,
+    "dieside": 4
   },
   "covers": [
     "graphics-lab/assets/sprites/iso/*",
     "graphics-lab/assets/iso/*"
-  ]
+  ],
+  "sheets": {
+    "infantry": [
+      "idle",
+      "march",
+      "aim",
+      "fire",
+      "reload"
+    ],
+    "fallen": [
+      "die",
+      "diefwd",
+      "dieside"
+    ]
+  }
 }
