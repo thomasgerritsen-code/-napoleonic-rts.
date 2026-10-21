@@ -1,3 +1,25 @@
+## v321 conceptreview: Franse hoofden zichtbaar
+
+De raster-PNG in de concept-PR had een lege, donkere hals onder de sjako:
+het leek alsof alle Franse soldaten geen hoofd hadden.
+
+De optionele reviewmodus corrigeert **alle 17 frames eenmaal bij het laden
+van de atlas** en geeft hetzelfde beeld door aan Canvas2D en Pixi/WebGL.
+Dit is een tijdelijke, reproduceerbare correctie van de rasterpixels,
+geen onzichtbaar extra spelelement of aangepaste gameplay.
+
+- `/graphics-lab/?sprites=review&pixi=off` — Franse hoofden zichtbaar;
+  ook de tijdlijn en 24/36/48px-keuze voor een grondige controle.
+- `/graphics-lab/?sprites=review&heads=original&pixi=off` — originele
+  foutieve atlas tonen voor vergelijking.
+- `/graphics-lab/?pixi=off` — gewone v320-demo: alles zoals voorheen.
+
+De gezichten zijn bewust eenvoudige pixelcorrecties, **niet de definitieve
+hoogwaardige Napoleontische head-art**. Historische nauwkeurigheid,
+camerahoek, animatieconsistentie en andere anatomie moeten nog beoordeeld
+worden. Daarom blijft `reviewedForUse:false` en is de PR een draft.
+
+---
 # v321 Franse rasteranimation review (conceptbranch)
 
 De `graphics-lab/` blijft standaard **v320** en toont de bewezen oorspronkelijke SVG's.
