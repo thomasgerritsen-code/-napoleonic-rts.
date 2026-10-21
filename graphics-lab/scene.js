@@ -1,3 +1,4 @@
+import {loadFrenchPreview,pickFrenchPose,canvasFrame,FR_REVIEW_DISPLAY_SIZE} from './render/french-atlas-review-v321.js';
 // Napoleonic RTS Graphics Lab — isolated visual proof-of-concept (v319).
 // No game simulation, no shared globals or changes to the playable game.
 const W=1440,H=900,host=document.getElementById('scene-host'),viewport=document.getElementById('viewport');
@@ -10,6 +11,9 @@ const ui={engine:document.getElementById('engine'),fps:document.getElementById('
  mode:document.getElementById('mode'),count:document.getElementById('count')};
 const files=['battlefield.svg','oak.svg','barracks-france.svg','barracks-britain.svg','infantry-france.svg','infantry-britain.svg',
  'landscape-details.svg','infantry-france-march.svg','infantry-britain-march.svg','supply-wagon.svg'];
+// Explicit opt-in: image review is not a claim of art approval.
+const useFrenchReview=new URLSearchParams(location.search).get('sprites')==='review';
+let frenchReview=null;
 const imgs={},treePositions=[[115,135,.92],[200,670,.85],[372,92,.78],[480,160,.73],[540,773,.95],
  [941,103,.86],[1110,122,.76],[1323,128,.95],[1255,750,.85],[1380,655,.84],
  [1088,830,.72],[250,810,.8],[1254,285,.78],[465,665,.75],[890,823,.67]];
@@ -114,6 +118,9 @@ function painter(ctx,now,stylized=false){
      ctx.fillStyle=u.team==='france'?'#273d65':'#a14642';
      ctx.beginPath();ctx.arc(pose.x,pose.y,7,0,7);ctx.fill();
      ctx.strokeStyle='#eee2c4';ctx.lineWidth=1;ctx.stroke();
+   }else if(useFrenchReview&&u.team==='france'&&frenchReview){
+     const chosen=pickFrenchPose(cycle,state.time,u.phase);
+     canvasFrame(ctx,frenchReview,chosen,pose.x,pose.y,pose.facing===-1);
    }else{
      const key='infantry-'+u.team+(pose.stepping?'-march':'')+'.svg',size=29;
      ctx.save();ctx.translate(pose.x,pose.y);
@@ -136,10 +143,14 @@ function syncSoldiersPixi(Sprite,Graphics,Texture){
  state.soldiers=[];
  const frame=state.pixiTextures;
  for(const u of soldiers){
-   const sp=new Sprite(frame[u.team==='france'?'infantry-france.svg':'infantry-britain.svg']);
-   sp.anchor.set(.5);sp.position.set(u.x,u.y);
-   sp.width=29;sp.height=39;
-   sp.rotation=u.team==='france'?Math.PI/2:-Math.PI/2;
+   const review=useFrenchReview&&u.team==='france'&&state.frenchPixiTextures;
+   const initial=review?state.frenchPixiTextures.fr_line_idle_01:
+     frame[u.team==='france'?'infantry-france.svg':'infantry-britain.svg'];
+   const sp=new Sprite(initial);
+   sp.anchor.set(review?.5:.5,review?.8125:.5);sp.position.set(u.x,u.y);
+   sp.width=review?FR_REVIEW_DISPLAY_SIZE:29;
+   sp.height=review?FR_REVIEW_DISPLAY_SIZE:39;
+   sp.rotation=review?0:u.team==='france'?Math.PI/2:-Math.PI/2;
    world.addChild(sp);
    state.soldiers.push(sp);
  }
@@ -155,7 +166,7 @@ function syncSoldiersPixi(Sprite,Graphics,Texture){
 async function startPixi(){
  try{
    // Pinned, publicly distributed PixiJS ESM build, isolated to this lab.
-   const {Application,Assets,Sprite,Container,Graphics}=await import('https://cdn.jsdelivr.net/npm/pixi.js@8.17.1/dist/pixi.min.mjs');
+   const {Application,Assets,Sprite,Container,Graphics,Texture,Rectangle}=await import('https://cdn.jsdelivr.net/npm/pixi.js@8.17.1/dist/pixi.min.mjs');
    const app=new Application();
    await app.init({preference:'webgl',resizeTo:viewport,background:0x667456,
      antialias:true,autoDensity:true,resolution:Math.min(devicePixelRatio||1,1.5)});
@@ -178,13 +189,22 @@ async function startPixi(){
      sp.position.set(w.x,w.y);world.addChild(sp);
    }
    state.pixi=app;state.world=world;state.pixiTextures=tex;
+   if(useFrenchReview&&frenchReview){
+     const atlas=await Assets.load('./assets/sprites/infantry/france/fr_line_infantry_atlas.png');
+     state.frenchPixiTextures={};
+     for(const [name,details] of Object.entries(frenchReview.meta.frames)){
+       const f=details.frame;
+       state.frenchPixiTextures[name]=new Texture({source:atlas.source,
+         frame:new Rectangle(f.x,f.y,f.w,f.h)});
+     }
+   }
    unitGraphics.Sprite=Sprite;unitGraphics.Graphics=Graphics;
    syncSoldiersPixi(Sprite,Graphics);
    host.appendChild(app.canvas);
    app.canvas.className='pixi-layer';
    detailed.style.display='none';
    state.engine='PixiJS 8 · WebGL GPU';
-   ui.status.textContent='PixiJS actief — GPU-sprites geladen.';
+   ui.status.textContent=useFrenchReview?'FRANSE ATLAS-PROEF (NIET GOEDGEKEURD) · PixiJS actief':'PixiJS actief — GPU-sprites geladen.';
    renderScale();
  }catch(e){
    state.engine='Canvas 2D · fallback';
@@ -198,7 +218,9 @@ function updateStatus(){
  ui.sprites.textContent=sceneObjects()+'';
  atmosphere.style.visibility=state.mode==='new'?'visible':'hidden';
  viewport.classList.toggle('reference',state.mode==='old');
- ui.mode.textContent=state.mode==='new'?'Nieuw: getextureerde sprites':'Voorheen: schematische vormen';
+ ui.mode.textContent=state.mode==='new'?
+   (useFrenchReview?'Franse 17-frame rasteratlas (concept)':'Nieuw: getextureerde sprites'):
+   'Voorheen: schematische vormen';
  document.getElementById('toggle').textContent=state.mode==='new'?'Toon oude tekenstijl':'Toon nieuwe sprites';
  detailed.style.visibility=state.mode==='new'?'visible':'hidden';
  oldCanvas.style.visibility=state.mode==='old'?'visible':'hidden';
@@ -251,9 +273,13 @@ function drawFrame(now){
    for(let i=0;i<state.soldiers.length;i++){
      const u=soldiers[i],p=state.soldiers[i];if(!p||!u)continue;
      const pose=soldierPose(u,cycle),name='infantry-'+u.team+(pose.stepping?'-march':'')+'.svg';
-     if(p.texture!==state.pixiTextures[name])p.texture=state.pixiTextures[name];
+     const french=useFrenchReview&&u.team==='france'&&state.frenchPixiTextures;
+     const tex=french?state.frenchPixiTextures[pickFrenchPose(cycle,state.time,u.phase).key]:
+       state.pixiTextures[name];
+     if(p.texture!==tex)p.texture=tex;
      p.x=pose.x;p.y=pose.y;
-     p.rotation=pose.facing===1?Math.PI/2:-Math.PI/2;
+     if(french){p.rotation=0;p.scale.x=Math.abs(p.scale.x)*(pose.facing===1?1:-1);}
+     else p.rotation=pose.facing===1?Math.PI/2:-Math.PI/2;
    }
    if(state.selectionOutline)state.selectionOutline.x=(state.selected==='france'?1:-1)*cycle.advance;
  }
@@ -343,19 +369,28 @@ window.__GRAPHICS_LAB_V319__={
  version:'320.0',state,assets:files.slice(),getStats:()=>({
    engine:state.engine,fps:state.fps,sprites:sceneObjects(),
    zoom:state.zoom,mode:state.mode,quality:state.quality,loaded:Object.keys(imgs).length,
-   realism:state.realism,stage:state.stage,staticTroopsDoNotMarch:true,animatedSmoke:true,layerCount:2
+   realism:state.realism,stage:state.stage,staticTroopsDoNotMarch:true,animatedSmoke:true,layerCount:2,
+   frenchReviewEnabled:useFrenchReview,frenchReviewLoaded:!!frenchReview,
+   frenchReviewApproved:false,frenchFrameCount:frenchReview?.poseCount||0,
+   frenchReviewPose:useFrenchReview?pickFrenchPose(formationCycle(),state.time,0):null
  })};
 async function preload(){
+ if(useFrenchReview){
+   frenchReview=await loadFrenchPreview();
+ }
  await Promise.all(files.map(name=>new Promise((resolve,reject)=>{
    const im=new Image();im.onload=()=>{imgs[name]=im;resolve();};im.onerror=reject;
    im.src='./assets/'+name;
  })));
- state.engine='Canvas 2D · getextureerd';ui.status.textContent='Sprites geladen · PixiJS wordt getest.';
+ state.engine='Canvas 2D · getextureerd';
+ ui.status.textContent=useFrenchReview?'ATLAS REVIEW · 17 Franse frames · ART NOG NIET GOEDGEKEURD':'Sprites geladen · PixiJS wordt getest.';
  renderScale();updateStatus();
  requestAnimationFrame(drawFrame);
  // The GPU path is optional; ?pixi=off verifies offline Canvas sprite fallback.
  if(new URLSearchParams(location.search).get('pixi')!=='off')await startPixi();
- else{state.engine='Canvas 2D · offline sprites';ui.status.textContent='Offline demo: sprites direct op Canvas 2D.';updateStatus();}
+ else{state.engine='Canvas 2D · offline sprites';
+   ui.status.textContent=useFrenchReview?'ATLAS REVIEW · Canvas2D · NIET GOEDGEKEURD':'Offline demo: sprites direct op Canvas 2D.';
+   updateStatus();}
 }
 preload().catch(err=>{
  ui.status.textContent='Laden van afbeeldingen mislukt.';
