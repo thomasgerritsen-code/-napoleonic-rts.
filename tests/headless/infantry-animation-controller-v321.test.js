@@ -77,3 +77,22 @@ test('v321 atlas loader rejects sheets whose cells drift from the 6x3 contract',
   assert.throws(() => atlas.validateSheet(sheet, 'france', config, names), /onjuiste cel/);
   assert.throws(() => anim.validateConfig({...config, muzzleEvent: {state: 'fire', frame: 9}}), /muzzleEvent/);
 });
+
+test('v331 per-unit rate stretches one-shot drill states; loops keep the shared cadence', () => {
+  const volley = rate => {
+    const c = anim.createInfantryAnimationController(config);
+    let t = 0, fired = false;
+    for (; t < 20000; t += 16) {
+      // Hold the order until the shot, then let him reload and stand easy.
+      const r = c.update('u', t, {fireOrder: !fired, rate});
+      if (r.state === 'fire') fired = true;
+      if (fired && r.state === 'idle') break;
+    }
+    return t;
+  };
+  const slow = volley(0.8), base = volley(1), fast = volley(1.25);
+  assert.ok(slow > base && base > fast, `${slow} > ${base} > ${fast}`);
+  assert.ok(Math.abs(slow / base - 1.25) < 0.08, `slow/base ${slow / base}`);
+  const a = anim.createInfantryAnimationController(config), b = anim.createInfantryAnimationController(config);
+  assert.deepEqual(a.update('m', 400, {moving: true, rate: 0.7}), b.update('m', 400, {moving: true, rate: 1.3}));
+});

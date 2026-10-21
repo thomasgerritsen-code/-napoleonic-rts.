@@ -7,11 +7,11 @@ async function open(page){
   return errors;
 }
 const frames=page=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
-test('v330 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
+test('v331 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
   const errors=await open(page);
   await frames(page);
   const s=await page.evaluate(()=>({...window.__GRAPHICS_LAB_ISO__.getStats(),version:window.__GRAPHICS_LAB_ISO__.version}));
-  expect(s.version).toBe('330.0');
+  expect(s.version).toBe('331.0');
   // Five looks per nation (incl. grenadiers and voltigeurs), all on the field.
   expect(s.loaded).toBe(16);
   // Officer, drummer and ensign lead each regiment.
@@ -25,7 +25,7 @@ test('v330 iso scene loads both Blender atlases and draws every soldier',async({
   expect(await page.locator('#iso-status').textContent()).toContain('gebouwen en terrein');
   expect(errors).toEqual([]);
 });
-test('v330 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
+test('v331 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
   const errors=await open(page);
   const seen=await page.evaluate(async()=>{
     const api=window.__GRAPHICS_LAB_ISO__,step=()=>new Promise(r=>requestAnimationFrame(r));
@@ -58,9 +58,9 @@ const advance=(page,seconds)=>page.evaluate(async seconds=>{
     const s=api.getStats();for(const k of Object.keys(s.animStates))seen[k]=1;smoke=Math.max(smoke,s.smoke);die=Math.max(die,s.animStates.die||0);}
   return{seen:Object.keys(seen).sort(),smoke,die,stats:api.getStats()};
 },seconds);
-test('v330 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
+test('v331 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
   const errors=await open(page);
-  await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
+  await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.misfireChance=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
   const deployed=await page.evaluate(DEPLOY);
   expect(deployed.walking).toBeGreaterThan(10);
@@ -73,7 +73,7 @@ test('v330 Vuur! deploys both columns into line, then the ranks fire in turn onc
   expect(r.stats.shooters).toBe(64);
   expect(r.stats.firing).toBe(true);
   expect(r.stats.halted).toBe(true);
-  expect(r.seen).toEqual(expect.arrayContaining(['aim','fire','reload']));
+  expect(r.seen).toEqual(expect.arrayContaining(['aim','fire','reload','kaim','kfire']));
   expect(r.seen).not.toContain('march');
   expect(r.stats.fallen).toEqual({fr:0,br:0});
   expect(r.smoke).toBeGreaterThanOrEqual(64);
@@ -81,7 +81,7 @@ test('v330 Vuur! deploys both columns into line, then the ranks fire in turn onc
   expect((await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).firing).toBe(false);
   expect(errors).toEqual([]);
 });
-test('v330 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
+test('v331 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=1;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -110,9 +110,34 @@ test('v330 casualties fall, the rank behind closes up, the fallen stay and Herst
   expect(after.drawn).toBe(64);
   expect(errors).toEqual([]);
 });
+test('v331 French front rank kneels, some muskets misfire and smoke hangs over the line',async({page})=>{
+  const errors=await open(page);
+  await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.misfireChance=0.5;});
+  await page.getByRole('button',{name:'Vuur!'}).click();
+  await page.evaluate(DEPLOY);
+  const r=await advance(page,6);
+  expect(r.seen).toEqual(expect.arrayContaining(['kaim','kfire','misfire']));
+  expect(r.stats.misfires).toBeGreaterThan(0);
+  // Misfiring men fire no ball: fewer shots than muskets presented.
+  expect(r.stats.shooters).toBeLessThan(64);
+  expect(r.stats.bank).toBeGreaterThan(20);
+  expect(r.stats.missing).toBe(0);
+  expect(errors).toEqual([]);
+});
+test('v331 men at rest look around, set their shako or lean on the musket',async({page})=>{
+  const errors=await open(page);
+  await page.getByRole('button',{name:'Halt'}).click();
+  const r=await advance(page,16);
+  const extras=['look','adjust','lean'].filter(k=>r.seen.includes(k));
+  expect(extras.length).toBeGreaterThanOrEqual(2);
+  // Every pose the scene asks for exists in the atlases.
+  expect(r.stats.missing).toBe(0);
+  expect(r.seen).toContain('idle');
+  expect(errors).toEqual([]);
+});
 test.describe('phone',()=>{
   test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-  test('v330 iso scene pinch-zooms on a phone',async({page})=>{
+  test('v331 iso scene pinch-zooms on a phone',async({page})=>{
     const errors=await open(page);
     const before=(await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).zoom;
     const r=await page.locator('#iso-view').boundingBox();

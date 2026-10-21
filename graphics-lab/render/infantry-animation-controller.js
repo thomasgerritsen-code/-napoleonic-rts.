@@ -38,7 +38,10 @@ function frameNames(prefix,config){
 function createInfantryAnimationController(config){
  validateConfig(config);
  const S=config.states,units=new Map();
- const duration=name=>S[name].frames*S[name].frameMs;
+ // One-shot drill states run at each man's own pace (input.rate, default 1),
+ // so a regiment does not reload like clockwork; loops keep the shared cadence.
+ const ms=(u,name)=>S[name].loop?S[name].frameMs:S[name].frameMs/u.rate;
+ const duration=(u,name)=>S[name].frames*ms(u,name);
  const metrics={updates:0,muzzleEvents:0,transitions:0};
 
  function enter(u,name,atMs){
@@ -49,12 +52,12 @@ function createInfantryAnimationController(config){
  // fire exactly once so muzzle flash and smoke are never doubled or lost.
  function settle(u,nowMs,input,events){
    for(let guard=0;guard<16;guard++){
-     if(u.state==='fire'&&!u.muzzleDone&&nowMs>=u.since+config.muzzleEvent.frame*S.fire.frameMs){
+     if(u.state==='fire'&&!u.muzzleDone&&nowMs>=u.since+config.muzzleEvent.frame*ms(u,'fire')){
        u.muzzleDone=true;metrics.muzzleEvents++;
-       events.push({type:'muzzle',atMs:u.since+config.muzzleEvent.frame*S.fire.frameMs});
+       events.push({type:'muzzle',atMs:u.since+config.muzzleEvent.frame*ms(u,'fire')});
      }
-     if(S[u.state].loop||nowMs<u.since+duration(u.state))return;
-     const end=u.since+duration(u.state);
+     if(S[u.state].loop||nowMs<u.since+duration(u,u.state))return;
+     const end=u.since+duration(u,u.state);
      if(u.state==='aim')enter(u,'fire',end);
      else if(u.state==='fire')enter(u,'reload',end);
      else if(u.state==='reload')enter(u,input.fireOrder?'aim':'idle',end);
@@ -66,7 +69,7 @@ function createInfantryAnimationController(config){
    metrics.updates++;
    const moving=!!input.moving,fireOrder=!!input.fireOrder&&!moving;
    let u=units.get(unitId);
-   if(!u){u={state:moving?'march':'idle',since:nowMs,muzzleDone:false,last:nowMs};units.set(unitId,u);}
+   if(!u){u={state:moving?'march':'idle',since:nowMs,muzzleDone:false,last:nowMs,rate:input.rate>0?input.rate:1};units.set(unitId,u);}
    // A rewound clock (scrubbed demo) restarts the state cleanly.
    if(nowMs<u.last)enter(u,moving?'march':'idle',nowMs);
    u.last=nowMs;
@@ -85,7 +88,7 @@ function createInfantryAnimationController(config){
    if(s.loop){
      const period=s.frames*s.frameMs;
      frame=Math.floor((elapsed+unitOffsetMs(unitId,period))/s.frameMs)%s.frames;
-   }else frame=Math.min(s.frames-1,Math.floor(elapsed/s.frameMs));
+   }else frame=Math.min(s.frames-1,Math.floor(elapsed/ms(u,u.state)));
    return{state:u.state,frame:Math.max(0,frame),events};
  }
 

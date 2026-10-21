@@ -263,3 +263,22 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
 - **Lazy loading**: de basislook per land en de staf laden eerst; de scène
   start meteen en de andere looks stromen daarna binnen (tot dan gebruiken
   soldaten de basislook).
+
+---
+
+# v331 — realistischer vuurgevecht
+
+- **Knielen**: de voorste Franse rij knielt om te richten en te vuren
+  (`kaim`/`kfire`, met eigen mondingspunten), zodat de rijen erachter over
+  hen heen vuren. Herladen gebeurt staand.
+- **Spreiding**: elke man legt tot 0,35 s eerder of later aan dan zijn buren,
+  en herlaadt in zijn eigen tempo (±15%). De controller kreeg daarvoor een
+  `rate` per eenheid; lussen (mars, rust) houden de gedeelde cadans.
+- **Ketsschoten**: 6% van de schoten ketst (`misfire`: vlam op de pan, geen
+  kogel, geen rookwolk uit de loop). Knielende mannen ketsen in de demo niet.
+- **Rookbank**: elk schot voedt ook een trage, vage rookbank die ~28 s boven de
+  linie blijft hangen en langzaam met de wind afdrijft.
+- **Rust**: wie niet vuurt, kijkt af en toe rond, zet zijn sjako recht of
+  leunt op zijn musket.
+- Reparaties: een man die net is geraakt, wordt in dat frame niet meer staand
+  getekend; ontbrekende animaties tellen als `missing` in `getStats()`.

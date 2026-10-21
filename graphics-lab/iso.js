@@ -1,4 +1,4 @@
-// Graphics Lab v330 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v331 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -20,7 +20,7 @@ const BAND_DELAY=0.8,HIT_CHANCE=0.05,HIT_DELAY=0.25,DIE_FRAME=0.17;
 const ROAD_R=14,GROUND=48,TILE=2;
 const state={zoom:1,customZoom:false,camX:0,camY:0,time:0,last:performance.now(),paused:false,halted:false,
  travelled:0,perSide:32,atlases:{},ground:null,terrain:null,props:[],firing:false,controller:null,smoke:[],volleys:0,
- fireStart:0,regiments:null,simTime:0,dead:new Map(),hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
+ fireStart:0,regiments:null,simTime:0,dead:new Map(),drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
 
 // Ground coordinates (metres) -> unzoomed screen pixels.
 const project=(gx,gy)=>({x:gx*S,y:-gy*SQUASH*S});
@@ -141,6 +141,11 @@ function resize(){
 // line facing the enemy (French 3 ranks deep, British 2). When a man falls the
 // man behind him in the same file steps up, so gaps move to the rear.
 const COLUMN={files:4,gap:1.6,spacing:1.15},LINE={spacing:0.8,gap:0.95},WALK=2.2,ARRIVE=0.06;
+// Firing realism: per-man delay before presenting, misfires (flash in the pan,
+// no shot), own reload pace, and a slow smoke bank over the firing line.
+const FIRE_JITTER=0.35,RATE_SPREAD=0.3,BANK_LIFE=28,BANK_MAX=320;
+// Idle variety: every few seconds a man looks around, sets his shako or leans on his musket.
+const IDLE_EXTRAS=[['look',4,0.45],['adjust',4,0.38],['lean',2,1.4]];
 const REGIMENTS=[{side:'france',prefix:'fr',lineRanks:3,start:0},{side:'britain',prefix:'br',lineRanks:2,start:0.5}];
 const slotKey=(r,f)=>r+','+f;
 
@@ -272,12 +277,27 @@ function frameFor(u){
  }
  const c=state.controller;
  if(c){
-   // Ranks open fire one after another once the whole line stands.
-   const reg=regimentOf(u);
-   const ordered=state.firing&&reg.formation==='line'&&reg.readyAt!==null&&state.time>=reg.readyAt+u.slot.r*BAND_DELAY;
-   const r=c.update(u.key,state.time*1000,{moving:u.moving,fireOrder:ordered&&!u.moving});
-   for(const e of r.events)if(e.type==='muzzle'){spawnSmoke(u);shoot(u);}
-   if(!u.moving&&r.state!=='march')return r.state+'_'+d+'|'+r.frame;
+   // Ranks open fire one after another once the whole line stands; each man
+   // presents a moment later or earlier than his neighbours.
+   const reg=regimentOf(u),jitter=hash(u.id+71,u.prefix==='fr'?13:17)*FIRE_JITTER;
+   const ordered=state.firing&&reg.formation==='line'&&reg.readyAt!==null&&state.time>=reg.readyAt+u.slot.r*BAND_DELAY+jitter;
+   const rate=1-RATE_SPREAD/2+hash(u.id+29,u.prefix==='fr'?19:23)*RATE_SPREAD;
+   const r=c.update(u.key,state.time*1000,{moving:u.moving,fireOrder:ordered&&!u.moving,rate});
+   const mem=state.drill.get(u.key)||{last:'idle',volley:0,misfire:false};
+   if(r.state==='aim'&&mem.last!=='aim'){mem.volley++;mem.misfire=hash(u.id*7+mem.volley,u.prefix==='fr'?29:31)<state.misfireChance;}
+   mem.last=r.state;state.drill.set(u.key,mem);
+   // The French front rank kneels to aim and fire; nobody kneels to reload.
+   const kneel=reg.formation==='line'&&reg.lineRanks===3&&u.slot.r===0;
+   for(const e of r.events)if(e.type==='muzzle'){
+     if(mem.misfire&&!kneel){state.misfires++;continue;}
+     spawnSmoke(u,kneel);shoot(u);
+   }
+   if(!u.moving&&r.state!=='march'){
+     if(kneel&&(r.state==='aim'||r.state==='fire'))return 'k'+r.state+'_'+d+'|'+r.frame;
+     if(r.state==='fire'&&mem.misfire)return 'misfire_'+d+'|'+r.frame;
+     if(r.state==='idle'&&!state.firing){const extra=idleExtra(u);if(extra)return extra[0]+'_'+d+'|'+extra[1];}
+     return r.state+'_'+d+'|'+r.frame;
+   }
  }else if(!u.moving){
    return 'idle_'+d+'|'+Math.floor((state.time*1000+u.id*137)/IDLE.frameMs)%IDLE.frames;
  }
@@ -285,15 +305,27 @@ function frameFor(u){
  return 'march_'+d+'|'+Math.floor((u.walk%MARCH.strideM)/MARCH.strideM*MARCH.frames)%MARCH.frames;
 }
 
+// A man at rest now and then looks around, sets his shako or leans on his musket.
+function idleExtra(u){
+ const period=7+hash(u.id+3,u.prefix==='fr'?41:43)*6,phase=state.time+hash(u.id,7)*period;
+ const bucket=Math.floor(phase/period),into=phase-bucket*period;
+ const [name,frames,frameS]=IDLE_EXTRAS[Math.floor(hash(bucket*13+u.id,u.prefix==='fr'?5:9)*IDLE_EXTRAS.length)];
+ if(into>=frames*frameS)return null;
+ return[name,Math.min(frames-1,Math.floor(into/frameS))];
+}
+
 // Powder smoke puffs born at the rendered muzzle pixel, drifting downwind.
-function spawnSmoke(u){
+function spawnSmoke(u,kneel){
  const atlas=state.atlases[u.look]||state.atlases[u.prefix];if(!atlas)return;
- const m=atlas.sheet.meta,px=m.muzzle.px[DIRS[u.dir]],k=S/SPRITE_PX_PER_M;
+ const m=(kneel?atlas.combat.sheet:atlas.sheet).meta,px=m.muzzle.px[DIRS[u.dir]],k=S/SPRITE_PX_PER_M;
  const x=u.x+(px.x-m.pivot.x)*k,y=u.y+(px.y-m.pivot.y)*k;
  if(u.id===0)state.volleys++;
  if(state.smoke.length>600)state.smoke.splice(0,state.smoke.length-600);
  const seed=hash(u.id+state.volleys*97,u.prefix==='fr'?1:2);
  state.smoke.push({x,y,born:state.time,life:4.5+seed*2,size:.55+seed*.5,seed});
+ // Every shot also feeds a slow, faint bank of smoke that hangs over the line.
+ if(state.bank.length>=BANK_MAX)state.bank.shift();
+ state.bank.push({x,y,born:state.time,seed});
 }
 
 // A musket ball may drop a random soldier of the other side a moment later.
@@ -333,6 +365,19 @@ function frontGaps(reg){
 }
 const regimentOf=u=>state.regiments[u.side==='france'?0:1];
 
+function drawSmokeBank(){
+ const t=state.time;
+ state.bank=state.bank.filter(p=>t-p.born<BANK_LIFE);
+ for(const p of state.bank){
+   const age=t-p.born,f=age/BANK_LIFE,r=24+age*4.2;
+   const x=p.x+age*3.2+Math.sin(age*.15+p.seed*9)*6,y=p.y-14-age*1.1;
+   const a=0.075*(age<1.5?age/1.5:1)*(1-f);
+   const g=ctx.createRadialGradient(x,y,0,x,y,r);
+   g.addColorStop(0,`rgba(226,224,216,${a.toFixed(3)})`);g.addColorStop(1,'rgba(214,214,208,0)');
+   ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(x,y,r,r*.62,0,0,Math.PI*2);ctx.fill();
+ }
+}
+
 function drawSmoke(){
  const t=state.time;
  state.smoke=state.smoke.filter(p=>t-p.born<p.life);
@@ -349,8 +394,10 @@ function drawSmoke(){
 }
 
 function drawSprite(atlas,anim,f,x,y,k){
- const src=atlas.byAnim.get(anim);if(!src)return;
- const name=src.sheet.animations[anim][f],fr=src.sheet.frames[name].frame,p=src.sheet.meta.pivot;
+ // A missing animation or frame is counted (tests expect none) instead of drawn.
+ const src=atlas.byAnim.get(anim),name=src&&src.sheet.animations[anim]?.[f];
+ if(!name){state.missing=(state.missing||0)+1;return;}
+ const fr=src.sheet.frames[name].frame,p=src.sheet.meta.pivot;
  ctx.drawImage(src.image,fr.x,fr.y,fr.w,fr.h,x-p.x*k,y-p.y*k,fr.w*k,fr.h*k);
 }
 
@@ -369,7 +416,7 @@ function draw(now){
  const alive=units();
  resolveHits(alive);
  const fallen=[...state.dead.values()].map(d=>({...d,fallen:true,...project(d.gx,d.gy)}));
- const list=alive.map(u=>({...u,...project(u.gx,u.gy)})).concat(fallen,state.props).sort((a,b)=>a.y-b.y);
+ const list=alive.filter(u=>!u.dead).map(u=>({...u,...project(u.gx,u.gy)})).concat(fallen,state.props).sort((a,b)=>a.y-b.y);
  state.animStates={};
  state.drawn=0;state.propsDrawn=0;state.rolesDrawn=0;
  for(const u of list){
@@ -389,6 +436,7 @@ function draw(now){
    state.directionsSeen.add(u.dir);state.drawn++;
  }
  drawSmoke();
+ drawSmokeBank();
  drawCompass(dpr);
  requestAnimationFrame(draw);
 }
@@ -431,7 +479,8 @@ function setFire(f){
  ui.fire.textContent=f?'✋ Staakt het vuren':'🔥 Vuur!';
 }
 function resetBattle(){
- state.dead.clear();state.hits=[];state.smoke=[];state.shots=0;state.volleys=0;state.regiments=null;state.shooters=null;
+ state.dead.clear();state.hits=[];state.smoke=[];state.bank=[];state.drill=new Map();state.misfires=0;
+ state.shots=0;state.volleys=0;state.regiments=null;state.shooters=null;
  if(state.controller)state.controller.reset();
 }
 ui.reset.addEventListener('click',()=>{setFire(false);resetBattle();});
@@ -442,8 +491,8 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'330.0',state,
- getStats:()=>({loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
+window.__GRAPHICS_LAB_ISO__={version:'331.0',state,
+ getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
    animStates:{...(state.animStates||{})},smoke:state.smoke.length,volleys:state.volleys,shots:state.shots,
@@ -451,7 +500,8 @@ window.__GRAPHICS_LAB_ISO__={version:'330.0',state,
    bands:state.regiments?Math.max(...state.regiments.map(r=>r.formation==='line'?r.line.ranks:0)):0,
    formations:state.regiments?state.regiments.map(r=>r.formation):[],
    deployed:state.regiments?state.regiments.filter(r=>r.readyAt!==null).length:0,
-   shooters:state.shooters?state.shooters.size:0,
+   shooters:state.shooters?state.shooters.size:0,misfires:state.misfires,bank:state.bank.length,
+   kneeling:state.animStates?(state.animStates.kaim||0)+(state.animStates.kfire||0):0,
    frontGaps:state.regiments?state.regiments.reduce((n,r)=>n+frontGaps(r),0):0,
    fallKinds:[...new Set([...state.dead.values()].map(d=>d.fall))].sort(),
    muzzleEvents:state.controller?state.controller.metrics().muzzleEvents:0})};
