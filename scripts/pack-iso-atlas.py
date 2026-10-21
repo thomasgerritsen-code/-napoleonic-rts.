@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Pack the isometric Blender infantry frames into two atlases per nation.
+"""Pack the isometric Blender infantry frames into atlases per soldier look.
 
 Each atlas has 8 rows (directions e, se, s, sw, w, nw, n, ne) of 176x128 px
 cells plus a Pixi-compatible JSON:
 - infantry: idle 2, march 6, aim 2, fire 3, reload 4 -> 2992x1024
 - fallen:   three ways to fall (die, diefwd, dieside), 4 frames each -> 2112x1024
-The renderer's muzzle.json (screen pixel of the muzzle on the firing frame,
-per direction) is copied into the infantry JSON so the lab spawns smoke at
-the barrel. Officer, drummer and ensign (render-iso-roles.py) get one atlas
+- combat:   kneeling aim 2 / fire 3, misfire 3, charge 6, bayonet thrust 3 -> 2992x1024
+- morale:   rout 6, wounded crawl 4, cheer 2 -> 2112x1024
+- idlex:    look around 4, set shako 4, lean on musket 2 -> 1760x1024
+Frames rendered N x larger (--supersample) are averaged back down first. The
+renderer's muzzle.json (screen pixel of the muzzle on the shot frame, per
+direction) goes into the infantry (standing fire) and combat (kneeling fire)
+JSON so the lab spawns smoke at the barrel. --webp writes lossy WebP with
+alpha (needs Pillow) instead of PNG. Officer, drummer and ensign (render-iso-roles.py) get one atlas
 each per nation: idle 2, march 6, command 2 in taller 176x160 cells (feet at
 88,140) -> 1760x1280. Optional --preview writes review sheets on a grass tone.
 
@@ -32,9 +37,13 @@ DIRECTIONS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]
 SHEETS = {
     "infantry": [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4)],
     "fallen": [("die", 4), ("diefwd", 4), ("dieside", 4)],
+    "combat": [("kaim", 2), ("kfire", 3), ("misfire", 3), ("charge", 6), ("thrust", 3)],
+    "morale": [("rout", 6), ("crawl", 4), ("cheer", 2)],
+    "idlex": [("look", 4), ("adjust", 4), ("lean", 2)],
 }
+MUZZLE_STATE = {"infantry": "fire", "combat": "kfire"}
 # Folder -> sprite prefix; folders 2 and 3 hold the alternative soldier looks.
-SIDES = {"france": "fr", "britain": "br", "france2": "fr2", "britain2": "br2", "france3": "fr3", "britain3": "br3"}
+SIDES = {side + v: prefix + v for side, prefix in (("france", "fr"), ("britain", "br")) for v in ("", "2", "3", "4", "5")}
 
 
 def frame_names(prefix: str, states) -> list[tuple[str, str, int, int]]:
@@ -52,6 +61,29 @@ ROLES = {"officer": "o", "drummer": "d", "ensign": "e"}
 ROLE_STATES = [("idle", 2), ("march", 6), ("command", 2)]
 ROLE_CELL = (176, 160)
 ROLE_PIVOT = {"x": 88, "y": 140}
+
+
+def downsample(rgba: bytes, w: int, h: int, n: int) -> bytes:
+    """Average n x n blocks with premultiplied alpha (supersampled renders)."""
+    ow, oh = w // n, h // n
+    out = bytearray(ow * oh * 4)
+    area = n * n
+    for oy in range(oh):
+        for ox in range(ow):
+            r = g = b = a = 0
+            for y in range(oy * n, oy * n + n):
+                i = (y * w + ox * n) * 4
+                for _ in range(n):
+                    al = rgba[i + 3]
+                    r += rgba[i] * al
+                    g += rgba[i + 1] * al
+                    b += rgba[i + 2] * al
+                    a += al
+                    i += 4
+            o = (oy * ow + ox) * 4
+            if a:
+                out[o:o + 4] = bytes((round(r / a), round(g / a), round(b / a), round(a / area)))
+    return bytes(out)
 
 
 def clean(rgba: bytes, name: str, cell=(CELL_W, CELL_H)) -> bytes:
@@ -74,11 +106,12 @@ def pack(frames_dir: Path, side: str, kind: str) -> tuple[bytes, dict, int]:
         return pack_cells(frames_dir / "roles" / f"{side}_{kind}", SIDES[side] + ROLES[kind], kind,
                           ROLE_STATES, ROLE_CELL, ROLE_PIVOT)
     atlas, sheet, w = pack_cells(frames_dir / side, SIDES[side], kind, SHEETS[kind], (CELL_W, CELL_H), PIVOT)
-    if kind == "infantry":
-        muzzle = json.loads((frames_dir / side / "muzzle.json").read_text())
+    if kind in MUZZLE_STATE:
+        state = MUZZLE_STATE[kind]
+        muzzle = json.loads((frames_dir / side / "muzzle.json").read_text()).get(state, {})
         if sorted(muzzle) != sorted(DIRECTIONS):
-            raise PngError(f"{side}: muzzle.json must list all 8 directions")
-        sheet["meta"]["muzzle"] = {"state": "fire", "frame": 1, "px": muzzle}
+            raise PngError(f"{side}: muzzle.json must list all 8 directions for {state}")
+        sheet["meta"]["muzzle"] = {"state": state, "frame": 1, "px": muzzle}
     return atlas, sheet, w
 
 
@@ -90,6 +123,9 @@ def pack_cells(folder: Path, prefix: str, kind: str, states, cell, pivot) -> tup
     frames, animations, digests = {}, {}, set()
     for name, state, row, col in frame_names(prefix, states):
         fw, fh, rgba = read_rgba(folder / (name + ".png"))
+        if fw != cw and fw % cw == 0 and fh == ch * (fw // cw):
+            rgba = downsample(rgba, fw, fh, fw // cw)
+            fw, fh = cw, ch
         if (fw, fh) != (cw, ch):
             raise PngError(f"{name}: {fw}x{fh}, expected {cw}x{ch}")
         rgba = clean(rgba, name, cell)
@@ -133,16 +169,27 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--frames", default="art/frames/iso-proof")
     ap.add_argument("--out", default="graphics-lab/assets/sprites/iso")
     ap.add_argument("--preview", help="directory for review sheets")
+    ap.add_argument("--webp", action="store_true", help="write lossy WebP with alpha (Pillow)")
+    ap.add_argument("--only", nargs="*", help="pack only these folders (e.g. france roles)")
     args = ap.parse_args(argv)
     try:
         jobs = [(side, kind) for side in SIDES for kind in SHEETS]
         jobs += [(side, role) for side in ("france", "britain") for role in ROLES]
+        if args.only:
+            jobs = [(s, k) for s, k in jobs if s in args.only or (k in ROLES and "roles" in args.only)]
         for side, kind in jobs:
             atlas, sheet, w = pack(Path(args.frames), side, kind)
             out = Path(args.out)
             out.mkdir(parents=True, exist_ok=True)
-            image = out / sheet["meta"]["image"]
-            write_rgba(image, w, len(atlas) // 4 // w, atlas)
+            h = len(atlas) // 4 // w
+            if args.webp:
+                from PIL import Image
+                sheet["meta"]["image"] = sheet["meta"]["image"].replace(".png", ".webp")
+                image = out / sheet["meta"]["image"]
+                Image.frombytes("RGBA", (w, h), atlas).save(image, "WEBP", quality=90, alpha_quality=100, method=6)
+            else:
+                image = out / sheet["meta"]["image"]
+                write_rgba(image, w, h, atlas)
             image.with_suffix(".json").write_text(json.dumps(sheet, indent=1) + "\n", encoding="utf8")
             if args.preview:
                 Path(args.preview).mkdir(parents=True, exist_ok=True)

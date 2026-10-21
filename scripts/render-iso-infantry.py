@@ -30,7 +30,10 @@ FRAME_W, FRAME_H = 176, 128   # output cell, px (wide enough for a levelled musk
 PIVOT = (88, 108)             # feet on screen, px
 DIRECTIONS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]  # clockwise on screen
 STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4),
-          ("die", 4), ("diefwd", 4), ("dieside", 4)]
+          ("die", 4), ("diefwd", 4), ("dieside", 4),
+          ("kaim", 2), ("kfire", 3), ("misfire", 3), ("charge", 6), ("thrust", 3),
+          ("rout", 6), ("crawl", 4), ("cheer", 2),
+          ("look", 4), ("adjust", 4), ("lean", 2)]
 
 PALETTES = {
     "france": {
@@ -60,6 +63,10 @@ VARIANTS = {
     # Brown blanket roll with a tin mess kettle on the pack.
     3: {"skin": "#e2b793", "hair": "#a5713a", "roll": "#6b5b47", "sideburns": True,
         "messtin": True},
+    # Elite companies: grenadiers (French red epaulettes and plume, British
+    # white plume and wings) and voltigeurs / the British light company.
+    4: {"company": "grenadier", "moustache": True, "skin": "#c99470"},
+    5: {"company": "light", "hair": "#3a2a1c"},
 }
 
 
@@ -135,6 +142,25 @@ def build_soldier(side: str, variant: int = 1) -> dict:
             part("box", (0.02, 0.05, 0.07), (x, 0.03, -0.02), M["hair"], head, name="sideburn")
     for x in (0.1, -0.1):
         part("ball", (0.022,), (x, 0, 0), M["skin"], head, name="ear", segments=8)
+    company = look.get("company")
+    if company:
+        british_colours = {"grenadier": ("#f1ebdd", "#b3262b"), "light": ("#2f5a33", "#b3262b")}
+        french_colours = {"grenadier": ("#b02a2e", "#b02a2e"), "light": ("#d9b43a", "#3e6b34")}
+        plume, shoulder = (british_colours if british else french_colours)[company]
+        pm, sm = material(plume, 0.8, pattern="cloth"), material(shoulder, 0.8, pattern="cloth")
+        for x in (0.2, -0.2):
+            if british:
+                # Shoulder wings with white lace.
+                part("box", (0.1, 0.16, 0.05), (x, 0, 0.56), sm, torso, name="wing")
+                part("box", (0.1, 0.165, 0.012), (x, 0, 0.535), M["turnback"], torso, name="winglace")
+            else:
+                part("cyl", (0.08, 0.05, 0.1), (x, 0, 0.575), sm, torso, name="epaulette")
+                for k in range(6):
+                    a = k / 6 * math.tau
+                    part("cyl", (0.012, 0.06), (x + math.cos(a) * 0.085, math.sin(a) * 0.085, 0.53), sm, torso,
+                         name="fringe", segments=6)
+        if company == "light" and not british:
+            part("cyl", (0.08, 0.075), (0, 0, 0.6), material("#d9b43a", 0.8, pattern="cloth"), torso, name="collar")
     if look.get("cover"):
         # Campaign oilcloth cover: glossy black, hides plate, cords and pompom.
         oil = material("#121212", 0.28, pattern="plain")
@@ -148,7 +174,12 @@ def build_soldier(side: str, variant: int = 1) -> dict:
         part("box", (0.075, 0.012, 0.075), (0, 0.108, 0.16), M["plate"], head, rot=(0, 45, 0), name="plate")
         for x in (0.1, -0.1):
             part("box", (0.01, 0.03, 0.1), (x * 1.02, -0.005, 0.04), M["plate"], head, rot=(10, 0, 0), name="chinscale")
-        if british:
+        if company:
+            # Tall company plume instead of the fusilier pompom.
+            part("cyl", (0.03, 0.2, 0.04), (0, 0.07, 0.36), pm, head, name="plume")
+            if not british:
+                part("box", (0.012, 0.012, 0.09), (0.06, 0.1, 0.12), pm, head, rot=(0, 40, 0), name="cord")
+        elif british:
             part("cyl", (0.022, 0.13, 0.03), (-0.05, 0.08, 0.33), M["pompom"], head, name="plume")
             part("box", (0.16, 0.01, 0.025), (0, 0.11, 0.24), M["turnback"], head, name="band")
         else:
@@ -186,7 +217,7 @@ def build_soldier(side: str, variant: int = 1) -> dict:
     flash = part("ball", (0.11, 1, 1, 1.9), (0, 0.032, MUZZLE_Z + 0.2), glow("#ffc45c", 7), musket, name="flash")
     flame = part("cyl", (0.06, 0.32, 0.0), (0, 0.032, MUZZLE_Z + 0.36), glow("#ff7f24", 6), musket, name="flame")
     pan = part("ball", (0.05,), (0.04, 0.03, 0.44), glow("#ffd27a", 6), musket, name="panflash")
-    return {"root": root, "fall": fall, "hips": hips, "torso": torso, "joints": joints, "musket": musket,
+    return {"root": root, "fall": fall, "hips": hips, "torso": torso, "head": head, "joints": joints, "musket": musket,
             "ramrod": ramrod, "flash": [flash, flame], "pan": pan}
 
 
@@ -262,6 +293,142 @@ def fall_twist(direction: int, head: float = 180) -> float:
     return min((-70, -55, -40, -25, 25, 40, 55, 70), key=cost)
 
 
+CHARGE = ((0.12, 0.16, 0.12), (-92, 0, 6))         # bayonet levelled at the hip
+THRUST_BACK = ((0.12, -0.04, 0.16), (-92, 0, 6))
+THRUST_OUT = ((0.12, 0.26, 0.1), (-94, 0, 4))
+TRAIL = ((0.22, 0.05, -0.3), (-40, 0, -10))         # musket trailed while running away
+
+
+def set_legs(rig, right, left, hips_z):
+    """right/left: (thigh, knee) degrees."""
+    rad = math.radians
+    _, _, th_r, kn_r = rig["joints"]["R"]
+    _, _, th_l, kn_l = rig["joints"]["L"]
+    th_r.rotation_euler = Euler((rad(right[0]), 0, 0))
+    kn_r.rotation_euler = Euler((rad(right[1]), 0, 0))
+    th_l.rotation_euler = Euler((rad(left[0]), 0, 0))
+    kn_l.rotation_euler = Euler((rad(left[1]), 0, 0))
+    rig["hips"].location.z = hips_z
+
+
+def set_arms(rig, right, left):
+    """right/left: (shoulder x, shoulder y, elbow) degrees."""
+    rad = math.radians
+    sh_r, el_r, _, _ = rig["joints"]["R"]
+    sh_l, el_l, _, _ = rig["joints"]["L"]
+    sh_r.rotation_euler = Euler((rad(right[0]), rad(right[1]), 0))
+    el_r.rotation_euler = Euler((rad(right[2]), 0, 0))
+    sh_l.rotation_euler = Euler((rad(left[0]), rad(left[1]), 0))
+    el_l.rotation_euler = Euler((rad(left[2]), 0, 0))
+
+
+def running(t, stride, lean_hips=0.9):
+    """Leg angles for a running cycle at phase t (0..1)."""
+    sw = math.sin(t * math.tau)
+    right = (stride * sw, -55 * max(0.0, -math.cos(t * math.tau)) - 10)
+    left = (-stride * sw, -55 * max(0.0, math.cos(t * math.tau)) - 10)
+    return right, left, lean_hips - 0.04 * abs(sw)
+
+
+KNEEL = ((0, -92), (84, -86), 0.53)                  # right knee on the ground
+
+
+def pose_extra(rig: dict, state: str, frame: int, frames: int, direction: int = 0) -> bool:
+    """Combat, morale and idle-variety poses added in v330."""
+    rad = math.radians
+    t = frame / frames
+    musket, torso, head = rig["musket"], rig["torso"], rig["head"]
+    if state in ("kaim", "kfire"):
+        # The front rank kneels to fire so the rank behind can fire over it.
+        drill = DRILL["aim" if state == "kaim" else "fire"][frame]
+        place(musket, drill[0])
+        set_arms(rig, drill[1], drill[2])
+        torso.rotation_euler = Euler((rad(drill[3]), 0, 0))
+        set_legs(rig, *KNEEL)
+        flash = drill[4]
+        if flash == 3:
+            rig["pan"].hide_render = False
+        elif flash:
+            for obj in rig["flash"]:
+                obj.hide_render = False
+                obj.scale = (1, 1, 1) if flash == 2 else (0.55, 0.55, 0.55)
+        return True
+    if state == "misfire":
+        # Flash in the pan, no shot: the man lowers his musket and looks at the lock.
+        place(musket, (PRESENT, PRESENT, LOWER)[frame])
+        set_arms(rig, ((72, 22, 48), (70, 22, 50), (52, 20, 60))[frame], ((84, -14, 12), (82, -14, 14), (66, -12, 30))[frame])
+        torso.rotation_euler = Euler((rad((5, 2, 8)[frame]), 0, 0))
+        head.rotation_euler = Euler((rad((0, 6, 14)[frame]), 0, rad((0, 8, 18)[frame])))
+        set_legs(rig, (-14, -6), (9, -8), 0.94)
+        if frame == 0:
+            rig["pan"].hide_render = False
+        return True
+    if state == "charge":
+        right, left, hips = running(t, 40)
+        set_legs(rig, right, left, hips)
+        place(musket, CHARGE)
+        set_arms(rig, (28, 16, 72), (72, -12, 24))
+        torso.rotation_euler = Euler((rad(16), 0, 0))
+        return True
+    if state == "thrust":
+        place(musket, (THRUST_BACK, THRUST_OUT, CHARGE)[frame])
+        set_arms(rig, ((20, 16, 80), (46, 14, 30), (28, 16, 72))[frame], ((60, -12, 40), (88, -12, 6), (72, -12, 24))[frame])
+        torso.rotation_euler = Euler((rad((-4, 20, 10)[frame]), 0, 0))
+        set_legs(rig, ((-10, -10), (-28, -6), (-16, -10))[frame], ((10, -12), (40, -30), (20, -16))[frame],
+                 (0.93, 0.86, 0.9)[frame])
+        return True
+    if state == "rout":
+        right, left, hips = running(t, 46)
+        set_legs(rig, right, left, hips)
+        place(musket, TRAIL)
+        swing = math.sin(t * math.tau)
+        set_arms(rig, (-30 * swing + 10, 10, 60), (30 * swing + 10, -10, 60))
+        torso.rotation_euler = Euler((rad(20), 0, 0))
+        head.rotation_euler = Euler((rad(-8), 0, rad(20 * swing)))
+        return True
+    if state == "crawl":
+        # Wounded, crawling on the belly with the musket left behind.
+        hide_render_tree(musket, True)
+        # Turned so the body lies across the screen, like the falls.
+        rig["fall"].rotation_euler = Euler((rad(-84), 0, rad(fall_twist(direction, 0))))
+        rig["fall"].location.z = 0.14
+        reach = math.sin(t * math.tau)
+        set_legs(rig, (15 + 20 * reach, -40 - 25 * max(0, reach)), (15 - 20 * reach, -40 - 25 * max(0, -reach)), 0.95)
+        set_arms(rig, (150 + 25 * reach, 25, 40 - 20 * reach), (150 - 25 * reach, -25, 40 + 20 * reach))
+        head.rotation_euler = Euler((rad(-30), 0, 0))
+        return True
+    if state == "cheer":
+        place(musket, RAM)
+        set_arms(rig, ((165, 20, 12), (140, 28, 40))[frame], (38, -14, 36))
+        set_legs(rig, (0, 0), (0, 0), 0.95)
+        head.rotation_euler = Euler((rad(-14), 0, 0))
+        return True
+    if state in ("look", "adjust", "lean"):
+        breath = math.cos(t * math.tau)
+        set_legs(rig, (0, 0), (0, 0), 0.95 + 0.004 * breath)
+        if state == "lean":
+            place(musket, RAM)
+            set_arms(rig, (48, 18, 22), (52, -16, 20))
+            torso.rotation_euler = Euler((rad(6 + 1.5 * breath), 0, 0))
+            return True
+        place(musket, CARRY)
+        if state == "look":
+            head.rotation_euler = Euler((0, 0, rad((16, 40, -16, -40)[frame])))
+            set_arms(rig, (4, 6, 10), (18, -8, 42))
+        else:
+            # Right hand goes up to set the shako straight.
+            set_arms(rig, ((30, 10, 60), (110, 20, 110), (140, 24, 120), (70, 16, 70))[frame], (18, -8, 42))
+            head.rotation_euler = Euler((0, rad((0, -4, -6, -2)[frame]), 0))
+        return True
+    return False
+
+
+def hide_render_tree(obj, hidden: bool) -> None:
+    obj.hide_render = hidden
+    for child in obj.children:
+        hide_render_tree(child, hidden)
+
+
 def place(obj, placement):
     loc, rot = placement
     obj.location = loc
@@ -277,8 +444,16 @@ def pose(rig: dict, state: str, frame: int, frames: int, direction: int = 0) -> 
     rig["pan"].hide_render = True
     rig["ramrod"].hide_render = True
     rig["torso"].rotation_euler = Euler((0, 0, 0))
+    rig["head"].rotation_euler = Euler((0, 0, 0))
     rig["fall"].rotation_euler = Euler((0, 0, 0))
     rig["fall"].location.z = 0
+    if rig.get("armed", True):
+        for name in ("butt", "stock", "barrel", "lock", "band", "sling", "bayonet"):
+            for obj in rig["musket"].children:
+                if obj.name.split(".")[0] == name:
+                    obj.hide_render = False
+    if pose_extra(rig, state, frame, frames, direction):
+        return
     if state in DEATHS:
         death = DEATHS[state]
         tilt, twist, lift, hips_z, thigh, knee, (rx, ry), (lx, ly), elbow, lean, musket = death["frames"][frame]
@@ -354,10 +529,13 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--out", default="art/frames/iso-proof")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--states", nargs="*", help="render only these states (review)")
+    ap.add_argument("--supersample", type=int, default=2,
+                    help="render N x larger; pack-iso-atlas.py averages back down for cleaner edges")
     args = ap.parse_args(argv)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     setup_render(args.samples)
-    camera(FRAME_W, FRAME_H, SPRITE_PX_PER_M, PIVOT)
+    ss = args.supersample
+    camera(FRAME_W * ss, FRAME_H * ss, SPRITE_PX_PER_M * ss, (PIVOT[0] * ss, PIVOT[1] * ss))
     # Small shadow catcher under the feet: its edge stays inside the frame.
     shadow_catcher("ground", [(0.2 + 0.85 * math.cos(a / 24 * math.tau), 0.05 + 0.85 * math.sin(a / 24 * math.tau)) for a in range(24)])
     rig = build_soldier(args.side, args.variant)
@@ -366,7 +544,7 @@ def main(argv: list[str]) -> int:
     out = Path(args.out).resolve() / (args.side + suffix)
     out.mkdir(parents=True, exist_ok=True)
     prefix = ("fr" if args.side == "france" else "br") + suffix
-    muzzle = {}
+    muzzle = {"fire": {}, "kfire": {}}
     for d, name in enumerate(DIRECTIONS):
         # Model faces +Y; screen direction d is clockwise from east.
         rig["root"].rotation_euler = Euler((0, 0, math.radians(-45 * d - 90)))
@@ -376,15 +554,17 @@ def main(argv: list[str]) -> int:
             for f in range(frames):
                 pose(rig, state, f, frames, d)
                 bpy.context.view_layer.update()
-                if state == "fire" and f == 1:
-                    # Screen pixel of the muzzle, so the lab spawns smoke exactly there.
+                if state in muzzle and f == 1:
+                    # Screen pixel of the muzzle (output scale), so the lab spawns smoke exactly there.
                     p = rig["musket"].matrix_world @ Vector((0, 0.032, MUZZLE_Z))
-                    muzzle[name] = {"x": round(PIVOT[0] + p.x * SPRITE_PX_PER_M, 1),
-                                    "y": round(PIVOT[1] - screen_up(p) * SPRITE_PX_PER_M, 1)}
+                    muzzle[state][name] = {"x": round(PIVOT[0] + p.x * SPRITE_PX_PER_M, 1),
+                                           "y": round(PIVOT[1] - screen_up(p) * SPRITE_PX_PER_M, 1)}
                 bpy.context.scene.render.filepath = str(out / f"{prefix}_iso_{state}_{name}_{f + 1:02d}.png")
                 bpy.ops.render.render(write_still=True)
-    if muzzle:
-        (out / "muzzle.json").write_text(json.dumps(muzzle, indent=1) + "\n")
+    if any(muzzle.values()):
+        previous = json.loads((out / "muzzle.json").read_text()) if (out / "muzzle.json").exists() else {}
+        previous.update({k: v for k, v in muzzle.items() if v})
+        (out / "muzzle.json").write_text(json.dumps(previous, indent=1) + "\n")
     print(f"{args.side}: {len(DIRECTIONS) * sum(n for _, n in STATES)} frames -> {out}")
     return 0
 

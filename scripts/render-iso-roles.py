@@ -91,6 +91,7 @@ def union_colour(u, v):
 def build_role(side: str, role: str) -> dict:
     rig = infantry.build_soldier(side, 1)
     hide_tree(rig["musket"])
+    rig["armed"] = False
     for obj in bpy.data.objects:
         if obj.name.split(".")[0] in STRIPPED:
             obj.hide_render = True
@@ -210,10 +211,12 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--role", choices=sorted(ROLES), required=True)
     ap.add_argument("--out", default="art/frames/iso-proof")
     ap.add_argument("--samples", type=int, default=64)
+    ap.add_argument("--supersample", type=int, default=2)
     args = ap.parse_args(argv)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     setup_render(args.samples)
-    camera(CELL_W, CELL_H, SPRITE_PX_PER_M, PIVOT)
+    ss = args.supersample
+    camera(CELL_W * ss, CELL_H * ss, SPRITE_PX_PER_M * ss, (PIVOT[0] * ss, PIVOT[1] * ss))
     shadow_catcher("ground", [(0.2 + 0.85 * math.cos(a / 24 * math.tau), 0.05 + 0.85 * math.sin(a / 24 * math.tau))
                               for a in range(24)])
     rig = build_role(args.side, args.role)
