@@ -192,7 +192,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_e_01": {
+  "frc_iso_trot_e_01": {
    "frame": {
     "x": 1792,
     "y": 0,
@@ -216,7 +216,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_e_02": {
+  "frc_iso_trot_e_02": {
    "frame": {
     "x": 2016,
     "y": 0,
@@ -240,7 +240,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_e_03": {
+  "frc_iso_trot_e_03": {
    "frame": {
     "x": 2240,
     "y": 0,
@@ -264,7 +264,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_e_04": {
+  "frc_iso_trot_e_04": {
    "frame": {
     "x": 2464,
     "y": 0,
@@ -288,7 +288,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_e_05": {
+  "frc_iso_trot_e_05": {
    "frame": {
     "x": 2688,
     "y": 0,
@@ -312,7 +312,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_e_06": {
+  "frc_iso_trot_e_06": {
    "frame": {
     "x": 2912,
     "y": 0,
@@ -528,7 +528,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_se_01": {
+  "frc_iso_trot_se_01": {
    "frame": {
     "x": 1792,
     "y": 192,
@@ -552,7 +552,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_se_02": {
+  "frc_iso_trot_se_02": {
    "frame": {
     "x": 2016,
     "y": 192,
@@ -576,7 +576,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_se_03": {
+  "frc_iso_trot_se_03": {
    "frame": {
     "x": 2240,
     "y": 192,
@@ -600,7 +600,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_se_04": {
+  "frc_iso_trot_se_04": {
    "frame": {
     "x": 2464,
     "y": 192,
@@ -624,7 +624,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_se_05": {
+  "frc_iso_trot_se_05": {
    "frame": {
     "x": 2688,
     "y": 192,
@@ -648,7 +648,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_se_06": {
+  "frc_iso_trot_se_06": {
    "frame": {
     "x": 2912,
     "y": 192,
@@ -864,7 +864,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_s_01": {
+  "frc_iso_trot_s_01": {
    "frame": {
     "x": 1792,
     "y": 384,
@@ -888,7 +888,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_s_02": {
+  "frc_iso_trot_s_02": {
    "frame": {
     "x": 2016,
     "y": 384,
@@ -912,7 +912,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_s_03": {
+  "frc_iso_trot_s_03": {
    "frame": {
     "x": 2240,
     "y": 384,
@@ -936,7 +936,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_s_04": {
+  "frc_iso_trot_s_04": {
    "frame": {
     "x": 2464,
     "y": 384,
@@ -960,7 +960,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_s_05": {
+  "frc_iso_trot_s_05": {
    "frame": {
     "x": 2688,
     "y": 384,
@@ -984,7 +984,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_s_06": {
+  "frc_iso_trot_s_06": {
    "frame": {
     "x": 2912,
     "y": 384,
@@ -1200,7 +1200,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_sw_01": {
+  "frc_iso_trot_sw_01": {
    "frame": {
     "x": 1792,
     "y": 576,
@@ -1224,7 +1224,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_sw_02": {
+  "frc_iso_trot_sw_02": {
    "frame": {
     "x": 2016,
     "y": 576,
@@ -1248,7 +1248,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_sw_03": {
+  "frc_iso_trot_sw_03": {
    "frame": {
     "x": 2240,
     "y": 576,
@@ -1272,7 +1272,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_sw_04": {
+  "frc_iso_trot_sw_04": {
    "frame": {
     "x": 2464,
     "y": 576,
@@ -1296,7 +1296,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_sw_05": {
+  "frc_iso_trot_sw_05": {
    "frame": {
     "x": 2688,
     "y": 576,
@@ -1320,7 +1320,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_sw_06": {
+  "frc_iso_trot_sw_06": {
    "frame": {
     "x": 2912,
     "y": 576,
@@ -1536,7 +1536,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_w_01": {
+  "frc_iso_trot_w_01": {
    "frame": {
     "x": 1792,
     "y": 768,
@@ -1560,7 +1560,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_w_02": {
+  "frc_iso_trot_w_02": {
    "frame": {
     "x": 2016,
     "y": 768,
@@ -1584,7 +1584,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_w_03": {
+  "frc_iso_trot_w_03": {
    "frame": {
     "x": 2240,
     "y": 768,
@@ -1608,7 +1608,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_w_04": {
+  "frc_iso_trot_w_04": {
    "frame": {
     "x": 2464,
     "y": 768,
@@ -1632,7 +1632,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_w_05": {
+  "frc_iso_trot_w_05": {
    "frame": {
     "x": 2688,
     "y": 768,
@@ -1656,7 +1656,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_w_06": {
+  "frc_iso_trot_w_06": {
    "frame": {
     "x": 2912,
     "y": 768,
@@ -1872,7 +1872,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_nw_01": {
+  "frc_iso_trot_nw_01": {
    "frame": {
     "x": 1792,
     "y": 960,
@@ -1896,7 +1896,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_nw_02": {
+  "frc_iso_trot_nw_02": {
    "frame": {
     "x": 2016,
     "y": 960,
@@ -1920,7 +1920,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_nw_03": {
+  "frc_iso_trot_nw_03": {
    "frame": {
     "x": 2240,
     "y": 960,
@@ -1944,7 +1944,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_nw_04": {
+  "frc_iso_trot_nw_04": {
    "frame": {
     "x": 2464,
     "y": 960,
@@ -1968,7 +1968,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_nw_05": {
+  "frc_iso_trot_nw_05": {
    "frame": {
     "x": 2688,
     "y": 960,
@@ -1992,7 +1992,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_nw_06": {
+  "frc_iso_trot_nw_06": {
    "frame": {
     "x": 2912,
     "y": 960,
@@ -2208,7 +2208,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_n_01": {
+  "frc_iso_trot_n_01": {
    "frame": {
     "x": 1792,
     "y": 1152,
@@ -2232,7 +2232,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_n_02": {
+  "frc_iso_trot_n_02": {
    "frame": {
     "x": 2016,
     "y": 1152,
@@ -2256,7 +2256,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_n_03": {
+  "frc_iso_trot_n_03": {
    "frame": {
     "x": 2240,
     "y": 1152,
@@ -2280,7 +2280,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_n_04": {
+  "frc_iso_trot_n_04": {
    "frame": {
     "x": 2464,
     "y": 1152,
@@ -2304,7 +2304,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_n_05": {
+  "frc_iso_trot_n_05": {
    "frame": {
     "x": 2688,
     "y": 1152,
@@ -2328,7 +2328,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_n_06": {
+  "frc_iso_trot_n_06": {
    "frame": {
     "x": 2912,
     "y": 1152,
@@ -2544,7 +2544,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_ne_01": {
+  "frc_iso_trot_ne_01": {
    "frame": {
     "x": 1792,
     "y": 1344,
@@ -2568,7 +2568,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_ne_02": {
+  "frc_iso_trot_ne_02": {
    "frame": {
     "x": 2016,
     "y": 1344,
@@ -2592,7 +2592,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_ne_03": {
+  "frc_iso_trot_ne_03": {
    "frame": {
     "x": 2240,
     "y": 1344,
@@ -2616,7 +2616,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_ne_04": {
+  "frc_iso_trot_ne_04": {
    "frame": {
     "x": 2464,
     "y": 1344,
@@ -2640,7 +2640,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_ne_05": {
+  "frc_iso_trot_ne_05": {
    "frame": {
     "x": 2688,
     "y": 1344,
@@ -2664,7 +2664,7 @@
     "y": 0.7916666666666666
    }
   },
-  "frc_iso_gallop_ne_06": {
+  "frc_iso_trot_ne_06": {
    "frame": {
     "x": 2912,
     "y": 1344,
@@ -2702,13 +2702,13 @@
    "frc_iso_walk_e_05",
    "frc_iso_walk_e_06"
   ],
-  "gallop_e": [
-   "frc_iso_gallop_e_01",
-   "frc_iso_gallop_e_02",
-   "frc_iso_gallop_e_03",
-   "frc_iso_gallop_e_04",
-   "frc_iso_gallop_e_05",
-   "frc_iso_gallop_e_06"
+  "trot_e": [
+   "frc_iso_trot_e_01",
+   "frc_iso_trot_e_02",
+   "frc_iso_trot_e_03",
+   "frc_iso_trot_e_04",
+   "frc_iso_trot_e_05",
+   "frc_iso_trot_e_06"
   ],
   "idle_se": [
    "frc_iso_idle_se_01",
@@ -2722,13 +2722,13 @@
    "frc_iso_walk_se_05",
    "frc_iso_walk_se_06"
   ],
-  "gallop_se": [
-   "frc_iso_gallop_se_01",
-   "frc_iso_gallop_se_02",
-   "frc_iso_gallop_se_03",
-   "frc_iso_gallop_se_04",
-   "frc_iso_gallop_se_05",
-   "frc_iso_gallop_se_06"
+  "trot_se": [
+   "frc_iso_trot_se_01",
+   "frc_iso_trot_se_02",
+   "frc_iso_trot_se_03",
+   "frc_iso_trot_se_04",
+   "frc_iso_trot_se_05",
+   "frc_iso_trot_se_06"
   ],
   "idle_s": [
    "frc_iso_idle_s_01",
@@ -2742,13 +2742,13 @@
    "frc_iso_walk_s_05",
    "frc_iso_walk_s_06"
   ],
-  "gallop_s": [
-   "frc_iso_gallop_s_01",
-   "frc_iso_gallop_s_02",
-   "frc_iso_gallop_s_03",
-   "frc_iso_gallop_s_04",
-   "frc_iso_gallop_s_05",
-   "frc_iso_gallop_s_06"
+  "trot_s": [
+   "frc_iso_trot_s_01",
+   "frc_iso_trot_s_02",
+   "frc_iso_trot_s_03",
+   "frc_iso_trot_s_04",
+   "frc_iso_trot_s_05",
+   "frc_iso_trot_s_06"
   ],
   "idle_sw": [
    "frc_iso_idle_sw_01",
@@ -2762,13 +2762,13 @@
    "frc_iso_walk_sw_05",
    "frc_iso_walk_sw_06"
   ],
-  "gallop_sw": [
-   "frc_iso_gallop_sw_01",
-   "frc_iso_gallop_sw_02",
-   "frc_iso_gallop_sw_03",
-   "frc_iso_gallop_sw_04",
-   "frc_iso_gallop_sw_05",
-   "frc_iso_gallop_sw_06"
+  "trot_sw": [
+   "frc_iso_trot_sw_01",
+   "frc_iso_trot_sw_02",
+   "frc_iso_trot_sw_03",
+   "frc_iso_trot_sw_04",
+   "frc_iso_trot_sw_05",
+   "frc_iso_trot_sw_06"
   ],
   "idle_w": [
    "frc_iso_idle_w_01",
@@ -2782,13 +2782,13 @@
    "frc_iso_walk_w_05",
    "frc_iso_walk_w_06"
   ],
-  "gallop_w": [
-   "frc_iso_gallop_w_01",
-   "frc_iso_gallop_w_02",
-   "frc_iso_gallop_w_03",
-   "frc_iso_gallop_w_04",
-   "frc_iso_gallop_w_05",
-   "frc_iso_gallop_w_06"
+  "trot_w": [
+   "frc_iso_trot_w_01",
+   "frc_iso_trot_w_02",
+   "frc_iso_trot_w_03",
+   "frc_iso_trot_w_04",
+   "frc_iso_trot_w_05",
+   "frc_iso_trot_w_06"
   ],
   "idle_nw": [
    "frc_iso_idle_nw_01",
@@ -2802,13 +2802,13 @@
    "frc_iso_walk_nw_05",
    "frc_iso_walk_nw_06"
   ],
-  "gallop_nw": [
-   "frc_iso_gallop_nw_01",
-   "frc_iso_gallop_nw_02",
-   "frc_iso_gallop_nw_03",
-   "frc_iso_gallop_nw_04",
-   "frc_iso_gallop_nw_05",
-   "frc_iso_gallop_nw_06"
+  "trot_nw": [
+   "frc_iso_trot_nw_01",
+   "frc_iso_trot_nw_02",
+   "frc_iso_trot_nw_03",
+   "frc_iso_trot_nw_04",
+   "frc_iso_trot_nw_05",
+   "frc_iso_trot_nw_06"
   ],
   "idle_n": [
    "frc_iso_idle_n_01",
@@ -2822,13 +2822,13 @@
    "frc_iso_walk_n_05",
    "frc_iso_walk_n_06"
   ],
-  "gallop_n": [
-   "frc_iso_gallop_n_01",
-   "frc_iso_gallop_n_02",
-   "frc_iso_gallop_n_03",
-   "frc_iso_gallop_n_04",
-   "frc_iso_gallop_n_05",
-   "frc_iso_gallop_n_06"
+  "trot_n": [
+   "frc_iso_trot_n_01",
+   "frc_iso_trot_n_02",
+   "frc_iso_trot_n_03",
+   "frc_iso_trot_n_04",
+   "frc_iso_trot_n_05",
+   "frc_iso_trot_n_06"
   ],
   "idle_ne": [
    "frc_iso_idle_ne_01",
@@ -2842,13 +2842,13 @@
    "frc_iso_walk_ne_05",
    "frc_iso_walk_ne_06"
   ],
-  "gallop_ne": [
-   "frc_iso_gallop_ne_01",
-   "frc_iso_gallop_ne_02",
-   "frc_iso_gallop_ne_03",
-   "frc_iso_gallop_ne_04",
-   "frc_iso_gallop_ne_05",
-   "frc_iso_gallop_ne_06"
+  "trot_ne": [
+   "frc_iso_trot_ne_01",
+   "frc_iso_trot_ne_02",
+   "frc_iso_trot_ne_03",
+   "frc_iso_trot_ne_04",
+   "frc_iso_trot_ne_05",
+   "frc_iso_trot_ne_06"
   ]
  },
  "meta": {

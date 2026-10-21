@@ -1,4 +1,4 @@
-// Graphics Lab v335 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v336 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -179,10 +179,11 @@ const CREW_SPOTS={
  ram:[0.35,2.55,[-1,0]],load:[-0.75,1.75,[1,0]],aim:[0.15,-2.6,[0,1]],
  haul:[[0.95,0.15,[0,1]],[-0.95,0.15,[0,1]]]};
 // --- Cavalry ------------------------------------------------------------------
-// Each regiment has a squadron of six light horse in two ranks. On the march
-// they ride behind the guns; in line they stand on the left flank. Cavalerie!
-// sends the French squadron at the British line: a walk, then the gallop, a
-// short melee of sabre cuts with rearing horses, then they rally back.
+// Each regiment has a squadron of six light horse in two ranks, led by an
+// officer with a trumpeter beside him. On the march they ride behind the guns;
+// in line they stand on the left flank, trotting when they have far to go.
+// Cavalerie! sends the French squadron at the British line: walk, trot, then
+// the gallop, a short melee of sabre cuts with rearing horses, then they rally.
 // Buildings a charge rides around (ground radius in metres).
 const OBSTACLE_R={farmhouse:5,barn:6,cottage:4,barracks_fr:6,barracks_br:6};
 // First building on the straight ride from c to e, and a point to ride round it on the near side.
@@ -198,7 +199,8 @@ function detour(c,e){
  }
  return best;
 }
-const SQUAD={ranks:2,files:3,walk:3.2,gallop:7.5,stride:2.4,gallopStride:3.6,walkFor:1.2,contact:1.2,
+const SQUAD={ranks:2,files:3,walk:3.2,trot:4.5,gallop:7.5,stride:2.4,trotStride:2.8,gallopStride:3.6,walkFor:1.2,trotFor:1.5,
+ trotFrom:5,contact:1.2,
  melee:3.2,cutEvery:0.45,cutChance:0.35,cutReach:1.6,fallChance:0.18,fallWithin:6,dieFrame:0.22};
 const REGIMENTS=[{side:'france',prefix:'fr',lineRanks:3,start:0},{side:'britain',prefix:'br',lineRanks:2,start:0.5}];
 const slotKey=(r,f)=>r+','+f;
@@ -548,6 +550,10 @@ function buildSquadrons(){
      riders.push({side:reg.side,prefix:reg.prefix,rider:true,id,r,f,look,key:reg.prefix+':cav'+id,gx:0,gy:0,walk:0,
        dir:0,moving:false,placed:false,act:'idle',gait:'walk',forceWalk:false});
    }
+   // Officer in front of the centre, trumpeter at his right.
+   [['officer','co',1],['trumpeter','ct',2]].forEach(([role,look,f],i)=>riders.push({side:reg.side,prefix:reg.prefix,
+     rider:true,role,id:SQUAD.ranks*SQUAD.files+i,r:-1,f,look:reg.prefix+look,key:reg.prefix+':cav'+role,gx:0,gy:0,walk:0,
+     dir:0,moving:false,placed:false,act:'idle',gait:'walk',forceWalk:false}));
    return{reg,riders};
  });
 }
@@ -568,8 +574,11 @@ function updateSquadrons(dt){
    const reg=sq.reg,charging=ch&&i===0,marching=reg.formation==='column'&&!state.halted;
    if(!charging){
      for(const m of liveRiders(sq)){
-       walkTo(m,riderHome(reg,m),dt,false,SQUAD.walk);
-       m.act='idle';m.gait='walk';m.forceWalk=marching;
+       // A long way to their place: trot there; otherwise walk.
+       const h=riderHome(reg,m),far=Math.hypot(h.x-m.gx,h.y-m.gy)>SQUAD.trotFrom&&m.placed;
+       if(far)m.gait='trot';else if(!m.moving)m.gait='walk';
+       walkTo(m,h,dt,false,m.gait==='trot'?SQUAD.trot:SQUAD.walk);
+       m.act='idle';m.forceWalk=marching;
      }
      return;
    }
@@ -581,7 +590,8 @@ function updateSquadrons(dt){
    }
    const A=ch.aim,T={x:-A.y,y:A.x},face=dirIndex(A.x,A.y),via=ch.via&&ch.phase!=='melee'&&ch.phase!=='rally'?ch.via:null;
    const since=state.time-ch.at;
-   if(ch.phase==='walk'&&since>=SQUAD.walkFor){ch.phase='gallop';ch.at=state.time;}
+   if(ch.phase==='walk'&&since>=SQUAD.walkFor){ch.phase='trot';ch.at=state.time;}
+   else if(ch.phase==='trot'&&since>=SQUAD.trotFor){ch.phase='gallop';ch.at=state.time;}
    let arrived=0;
    for(const m of liveRiders(sq)){
      m.forceWalk=false;
@@ -589,11 +599,13 @@ function updateSquadrons(dt){
        const h=riderHome(reg,m);walkTo(m,h,dt,false,SQUAD.gallop*0.8);m.gait='gallop';m.act='idle';
        if(!m.moving)arrived++;continue;
      }
-     const goal=via||E,back=via?m.r*2.2:SQUAD.contact+0.4+m.r*2.2;
-     const t={x:goal.x-A.x*back+T.x*(m.f-1)*1.5,y:goal.y-A.y*back+T.y*(m.f-1)*1.5,dir:face};
+     // Officer and trumpeter ride in at the ends of the front rank.
+     const r=Math.max(0,m.r),f=m.r<0?(m.role==='officer'?-0.6:2.6):m.f;
+     const goal=via||E,back=via?r*2.2:SQUAD.contact+0.4+r*2.2;
+     const t={x:goal.x-A.x*back+T.x*(f-1)*1.5,y:goal.y-A.y*back+T.y*(f-1)*1.5,dir:face};
      if(ch.phase==='melee'){walkTo(m,t,dt,false,SQUAD.walk);meleeRider(m,ch);continue;}
-     walkTo(m,t,dt,false,ch.phase==='walk'?SQUAD.walk:SQUAD.gallop);
-     m.gait=ch.phase==='walk'?'walk':'gallop';m.act='idle';
+     walkTo(m,t,dt,false,SQUAD[ch.phase]);
+     m.gait=ch.phase;m.act='idle';
      // Some riders are brought down by musketry as they close.
      if(ch.phase==='gallop'&&!via&&Math.hypot(t.x-m.gx,t.y-m.gy)<SQUAD.fallWithin&&hash(m.id+ch.count*13,77)<SQUAD.fallChance){
        m.dead=true;state.riderFalls++;
@@ -627,7 +639,7 @@ function meleeRider(m,ch){
 function riderFrame(u){
  const d=DIRS[u.dir],seed=hash(u.id,u.prefix==='fr'?61:63);
  if(u.moving||u.forceWalk){
-   const stride=u.gait==='gallop'?SQUAD.gallopStride:SQUAD.stride;
+   const stride=u.gait==='gallop'?SQUAD.gallopStride:u.gait==='trot'?SQUAD.trotStride:SQUAD.stride;
    return u.gait+'_'+d+'|'+Math.floor((u.walk%stride)/stride*6)%6;
  }
  if(u.act==='slash')return 'slash_'+d+'|'+Math.floor(state.time/0.18+seed*3)%3;
@@ -941,7 +953,7 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'335.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'336.0',state,
  getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -979,9 +991,9 @@ const loadRole=([key,role])=>loadSheet(key,role,['idle','march','command']).then
 // stream in afterwards (soldiers use the base look until theirs has arrived).
 const firstKeys=['fr','br'];
 // Cavalry: two coat colours per nation, a riding and a fighting sheet each.
-const CAV_KEYS=['frc','frc2','brc','brc2'];
-const loadCav=key=>Promise.all([loadSheet(key,'cavalry',['idle','walk','gallop']),
- loadSheet(key,'cavfight',['slash','rear','die'])]).then(indexAtlas);
+const CAV_KEYS=['frc','frc2','frco','frct','brc','brc2','brco','brct'];
+const loadCav=key=>Promise.all([loadSheet(key,'cavalry',['idle','walk','trot']),
+ loadSheet(key,'cavfight',['gallop','slash','rear','die'])]).then(indexAtlas);
 // Batteries: one gun atlas and two gunner sheets per nation, streamed in with the extra looks.
 const loadGun=p=>loadSheet(p+'g','gun',['idle','fire','roll']).then(s=>{
  if(!s.sheet.meta.muzzle)throw new Error(p+': kanon zonder mondingspunten');return indexAtlas([s]);});

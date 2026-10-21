@@ -142,9 +142,10 @@ for (const prefix of ['fr', 'br']) {
   });
 }
 
-for (const key of ['frc', 'frc2', 'brc', 'brc2']) {
-  test(`v335 ${key} cavalry atlases: walk, gallop, slash, rear and fall in 8 directions`, () => {
-    const sheets = {cavalry: [[['idle', 2], ['walk', 6], ['gallop', 6]], 3136], cavfight: [[['slash', 3], ['rear', 2], ['die', 4]], 2016]};
+for (const key of ['frc', 'frc2', 'frco', 'frct', 'brc', 'brc2', 'brco', 'brct']) {
+  test(`v336 ${key} cavalry atlases: walk, trot, gallop, slash, rear and fall in 8 directions`, () => {
+    const sheets = {cavalry: [[['idle', 2], ['walk', 6], ['trot', 6]], 3136],
+      cavfight: [[['gallop', 6], ['slash', 3], ['rear', 2], ['die', 4]], 3360]};
     for (const [kind, [states, width]] of Object.entries(sheets)) {
       const sheet = JSON.parse(fs.readFileSync(path.join(dir, `${key}_iso_${kind}_atlas.json`), 'utf8'));
       assert.deepEqual(imageSize(path.join(dir, sheet.meta.image)), {w: width, h: 1536, alpha: true});

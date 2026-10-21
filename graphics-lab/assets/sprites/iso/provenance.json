@@ -1,5 +1,5 @@
 {
-  "assetId": "iso-scene-v335",
+  "assetId": "iso-scene-v336",
   "sourceType": "original",
   "author": "Claude Code via scripts/render-iso-infantry.py, commissioned by the repository owner",
   "usageRights": "Original script-generated Blender models (soldiers, buildings, trees, terrain) and renders; no third-party models, textures or animations; full rights of the repository owner",
@@ -159,7 +159,8 @@
       "gallop": 6,
       "slash": 3,
       "rear": 2,
-      "die": 4
+      "die": 4,
+      "trot": 6
     },
     "variants": {
       "1": "bay horse",
@@ -168,6 +169,10 @@
     "riders": {
       "france": "chasseur \u00e0 cheval",
       "britain": "light dragoon"
+    },
+    "roles": {
+      "officer": "black horse, gold lace, epaulettes, sash",
+      "trumpeter": "grey horse, reversed coat, trumpet"
     }
   }
 }

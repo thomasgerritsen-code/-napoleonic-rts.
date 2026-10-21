@@ -392,3 +392,21 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   manen en staart bij bruine en zwarte paarden; smallere, langere staart.
 - Zadel: zadelkleed over rug en flanken met boord en punt, gevormd zadel met
   voor- en achterboog, holsters en grijze mantelrol.
+
+---
+
+# v336 — draf, officier en trompetter
+
+- **Draf** (6 frames): tweeslag op diagonale beenparen, de romp veert twee keer
+  per pas en de ruiter rijst in de stijgbeugels mee. Atlassen nu: `cavalry`
+  (rust, stap, draf; 3136×1536) en `cavfight` (galop, sabelhouw, steigeren,
+  sneuvelen; 3360×1536).
+- **Officier** (`--role officer`, look `frco`/`brco`): zwart paard, goudboord op
+  de schabrak, gouden epauletten en sjakoband, sjerp.
+- **Trompetter** (`--role trumpeter`, look `frct`/`brct`): schimmel, karmozijnrode
+  (Frans) of scharlakenrode (Brits) jas; de trompet hangt aan de heup en gaat in
+  galop en in het gevecht aan de mond in plaats van de sabel.
+- **Lab**: elk eskadron heeft nu zes ruiters plus de officier vooraan en de
+  trompetter rechts naast hem. Moeten ze ver naar hun plaats, dan draven ze. De
+  charge gaat van stap via draf naar galop; officier en trompetter rijden aan de
+  uiteinden van het voorste gelid mee.
