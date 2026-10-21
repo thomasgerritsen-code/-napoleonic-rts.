@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from infantry_atlas_png import PngError, read_rgba, write_rgba  # noqa: E402
 
 CELL = 128
-PIVOT = {"x": 64, "y": 104}
+PIVOT = {"x": 64, "y": 108}
 ALPHA_FLOOR = 16  # render/denoise speckle below ~6% opacity is cleared
 DIRECTIONS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]
 STATES = [("idle", 2), ("march", 6)]

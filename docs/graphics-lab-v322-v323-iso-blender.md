@@ -57,3 +57,50 @@ de beelden heeft goedgekeurd voor de game.
 - `tests/headless/iso-atlas-v322.test.js` — atlasindeling, PNG-maat, herkomst.
 - `tests/graphics-lab-iso-v322.spec.js` — laden, alle 8 richtingen zichtbaar,
   pauze, halt en knijpzoom op een telefoon.
+
+---
+
+# v323 — verfijnd model, gebouwen, natuur en Blender-terrein
+
+## Wat er bij komt
+- **Gedeelde basis** `scripts/iso_blender_common.py`: één camera (orthografisch,
+  30°), één sleutelzon linksboven plus warm randlicht, en een materiaal-
+  bibliotheek met procedurele oppervlakken (stofweefsel, huid, pleister,
+  baksteen, dakpannen, leien, planken, riet, bladeren, schors, gras, aarde,
+  akkerrijen). Alle onderdelen staan daardoor in dezelfde wereld.
+- **Verfijnde soldaat**: knopen, kinschubben, haar, neus, oren, schouder-
+  stukken (Brits met wollen kwastjes), koppelplaat, broodzak, bajonetschede,
+  Britse veldfles, ranselriemen, musket met loop, slot, banden en draagriem,
+  Britse pluim. Voetanker nu (64,108) zodat de bajonet nooit wordt afgesneden.
+- **Gebouwen en natuur** `scripts/render-iso-props.py`: Franse kazerne
+  (pleister, groene luiken, driekleur), Britse kazerne (baksteen, hoekstenen,
+  Union Flag), vakwerkboerderij met pannendak, schuur en stenen huisje met
+  rieten dak, put, hooiberg, eik, populier, struik en hek. Gebouwen staan
+  schuin (±30°) zodat twee gevels en een topgevel zichtbaar zijn, zoals in
+  Age of Empires. Elk object heeft een eigen zachte contactschaduw die naar de
+  rand toe uitloopt.
+- **Terrein** `scripts/render-iso-ground.py`: gras met vlekken, ~4200
+  graspollen, bloemen, zandweg (achthoek + twee uitlopers) met berm en
+  steentjes, drie akkers en een vijver, gerenderd als één JPEG.
+- **Indeling** `graphics-lab/assets/iso/layout.json` wordt door Blender
+  (terrein) én door de lab-pagina (gebouwen, bomen) gelezen, zodat weg en
+  objecten exact samenvallen.
+- **Lab** (`/graphics-lab/iso.html`, v323): terrein-JPEG als ondergrond,
+  objecten en soldaten in één diepte-volgorde; zonder Blender-terrein valt de
+  pagina terug op het eenvoudige getekende terrein.
+
+## Opnieuw renderen (ongeveer 4 minuten op CPU)
+```bash
+.bvenv/bin/python scripts/render-iso-infantry.py --side france --out art/frames/iso-proof
+.bvenv/bin/python scripts/render-iso-infantry.py --side britain --out art/frames/iso-proof
+python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-lab/assets/sprites/iso
+.bvenv/bin/python scripts/render-iso-props.py
+.bvenv/bin/python scripts/render-iso-ground.py
+```
+
+## Tests
+- `tests/headless/iso-scene-v323.test.js`: atlassen, herkomst, elk object uit
+  de indeling heeft een sprite met kloppende PNG-maat, terrein aanwezig en
+  geen object op de marsroute.
+- `tests/graphics-lab-iso-v323.spec.js`: terrein en alle objecten getekend,
+  8 richtingen, pauze/halt, knijpzoom op telefoon.

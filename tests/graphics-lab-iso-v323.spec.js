@@ -7,17 +7,20 @@ async function open(page){
   return errors;
 }
 const frames=page=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
-test('v322 iso proof loads both Blender atlases and draws every soldier',async({page})=>{
+test('v323 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
   const errors=await open(page);
   await frames(page);
   const s=await page.evaluate(()=>({...window.__GRAPHICS_LAB_ISO__.getStats(),version:window.__GRAPHICS_LAB_ISO__.version}));
-  expect(s.version).toBe('322.0');
+  expect(s.version).toBe('323.0');
+  expect(s.terrain).toBe(true);
+  expect(s.props).toBeGreaterThan(30);
+  expect(s.propsDrawn).toBe(s.props);
   expect(s.units).toBe(64);
   expect(s.drawn).toBe(64);
-  expect(await page.locator('#iso-status').textContent()).toContain('8 richtingen');
+  expect(await page.locator('#iso-status').textContent()).toContain('gebouwen en terrein');
   expect(errors).toEqual([]);
 });
-test('v322 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
+test('v323 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
   const errors=await open(page);
   const seen=await page.evaluate(async()=>{
     const api=window.__GRAPHICS_LAB_ISO__,step=()=>new Promise(r=>requestAnimationFrame(r));
@@ -36,7 +39,7 @@ test('v322 octagon march shows all 8 sprite directions; pause freezes the frame'
 });
 test.describe('phone',()=>{
   test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-  test('v322 iso proof pinch-zooms on a phone',async({page})=>{
+  test('v323 iso scene pinch-zooms on a phone',async({page})=>{
     const errors=await open(page);
     const before=(await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).zoom;
     const r=await page.locator('#iso-view').boundingBox();

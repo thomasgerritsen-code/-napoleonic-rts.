@@ -1,12 +1,36 @@
 {
-  "assetId": "iso-line-infantry-proof-v322",
+  "assetId": "iso-scene-v323",
   "sourceType": "original",
   "author": "Claude Code via scripts/render-iso-infantry.py, commissioned by the repository owner",
-  "usageRights": "Original script-generated Blender model and renders; no third-party models, textures or animations; full rights of the repository owner",
-  "sourceRef": "scripts/render-iso-infantry.py (Blender 5.2 bpy, Cycles CPU, 48 samples) + scripts/pack-iso-atlas.py",
+  "usageRights": "Original script-generated Blender models (soldiers, buildings, trees, terrain) and renders; no third-party models, textures or animations; full rights of the repository owner",
+  "sourceRef": "scripts/iso_blender_common.py, render-iso-infantry.py, render-iso-props.py, render-iso-ground.py (Blender 5.2 bpy, Cycles CPU) + pack-iso-atlas.py",
   "reviewedForUse": false,
-  "reviewNote": "Graphics Lab proof only; awaiting human visual review before any use in the game",
-  "camera": {"projection": "orthographic", "elevationDeg": 30, "frame": 128, "pivot": {"x": 64, "y": 104}},
-  "directions": ["e", "se", "s", "sw", "w", "nw", "n", "ne"],
-  "states": {"idle": 2, "march": 6}
+  "reviewNote": "Graphics Lab only; awaiting human visual review before any use in the game",
+  "camera": {
+    "projection": "orthographic",
+    "elevationDeg": 30,
+    "frame": 128,
+    "pivot": {
+      "x": 64,
+      "y": 108
+    }
+  },
+  "directions": [
+    "e",
+    "se",
+    "s",
+    "sw",
+    "w",
+    "nw",
+    "n",
+    "ne"
+  ],
+  "states": {
+    "idle": 2,
+    "march": 6
+  },
+  "covers": [
+    "graphics-lab/assets/sprites/iso/*",
+    "graphics-lab/assets/iso/*"
+  ]
 }

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Render the isometric Blender infantry proof (Graphics Lab iso proof).
+"""Render the isometric Blender infantry (Graphics Lab iso proof, v323 model).
 
 Builds an original, script-generated 1809 line fusilier from primitives (no
 third-party model), poses it per frame and renders 8 directions x (2 idle +
-6 march) frames (128 px) with one fixed orthographic camera and one fixed sun. The
-same rig and colour tables produce the French and the British soldier.
+6 march) frames with the shared iso camera and sun (iso_blender_common.py).
+The same rig produces the French and the British soldier; only uniform
+details and colours differ.
 
 Requires Blender's Python module (``pip install bpy``, Blender 5.x):
   python scripts/render-iso-infantry.py --side france --out art/frames/iso-proof
@@ -20,140 +21,132 @@ from pathlib import Path
 import bpy
 from mathutils import Euler
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from iso_blender_common import (SPRITE_PX_PER_M, camera, empty, material, part,  # noqa: E402
+                                setup_render, shadow_catcher)
+
 FRAME = 128              # output cell, px
-PIVOT = (64, 104)        # feet on screen, px
-ELEVATION = 30.0         # camera elevation, degrees (classic RTS 3/4 view)
-ORTHO_SCALE = 3.1       # metres covered by the 128 px frame
+PIVOT = (64, 108)        # feet on screen, px
 DIRECTIONS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]  # clockwise on screen
 STATES = [("idle", 2), ("march", 6)]
 
 PALETTES = {
     "france": {
-        "coat": "#24315c", "lapel": "#e9e5d8", "collar": "#a62222", "cuff": "#a62222",
-        "turnback": "#e9e5d8", "breeches": "#ddd8c8", "gaiter": "#1b1b1b",
-        "shako": "#161616", "plate": "#c9a33c", "pompom": "#2f7d3a", "pack": "#7b5636",
-        "roll": "#4b5a73", "belt": "#f1eee6", "lace": None,
+        "coat": "#24315c", "lapel": "#ece8db", "collar": "#a62222", "cuff": "#a62222",
+        "turnback": "#ece8db", "breeches": "#e0dbcb", "gaiter": "#1b1b1b", "strap": "#24315c",
+        "shako": "#171717", "plate": "#c9a33c", "pompom": "#2f7d3a", "pack": "#86603c",
+        "roll": "#4b5a73", "belt": "#f3f0e8", "button": "#d8b44a", "hair": "#4a3324",
     },
     "britain": {
-        "coat": "#b0262a", "lapel": "#b0262a", "collar": "#e2d6a8", "cuff": "#e2d6a8",
-        "turnback": "#efe9dc", "breeches": "#8c8f93", "gaiter": "#1b1b1b",
-        "shako": "#161616", "plate": "#c9a33c", "pompom": "#efe9dc", "pack": "#262626",
-        "roll": "#5b5f66", "belt": "#f1eee6", "lace": "#f4f1ea",
+        "coat": "#b3262b", "lapel": "#b3262b", "collar": "#e4d7a6", "cuff": "#e4d7a6",
+        "turnback": "#f1ebdd", "breeches": "#8c9095", "gaiter": "#1b1b1b", "strap": "#b3262b",
+        "shako": "#171717", "plate": "#c9a33c", "pompom": "#f1ebdd", "pack": "#272727",
+        "roll": "#5b5f66", "belt": "#f3f0e8", "button": "#e9e6dc", "hair": "#6b4a2e",
     },
 }
-COMMON = {"skin": "#d6a27c", "wood": "#6a4322", "steel": "#a3a9ae", "shoe": "#101010",
-          "box": "#151515"}
-
-
-def linear(hex_color: str) -> tuple[float, float, float, float]:
-    h = hex_color.lstrip("#")
-    c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
-    return tuple((v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4) for v in c) + (1.0,)
-
-
-_materials: dict[str, bpy.types.Material] = {}
-
-
-def material(hex_color: str, rough: float = 0.75, metal: float = 0.0) -> bpy.types.Material:
-    key = f"{hex_color}-{rough}-{metal}"
-    if key not in _materials:
-        m = bpy.data.materials.new(key)
-        m.use_nodes = True
-        bsdf = m.node_tree.nodes["Principled BSDF"]
-        bsdf.inputs["Base Color"].default_value = linear(hex_color)
-        bsdf.inputs["Roughness"].default_value = rough
-        bsdf.inputs["Metallic"].default_value = metal
-        _materials[key] = m
-    return _materials[key]
-
-
-def empty(name, parent=None, loc=(0, 0, 0)):
-    obj = bpy.data.objects.new(name, None)
-    bpy.context.collection.objects.link(obj)
-    obj.parent = parent
-    obj.location = loc
-    return obj
-
-
-def part(kind, size, loc, mat, parent, rot=(0, 0, 0), name="part"):
-    """kind: box (size=x,y,z), cyl (size=r,depth[,r_top]), ball (size=r[,sx,sy,sz])."""
-    if kind == "box":
-        bpy.ops.mesh.primitive_cube_add(size=1)
-        obj = bpy.context.object
-        obj.scale = size
-    elif kind == "cyl":
-        r, depth = size[0], size[1]
-        top = size[2] if len(size) > 2 else r
-        bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=r, radius2=top, depth=depth)
-        obj = bpy.context.object
-        bpy.ops.object.shade_smooth()
-    else:
-        bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, radius=size[0])
-        obj = bpy.context.object
-        if len(size) == 4:
-            obj.scale = size[1:]
-        bpy.ops.object.shade_smooth()
-    obj.name = name
-    obj.data.materials.append(mat)
-    obj.parent = parent
-    obj.location = loc
-    obj.rotation_euler = Euler([math.radians(a) for a in rot])
-    return obj
+COMMON = {"skin": "#d6a27c", "wood": "#6a4322", "steel": "#a8aeb3", "shoe": "#121212",
+          "box": "#161616", "canvas": "#d9d1b8", "canteen": "#6f8197"}
 
 
 def build_soldier(side: str) -> dict:
     p = {**PALETTES[side], **COMMON}
-    M = {k: material(v) for k, v in p.items() if v}
-    M["steel"] = material(p["steel"], 0.35, 0.8)
-    M["plate"] = material(p["plate"], 0.35, 0.9)
+    M = {k: material(v) for k, v in p.items()}
+    M["skin"] = material(p["skin"], 0.6, pattern="skin")
+    M["hair"] = material(p["hair"], 0.7, pattern="skin")
+    M["steel"] = material(p["steel"], 0.32, 0.85, pattern="plain")
+    M["plate"] = material(p["plate"], 0.3, 0.9, pattern="plain")
+    M["button"] = material(p["button"], 0.35, 0.7 if side == "france" else 0.1, pattern="plain")
+    M["wood"] = material(p["wood"], 0.55, pattern="bark", scale=2.5)
+    M["shoe"] = material(p["shoe"], 0.35, pattern="plain")
+    M["box"] = material(p["box"], 0.4, pattern="plain")
+    british = side == "britain"
+
     root = empty("root")
     hips = empty("hips", root, (0, 0, 0.95))
-    torso = empty("torso", hips, (0, 0, 0))
-    # Coat body, open French lapels / British laced front, collar and tails.
+    torso = empty("torso", hips)
+    # Coat body with a slightly fuller chest, collar and short tails.
     part("box", (0.36, 0.23, 0.56), (0, 0, 0.29), M["coat"], torso, name="coat")
-    if not p["lace"]:
+    part("box", (0.38, 0.24, 0.16), (0, 0.004, 0.46), M["coat"], torso, name="chest")
+    if not british:
         part("box", (0.2, 0.02, 0.34), (0, 0.118, 0.36), M["lapel"], torso, name="lapel")
+        for col in (-0.085, 0.085):
+            for i in range(6):
+                part("ball", (0.012,), (col, 0.131, 0.22 + i * 0.055), M["button"], torso, name="button", segments=8)
     else:
-        for i in range(5):
-            part("box", (0.16, 0.012, 0.022), (0, 0.13, 0.22 + i * 0.065), M["lace"], torso, name="lace")
-    part("box", (0.3, 0.04, 0.26), (0, -0.115, -0.08), M["coat"], torso, name="tails")
-    part("box", (0.06, 0.045, 0.24), (0.11, -0.12, -0.08), M["turnback"], torso, name="turnback")
-    part("box", (0.06, 0.045, 0.24), (-0.11, -0.12, -0.08), M["turnback"], torso, name="turnback")
-    part("box", (0.3, 0.2, 0.16), (0, 0.01, -0.02), M["breeches"], torso, name="waist")
-    # White crossbelts read as an X on chest and back.
+        for i in range(6):
+            part("box", (0.15, 0.012, 0.02), (0, 0.124, 0.2 + i * 0.056), M["turnback"], torso, name="lace")
+            part("ball", (0.012,), (0.08, 0.131, 0.2 + i * 0.056), M["button"], torso, name="button", segments=8)
+            part("ball", (0.012,), (-0.08, 0.131, 0.2 + i * 0.056), M["button"], torso, name="button", segments=8)
+    part("box", (0.32, 0.045, 0.3), (0, -0.115, -0.1), M["coat"], torso, name="tails")
+    for x in (0.1, -0.1):
+        part("box", (0.07, 0.05, 0.28), (x, -0.12, -0.1), M["turnback"], torso, name="turnback")
+    part("box", (0.31, 0.21, 0.17), (0, 0.01, -0.02), M["breeches"], torso, name="waist")
+    # Shoulder straps (British: with white worsted tufts).
+    for x in (0.16, -0.16):
+        part("box", (0.08, 0.13, 0.02), (x, 0, 0.575), M["strap"], torso, name="strap")
+        if british:
+            part("ball", (0.035, 1.3, 1, 0.6), (x * 1.18, 0, 0.57), M["turnback"], torso, name="tuft")
+    # White crossbelts as an X on chest and back, with brass belt plate.
     for angle in (38, -38):
-        part("box", (0.042, 0.27, 0.66), (0, 0, 0.3), M["belt"], torso, rot=(0, angle, 0), name="belt")
-    part("box", (0.2, 0.08, 0.13), (0.1, -0.14, 0.0), M["box"], torso, name="cartridge")
-    part("box", (0.3, 0.13, 0.31), (0, -0.185, 0.38), M["pack"], torso, name="pack")
-    part("cyl", (0.055, 0.32), (0, -0.17, 0.57), M["roll"], torso, rot=(0, 90, 0), name="roll")
-    part("cyl", (0.075, 0.07), (0, 0, 0.6), M["collar"], torso, name="collar")
+        part("box", (0.042, 0.272, 0.66), (0, 0, 0.3), M["belt"], torso, rot=(0, angle, 0), name="belt")
+    part("box", (0.05, 0.012, 0.06), (0, 0.142, 0.3), M["plate"], torso, name="beltplate")
+    part("box", (0.21, 0.085, 0.14), (0.1, -0.145, 0.0), M["box"], torso, name="cartridge")
+    part("box", (0.16, 0.06, 0.18), (-0.19, 0.0, -0.03), M["canvas"], torso, name="haversack")
+    part("cyl", (0.018, 0.34, 0.014), (-0.2, -0.07, -0.08), M["box"], torso, rot=(0, -8, 0), name="scabbard")
+    if british:
+        part("cyl", (0.065, 0.05), (0.2, 0.02, -0.01), M["canteen"], torso, rot=(0, 90, 0), name="canteen")
+    part("box", (0.31, 0.13, 0.32), (0, -0.19, 0.38), M["pack"], torso, name="pack")
+    for x in (0.1, -0.1):
+        part("box", (0.03, 0.012, 0.3), (x, -0.26, 0.38), M["belt"], torso, name="packstrap")
+    part("cyl", (0.058, 0.33), (0, -0.175, 0.58), M["roll"], torso, rot=(0, 90, 0), name="roll")
+    part("cyl", (0.078, 0.075), (0, 0, 0.6), M["collar"], torso, name="collar")
+
     head = empty("head", torso, (0, 0, 0.72))
-    part("ball", (0.105,), (0, 0.01, 0), M["skin"], head, name="face")
-    part("cyl", (0.098, 0.2, 0.112), (0, 0, 0.16), M["shako"], head, name="shako")
+    part("ball", (0.104, 1, 1.02, 1.05), (0, 0.01, 0), M["skin"], head, name="face")
+    part("ball", (0.106, 1, 0.95, 0.9), (0, -0.025, 0.02), M["hair"], head, name="hair")
+    part("cyl", (0.022, 0.05, 0.004), (0, 0.115, -0.01), M["skin"], head, rot=(-90, 0, 0), name="nose", segments=8)
+    for x in (0.1, -0.1):
+        part("ball", (0.022,), (x, 0, 0), M["skin"], head, name="ear", segments=8)
+    part("cyl", (0.097, 0.2, 0.112), (0, 0, 0.16), M["shako"], head, name="shako")
+    part("cyl", (0.114, 0.02), (0, 0, 0.265), M["shako"], head, name="lid")
     part("box", (0.13, 0.06, 0.014), (0, 0.1, 0.075), M["shako"], head, rot=(-12, 0, 0), name="visor")
-    part("box", (0.08, 0.015, 0.08), (0, 0.105, 0.15), M["plate"], head, name="plate")
-    part("ball", (0.035,), (0, 0.06, 0.285), M["pompom"], head, name="pompom")
+    part("box", (0.075, 0.012, 0.075), (0, 0.108, 0.16), M["plate"], head, rot=(0, 45, 0), name="plate")
+    for x in (0.1, -0.1):
+        part("box", (0.01, 0.03, 0.1), (x * 1.02, -0.005, 0.04), M["plate"], head, rot=(10, 0, 0), name="chinscale")
+    if british:
+        part("cyl", (0.022, 0.13, 0.03), (-0.05, 0.08, 0.33), M["pompom"], head, name="plume")
+        part("box", (0.16, 0.01, 0.025), (0, 0.11, 0.24), M["turnback"], head, name="band")
+    else:
+        part("ball", (0.038,), (0, 0.06, 0.3), M["pompom"], head, name="pompom")
+        part("box", (0.012, 0.012, 0.09), (0.06, 0.1, 0.12), M["belt"], head, rot=(0, 40, 0), name="cord")
+
     joints = {}
     for sign, key in ((1, "R"), (-1, "L")):
         sh = empty("shoulder" + key, torso, (0.215 * sign, 0, 0.52))
-        part("cyl", (0.058, 0.3), (0, 0, -0.15), M["coat"], sh, name="upperarm")
+        part("cyl", (0.06, 0.3, 0.054), (0, 0, -0.15), M["coat"], sh, name="upperarm")
         el = empty("elbow" + key, sh, (0, 0, -0.3))
-        part("cyl", (0.05, 0.25), (0, 0, -0.125), M["coat"], el, name="forearm")
-        part("cyl", (0.056, 0.07), (0, 0, -0.22), M["cuff"], el, name="cuff")
-        part("ball", (0.045,), (0, 0, -0.29), M["skin"], el, name="hand")
+        part("cyl", (0.052, 0.25, 0.046), (0, 0, -0.125), M["coat"], el, name="forearm")
+        part("cyl", (0.058, 0.075), (0, 0, -0.215), M["cuff"], el, name="cuff")
+        part("ball", (0.042, 0.9, 0.75, 1.2), (0, 0.005, -0.29), M["skin"], el, name="hand")
         th = empty("thigh" + key, hips, (0.095 * sign, 0, 0))
-        part("cyl", (0.078, 0.46, 0.066), (0, 0, -0.23), M["breeches"], th, name="thigh")
+        part("cyl", (0.08, 0.46, 0.066), (0, 0, -0.23), M["breeches"], th, name="thigh")
         kn = empty("knee" + key, th, (0, 0, -0.45))
+        part("cyl", (0.068, 0.1), (0, 0, -0.03), M["gaiter"], kn, name="gaitertop")
         part("cyl", (0.064, 0.42, 0.055), (0, 0, -0.21), M["gaiter"], kn, name="shin")
-        part("box", (0.1, 0.24, 0.07), (0, 0.05, -0.455), M["shoe"], kn, name="shoe")
+        part("box", (0.1, 0.25, 0.07), (0, 0.05, -0.455), M["shoe"], kn, name="shoe")
         joints[key] = (sh, el, th, kn)
+
     # Shouldered musket on the left: butt in the left hand, barrel past the shoulder.
-    musket = empty("musket", torso, (-0.25, 0.1, -0.05))
-    musket.rotation_euler = Euler((math.radians(-22), math.radians(-6), 0))
-    part("box", (0.05, 0.09, 0.32), (0, 0, 0.16), M["wood"], musket, name="butt")
-    part("cyl", (0.022, 0.95), (0, 0, 0.78), M["wood"], musket, name="stock")
-    part("cyl", (0.012, 0.36), (0, 0, 1.4), M["steel"], musket, name="bayonet")
-    return {"root": root, "hips": hips, "torso": torso, "joints": joints, "musket": musket}
+    musket = empty("musket", torso, (-0.25, 0.1, -0.05), (-22, -6, 0))
+    part("box", (0.045, 0.1, 0.3), (0, 0, 0.15), M["wood"], musket, name="butt")
+    part("cyl", (0.024, 0.95, 0.018), (0, 0.01, 0.75), M["wood"], musket, name="stock")
+    part("cyl", (0.011, 1.05), (0, 0.032, 0.85), M["steel"], musket, name="barrel")
+    part("box", (0.012, 0.03, 0.07), (0.022, 0.02, 0.42), M["steel"], musket, name="lock")
+    for z in (0.62, 0.9, 1.15):
+        part("cyl", (0.027, 0.022), (0, 0.015, z), M["steel"], musket, name="band")
+    part("box", (0.008, 0.012, 0.8), (0, -0.03, 0.55), M["belt"], musket, rot=(4, 0, 0), name="sling")
+    part("cyl", (0.009, 0.34, 0.002), (0, 0.04, 1.5), M["steel"], musket, name="bayonet")
+    return {"root": root, "hips": hips, "torso": torso, "joints": joints}
 
 
 def pose(rig: dict, state: str, frame: int, frames: int) -> None:
@@ -186,56 +179,17 @@ def pose(rig: dict, state: str, frame: int, frames: int) -> None:
     el_r.rotation_euler = Euler((rad(14 + 8 * max(0.0, -swing)), 0, 0))
 
 
-def setup_scene(samples: int) -> None:
-    scene = bpy.context.scene
-    scene.render.engine = "CYCLES"
-    scene.cycles.device = "CPU"
-    scene.cycles.samples = samples
-    scene.cycles.use_denoising = True
-    scene.render.resolution_x = scene.render.resolution_y = FRAME
-    scene.render.film_transparent = True
-    scene.render.filter_size = 1.2
-    scene.render.image_settings.file_format = "PNG"
-    scene.render.image_settings.color_mode = "RGBA"
-    scene.render.image_settings.color_depth = "8"
-    scene.view_settings.view_transform = "Standard"
-    world = bpy.data.worlds.new("sky")
-    world.use_nodes = True
-    world.node_tree.nodes["Background"].inputs["Color"].default_value = linear("#b9c4cf")
-    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.75
-    scene.world = world
-    # Fixed orthographic 3/4 camera; screen-right is world +X.
-    cam_data = bpy.data.cameras.new("cam")
-    cam_data.type = "ORTHO"
-    cam_data.ortho_scale = ORTHO_SCALE
-    cam_data.shift_y = (PIVOT[1] - FRAME / 2) / FRAME
-    cam = bpy.data.objects.new("cam", cam_data)
-    scene.collection.objects.link(cam)
-    el = math.radians(ELEVATION)
-    cam.location = (0, -20 * math.cos(el), 20 * math.sin(el))
-    cam.rotation_euler = Euler((math.radians(90) - el, 0, 0))
-    scene.camera = cam
-    # Sun from the upper left of the screen; short shadow to the lower right.
-    sun_data = bpy.data.lights.new("sun", "SUN")
-    sun_data.energy = 3.6
-    sun_data.angle = math.radians(6)
-    sun = bpy.data.objects.new("sun", sun_data)
-    scene.collection.objects.link(sun)
-    sun.rotation_euler = Euler((math.radians(26), 0, math.radians(-135)))
-    # Small shadow catcher under the feet: its edge stays inside the frame.
-    bpy.ops.mesh.primitive_circle_add(vertices=48, radius=1.0, fill_type="NGON", location=(0.25, 0.1, 0))
-    ground = bpy.context.object
-    ground.is_shadow_catcher = True
-
-
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--side", choices=sorted(PALETTES), required=True)
     ap.add_argument("--out", default="art/frames/iso-proof")
-    ap.add_argument("--samples", type=int, default=48)
+    ap.add_argument("--samples", type=int, default=64)
     args = ap.parse_args(argv)
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    setup_scene(args.samples)
+    setup_render(args.samples)
+    camera(FRAME, FRAME, SPRITE_PX_PER_M, PIVOT)
+    # Small shadow catcher under the feet: its edge stays inside the frame.
+    shadow_catcher("ground", [(0.2 + 0.85 * math.cos(a / 24 * math.tau), 0.05 + 0.85 * math.sin(a / 24 * math.tau)) for a in range(24)])
     rig = build_soldier(args.side)
     out = Path(args.out).resolve() / args.side
     out.mkdir(parents=True, exist_ok=True)
@@ -247,8 +201,7 @@ def main(argv: list[str]) -> int:
             for f in range(frames):
                 pose(rig, state, f, frames)
                 bpy.context.view_layer.update()
-                path = out / f"{prefix}_iso_{state}_{name}_{f + 1:02d}.png"
-                bpy.context.scene.render.filepath = str(path)
+                bpy.context.scene.render.filepath = str(out / f"{prefix}_iso_{state}_{name}_{f + 1:02d}.png")
                 bpy.ops.render.render(write_still=True)
     print(f"{args.side}: {len(DIRECTIONS) * sum(n for _, n in STATES)} frames -> {out}")
     return 0

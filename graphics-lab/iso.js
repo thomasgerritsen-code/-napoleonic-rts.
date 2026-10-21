@@ -1,4 +1,4 @@
-// Graphics Lab v322 — isometric proof with Blender-rendered 8-direction sprites.
+// Graphics Lab v323 — isometric scene: Blender-rendered soldiers, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
 (function(){
 'use strict';
@@ -7,12 +7,12 @@ const ui={status:document.getElementById('iso-status'),halt:document.getElementB
  pause:document.getElementById('iso-pause'),center:document.getElementById('iso-center'),count:document.getElementById('iso-count')};
 // Sprite contract from scripts/render-iso-infantry.py: 128 px cell covers 3.1 m,
 // feet at (64,104), camera elevation 30° so the ground is squashed by sin(30°)=0.5.
-const CELL=128,PIVOT={x:64,y:104},SPRITE_PX_PER_M=CELL/3.1,SQUASH=0.5,S=20;
+const CELL=128,PIVOT={x:64,y:108},SPRITE_PX_PER_M=CELL/3.1,SQUASH=0.5,S=20;
 const DIRS=['e','se','s','sw','w','nw','n','ne'];
 const MARCH={frames:6,strideM:1.5},IDLE={frames:2,frameMs:500},SPEED=1.3;
 const ROAD_R=14,GROUND=48,TILE=2;
 const state={zoom:1,customZoom:false,camX:0,camY:0,time:0,last:performance.now(),paused:false,halted:false,
- travelled:0,perSide:32,atlases:{},ground:null,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
+ travelled:0,perSide:32,atlases:{},ground:null,terrain:null,props:[],fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
 
 // Ground coordinates (metres) -> unzoomed screen pixels.
 const project=(gx,gy)=>({x:gx*S,y:-gy*SQUASH*S});
@@ -67,6 +67,18 @@ function paintGround(){
    g.fillRect(p.x,p.y,2,1.4);
  }
  state.ground={canvas:c,w,h};
+}
+
+const loadImage=src=>new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('ontbreekt: '+src));im.src=src;});
+const loadJson=url=>fetch(url,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('ontbreekt: '+url);return r.json();});
+// Blender terrain + props share the sprite camera; the procedural ground stays as fallback.
+async function loadScene(){
+ const [layout,manifest]=await Promise.all([loadJson('./assets/iso/layout.json'),loadJson('./assets/iso/props/props.json')]);
+ const image=await loadImage('./assets/iso/'+layout.ground.image);
+ const sprites={};
+ await Promise.all(Object.entries(manifest.props).map(async([kind,meta])=>{sprites[kind]={...meta,image:await loadImage('./assets/iso/props/'+meta.image)};}));
+ state.terrain={image,scale:S/layout.ground.pxPerM};
+ state.props=layout.props.filter(p=>sprites[p.type]).map(p=>({...p,sprite:sprites[p.type],...project(p.x,p.y)}));
 }
 
 function loadAtlas(prefix){
@@ -124,11 +136,14 @@ function draw(now){
  const dpr=canvas.width/Math.max(1,view.clientWidth),z=state.zoom;
  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#5d6b45';ctx.fillRect(0,0,canvas.width,canvas.height);
  ctx.setTransform(dpr*z,0,0,dpr*z,dpr*(view.clientWidth/2-state.camX*z),dpr*(view.clientHeight/2-state.camY*z));
- if(state.ground)ctx.drawImage(state.ground.canvas,-state.ground.w/2,-state.ground.h/2);
- const list=units().map(u=>({...u,...project(u.gx,u.gy)})).sort((a,b)=>a.y-b.y);
+ if(state.terrain){const t=state.terrain,w=t.image.naturalWidth*t.scale,h=t.image.naturalHeight*t.scale;ctx.drawImage(t.image,-w/2,-h/2,w,h);}
+ else if(state.ground)ctx.drawImage(state.ground.canvas,-state.ground.w/2,-state.ground.h/2);
  const k=S/SPRITE_PX_PER_M;
- state.drawn=0;
+ // Soldiers and props share one painter's order by their ground point.
+ const list=units().map(u=>({...u,...project(u.gx,u.gy)})).concat(state.props).sort((a,b)=>a.y-b.y);
+ state.drawn=0;state.propsDrawn=0;
  for(const u of list){
+   if(u.sprite){const p=u.sprite;ctx.drawImage(p.image,u.x-p.pivot.x*k,u.y-p.pivot.y*k,p.w*k,p.h*k);state.propsDrawn++;continue;}
    const atlas=state.atlases[u.prefix];if(!atlas)continue;
    const [anim,f]=frameFor(u).split('|');
    drawSprite(atlas,anim,Number(f),u.x,u.y,k);
@@ -172,14 +187,15 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'322.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'323.0',state,
  getStats:()=>({loaded:Object.keys(state.atlases).length,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
+   terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,directionsSeen:state.directionsSeen.size,perimeter})};
 
 paintGround();resize();
-Promise.all([loadAtlas('fr'),loadAtlas('br')]).then(([fr,br])=>{
+Promise.all([loadAtlas('fr'),loadAtlas('br'),loadScene().catch(err=>{console.warn('Iso terrein/gebouwen fallback:',err);})]).then(([fr,br])=>{
  state.atlases={fr,br};
- ui.status.textContent='Blender-sprites geladen · 8 richtingen · Canvas 2D';
+ ui.status.textContent=state.terrain?'Blender-scène geladen · soldaten, gebouwen en terrein':'Blender-soldaten geladen · eenvoudig terrein';
 }).catch(err=>{
  ui.status.textContent='Atlassen konden niet laden.';console.error(err);
 });
