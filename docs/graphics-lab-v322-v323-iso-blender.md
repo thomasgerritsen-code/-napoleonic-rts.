@@ -410,3 +410,26 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   trompetter rechts naast hem. Moeten ze ver naar hun plaats, dan draven ze. De
   charge gaat van stap via draf naar galop; officier en trompetter rijden aan de
   uiteinden van het voorste gelid mee.
+
+---
+
+# v337 — Britse tegenaanval
+
+- **Carré**: zodra de Franse cavalerie chargeert, vormt de Britse infanterie een
+  hol carré rond haar midden: op elke zijde twee rijen, iedereen met front naar
+  buiten, de buitenste rij geknield met gevelde bajonet. Mannen en plaatsen
+  worden op hun hoek rond het midden gekoppeld, zodat niemand dwars door het
+  carré loopt. Staf en vaandel staan in het midden. Elke zijde vuurt (via de
+  animatiecontroller) op ruiters binnen 9 m vóór die zijde; een schot kan een
+  paard neerhalen.
+- **Tegencharge**: zodra de Fransen in draf gaan, galoppeert het Britse eskadron
+  ze tegemoet. Komen de eskadrons binnen 3,5 m, dan volgt 3,5 s ruiter tegen
+  ruiter (sabelhouwen, steigerende paarden); elke halve seconde kan aan beide
+  kanten een ruiter vallen, en de grootste ploeg verliest er minder.
+- **Afloop**: winnen de Fransen, dan galopperen ze door naar het carré, waar de
+  paarden weigeren (meer steigeren, weinig houwen komen door de bajonetten) en
+  het vuur van het carré ze uitdunt; daarna verzamelen ze. Verliezen ze, dan
+  rijden beide eskadrons terug. Is de Franse cavalerie terug, dan vormen de
+  Britten weer linie.
+- `state.reaction` (standaard aan) schakelt de Britse reactie; `getStats()` toont
+  `cavCounter`, `squareShots` en `clashes`.

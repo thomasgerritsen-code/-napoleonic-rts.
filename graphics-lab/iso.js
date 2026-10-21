@@ -1,4 +1,4 @@
-// Graphics Lab v336 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v337 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -21,7 +21,7 @@ const BAND_DELAY=0.8,HIT_CHANCE=0.05,HIT_DELAY=0.25,DIE_FRAME=0.17;
 const ROAD_R=14,GROUND=48,TILE=2;
 const state={zoom:1,customZoom:false,camX:0,camY:0,time:0,last:performance.now(),paused:false,halted:false,
  travelled:0,perSide:32,atlases:{},ground:null,terrain:null,props:[],firing:false,controller:null,smoke:[],volleys:0,
- fireStart:0,regiments:null,simTime:0,dead:new Map(),batteries:null,squadrons:null,cavCharge:null,deadRiders:[],riderFalls:0,sabreHits:0,balls:[],cannonShots:0,ballHits:0,charge:null,woundedShare:0.3,drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
+ fireStart:0,regiments:null,simTime:0,dead:new Map(),batteries:null,squadrons:null,cavCharge:null,reaction:true,cavCounter:null,squareShots:0,clashes:0,deadRiders:[],riderFalls:0,sabreHits:0,balls:[],cannonShots:0,ballHits:0,charge:null,woundedShare:0.3,drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
 
 // Ground coordinates (metres) -> unzoomed screen pixels.
 const project=(gx,gy)=>({x:gx*S,y:-gy*SQUASH*S});
@@ -201,7 +201,7 @@ function detour(c,e){
 }
 const SQUAD={ranks:2,files:3,walk:3.2,trot:4.5,gallop:7.5,stride:2.4,trotStride:2.8,gallopStride:3.6,walkFor:1.2,trotFor:1.5,
  trotFrom:5,contact:1.2,
- melee:3.2,cutEvery:0.45,cutChance:0.35,cutReach:1.6,fallChance:0.18,fallWithin:6,dieFrame:0.22};
+ melee:3.2,meet:3.5,clash:3.5,clashLoss:0.2,squareHit:0.15,squareCut:0.08,cutEvery:0.45,cutChance:0.35,cutReach:1.6,fallChance:0.18,fallWithin:6,dieFrame:0.22};
 const REGIMENTS=[{side:'france',prefix:'fr',lineRanks:3,start:0},{side:'britain',prefix:'br',lineRanks:2,start:0.5}];
 const slotKey=(r,f)=>r+','+f;
 
@@ -235,11 +235,34 @@ function lineTarget(reg,r,f){
  const L=reg.line,u=(f-(L.files-1)/2)*LINE.spacing,v=-r*LINE.gap;
  return{x:L.cx+L.tx*u+L.nx*v,y:L.cy+L.ty*u+L.ny*v,dir:dirIndex(L.nx,L.ny)};
 }
+// Square against cavalry: a hollow square, two ranks on each face, every man
+// facing outward; slots and men are matched by their angle round the centre so
+// nobody crosses the square to reach his place.
+function formSquare(reg,threat){
+ const c=centreOf(reg),men=aliveMen(reg),per=Math.ceil(men.length/8),half=per*LINE.spacing/2;
+ let nx=threat.x-c.x,ny=threat.y-c.y;const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;
+ const slots=[];
+ for(let k=0;k<4;k++){
+   const fx=k===0?nx:k===1?-ny:k===2?-nx:ny,fy=k===0?ny:k===1?nx:k===2?-ny:-nx,tx=-fy,ty=fx;
+   for(let r=0;r<2;r++)for(let i=0;i<per;i++){
+     const out=half+(r===0?0.5:-0.45),side=(i-(per-1)/2)*LINE.spacing;
+     slots.push({x:c.x+fx*out+tx*side,y:c.y+fy*out+ty*side,dir:dirIndex(fx,fy),r,fx,fy});
+   }
+ }
+ const angle=p=>Math.atan2(p.y-c.y,p.x-c.x);
+ slots.sort((a,b)=>angle(a)-angle(b));
+ men.sort((a,b)=>angle({x:a.gx,y:a.gy})-angle({x:b.gx,y:b.gy}));
+ men.forEach((m,j)=>{m.square=slots[Math.floor(j*slots.length/men.length)];});
+ reg.square={cx:c.x,cy:c.y,half};reg.formation='square';reg.readyAt=null;
+}
 function slotTarget(reg,m){
+ if(reg.formation==='square'&&m.square)return m.square;
  return reg.formation==='line'?lineTarget(reg,m.slot.r,m.slot.f)
    :columnTarget(reg,m.slot.r*COLUMN.gap,(m.slot.f-(COLUMN.files-1)/2)*COLUMN.spacing);
 }
 function staffTarget(reg,role){
+ // In square the staff and the colour stand in the middle.
+ if(reg.formation==='square'){const S=reg.square,o=role==='officer'?0:role==='ensign'?0.7:-0.7;return{x:S.cx+o,y:S.cy,dir:0};}
  if(reg.formation==='line'){
    const L=reg.line,half=(L.files/2)*LINE.spacing;
    const at=(u,v)=>({x:L.cx+L.tx*u+L.nx*v,y:L.cy+L.ty*u+L.ny*v,dir:dirIndex(L.nx,L.ny)});
@@ -305,7 +328,11 @@ function updateRegiments(){
  updateBatteries(dt);
  updateSquadrons(dt);
  state.regiments.forEach((reg,i)=>{
-   if((state.firing||state.charge)&&reg.formation!=='line')formLine(reg,centres[1-i]);
+   // The British form square while the French horse is out, and line again after.
+   const square=i===1&&state.reaction&&state.cavCharge&&state.cavCharge.phase!=='rally';
+   if(square){if(reg.formation!=='square')formSquare(reg,centreOf({men:liveRiders(state.squadrons[0])}));}
+   else if(reg.formation==='square')formLine(reg,centres[1-i]);
+   else if((state.firing||state.charge)&&reg.formation!=='line')formLine(reg,centres[1-i]);
    else if(!state.halted&&reg.formation!=='column')formColumn(reg);
    // A column on the march follows the road exactly; reforming men walk.
    const snap=reg.formation==='column'&&!reg.reforming;
@@ -394,7 +421,7 @@ function buildBatteries(){
 // Where a gun belongs: behind the column, or on its flank of the line facing the enemy.
 function gunTarget(reg,i){
  const ranks=Math.ceil(aliveMen(reg).length/COLUMN.files);
- if(reg.formation!=='line')return columnTarget(reg,ranks*COLUMN.gap+GUN.trail+i*GUN.spacing,0);
+ if(reg.formation==='column'||!reg.line)return columnTarget(reg,ranks*COLUMN.gap+GUN.trail+i*GUN.spacing,0);
  const L=reg.line,u=(i?-1:1)*((L.files-1)/2*LINE.spacing+GUN.flank);
  return{x:L.cx+L.tx*u,y:L.cy+L.ty*u,dir:dirIndex(L.nx,L.ny)};
 }
@@ -559,7 +586,7 @@ function buildSquadrons(){
 }
 // A rider's place: in the column behind the guns, or on the line's left flank.
 function riderHome(reg,m){
- if(reg.formation!=='line'){
+ if(reg.formation==='column'||!reg.line){
    const ranks=Math.ceil(aliveMen(reg).length/COLUMN.files);
    return columnTarget(reg,ranks*COLUMN.gap+GUN.trail+GUN.spacing+4+m.r*2.8,(m.f-1)*1.4);
  }
@@ -570,8 +597,10 @@ const liveRiders=sq=>sq.riders.filter(m=>!m.dead);
 function updateSquadrons(dt){
  if(!state.squadrons)buildSquadrons();
  const ch=state.cavCharge;
+ updateCounter(dt);updateClash();
  state.squadrons.forEach((sq,i)=>{
    const reg=sq.reg,charging=ch&&i===0,marching=reg.formation==='column'&&!state.halted;
+   if(i===1&&state.cavCounter)return;
    if(!charging){
      for(const m of liveRiders(sq)){
        // A long way to their place: trot there; otherwise walk.
@@ -582,7 +611,9 @@ function updateSquadrons(dt){
      }
      return;
    }
-   const enemy=state.regiments[1],E=centreOf(enemy),C=centreOf({men:liveRiders(sq).map(m=>({gx:m.gx,gy:m.gy}))});
+   const enemy=state.regiments[1],E=enemy.formation==='square'?{x:enemy.square.cx,y:enemy.square.cy}:centreOf(enemy);
+   const C=centreOf({men:liveRiders(sq).map(m=>({gx:m.gx,gy:m.gy}))});
+   const contact=enemy.formation==='square'?enemy.square.half+1.6:SQUAD.contact;
    if(!ch.aim){const l=Math.hypot(E.x-C.x,E.y-C.y)||1;ch.aim={x:(E.x-C.x)/l,y:(E.y-C.y)/l};ch.via=detour(C,E);}
    // Ride round a building first, then straight at the enemy.
    if(ch.via&&Math.hypot(ch.via.x-C.x,ch.via.y-C.y)<2.5){
@@ -601,20 +632,21 @@ function updateSquadrons(dt){
      }
      // Officer and trumpeter ride in at the ends of the front rank.
      const r=Math.max(0,m.r),f=m.r<0?(m.role==='officer'?-0.6:2.6):m.f;
-     const goal=via||E,back=via?r*2.2:SQUAD.contact+0.4+r*2.2;
+     const goal=via||E,back=via?r*2.2:contact+0.4+r*2.2;
      const t={x:goal.x-A.x*back+T.x*(f-1)*1.5,y:goal.y-A.y*back+T.y*(f-1)*1.5,dir:face};
      if(ch.phase==='melee'){walkTo(m,t,dt,false,SQUAD.walk);meleeRider(m,ch);continue;}
+     if(ch.phase==='clash'){walkTo(m,{x:m.gx,y:m.gy,dir:m.dir},dt,false);m.act=hash(m.id+3,Math.floor(state.time/0.4))<0.25?'rear':'slash';continue;}
      walkTo(m,t,dt,false,SQUAD[ch.phase]);
      m.gait=ch.phase;m.act='idle';
      // Some riders are brought down by musketry as they close.
-     if(ch.phase==='gallop'&&!via&&Math.hypot(t.x-m.gx,t.y-m.gy)<SQUAD.fallWithin&&hash(m.id+ch.count*13,77)<SQUAD.fallChance){
+     if(ch.phase==='gallop'&&!via&&enemy.formation!=='square'&&!state.cavCounter&&Math.hypot(t.x-m.gx,t.y-m.gy)<SQUAD.fallWithin&&hash(m.id+ch.count*13,77)<SQUAD.fallChance){
        m.dead=true;state.riderFalls++;
        state.deadRiders.push({look:m.look,prefix:m.prefix,gx:m.gx,gy:m.gy,dir:m.dir,t0:state.time});continue;
      }
      if(!m.moving)arrived++;
    }
    const alive=liveRiders(sq).length;
-   if(ch.phase==='gallop'&&!ch.via&&(arrived>=alive||since>12)){ch.phase='melee';ch.at=state.time;}
+   if(ch.phase==='gallop'&&!ch.via&&!(state.cavCounter&&state.cavCounter.phase==='gallop')&&(arrived>=alive||since>12)){ch.phase='melee';ch.at=state.time;}
    else if(ch.phase==='melee'&&since>=SQUAD.melee){ch.phase='rally';ch.at=state.time;}
    else if(ch.phase==='rally'&&(arrived>=alive||since>10)){state.cavCharge=null;ui.cav.disabled=false;}
    if(ch.phase==='gallop'&&audio&&state.time>=(ch.hoofAt||0)){
@@ -622,13 +654,85 @@ function updateSquadrons(dt){
    }
  });
 }
+// Nearest live French rider within range in front of a man of the square.
+function riderInFront(u,range){
+ if(!state.squadrons)return null;
+ const fx=u.square.fx,fy=u.square.fy;let best=null,bd=range;
+ for(const m of liveRiders(state.squadrons[0])){
+   const dx=m.gx-u.gx,dy=m.gy-u.gy,dist=Math.hypot(dx,dy);
+   if(dist<bd&&(dx*fx+dy*fy)>0.3*dist){best=m;bd=dist;}
+ }
+ return best;
+}
+function killRider(m){
+ m.dead=true;state.riderFalls++;
+ state.deadRiders.push({look:m.look,prefix:m.prefix,gx:m.gx,gy:m.gy,dir:m.dir,t0:state.time});
+}
+// A musket ball from the square may bring down a horse.
+function shootRider(u){
+ state.squareShots++;
+ const m=riderInFront(u,10);
+ if(m&&hash(state.squareShots*17+u.id,59)<SQUAD.squareHit)killRider(m);
+}
+// Squadron against squadron: every half second each side may lose a rider.
+function updateClash(){
+ const ch=state.cavCharge,co=state.cavCounter;
+ if(!ch||!co||ch.phase!=='clash')return;
+ const beat=Math.floor((state.time-ch.at)/0.5);
+ if(beat!==ch.clashBeat){
+   ch.clashBeat=beat;
+   // The stronger squadron loses fewer: each side's risk grows with the odds against it.
+   const live=state.squadrons.map(sq=>liveRiders(sq));
+   live.forEach((own,i)=>{
+     const odds=live[1-i].length/Math.max(1,own.length),risk=Math.min(0.9,SQUAD.clashLoss*odds);
+     if(own.length>1&&hash(beat*11+i*5,ch.count+131)<risk)killRider(own[Math.floor(hash(beat,i+7)*own.length)]);
+   });
+ }
+ if(state.time-ch.at<SQUAD.clash)return;
+ const [fr,br]=state.squadrons.map(sq=>liveRiders(sq).length);
+ co.phase='rally';co.at=state.time;
+ // The winners of the clash ride on at the square; beaten, the French rally too.
+ if(fr>=br){ch.phase='gallop';ch.aim=null;ch.via=null;ch.won=true;}else{ch.phase='rally';ch.won=false;}
+ ch.at=state.time;
+}
+// The British squadron rides out at the French one once it is under way.
+function updateCounter(dt){
+ const ch=state.cavCharge;
+ if(state.reaction&&ch&&!state.cavCounter&&(ch.phase==='trot'||ch.phase==='gallop')&&!ch.won)
+   state.cavCounter={phase:'gallop',at:state.time};
+ const co=state.cavCounter;if(!co)return;
+ // Nothing left to meet: the French are going home.
+ if(co.phase==='gallop'&&(!ch||ch.phase==='rally')){co.phase='rally';co.at=state.time;}
+ const sq=state.squadrons[1],own=liveRiders(sq),foe=liveRiders(state.squadrons[0]);
+ const C=centreOf({men:own}),F=centreOf({men:foe});
+ const l=Math.hypot(F.x-C.x,F.y-C.y)||1,A={x:(F.x-C.x)/l,y:(F.y-C.y)/l},T={x:-A.y,y:A.x},face=dirIndex(A.x,A.y);
+ let arrived=0;
+ for(const m of own){
+   m.forceWalk=false;
+   if(co.phase==='rally'){
+     const h=riderHome(sq.reg,m);walkTo(m,h,dt,false,SQUAD.gallop*0.8);m.gait='gallop';m.act='idle';
+     if(!m.moving)arrived++;continue;
+   }
+   if(co.phase==='clash'){walkTo(m,{x:m.gx,y:m.gy,dir:face},dt,false);m.act=hash(m.id,Math.floor(state.time/0.4))<0.3?'rear':'slash';continue;}
+   const r=Math.max(0,m.r),f=m.r<0?(m.role==='officer'?-0.6:2.6):m.f;
+   walkTo(m,{x:F.x-A.x*r*2.2+T.x*(f-1)*1.5,y:F.y-A.y*r*2.2+T.y*(f-1)*1.5,dir:face},dt,false,SQUAD.gallop);
+   m.gait='gallop';m.act='idle';
+ }
+ // The two squadrons meet.
+ if(co.phase==='gallop'&&ch&&ch.phase==='gallop'&&foe.length&&own.length&&l<SQUAD.meet){
+   co.phase='clash';co.at=state.time;ch.phase='clash';ch.at=state.time;ch.clashBeat=-1;state.clashes++;
+ }
+ if(co.phase==='rally'&&(arrived>=own.length||state.time-co.at>10))state.cavCounter=null;
+}
 // In the melee each rider cuts at the nearest enemy now and then; some horses rear.
 function meleeRider(m,ch){
  const beat=Math.floor((state.time-ch.at)/SQUAD.cutEvery);
- m.act=hash(m.id+ch.count*7,beat%3+90)<0.25?'rear':'slash';
+ // Horses refuse a square: more rearing and few cuts get through the bayonets.
+ const square=state.regiments[1].formation==='square';
+ m.act=hash(m.id+ch.count*7,beat%3+90)<(square?0.5:0.25)?'rear':'slash';
  if(m.lastCut===beat)return;
  m.lastCut=beat;
- if(hash(m.id*31+beat,ch.count+97)>=SQUAD.cutChance)return;
+ if(hash(m.id*31+beat,ch.count+97)>=(square?SQUAD.squareCut:SQUAD.cutChance))return;
  let best=null,bestD=SQUAD.cutReach;
  for(const e of aliveMen(state.regiments[1])){
    if(state.hits.some(h=>h.key===e.key))continue;
@@ -672,7 +776,16 @@ function frameFor(u){
    if(ch.phase==='melee'&&u.slot.r===0)return 'thrust_'+d+'|'+(Math.floor(state.time/0.2+beat*3)%3);
    return (i===ch.attacker?'charge_'+d+'|0':'aim_'+d+'|0');
  }
- const c=state.controller;
+ const c=state.controller,sreg=regimentOf(u);
+ if(c&&sreg.formation==='square'&&u.square&&!u.moving){
+   // Each face fires at horsemen in front of it; the outer rank kneels.
+   const kneel=u.square.r===0,threat=riderInFront(u,9);
+   const r=c.update(u.key,state.time*1000,{moving:false,fireOrder:!!threat,rate:1});
+   for(const e of r.events)if(e.type==='muzzle'){spawnSmoke(u,kneel);shootRider(u);}
+   if(kneel&&(r.state==='aim'||r.state==='fire'))return 'k'+r.state+'_'+d+'|'+r.frame;
+   if(kneel&&r.state==='idle')return 'kaim_'+d+'|0';
+   return r.state+'_'+d+'|'+r.frame;
+ }
  if(c){
    // Ranks open fire one after another once the whole line stands; each man
    // presents a moment later or earlier than his neighbours.
@@ -936,6 +1049,7 @@ function resetBattle(){
  state.shots=0;state.volleys=0;state.regiments=null;state.shooters=null;
  state.batteries=null;state.balls=[];state.cannonShots=0;state.ballHits=0;
  state.squadrons=null;state.cavCharge=null;state.deadRiders=[];state.riderFalls=0;state.sabreHits=0;ui.cav.disabled=false;
+ state.cavCounter=null;state.squareShots=0;state.clashes=0;
  if(state.controller)state.controller.reset();
 }
 ui.reset.addEventListener('click',()=>{setFire(false);resetBattle();});
@@ -953,7 +1067,7 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'336.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'337.0',state,
  getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -970,6 +1084,7 @@ window.__GRAPHICS_LAB_ISO__={version:'336.0',state,
    riders:state.squadrons?state.squadrons.reduce((n,sq)=>n+liveRiders(sq).length,0):0,ridersDrawn:state.ridersDrawn||0,
    cavStates:{...(state.cavStates||{})},cavCharge:state.cavCharge?state.cavCharge.phase:null,
    riderFalls:state.riderFalls,sabreHits:state.sabreHits,
+   cavCounter:state.cavCounter?state.cavCounter.phase:null,squareShots:state.squareShots,clashes:state.clashes,
    recoiled:state.batteries?state.batteries.filter(g=>g.recoil>0.5).length:0,
    charge:state.charge?state.charge.phase:null,loser:state.charge&&state.charge.loser!==null?['fr','br'][state.charge.loser]:null,
    gone:state.regiments?state.regiments.reduce((n,r)=>n+r.men.filter(m=>m.gone).length,0):0,
