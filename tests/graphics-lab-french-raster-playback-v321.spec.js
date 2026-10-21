@@ -61,3 +61,35 @@ test('legacy graphics lab is still default; no atlas is loaded without opt-in',a
  expect(s.frenchReviewLoaded).toBe(false);
  expect(await page.evaluate(()=>window.__GRAPHICS_LAB_V319__.version)).toBe('320.0');
 });
+
+test('v321 review slider pauses and samples real fire then reload without a frozen fire pose',async({page})=>{
+ const errors=await openReview(page);
+ await expect(page.locator('#atlas-review-controls')).toBeVisible();
+ for(const [time,expected] of [[5.1,'aim'],[6.10,'fire'],[6.30,'reload'],[8.6,'reload'],[9.1,'idle']]){
+   await page.locator('#atlas-review-time').evaluate((node,value)=>{
+     node.value=String(value);node.dispatchEvent(new Event('input',{bubbles:true}));
+   },time);
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   const state=await page.evaluate(()=>({
+     paused:window.__GRAPHICS_LAB_V319__.state.paused,
+     pose:window.__GRAPHICS_LAB_V319__.getStats().frenchReviewPose,
+     label:document.getElementById('atlas-review-pose').textContent
+   }));
+   expect(state.paused).toBe(true);
+   expect(state.pose.state).toBe(expected);
+   expect(state.label).toContain(expected);
+ }
+ await page.locator('#atlas-review-size').selectOption('24');
+ expect((await page.evaluate(()=>window.__GRAPHICS_LAB_V319__.getStats())).reviewSpriteSize).toBe(24);
+ await page.locator('#atlas-review-size').selectOption('48');
+ expect((await page.evaluate(()=>window.__GRAPHICS_LAB_V319__.getStats())).reviewSpriteSize).toBe(48);
+ expect(errors).toEqual([]);
+});
+test('v321 timeline and scale controls stay hidden outside explicitly opted-in art review',async({page})=>{
+ await page.goto('/graphics-lab/?pixi=off',{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__GRAPHICS_LAB_V319__?.getStats().loaded===10);
+ expect(await page.locator('#atlas-review-controls').isVisible()).toBe(false);
+ const s=await page.evaluate(()=>window.__GRAPHICS_LAB_V319__.getStats());
+ expect(s.frenchReviewEnabled).toBe(false);
+ expect(s.reviewTimelineVisible).toBe(false);
+});
