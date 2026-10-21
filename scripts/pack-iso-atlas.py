@@ -20,7 +20,8 @@ and the gunners in two 176x128 sheets: gunner (idle, ram, load, aim, ready,
 touch, haul) and gunner2 (march and the three falls) -> 3168x1024 each.
 Cavalry (render-iso-cavalry.py, horse and rider, two coat colours per nation)
 in 224x192 cells with the hooves' centre at 112,152: cavalry (idle, walk,
-gallop) -> 3136x1536 and cavfight (slash, rear, die) -> 2016x1536.
+trot) -> 3136x1536 and cavfight (gallop, slash, rear, die) -> 3360x1536; also
+for the squadron officer (o) and trumpeter (t).
 Optional --preview writes review sheets on a grass tone.
 
   python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof \
@@ -69,8 +70,11 @@ ROLE_STATES = [("idle", 2), ("march", 6), ("command", 2)]
 ROLE_CELL = (176, 160)
 ROLE_PIVOT = {"x": 88, "y": 140}
 CAV_CELL, CAV_PIVOT = (224, 192), {"x": 112, "y": 152}
-CAVALRY = {"cavalry": [("idle", 2), ("walk", 6), ("gallop", 6)], "cavfight": [("slash", 3), ("rear", 2), ("die", 4)]}
-CAV_SIDES = {side + v: prefix + "c" + v for side, prefix in (("france", "fr"), ("britain", "br")) for v in ("", "2")}
+CAVALRY = {"cavalry": [("idle", 2), ("walk", 6), ("trot", 6)],
+           "cavfight": [("gallop", 6), ("slash", 3), ("rear", 2), ("die", 4)]}
+# Troopers in two coat colours, plus the squadron's officer (o) and trumpeter (t).
+CAV_SIDES = {side + v: prefix + "c" + v for side, prefix in (("france", "fr"), ("britain", "br"))
+             for v in ("", "2", "o", "t")}
 # Artillery: kind -> (folder piece, sprite letter, states, cell, pivot)
 ARTILLERY = {
     "gun": ("gun", "g", [("idle", 1), ("fire", 2), ("roll", 4)], (256, 176), {"x": 128, "y": 112}),

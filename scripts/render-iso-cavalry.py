@@ -13,8 +13,9 @@ Same camera, sun and 30° view as the infantry (render-iso-infantry.py).
 - rider: the fusilier body as a chasseur à cheval (French green with red) or a
   light dragoon (British blue with buff), without pack or musket, with a sabre.
 States in 8 directions, 224x192 cells with the hooves' centre at (112,152):
-  cavalry:  idle 2, walk 6, gallop 6
-  cavfight: slash 3, rear 2, die 4 (horse and rider go down together)
+  cavalry:  idle 2, walk 6, trot 6
+  cavfight: gallop 6, slash 3, rear 2, die 4 (horse and rider go down together)
+--role officer / trumpeter renders the squadron's officer and trumpeter.
 
   python scripts/render-iso-cavalry.py --side france --out art/frames/iso-proof
 """
@@ -39,7 +40,12 @@ infantry = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(infantry)
 
 CELL, PIVOT = (224, 192), (112, 152)
-STATES = [("idle", 2), ("walk", 6), ("gallop", 6), ("slash", 3), ("rear", 2), ("die", 4)]
+STATES = [("idle", 2), ("walk", 6), ("trot", 6), ("gallop", 6), ("slash", 3), ("rear", 2), ("die", 4)]
+# Squadron roles: the officer has gold lace and epaulettes; the trumpeter rides a
+# grey in reversed colours and sounds the charge instead of cutting.
+ROLES = {"trooper": "", "officer": "o", "trumpeter": "t"}
+GOLD = "#d4ad45"
+TRUMPETER_COAT = {"france": "#8f1d2c", "britain": "#b3262b"}
 COATS = {1: ("#6b3f22", "#1c1410"), 2: ("#2a2420", "#121010")}   # (coat, mane/tail/lower legs)
 GREY = ("#b9b4aa", "#5a5652")
 UNIFORM = {
@@ -96,15 +102,16 @@ def draped(name, rx, rz, angle, y0, y1, mat, parent, point=0.0, zc=0.2):
     return obj
 
 
-def build_horse(side: str, variant: int) -> dict:
-    coat_hex, dark_hex = GREY if (side == "britain" and variant == 2) else COATS[variant]
+def build_horse(side: str, variant: int, role: str = "trooper") -> dict:
+    coat_hex, dark_hex = GREY if (side == "britain" and variant == 2) or role == "trumpeter" else COATS[variant]
     coat = material(coat_hex, 0.55, pattern="skin")
     dark = material(dark_hex, 0.6, pattern="skin")
     hoof = material("#1a1714", 0.5, pattern="plain")
     leather = material("#3a2414", 0.5, pattern="plain")
     colours = UNIFORM[side]
     cloth = material(colours["cloth"], 0.85, pattern="cloth")
-    lace = material(colours["lace"], 0.7, pattern="plain")
+    lace = material(GOLD if role == "officer" else colours["lace"], 0.4 if role == "officer" else 0.7,
+                    0.7 if role == "officer" else 0.0, pattern="plain")
     steel = material("#c7ccd0", 0.25, 0.9, pattern="plain")
 
     # Black points (lower legs, mane, tail) on bays and blacks; a grey keeps its coat.
@@ -202,14 +209,17 @@ def build_horse(side: str, variant: int) -> dict:
             "saddle": saddle, "steel": steel, "leather": leather}
 
 
-def build_rider(side: str, horse: dict) -> dict:
+def build_rider(side: str, horse: dict, role: str = "trooper") -> dict:
     rig = infantry.build_soldier(side, 1)
     hide_tree(rig["musket"])
     rig["armed"] = False
     for obj in bpy.data.objects:
         if obj.name.split(".")[0] in STRIPPED:
             obj.hide_render = True
-    mats = {k: material(v, 0.8, pattern="cloth") for k, v in UNIFORM[side].items()}
+    colours = dict(UNIFORM[side])
+    if role == "trumpeter":
+        colours["coat"] = colours["lapel"] = TRUMPETER_COAT[side]
+    mats = {k: material(v, 0.8, pattern="cloth") for k, v in colours.items()}
     for obj in bpy.data.objects:
         base = obj.name.split(".")[0]
         for key, names in RECOLOUR.items():
@@ -233,6 +243,26 @@ def build_rider(side: str, horse: dict) -> dict:
     part("box", (0.06, 0.03, 0.02), (0, 0, -0.03), material("#c9a33c", 0.3, 0.85, pattern="plain"), sabre,
          name="hilt")
     rig["sabre"] = sabre
+    gold = material(GOLD, 0.35, 0.8, pattern="plain")
+    sh_r, _, _, _ = rig["joints"]["R"]
+    if role == "officer":
+        sh_l = rig["joints"]["L"][0]
+        for sh in (sh_r, sh_l):
+            part("cyl", (0.075, 0.05, 0.09), (0, 0, 0.0), gold, sh, name="epaulette")
+        part("cyl", (0.1, 0.03, 0.105), (0, 0, 0.245), gold, rig["head"], name="shakoband")
+        part("cyl", (0.17, 0.1, 0.16), (0, 0, 0.02), material("#c9a33c" if side == "france" else "#8f1d2c", 0.7,
+             pattern="cloth"), torso, name="sash")
+    rig["trumpets"] = []
+    if role == "trumpeter":
+        brass = material("#d9b45a", 0.3, 0.85, pattern="plain")
+        for name, parent, loc, rot in (("trumpet_hip", torso, (0.24, 0.02, -0.12), (0, 10, 0)),
+                                       ("trumpet_play", el_r, (0, 0.02, -0.3), (0, 0, 0))):
+            t = empty(name, parent, loc, rot)
+            part("cyl", (0.013, 0.5), (0, 0, 0.25), brass, t, name="tube", segments=10)
+            part("cyl", (0.012, 0.16, 0.06), (0, 0, 0.56), brass, t, name="bell", segments=16)
+            part("cyl", (0.016, 0.05), (0, 0, -0.01), brass, t, name="mouthpiece", segments=8)
+            rig["trumpets"].append(t)
+    rig["role"] = role
     return rig
 
 
@@ -282,6 +312,12 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
     el_r.rotation_euler = Euler((rad(92), 0, 0))
     rider["sabre"].rotation_euler = Euler((rad(78), 0, 0))
     torso = rider["torso"]
+    # The trumpeter carries the trumpet at his hip and blows it in the charge.
+    blowing = rider["role"] == "trumpeter" and state in ("gallop", "slash")
+    if rider["trumpets"]:
+        hide_tree(rider["trumpets"][0], blowing)
+        hide_tree(rider["trumpets"][1], not blowing)
+        hide_tree(rider["sabre"], rider["role"] == "trumpeter")
     if state == "idle":
         # Head lowered and raised, tail swish.
         neck.rotation_euler = Euler((rad((-38, -46)[frame]), 0, 0))
@@ -294,6 +330,16 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
         neck.rotation_euler = Euler((rad(-38 - 4 * math.sin(t * math.tau * 2)), 0, 0))
         body.location = (0, 0, HIP_Z - 0.02 * abs(math.sin(t * math.tau * 2)))
         return
+    if state == "trot":
+        # Two-beat trot on diagonal pairs; the body bounces twice per stride and
+        # the rider rises to the trot.
+        gait(horse, t, {"FL": 0.0, "HR": 0.0, "FR": 0.5, "HL": 0.5}, 26, 58)
+        body.location = (0, 0, HIP_Z + 0.03 * math.cos(t * math.tau * 2))
+        neck.rotation_euler = Euler((rad(-34), 0, 0))
+        tail.rotation_euler = Euler((rad(160), 0, 0))
+        rider["hips"].location.z = 0.95 + (0.06 if math.sin(t * math.tau) > 0 else 0.0)
+        torso.rotation_euler = Euler((rad(8), 0, 0))
+        return
     if state == "gallop":
         # Transverse gallop with suspension: hinds, then fores; the body rocks.
         gait(horse, t, {"HL": 0.0, "HR": 0.12, "FL": 0.42, "FR": 0.54}, 38, 75)
@@ -302,8 +348,11 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
         body.location = (0, 0, HIP_Z + 0.06 * max(0.0, math.sin(t * math.tau + 1.2)))
         neck.rotation_euler = Euler((rad(-28 - 8 * math.sin(t * math.tau)), 0, 0))
         tail.rotation_euler = Euler((rad(140), 0, 0))
-        # Rider leans forward, sabre levelled at the enemy.
+        # Rider leans forward, sabre levelled at the enemy (the trumpeter sounds the charge).
         torso.rotation_euler = Euler((rad(22 - pitch), 0, 0))
+        if blowing:
+            trumpet_to_lips(rider, rad)
+            return
         sh_r.rotation_euler = Euler((rad(92), rad(4), 0))
         el_r.rotation_euler = Euler((rad(4), 0, 0))
         rider["sabre"].rotation_euler = Euler((rad(-4), 0, 0))
@@ -311,6 +360,10 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
     if state == "slash":
         # Cut: sabre raised, swept across, down; the horse stamps.
         leg(horse, "FR", (10, 26, 4)[frame], (-30, -60, -10)[frame])
+        if blowing:
+            torso.rotation_euler = Euler((rad((20, 22, 24)[frame]), 0, 0))
+            trumpet_to_lips(rider, rad)
+            return
         torso.rotation_euler = Euler((rad((6, 18, 30)[frame]), 0, rad((20, 0, -24)[frame])))
         sh_r.rotation_euler = Euler((rad((170, 120, 60)[frame]), rad((20, 0, -10)[frame]), 0))
         el_r.rotation_euler = Euler((rad((30, 10, 0)[frame]), 0, 0))
@@ -352,10 +405,19 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
     raise ValueError(state)
 
 
+def trumpet_to_lips(rider, rad) -> None:
+    """Right hand at the mouth, trumpet pointing forward and a little up."""
+    sh_r, el_r, _, _ = rider["joints"]["R"]
+    sh_r.rotation_euler = Euler((rad(62), rad(26), 0))
+    el_r.rotation_euler = Euler((rad(118), 0, 0))
+    rider["trumpets"][1].rotation_euler = Euler((rad(-150), 0, 0))
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--side", choices=sorted(infantry.PALETTES), required=True)
     ap.add_argument("--variant", type=int, choices=sorted(COATS), default=1)
+    ap.add_argument("--role", choices=sorted(ROLES), default="trooper")
     ap.add_argument("--out", default="art/frames/iso-proof")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--states", nargs="*", help="render only these states (review)")
@@ -366,9 +428,9 @@ def main(argv: list[str]) -> int:
     ss = args.supersample
     camera(CELL[0] * ss, CELL[1] * ss, SPRITE_PX_PER_M * ss, (PIVOT[0] * ss, PIVOT[1] * ss))
     shadow_catcher("ground", [(1.6 * math.cos(a / 32 * math.tau), 1.6 * math.sin(a / 32 * math.tau)) for a in range(32)])
-    horse = build_horse(args.side, args.variant)
-    rider = build_rider(args.side, horse)
-    suffix = "" if args.variant == 1 else str(args.variant)
+    horse = build_horse(args.side, args.variant, args.role)
+    rider = build_rider(args.side, horse, args.role)
+    suffix = ROLES[args.role] or ("" if args.variant == 1 else str(args.variant))
     prefix = ("fr" if args.side == "france" else "br") + "c" + suffix
     out = Path(args.out).resolve() / "cavalry" / f"{args.side}{suffix}"
     out.mkdir(parents=True, exist_ok=True)
