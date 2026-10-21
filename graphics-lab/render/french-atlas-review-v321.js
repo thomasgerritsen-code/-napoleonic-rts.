@@ -1,19 +1,19 @@
 // Graphics Lab v321 draft review: NOT a production-approved infantry sprite.
 // Keep selection logic renderer-independent so Pixi and Canvas show one pose.
-export const FR_REVIEW_URL='./assets/sprites/infantry/france/fr_line_infantry_atlas';
-export const FR_REVIEW_FRAME_W=96,FR_REVIEW_FRAME_H=96;
-export const FR_REVIEW_DISPLAY_SIZE=48;
-export const FR_REVIEW_PIVOT={x:48,y:78};
+const FR_REVIEW_URL='./assets/sprites/infantry/france/fr_line_infantry_atlas';
+const FR_REVIEW_FRAME_W=96,FR_REVIEW_FRAME_H=96;
+const FR_REVIEW_DISPLAY_SIZE=48;
+const FR_REVIEW_PIVOT={x:48,y:78};
 const expected={idle:2,march:6,aim:2,fire:3,reload:4};
 
-export function frameState(cycle){
+function frameState(cycle){
   if(cycle.walking)return'march';
   if(cycle.phase>=4&&cycle.phase<6)return'aim';
   if(cycle.phase>=6&&cycle.phase<8.5)return'fire';
   if(cycle.phase>=8.5&&cycle.phase<11)return'reload';
   return'idle';
 }
-export function pickFrenchPose(cycle,time,phase=0){
+function pickFrenchPose(cycle,time,phase=0){
   const state=frameState(cycle),count=expected[state];
   // Deterministic offset only while marching; volley must remain synchronized.
   const offset=state==='march'?phase*.08:0;
@@ -26,7 +26,7 @@ export function pickFrenchPose(cycle,time,phase=0){
   const index=state==='idle'||state==='march'?n%count:Math.min(count-1,n);
   return {state,index,key:'fr_line_'+state+'_'+String(index+1).padStart(2,'0')};
 }
-export async function loadFrenchPreview(){
+async function loadFrenchPreview(){
   const [image,meta]=await Promise.all([
     new Promise((resolve,reject)=>{
       const im=new Image();
@@ -53,7 +53,7 @@ export async function loadFrenchPreview(){
   }
   return {image,meta,poseCount:17,approved:false};
 }
-export function canvasFrame(ctx,review,pose,worldX,worldY,flip=false){
+function canvasFrame(ctx,review,pose,worldX,worldY,flip=false){
   const data=review.meta.frames[pose.key].frame;
   const scale=FR_REVIEW_DISPLAY_SIZE/FR_REVIEW_FRAME_W;
   const left=worldX-FR_REVIEW_PIVOT.x*scale;
@@ -69,3 +69,5 @@ export function canvasFrame(ctx,review,pose,worldX,worldY,flip=false){
       left,top,FR_REVIEW_DISPLAY_SIZE,FR_REVIEW_DISPLAY_SIZE);
   }
 }
+
+window.__FRENCH_ATLAS_REVIEW_V321__=Object.freeze({loadFrenchPreview,pickFrenchPose,canvasFrame,FR_REVIEW_URL,FR_REVIEW_FRAME_W,FR_REVIEW_FRAME_H,FR_REVIEW_DISPLAY_SIZE});
