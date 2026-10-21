@@ -282,3 +282,22 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   leunt op zijn musket.
 - Reparaties: een man die net is geraakt, wordt in dat frame niet meer staand
   getekend; ontbrekende animaties tellen als `missing` in `getStats()`.
+
+---
+
+# v332 — bajonetcharge, man tegen man, vluchten, gewonden
+
+- **Bajonet!** (nieuwe knop): beide regimenten vormen linie; zodra ze staan,
+  rukt de Franse linie op in looppas (`charge`, 3 m/s) tot de voorste rijen
+  elkaar raken.
+- **Man tegen man** (4,5 s): de voorste rijen stoten met de bajonet (`thrust`),
+  de rijen erachter houden de bajonet geveld. Elke 0,4 s kan aan beide kanten
+  een man in de voorste rij vallen; de aanvaller (diepere linie, vaart)
+  verliest er minder. De man erachter sluit aan.
+- **Vluchten**: daarna slaat het regiment met de minste mannen op de vlucht
+  (`rout`), elk op zijn eigen lijn weg van de vijand, en verdwijnt van het
+  veld. De winnaars juichen (`cheer`) en gaan dan in rust.
+- **Gewonden**: 30% van de getroffenen is gewond: hij draait zich om, gaat
+  neer en kruipt zo'n 2 m naar achteren (`crawl`), daarna blijft hij liggen.
+- `getStats()` toont `charge` (fase), `loser`, `gone` en `wounded`; de
+  reviewstrook bovenaan doorloopt nu alle houdingen.

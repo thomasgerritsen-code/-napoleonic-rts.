@@ -1,4 +1,4 @@
-// Graphics Lab v331 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v332 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -7,7 +7,7 @@
 const view=document.getElementById('iso-view'),canvas=document.getElementById('iso-canvas'),ctx=canvas.getContext('2d');
 const ui={status:document.getElementById('iso-status'),halt:document.getElementById('iso-halt'),
  pause:document.getElementById('iso-pause'),center:document.getElementById('iso-center'),count:document.getElementById('iso-count'),
- fire:document.getElementById('iso-fire'),reset:document.getElementById('iso-reset')};
+ fire:document.getElementById('iso-fire'),reset:document.getElementById('iso-reset'),charge:document.getElementById('iso-charge')};
 // Sprite contract from scripts/render-iso-infantry.py: 41.3 px per metre, cell
 // size and feet pivot come from the atlas meta; camera elevation 30° squashes
 // the ground by sin(30°)=0.5.
@@ -20,7 +20,7 @@ const BAND_DELAY=0.8,HIT_CHANCE=0.05,HIT_DELAY=0.25,DIE_FRAME=0.17;
 const ROAD_R=14,GROUND=48,TILE=2;
 const state={zoom:1,customZoom:false,camX:0,camY:0,time:0,last:performance.now(),paused:false,halted:false,
  travelled:0,perSide:32,atlases:{},ground:null,terrain:null,props:[],firing:false,controller:null,smoke:[],volleys:0,
- fireStart:0,regiments:null,simTime:0,dead:new Map(),drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
+ fireStart:0,regiments:null,simTime:0,dead:new Map(),charge:null,woundedShare:0.3,drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
 
 // Ground coordinates (metres) -> unzoomed screen pixels.
 const project=(gx,gy)=>({x:gx*S,y:-gy*SQUASH*S});
@@ -146,6 +146,12 @@ const COLUMN={files:4,gap:1.6,spacing:1.15},LINE={spacing:0.8,gap:0.95},WALK=2.2
 const FIRE_JITTER=0.35,RATE_SPREAD=0.3,BANK_LIFE=28,BANK_MAX=320;
 // Idle variety: every few seconds a man looks around, sets his shako or leans on his musket.
 const IDLE_EXTRAS=[['look',4,0.45],['adjust',4,0.38],['lean',2,1.4]];
+// Bayonet charge: the French line advances at the double until the front ranks
+// meet, both front ranks fight with the bayonet, then the weaker side routs and
+// the victors cheer. Some casualties are only wounded and crawl to the rear.
+const CHARGE={speed:3.0,contact:1.3,melee:4.5,strikeEvery:0.4,rout:3.6,cheer:4,stride:1.8,routStride:1.6};
+const CRAWL={time:7,speed:0.3,frameS:0.32};
+const groundVec=d=>({x:Math.cos(-d*Math.PI/4),y:Math.sin(-d*Math.PI/4)});
 const REGIMENTS=[{side:'france',prefix:'fr',lineRanks:3,start:0},{side:'britain',prefix:'br',lineRanks:2,start:0.5}];
 const slotKey=(r,f)=>r+','+f;
 
@@ -164,7 +170,8 @@ function buildRegiments(){
  state.simTime=state.time;
 }
 
-const aliveMen=reg=>reg.men.filter(m=>!m.dead);
+// Men who fell or ran off the field no longer belong to the formation.
+const aliveMen=reg=>reg.men.filter(m=>!m.dead&&!m.gone);
 function centreOf(reg){
  const l=aliveMen(reg);
  return{x:l.reduce((a,m)=>a+m.gx,0)/Math.max(1,l.length),y:l.reduce((a,m)=>a+m.gy,0)/Math.max(1,l.length)};
@@ -227,7 +234,7 @@ function closeUp(reg,slot){
  }
 }
 
-function walkTo(m,t,dt,snap){
+function walkTo(m,t,dt,snap,speed=WALK){
  const dx=t.x-m.gx,dy=t.y-m.gy,dist=Math.hypot(dx,dy);
  if(!m.placed||snap||dist<=ARRIVE){
    if(m.placed)m.walk+=dist;
@@ -235,7 +242,7 @@ function walkTo(m,t,dt,snap){
    m.gx=t.x;m.gy=t.y;m.placed=true;
    m.dir=t.dir;return;
  }
- const step=Math.min(dist,WALK*dt);
+ const step=Math.min(dist,speed*dt);
  m.gx+=dx/dist*step;m.gy+=dy/dist*step;m.walk+=step;
  m.moving=true;m.dir=dirIndex(dx,dy);
 }
@@ -244,14 +251,17 @@ function updateRegiments(){
  if(!state.regiments)buildRegiments();
  const dt=Math.max(0,Math.min(0.25,state.time-state.simTime));state.simTime=state.time;
  const [fr,br]=state.regiments,centres=[centreOf(fr),centreOf(br)];
+ if(state.charge)updateCharge(dt);
  state.regiments.forEach((reg,i)=>{
-   if(state.firing&&reg.formation!=='line')formLine(reg,centres[1-i]);
+   if((state.firing||state.charge)&&reg.formation!=='line')formLine(reg,centres[1-i]);
    else if(!state.halted&&reg.formation!=='column')formColumn(reg);
    // A column on the march follows the road exactly; reforming men walk.
    const snap=reg.formation==='column'&&!reg.reforming;
    let spread=0,walking=0;
+   if(state.charge&&state.charge.loser===i){flee(reg,dt);return;}
+   const speed=state.charge&&state.charge.phase==='advance'&&i===state.charge.attacker?CHARGE.speed*1.15:WALK;
    for(const m of aliveMen(reg)){
-     const t=slotTarget(reg,m);walkTo(m,t,dt,snap);
+     const t=slotTarget(reg,m);walkTo(m,t,dt,snap,speed);
      spread=Math.max(spread,Math.hypot(t.x-m.gx,t.y-m.gy));if(m.moving&&!snap)walking++;
    }
    for(const st of reg.staff)walkTo(st,staffTarget(reg,st.role),dt,snap);
@@ -260,9 +270,52 @@ function updateRegiments(){
  });
 }
 
+// Charge phases: form (both lines stand) -> advance -> melee -> rout.
+function updateCharge(dt){
+ const ch=state.charge,regs=state.regiments,att=regs[ch.attacker],def=regs[1-ch.attacker];
+ if(ch.phase==='form'&&att.readyAt!==null&&def.readyAt!==null){ch.phase='advance';ch.at=state.time;}
+ if(ch.phase==='advance'){
+   const L=att.line,E=def.line,gap=(E.cx-L.cx)*L.nx+(E.cy-L.cy)*L.ny;
+   // Within a millimetre counts as contact (the last step lands on it exactly, up to rounding).
+   if(gap<=CHARGE.contact+1e-3){ch.phase='melee';ch.at=state.time;ch.strikes=0;}
+   else{const step=Math.min(gap-CHARGE.contact,CHARGE.speed*dt);L.cx+=L.nx*step;L.cy+=L.ny*step;}
+ }
+ if(ch.phase==='melee'){
+   // Each round the front ranks trade bayonet thrusts; the attacker, deeper in
+   // ranks and with momentum, loses fewer men.
+   while(state.time>=ch.at+(ch.strikes+1)*CHARGE.strikeEvery){
+     ch.strikes++;
+     regs.forEach((reg,i)=>{
+       const front=aliveMen(reg).filter(m=>m.slot.r===0&&!state.hits.some(h=>h.key===m.key));
+       if(front.length<=1||hash(ch.strikes*13+i,61)>=(i===ch.attacker?0.3:0.6))return;
+       const m=front[Math.floor(hash(ch.strikes,i+71)*front.length)];
+       state.hits.push({key:m.key,at:state.time,seed:1000+ch.strikes*2+i,melee:true});
+     });
+   }
+   if(state.time>=ch.at+CHARGE.melee){
+     const alive=regs.map(r=>aliveMen(r).length);
+     ch.loser=alive[ch.attacker]>=alive[1-ch.attacker]?1-ch.attacker:ch.attacker;
+     ch.phase='rout';ch.at=state.time;
+   }
+ }
+}
+// The beaten regiment turns and runs from the enemy, each man on his own line,
+// and is gone once he has left the field.
+function flee(reg,dt){
+ const enemy=centreOf(state.regiments[1-state.regiments.indexOf(reg)]),c=centreOf(reg);
+ const l=Math.hypot(c.x-enemy.x,c.y-enemy.y)||1,ax=(c.x-enemy.x)/l,ay=(c.y-enemy.y)/l;
+ for(const m of [...aliveMen(reg),...reg.staff]){
+   if(m.gone)continue;
+   const seed=hash((m.id??m.role.length)+5,reg.prefix==='fr'?83:89),turn=(seed-.5)*0.7,v=CHARGE.rout*(0.85+seed*0.3);
+   const dx=ax*Math.cos(turn)-ay*Math.sin(turn),dy=ax*Math.sin(turn)+ay*Math.cos(turn);
+   m.gx+=dx*v*dt;m.gy+=dy*v*dt;m.walk+=v*dt;m.moving=true;m.dir=dirIndex(dx,dy);
+   if(Math.max(Math.abs(m.gx),Math.abs(m.gy))>GROUND*0.85)m.gone=true;
+ }
+}
+
 function units(){
  updateRegiments();
- return state.regiments.flatMap(reg=>[...aliveMen(reg),...reg.staff]);
+ return state.regiments.flatMap(reg=>[...aliveMen(reg),...reg.staff.filter(s=>!s.gone)]);
 }
 
 // One deterministic controller (v321) drives idle/aim/fire/reload on the lab
@@ -274,6 +327,16 @@ function frameFor(u){
    if(u.moving)return 'march_'+d+'|'+Math.floor((u.walk%MARCH.strideM)/MARCH.strideM*MARCH.frames)%MARCH.frames;
    if(state.firing)return 'command_'+d+'|'+(Math.floor(state.time/0.45)%2);
    return 'idle_'+d+'|'+(Math.floor(state.time/0.6)%2);
+ }
+ const ch=state.charge,step=(stride,frames)=>Math.floor((u.walk%stride)/stride*frames)%frames;
+ if(ch&&ch.phase!=='form'){
+   const i=u.side==='france'?0:1,beat=hash(u.id+9,i+3);
+   if(ch.loser===i)return 'rout_'+d+'|'+step(CHARGE.routStride,6);
+   if(ch.phase==='rout')return state.time<ch.at+CHARGE.cheer?'cheer_'+d+'|'+(Math.floor(state.time/0.35+beat*2)%2):'idle_'+d+'|'+(Math.floor(state.time/0.6+beat)%2);
+   if(u.moving)return (i===ch.attacker?'charge_':'march_')+d+'|'+(i===ch.attacker?step(CHARGE.stride,6):step(MARCH.strideM,MARCH.frames));
+   // Melee: the front ranks thrust, the men behind stand with bayonets levelled.
+   if(ch.phase==='melee'&&u.slot.r===0)return 'thrust_'+d+'|'+(Math.floor(state.time/0.2+beat*3)%3);
+   return (i===ch.attacker?'charge_'+d+'|0':'aim_'+d+'|0');
  }
  const c=state.controller;
  if(c){
@@ -346,7 +409,10 @@ function resolveHits(list){
    // Each casualty falls one of three ways (deterministic per shot).
    const fall=FALLS[Math.floor(hash(h.seed,u?u.id+17:0)*FALLS.length)];
    if(u&&!state.dead.has(h.key)){
-     state.dead.set(h.key,{prefix:u.prefix,look:u.look,side:u.side,id:u.id,gx:u.gx,gy:u.gy,dir:u.dir,t0:state.time,fall});
+     // Some are only wounded: they turn, go down and crawl to the rear.
+     const wounded=hash(h.seed+5,u.id+23)<state.woundedShare;
+     state.dead.set(h.key,{prefix:u.prefix,look:u.look,side:u.side,id:u.id,gx:u.gx,gy:u.gy,dir:wounded?(u.dir+4)%8:u.dir,t0:state.time,
+       fall:wounded?'diefwd':fall,wounded});
      u.dead=true;closeUp(regimentOf(u),u.slot);
    }
    return false;
@@ -415,7 +481,8 @@ function draw(now){
  // Soldiers and props share one painter's order by their ground point.
  const alive=units();
  resolveHits(alive);
- const fallen=[...state.dead.values()].map(d=>({...d,fallen:true,...project(d.gx,d.gy)}));
+ const fallen=[...state.dead.values()].map(d=>{
+   const p=crawled(d);return{...d,fallen:true,...project(d.gx+p.x,d.gy+p.y)};});
  const list=alive.filter(u=>!u.dead).map(u=>({...u,...project(u.gx,u.gy)})).concat(fallen,state.props).sort((a,b)=>a.y-b.y);
  state.animStates={};
  state.drawn=0;state.propsDrawn=0;state.rolesDrawn=0;
@@ -423,9 +490,15 @@ function draw(now){
    if(u.sprite){const p=u.sprite;ctx.drawImage(p.image,u.x-p.pivot.x*k,u.y-p.pivot.y*k,p.w*k,p.h*k);state.propsDrawn++;continue;}
    const atlas=state.atlases[u.look]||state.atlases[u.prefix];if(!atlas)continue;
    if(u.fallen){
-     // The fall plays once; the last frame stays on the field.
-     const f=Math.min(3,Math.floor(Math.max(0,state.time-u.t0)/DIE_FRAME));
-     drawSprite(atlas,u.fall+'_'+DIRS[u.dir],f,u.x,u.y,k);
+     // The fall plays once; the last frame stays on the field. The wounded
+     // then crawl a few metres to the rear before they lie still.
+     const age=Math.max(0,state.time-u.t0),crawl=u.wounded?age-4*DIE_FRAME:-1;
+     if(crawl>=0){
+       const f=crawl<CRAWL.time?Math.floor(crawl/CRAWL.frameS)%4:0;
+       drawSprite(atlas,'crawl_'+DIRS[u.dir],f,u.x,u.y,k);
+       state.animStates.crawl=(state.animStates.crawl||0)+1;continue;
+     }
+     drawSprite(atlas,u.fall+'_'+DIRS[u.dir],Math.min(3,Math.floor(age/DIE_FRAME)),u.x,u.y,k);
      state.animStates.die=(state.animStates.die||0)+1;continue;
    }
    const [anim,f]=frameFor(u).split('|');
@@ -448,7 +521,9 @@ function drawCompass(dpr){
  ctx.setTransform(dpr,0,0,dpr,0,0);
  ctx.fillStyle='rgba(20,24,22,.62)';ctx.fillRect(8,8,size*8+8,size*.95+8);
  // Cycles the full drill so every state can be reviewed in all directions.
- const drill=[['march',6,110],['aim',2,260],['fire',3,140],['reload',4,425],['die',4,300],['diefwd',4,300],['dieside',4,300]];
+ const drill=[['march',6,110],['aim',2,260],['fire',3,140],['reload',4,425],['kaim',2,260],['kfire',3,140],['misfire',3,200],
+   ['charge',6,100],['thrust',3,200],['rout',6,100],['crawl',4,320],['cheer',2,350],['look',4,450],['adjust',4,380],['lean',2,900],
+   ['die',4,300],['diefwd',4,300],['dieside',4,300]];
  const total=drill.reduce((s,[,n,ms])=>s+n*ms,0);let t=(state.time*1000)%total,anim='march',f=0;
  for(const [name,n,ms] of drill){if(t<n*ms){anim=name;f=Math.floor(t/ms);break;}t-=n*ms;}
  DIRS.forEach((d,i)=>drawSprite(a,anim+'_'+d,f,12+size*(i+.5),12+size*.85,size/cell));
@@ -472,13 +547,27 @@ view.addEventListener('pointerup',up);view.addEventListener('pointercancel',up);
 view.addEventListener('wheel',e=>{e.preventDefault();const r=view.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,a=toWorld(x,y);
  state.zoom=Math.min(3,Math.max(.35,state.zoom*Math.exp(-e.deltaY*.001)));
  state.camX=a.x-(x-r.width/2)/state.zoom;state.camY=a.y-(y-r.height/2)/state.zoom;state.customZoom=true;},{passive:false});
-function setHalt(h){state.halted=h;if(!h)setFire(false);ui.halt.textContent=h?'▶ Voorwaarts mars':'✋ Halt';}
+function setHalt(h){state.halted=h;if(!h){setFire(false);state.charge=null;ui.charge.disabled=false;}ui.halt.textContent=h?'▶ Voorwaarts mars':'✋ Halt';}
+// Offset of a wounded man who has crawled toward his own rear (his sprite direction).
+function crawled(d){
+ if(!d.wounded)return{x:0,y:0};
+ const m=Math.max(0,Math.min(CRAWL.time,state.time-d.t0-4*DIE_FRAME))*CRAWL.speed,v=groundVec(d.dir);
+ return{x:v.x*m,y:v.y*m};
+}
+function setCharge(){
+ if(state.charge)return;
+ setFire(false);if(!state.halted)setHalt(true);
+ state.charge={phase:'form',at:state.time,attacker:0,loser:null,strikes:0};
+ ui.charge.disabled=true;
+}
 function setFire(f){
+ if(f&&state.charge)return;
  state.firing=f;if(f&&!state.halted)setHalt(true);
  if(f)state.fireStart=state.time;
  ui.fire.textContent=f?'✋ Staakt het vuren':'🔥 Vuur!';
 }
 function resetBattle(){
+ state.charge=null;ui.charge.disabled=false;
  state.dead.clear();state.hits=[];state.smoke=[];state.bank=[];state.drill=new Map();state.misfires=0;
  state.shots=0;state.volleys=0;state.regiments=null;state.shooters=null;
  if(state.controller)state.controller.reset();
@@ -486,12 +575,13 @@ function resetBattle(){
 ui.reset.addEventListener('click',()=>{setFire(false);resetBattle();});
 ui.halt.addEventListener('click',()=>setHalt(!state.halted));
 ui.fire.addEventListener('click',()=>setFire(!state.firing));
+ui.charge.addEventListener('click',setCharge);
 ui.pause.addEventListener('click',()=>{state.paused=!state.paused;ui.pause.textContent=state.paused?'▶ Hervatten':'⏸ Pauzeren';});
 ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom=false;resize();});
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'331.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'332.0',state,
  getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -502,6 +592,9 @@ window.__GRAPHICS_LAB_ISO__={version:'331.0',state,
    deployed:state.regiments?state.regiments.filter(r=>r.readyAt!==null).length:0,
    shooters:state.shooters?state.shooters.size:0,misfires:state.misfires,bank:state.bank.length,
    kneeling:state.animStates?(state.animStates.kaim||0)+(state.animStates.kfire||0):0,
+   charge:state.charge?state.charge.phase:null,loser:state.charge&&state.charge.loser!==null?['fr','br'][state.charge.loser]:null,
+   gone:state.regiments?state.regiments.reduce((n,r)=>n+r.men.filter(m=>m.gone).length,0):0,
+   wounded:[...state.dead.values()].filter(d=>d.wounded).length,
    frontGaps:state.regiments?state.regiments.reduce((n,r)=>n+frontGaps(r),0):0,
    fallKinds:[...new Set([...state.dead.values()].map(d=>d.fall))].sort(),
    muzzleEvents:state.controller?state.controller.metrics().muzzleEvents:0})};
