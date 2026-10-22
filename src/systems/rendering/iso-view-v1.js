@@ -1085,17 +1085,18 @@
           wx += nx * to; wy += ny * to; m.parapet = sunk; st.leaning++;
         }
       }
-      const X = sx(wx), depth = sunk ? TRENCH_SINK * Math.min(1, sunk.progress) : 0;
+      // The front rank stands up on the fire-step, the ranks behind down on the bed.
+      const X = sx(wx), depth = sunk ? (m.parapet ? FIRE_STEP : TRENCH_SINK) * Math.min(1, sunk.progress) : 0;
       const up = deck ? deck.h * LIFT * z() : sunk ? -depth * PPM * LIFT * z() : 0, Y = gy(wx, wy) - up;
       const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
       if (deck) st.onBridge++;
       // Men in a trench: with the bank on the near side (enemy to the south)
-      // they are drawn before it and it hides them to the chest; with the bank
-      // on the far side they are drawn after it, standing in front of it. The
-      // near wall of the cut hides their legs either way.
+      // they are drawn before it and it hides them to the chest; otherwise they
+      // are drawn after it, leaning on it. Among themselves they keep their
+      // order (a tiny share of their own y). The near wall hides their legs.
       const ridge = sunk && sunk.y + Math.sin(sunk.facing) * (sunk.width / 2 + 7);
       const key = deck ? Math.max(u.y, deck.b.y + deck.b.width / 2 + 1)
-        : sunk ? (Math.sin(sunk.facing) > 0 ? Math.min(u.y, ridge - 0.5) : Math.max(u.y, ridge + 0.5)) : u.y;
+        : sunk ? ridge + (Math.sin(sunk.facing) > 0 ? -0.5 : 0.5) + (u.y - sunk.y) * 0.002 + (m.parapet ? 0.001 : 0) : u.y;
       if (sunk) st.inTrench = (st.inTrench || 0) + 1;
       const lip = sunk && view.trenchLips.get(sunk.id);
       list.push({ y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
@@ -1250,7 +1251,7 @@
   // wall shows its depth, the parapet of thrown-up earth towards the enemy,
   // earth flying while it is dug. Men in it stand down on the bed (the near
   // wall hides them below the lip); the front rank leans on the parapet ----
-  const TRENCH_SINK = 1.1, PARAPET_H = 0.5, TRENCH_LEAN_GAP = 3;
+  const TRENCH_SINK = 1.1, FIRE_STEP = 0.5, PARAPET_H = 0.5, TRENCH_LEAN_GAP = 3;
   const trenchList = () => global.__REGIMENT_ORDERS_V1__?.trenches?.() || [];
   function trenchFrame(t) {
     const ax = Math.cos(t.facing + Math.PI / 2), ay = Math.sin(t.facing + Math.PI / 2), nx = Math.cos(t.facing), ny = Math.sin(t.facing);
@@ -1280,13 +1281,27 @@
   // Clip to everything above the near lip of a cut (screen space), so the men
   // standing in it are hidden below ground by its near wall.
   function clipAboveLip(lip) {
-    let L = 0, R = 0;
-    lip.forEach((p, i) => { if (p[0] < lip[L][0]) L = i; if (p[0] > lip[R][0]) R = i; });
-    const chain = dir => { const out = []; for (let i = L; ; i = (i + dir + lip.length) % lip.length) { out.push(lip[i]); if (i === R) break; } return out; };
-    const a = chain(1), b = chain(-1), avg = c => c.reduce((s, p) => s + p[1], 0) / c.length, low = avg(a) > avg(b) ? a : b;
-    ctx.beginPath(); ctx.moveTo(-1e4, -1e4); ctx.lineTo(-1e4, low[0][1]);
+    // The near lip is the lower envelope of the outline: for each screen x the
+    // lowest point of the cut there.
+    let x0 = Infinity, x1 = -Infinity;
+    for (const p of lip) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); }
+    const low = [], n = 28;
+    for (let k = 0; k <= n; k++) {
+      const x = x0 + (x1 - x0) * Math.min(1, Math.max(0, k / n)) + (k === 0 ? 0.01 : k === n ? -0.01 : 0);
+      let y = -Infinity;
+      for (let i = 0; i < lip.length; i++) {
+        const a = lip[i], b = lip[(i + 1) % lip.length];
+        if ((a[0] - x) * (b[0] - x) > 0 || a[0] === b[0]) continue;
+        y = Math.max(y, a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]));
+      }
+      if (y > -Infinity) low.push([x, y]);
+    }
+    if (low.length < 2) return;
+    // Only below the lip and between its ends: beside the cut (a muzzle over
+    // the bank of a trench running up the screen) nothing is cut away.
+    ctx.beginPath(); ctx.moveTo(-1e4, -1e4); ctx.lineTo(-1e4, 1e4); ctx.lineTo(low[0][0], 1e4);
     for (const p of low) ctx.lineTo(p[0], p[1]);
-    ctx.lineTo(1e4, low[low.length - 1][1]); ctx.lineTo(1e4, -1e4); ctx.closePath(); ctx.clip();
+    ctx.lineTo(low[low.length - 1][0], 1e4); ctx.lineTo(1e4, 1e4); ctx.lineTo(1e4, -1e4); ctx.closePath(); ctx.clip();
   }
   function drawTrenchBeds(now) {
     view.trenchLips.clear();
@@ -1312,6 +1327,17 @@
       ctx.strokeStyle = 'rgba(30,22,14,.28)'; ctx.lineWidth = Math.max(0.6, 0.8 * z());
       for (const k of [0.3, 0.62]) { smoothFill(trenchOutline(t, f, w * 0.12 * k, -depth * k)); ctx.stroke(); }
       smoothFill(trenchOutline(t, f, w * 0.18, -depth), '#3b2e20');
+      // The fire-step along the parapet wall: a ledge the front rank stands on.
+      if (p > 0.5) {
+        const n = Math.max(8, Math.round(half / 6)), us = [];
+        for (let i = 0; i <= n; i++) us.push(-(half - w * 0.4) * Math.cos(Math.PI * i / n));
+        const step = FIRE_STEP * p, edge = us.map(u => at(u, f.across(u) * 0.5, -step)), back = us.map(u => at(u, f.across(u) * 0.97, -step));
+        const riser = us.map(u => at(u, f.across(u) * 0.5, -depth));
+        smoothFill([...riser, ...edge.slice().reverse()], '#2f2419');
+        smoothFill([...edge, ...back.slice().reverse()], '#6a5536');
+        ctx.strokeStyle = 'rgba(160,134,92,.6)'; ctx.lineWidth = Math.max(0.8, 1.2 * z());
+        ctx.beginPath(); ctx.moveTo(edge[0][0], edge[0][1]); for (const q of edge.slice(1)) ctx.lineTo(q[0], q[1]); ctx.stroke();
+      }
       // Trodden duckboard line down the middle of the bed.
       if (p >= 1) {
         ctx.strokeStyle = 'rgba(110,86,56,.55)'; ctx.lineWidth = Math.max(1, 2.2 * z());
