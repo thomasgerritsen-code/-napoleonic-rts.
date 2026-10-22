@@ -7,6 +7,11 @@
 //     reloads in defendReload of the time. Moving loses the advantage; it builds
 //     up again where the regiment halts. The British commander braces its
 //     regiments while it defends or regroups.
+//   - Trenches: a braced line goes on to dig a trench along its front (digSeconds,
+//     slower under fire). A finished trench stays on the field; men standing in it
+//     - of either side - take trenchDamage of the losses and trenchShock of the
+//     morale shock. A defending regiment that halts by an empty trench steps into
+//     it, front the way the trench faces.
 //   - Reinforce: loose musketiers selected together with one regiment join it,
 //     up to maxInfantry men.
 // Only on the open map (NRTS_CONFIG.regimentOrders); the normal game is unchanged.
@@ -17,7 +22,8 @@
   if (!cfg) return;
   if (document.readyState !== 'complete') { addEventListener('load', () => installRegimentOrdersV1(global), { once: true }); return; }
   if (global.__REGIMENT_ORDERS_V1__ || typeof applyDamage !== 'function' || typeof refreshRegiment !== 'function') return;
-  const stats = { braced: 0, reduced: 0, reinforced: 0, toggles: 0 };
+  const stats = { braced: 0, reduced: 0, inTrench: 0, reinforced: 0, toggles: 0, dug: 0, manned: 0 };
+  const trenches = [];
   const isBraced = reg => !!(reg && !reg.destroyed && reg.defend && reg.bracedAt != null && elapsed - reg.bracedAt >= cfg.braceSeconds);
   const regOf = u => (u && u.kind === 'unit' && u.regimentId && typeof getRegiment === 'function') ? getRegiment(u.regimentId) : null;
 
@@ -38,11 +44,72 @@
     const formed = reg.formation === 'line' || reg.formation === 'square';
     if (still && formed) { if (reg.bracedAt == null) reg.bracedAt = elapsed; }
     else reg.bracedAt = null;
+    if (still && reg.formation === 'line') trenchWork(reg, m, c);
   };
+
+  // ---- trenches ----
+  // A trench lies along a line's front: centre, facing (towards the enemy, game
+  // radians) and length; progress 0..1 while it is dug.
+  const inTrench = (t, x, y) => {
+    const dx = x - t.x, dy = y - t.y, ax = Math.cos(t.facing + Math.PI / 2), ay = Math.sin(t.facing + Math.PI / 2);
+    return Math.abs(dx * ax + dy * ay) <= t.length / 2 && Math.abs(dx * Math.cos(t.facing) + dy * Math.sin(t.facing)) <= t.width / 2;
+  };
+  const trenchAt = (x, y) => trenches.find(t => t.progress >= 1 && inTrench(t, x, y)) || null;
+  const foeNear = (side, c, r) => units.some(e => !e.dead && !e.routing && e.side !== side && e.type !== 'worker' && Math.hypot(e.x - c.x, e.y - c.y) < r);
+  function lineGeometry(reg, m) {
+    const facing = Number.isFinite(reg.facing) ? reg.facing : -Math.PI / 2, ax = Math.cos(facing + Math.PI / 2), ay = Math.sin(facing + Math.PI / 2);
+    const c = centroid(m);
+    const nx = Math.cos(facing), ny = Math.sin(facing);
+    let lo = Infinity, hi = -Infinity, back = Infinity, front = -Infinity;
+    for (const u of m) {
+      if (u.type !== 'infantry') continue;
+      const p = (u.x - c.x) * ax + (u.y - c.y) * ay, q = (u.x - c.x) * nx + (u.y - c.y) * ny;
+      lo = Math.min(lo, p); hi = Math.max(hi, p); back = Math.min(back, q); front = Math.max(front, q);
+    }
+    if (!Number.isFinite(lo)) { lo = hi = back = front = 0; }
+    const mid = (lo + hi) / 2, depth = (back + front) / 2;
+    // Long enough for every file, deep enough for every rank, with room to stand.
+    return { x: c.x + ax * mid + nx * depth, y: c.y + ay * mid + ny * depth, facing, length: Math.max(60, hi - lo + 30), width: Math.max(cfg.trenchWidth, front - back + 26) };
+  }
+  function trenchWork(reg, m, c) {
+    // Step into an empty finished trench close by, once.
+    const near = trenches.find(t => Math.hypot(t.x - c.x, t.y - c.y) < cfg.trenchSnap);
+    if (near && near.progress >= 1) {
+      const holder = regiments.find(r => r !== reg && !r.destroyed && r.trenchId === near.id);
+      if (!holder && reg.trenchId !== near.id) {
+        reg.trenchId = near.id; near.side = reg.side; stats.manned++;
+        if (typeof arrangeFacingRegimentV146 === 'function') arrangeFacingRegimentV146(reg, near.x, near.y, 'line', near.facing);
+        reg.bracedAt = elapsed - cfg.braceSeconds;   // men stepping into a trench are at once in cover
+      }
+      return;
+    }
+    if (!isBraced(reg) || elapsed - reg.bracedAt < cfg.braceSeconds + cfg.digDelay) return;
+    let t = near && near.progress < 1 ? near : null;
+    if (!t && !near) {
+      if (trenches.length >= cfg.maxTrenches) return;
+      const g = lineGeometry(reg, m);
+      t = { id: ++trenchSeq, side: reg.side, x: g.x, y: g.y, facing: g.facing, length: g.length, width: g.width, progress: 0, startedAt: elapsed };
+      trenches.push(t); reg.trenchId = t.id; stats.dug++;
+    }
+    if (!t) return;
+    // A second has passed since the last check (refresh runs the stance once a second).
+    const rate = (foeNear(reg.side, c, 260) ? 0.4 : 1) / cfg.digSeconds;
+    t.progress = Math.min(1, t.progress + rate);
+    t.diggers = reg.id;
+    if (t.progress >= 1) reg.trenchId = t.id;
+  }
+  let trenchSeq = 0;
+  if (typeof resetGame === 'function') {
+    const baseReset = resetGame;
+    resetGame = function resetGameClearingTrenches(...args) { trenches.length = 0; return baseReset(...args); };
+  }
 
   // ---- the advantage ----
   const baseDamage = applyDamage;
   applyDamage = function applyDamageWithStance(victim, damage, shock = 8) {
+    if (victim && victim.kind === 'unit' && trenches.length && trenchAt(victim.x, victim.y)) {
+      stats.inTrench++; return baseDamage(victim, damage * cfg.trenchDamage, shock * cfg.trenchShock);
+    }
     const reg = regOf(victim);
     if (isBraced(reg)) { stats.reduced++; return baseDamage(victim, damage * cfg.defendDamage, shock * cfg.defendShock); }
     return baseDamage(victim, damage, shock);
@@ -124,6 +191,7 @@
 
   global.__REGIMENT_ORDERS_V1__ = Object.freeze({
     version: 'regiment-orders-v1', config: cfg, isBraced, toggleDefend, reinforce,
-    stats: () => ({ ...stats, braced: regiments.filter(isBraced).length, defending: regiments.filter(r => !r.destroyed && r.defend).length })
+    trenches: () => trenches, trenchAt,
+    stats: () => ({ ...stats, trenches: trenches.length, finished: trenches.filter(t => t.progress >= 1).length, braced: regiments.filter(isBraced).length, defending: regiments.filter(r => !r.destroyed && r.defend).length })
   });
 })(window);

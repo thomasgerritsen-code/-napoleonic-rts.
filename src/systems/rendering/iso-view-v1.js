@@ -1036,6 +1036,8 @@
     panFix();
     ensureAttackHook();
     drawTerrain();
+    view.stats.trenches = 0;
+    drawTrenchBeds(t);
     const k = spriteK(), seen = new Set(), list = [];
     const visible = u => u.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance(u);
     for (const u of units) {
@@ -1045,10 +1047,14 @@
       if (!visible(u)) continue;
       const X = sx(u.x);
       if (X < -80 || X > innerWidth + 80 || gy(u.x, u.y) < -40 || gy(u.x, u.y) > innerHeight + 140) continue;
-      const deck = deckAt(u.x, u.y), up = deck ? deck.h * LIFT * z() : 0, Y = gy(u.x, u.y) - up;
+      const deck = deckAt(u.x, u.y), sunk = !deck && global.__REGIMENT_ORDERS_V1__?.trenchAt?.(u.x, u.y);
+      const up = deck ? deck.h * LIFT * z() : sunk ? -TRENCH_SINK * PPM * LIFT * z() : 0, Y = gy(u.x, u.y) - up;
       const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
       if (deck) st.onBridge++;
-      const key = deck ? Math.max(u.y, deck.b.y + deck.b.width / 2 + 1) : u.y;
+      // Men in a trench are drawn behind its bank (the bank hides their legs).
+      const key = deck ? Math.max(u.y, deck.b.y + deck.b.width / 2 + 1)
+        : sunk ? Math.min(u.y, sunk.y + Math.sin(sunk.facing) * (sunk.width / 2 + 7) - 0.5) : u.y;
+      if (sunk) st.inTrench = (st.inTrench || 0) + 1;
       list.push({ y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
         // A faint ring in the side's colour under every man, horse and gun.
         const rr = (u.type === 'cavalry' ? 0.95 : u.type === 'artillery' ? 1.1 : 0.42) * PPM * z();
@@ -1076,6 +1082,7 @@
     for (const b of buildings) { const d = buildingDrawable(b); if (d) list.push(d); }
     for (const h of villageHouses()) { const d = houseDrawable(h); if (d) list.push(d); }
     for (const b of crossings()) { const d = bridgeDrawable(b); if (d) list.push(d); }
+    for (const tr of trenchList()) { const d = parapetDrawable(tr); if (d) list.push(d); }
     if (view.village && view.props.well && !view.dressing) view.dressing = buildDressing();
     for (const it of view.dressing || []) { const d = dressingDrawable(it); if (d) list.push(d); }
     if (view.props.oak && !view.woodTrees) view.woodTrees = buildWoodTrees();
@@ -1193,6 +1200,64 @@
       const p = isoWorldToScreen(wx, wy);
       return pickDrawn(buildings.filter(b => !side || b.side === side), buildingDrawable, p.x, p.y) || baseBuildingAt(wx, wy, side);
     };
+  }
+  // ---- trenches (regiment-orders-v1): the bed dug into the ground, its
+  // parapet towards the enemy, earth flying while it is dug; men in a finished
+  // trench stand lower, the parapet hiding their legs from the front ----
+  const TRENCH_SINK = 0.55, PARAPET_H = 0.45;
+  const trenchList = () => global.__REGIMENT_ORDERS_V1__?.trenches?.() || [];
+  function trenchFrame(t) {
+    const ax = Math.cos(t.facing + Math.PI / 2), ay = Math.sin(t.facing + Math.PI / 2), nx = Math.cos(t.facing), ny = Math.sin(t.facing);
+    const half = t.length / 2 * Math.min(1, Math.max(0.08, t.progress));
+    const at = (u, v, up = 0) => { const x = t.x + ax * u + nx * v, y = t.y + ay * u + ny * v; return [sx(x), gy(x, y) - up * PPM * LIFT * z()]; };
+    return { half, at, ny };
+  }
+  function poly(pts, fill) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) ctx.lineTo(p[0], p[1]); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); }
+  function drawTrenchBeds(now) {
+    for (const t of trenchList()) {
+      const X = sx(t.x), Y = gy(t.x, t.y);
+      if (X < -400 || X > innerWidth + 400 || Y < -200 || Y > innerHeight + 200) continue;
+      const { half, at } = trenchFrame(t), w = t.width / 2;
+      poly([at(-half - 6, -w - 4), at(half + 6, -w - 4), at(half + 6, w + 4), at(-half - 6, w + 4)], 'rgba(96,78,52,.85)');   // spoil and trodden edge
+      poly([at(-half, -w), at(half, -w), at(half, w), at(-half, w)], '#3b2e20');                                               // the bed
+      poly([at(-half, -w * 0.35), at(half, -w * 0.35), at(half, w * 0.35), at(-half, w * 0.35)], '#2c2218');
+      if (t.progress < 1) {
+        // Earth flying from the spades along the dug stretch.
+        ctx.fillStyle = 'rgba(120,96,62,.9)';
+        for (let i = 0; i < 7; i++) {
+          const ph = (now * 1.7 + i * 0.37) % 1, u = (hash(t.id, i) * 2 - 1) * half, [px, py] = at(u, w * 0.6, ph * 0.9);
+          ctx.beginPath(); ctx.arc(px, py, Math.max(1.2, 2.4 * z()) * (1 - ph * 0.5), 0, 7); ctx.fill();
+        }
+      }
+      view.stats.trenches = (view.stats.trenches || 0) + 1;
+    }
+  }
+  function parapetDrawable(t) {
+    const X = sx(t.x), Y = gy(t.x, t.y);
+    if (X < -400 || X > innerWidth + 400 || Y < -200 || Y > innerHeight + 200) return null;
+    const { half, at } = trenchFrame(t), w = t.width / 2, h = PARAPET_H * Math.min(1, t.progress * 1.4);
+    const ridgeY = t.y + Math.sin(t.facing) * (w + 7);
+    // A bank of thrown-up earth: a short steep face to the trench, a long gentle
+    // slope out towards the enemy that greens over at its foot.
+    return { y: ridgeY, draw: () => {
+      // Irregular along its length: shovelfuls, not a plank.
+      const n = Math.max(4, Math.round(half / 14)), ends = [[-half - 8, 0]];
+      for (let i = 0; i <= n; i++) ends.push([-half + (2 * half) * i / n, 0.8 + 0.35 * hash(t.id * 31 + i, 5)]);
+      ends.push([half + 8, 0]);
+      const ridge = ends.map(([u, f], i) => at(u, w + 6 + 3 * hash(t.id + i, 9), h * f)), inner = ends.map(([u]) => at(u, w)), outer = ends.map(([u], i) => at(u * 1.03, w + 28 + 10 * hash(t.id + i, 4)));
+      poly([...inner, ...ridge.slice().reverse()], '#4a3b29');
+      const [x0, y0] = at(0, w + 7, h), [x1, y1] = at(0, w + 34), g = ctx.createLinearGradient(x0, y0, x1, y1);
+      g.addColorStop(0, '#8a7350'); g.addColorStop(0.65, '#6f6440'); g.addColorStop(1, 'rgba(90,107,55,0)');
+      poly([...ridge, ...outer.slice().reverse()], g);
+      ctx.strokeStyle = 'rgba(176,152,110,.55)'; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.moveTo(ridge[0][0], ridge[0][1]); for (const p of ridge.slice(1)) ctx.lineTo(p[0], p[1]); ctx.stroke();
+      // Clods on the slope.
+      for (let i = 0; i < n * 3; i++) {
+        const u = (hash(t.id, i + 40) * 2 - 1) * half, v = w + 9 + hash(i, t.id + 3) * 16, [px, py] = at(u, v, h * (1 - (v - w - 7) / 27) * 0.9);
+        ctx.fillStyle = i % 3 ? 'rgba(74,58,38,.55)' : 'rgba(150,128,90,.5)';
+        ctx.beginPath(); ctx.ellipse(px, py, (1.5 + hash(i, 7) * 2) * z(), (1 + hash(i, 8)) * z(), 0, 0, 7); ctx.fill();
+      }
+    } };
   }
   // A shield over each regiment in the defensive stance: outlined while it
   // braces, filled once braced (regiment-orders-v1).

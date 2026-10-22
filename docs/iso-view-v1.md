@@ -92,6 +92,16 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   In de iso-weergave staat er een schild boven het regiment: open terwijl het zich
   ingraaft, gevuld zodra het ingegraven is. De Britse commandant graaft zijn regimenten
   in zolang hij verdedigt of hergroepeert.
+- **Loopgraven**: een ingegraven regiment in linie begint 3 seconden later een loopgraaf
+  te graven langs zijn front (ongeveer 25 seconden, onder vijandelijk vuur binnen
+  ~12 m ruim twee keer zo lang). Je ziet hem vanuit het midden groeien, met
+  opspattende aarde; de aarden wal komt aan de vijandkant. Wie in een voltooide
+  loopgraaf staat - van welke kant ook - lijdt 50% minder verlies en verliest nog
+  minder moraal dan alleen ingegraven. In de iso-weergave staan de mannen erin lager,
+  en de wal verbergt hun benen. Een loopgraaf blijft liggen als het regiment vertrekt;
+  een regiment in verdedigende houding dat vlak bij een lege loopgraaf tot stilstand
+  komt, stelt zich erin op, front de kant op die de loopgraaf heeft. Ook de Britse
+  commandant graaft in waar hij verdedigt.
 - **Grotere regimenten**: 12 tot 36 musketiers. "Selecteer nabij" vult aan tot 36, een
   officier verzamelt alle vrije musketiers in zijn buurt (tot 36), en **Versterk
   regiment** (één regiment + losse musketiers geselecteerd) voegt ze toe.

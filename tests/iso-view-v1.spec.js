@@ -380,3 +380,36 @@ test('iso view: a man by a barracks is picked before the barracks, a tree by its
   expect(r.tree).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('iso view: a defending line digs a trench, men in it lose less, and a regiment halting by an empty trench steps into it', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await openGame(page, 'test=iso-trench&view=iso');
+  await page.waitForFunction(() => window.__REGIMENT_ORDERS_V1__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const O = window.__REGIMENT_ORDERS_V1__;
+    const make = (x, y) => { const us = []; for (let i = 0; i < 14; i++) us.push(createUnit('france', 'infantry', x + (i % 7) * 20, y + (i < 7 ? 0 : 18)));
+      us.push(createUnit('france', 'officer', x - 20, y)); us.push(createUnit('france', 'drummer', x - 20, y + 10)); return createRegiment('france', us); };
+    const a = make(900, 1300);
+    arrangeFacingRegimentV146(a, 960, 1300, 'line', Math.PI / 2);
+    selectWholeRegiment(a); O.toggleDefend();
+    for (let k = 0; k < 45; k++) window.__RTS_DEBUG__.tick(1);
+    const t = O.trenches()[0];
+    const man = regimentMembers(a).find(u => u.type === 'infantry' && O.trenchAt(u.x, u.y));
+    const out = createUnit('france', 'infantry', 900, 1700);
+    const h1 = man.hp, h2 = out.hp; applyDamage(man, 20); applyDamage(out, 20);
+    // The first regiment marches off; a second, defending, halts beside the trench.
+    orderGroupPathV06(a, 900, 1800, 'line', Math.PI / 2);
+    for (let k = 0; k < 20; k++) window.__RTS_DEBUG__.tick(1);
+    const b = make(t.x - 60, t.y + 70);
+    selectWholeRegiment(b); O.toggleDefend();
+    for (let k = 0; k < 12; k++) window.__RTS_DEBUG__.tick(1);
+    const inB = regimentMembers(b).filter(u => u.type === 'infantry' && O.trenchAt(u.x, u.y)).length;
+    return { finished: t && t.progress >= 1, lostIn: h1 - man.hp, lostOut: h2 - out.hp, manned: b.trenchId === t.id, inB, facing: b.facing, tf: t.facing };
+  });
+  expect(r.finished).toBe(true);
+  expect(r.lostIn).toBeLessThan(r.lostOut * 0.6);
+  expect(r.manned).toBe(true);
+  expect(r.inB).toBeGreaterThan(10);
+  expect(r.facing).toBeCloseTo(r.tf, 2);
+  expect(errors).toEqual([]);
+});
