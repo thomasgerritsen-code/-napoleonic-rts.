@@ -29,7 +29,7 @@
   const detailed = () => !view.overview && z() >= DETAIL_ZOOM;
   // Screen box of a sprite drawn at (X, Y) with its pivot, for the see-through test.
   const box = (X, Y, px, py, w, h, k) => [X - px * k, Y - py * k, X + (w - px) * k, Y + (h - py) * k];
-  const view = { on: true, atlases: {}, props: {}, village: null, dressing: null, chimneyAt: new Map(), chimneySmoke: [], info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(), trenchLips: new Map(),
+  const view = { on: true, atlases: {}, props: {}, village: null, dressing: null, chimneyAt: new Map(), chimneySmoke: [], info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(), trenchLips: new Map(), trenchCrests: new Map(),
     tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), miniAt: 0, fogAt: 0,
     stats: { renderMs: 0, seeThrough: 0, flags: 0, ground: false, houses: 0, dressing: 0, chimneySmoke: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
 
@@ -1086,7 +1086,10 @@
         }
       }
       // The front rank stands up on the fire-step, the ranks behind down on the bed.
-      const X = sx(wx), depth = sunk ? (m.parapet ? FIRE_STEP : TRENCH_SINK) * Math.min(1, sunk.progress) : 0;
+      // Over a bank on the near side the steep view would show him to the knees
+      // from the fire-step, so he stands a little lower there: chest over the crest.
+      const step = m.parapet ? (Math.sin(sunk.facing) > 0.3 ? FIRE_STEP_NEAR : FIRE_STEP) : TRENCH_SINK;
+      const X = sx(wx), depth = sunk ? step * Math.min(1, sunk.progress) : 0;
       const up = deck ? deck.h * LIFT * z() : sunk ? -depth * PPM * LIFT * z() : 0, Y = gy(wx, wy) - up;
       const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
       if (deck) st.onBridge++;
@@ -1096,20 +1099,24 @@
       // order (a tiny share of their own y). The near wall hides their legs.
       const ridge = sunk && sunk.y + Math.sin(sunk.facing) * (sunk.width / 2 + 7);
       const key = deck ? Math.max(u.y, deck.b.y + deck.b.width / 2 + 1)
-        : sunk ? ridge + (Math.sin(sunk.facing) > 0 ? -0.5 : 0.5) + (u.y - sunk.y) * 0.002 + (m.parapet ? 0.001 : 0) : u.y;
+        : sunk ? ridge + (Math.sin(sunk.facing) > 0 && !m.parapet ? -0.5 : 0.5) + (u.y - sunk.y) * 0.002 + (m.parapet ? 0.001 : 0) : u.y;
       if (sunk) st.inTrench = (st.inTrench || 0) + 1;
-      const lip = sunk && view.trenchLips.get(sunk.id);
+      // Leaning over a bank on the near side: drawn after the bank, but cut off
+      // along its crest, so chest, arms and musket hang over it.
+      const crest = m.parapet && Math.sin(sunk.facing) > 0 ? view.trenchCrests.get(sunk.id) : null;
+      const lip = !crest && sunk && view.trenchLips.get(sunk.id);
       list.push({ y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
-        if (lip) { ctx.save(); clipAboveLip(lip); }
+        if (crest) { ctx.save(); const dy = CREST_OVERHANG * PPM * LIFT * z(); clipBelowLine(crest.map(q => [q[0], q[1] + dy])); }
+        else if (lip) { ctx.save(); clipAboveLip(lip); }
         // A faint ring in the side's colour under every man, horse and gun.
         const rr = (u.type === 'cavalry' ? 0.95 : u.type === 'artillery' ? 1.1 : 0.42) * PPM * z();
         ctx.fillStyle = u.side === 'france' ? 'rgba(70,110,230,.38)' : 'rgba(225,60,50,.38)';
         ctx.beginPath(); ctx.ellipse(X, Y, rr, rr * SQ, 0, 0, 7); ctx.fill();
-        if (u.type === 'worker' && !view.atlases[(u.side === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); if (lip) ctx.restore(); return; }
+        if (u.type === 'worker' && !view.atlases[(u.side === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); if (crest || lip) ctx.restore(); return; }
         const [key, anim, f] = frameFor(u, m, t);
         // Until its atlas has loaded a unit is simply not drawn yet.
         if (drawSprite(view.atlases[key], anim, f, X, Y, k)) st.sprites++;
-        if (lip) ctx.restore();
+        if (crest || lip) ctx.restore();
       } });
       st.drawn++;
     }
@@ -1251,7 +1258,9 @@
   // wall shows its depth, the parapet of thrown-up earth towards the enemy,
   // earth flying while it is dug. Men in it stand down on the bed (the near
   // wall hides them below the lip); the front rank leans on the parapet ----
-  const TRENCH_SINK = 1.1, FIRE_STEP = 0.5, PARAPET_H = 0.5, TRENCH_LEAN_GAP = 3;
+  // CREST_OVERHANG: how far (m, on screen) below the crest a man leaning over it still
+  // shows: his forearms and musket lie on the far side of the bank.
+  const TRENCH_SINK = 1.1, FIRE_STEP = 0.5, FIRE_STEP_NEAR = 0.9, PARAPET_H = 0.5, TRENCH_LEAN_GAP = 3, CREST_OVERHANG = 0.12;
   const trenchList = () => global.__REGIMENT_ORDERS_V1__?.trenches?.() || [];
   function trenchFrame(t) {
     const ax = Math.cos(t.facing + Math.PI / 2), ay = Math.sin(t.facing + Math.PI / 2), nx = Math.cos(t.facing), ny = Math.sin(t.facing);
@@ -1296,6 +1305,11 @@
       }
       if (y > -Infinity) low.push([x, y]);
     }
+    clipBelowLine(low);
+  }
+  // Clip away what lies below a line running left to right across the screen
+  // (only between its ends).
+  function clipBelowLine(low) {
     if (low.length < 2) return;
     // Only below the lip and between its ends: beside the cut (a muzzle over
     // the bank of a trench running up the screen) nothing is cut away.
@@ -1304,13 +1318,15 @@
     ctx.lineTo(low[low.length - 1][0], 1e4); ctx.lineTo(1e4, 1e4); ctx.lineTo(1e4, -1e4); ctx.closePath(); ctx.clip();
   }
   function drawTrenchBeds(now) {
-    view.trenchLips.clear();
+    view.trenchLips.clear(); view.trenchCrests.clear();
     for (const t of trenchList()) {
       const X = sx(t.x), Y = gy(t.x, t.y);
       if (X < -400 || X > innerWidth + 400 || Y < -200 || Y > innerHeight + 200) continue;
       const f = trenchFrame(t), { half, w, at } = f, p = Math.min(1, t.progress), depth = TRENCH_SINK * p;
       const lip = trenchOutline(t, f);
       view.trenchLips.set(t.id, lip);
+      const ps = parapetShape(t, f);
+      view.trenchCrests.set(t.id, ps.us.map(u => at(u, ps.lipV(u) + 7, ps.lift(u))).sort((a, b) => a[0] - b[0]));
       // Trodden, spoil-strewn ground round the cut.
       ctx.globalAlpha = 0.5 + 0.5 * p;
       smoothFill(trenchOutline(t, f, 0, 0, 7), 'rgba(104,86,58,.55)');
@@ -1357,6 +1373,15 @@
       view.stats.trenches = (view.stats.trenches || 0) + 1;
     }
   }
+  // Crest line of the parapet along the cut: where along it (u), how high (lift).
+  function parapetShape(t, f) {
+    const { half, w, across } = f, h = PARAPET_H * Math.min(1, t.progress * 1.4);
+    const n = Math.max(8, Math.round(half / 6)), us = [];
+    for (let i = 0; i <= n; i++) us.push(-(half + 6) * Math.cos(Math.PI * i / n));
+    const lift = u => { const e = Math.min(1, Math.max(0, (half + 6 - Math.abs(u)) / (w * 1.2))); return h * e * e * (3 - 2 * e) * (0.88 + 0.22 * hash(t.id * 31 + Math.round(u), 5)); };
+    const lipV = u => Math.max(across(u), 2);
+    return { n, us, lift, lipV };
+  }
   function parapetDrawable(t) {
     const X = sx(t.x), Y = gy(t.x, t.y);
     if (X < -400 || X > innerWidth + 400 || Y < -200 || Y > innerHeight + 200) return null;
@@ -1366,10 +1391,7 @@
     // long gentle slope out towards the enemy that greens over at its foot,
     // tapering off round the ends of the cut.
     return { y: ridgeY, draw: () => {
-      const n = Math.max(8, Math.round(half / 6)), us = [];
-      for (let i = 0; i <= n; i++) us.push(-(half + 6) * Math.cos(Math.PI * i / n));
-      const lift = u => { const e = Math.min(1, Math.max(0, (half + 6 - Math.abs(u)) / (w * 1.2))); return h * e * e * (3 - 2 * e) * (0.88 + 0.22 * hash(t.id * 31 + Math.round(u), 5)); };
-      const lipV = u => Math.max(across(u), 2);
+      const { n, us, lift, lipV } = parapetShape(t, f);
       const inner = us.map(u => at(u, lipV(u))), ridge = us.map(u => at(u, lipV(u) + 7, lift(u)));
       const outer = us.map((u, i) => at(u * 1.05, lipV(u) + 30 + 8 * hash(t.id + i, 4)));
       // Steep inner face, darker.
