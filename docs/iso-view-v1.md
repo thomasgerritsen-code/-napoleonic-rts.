@@ -34,9 +34,12 @@ veranderd.
   - eerder gezien (de verkende vakken van de game): een lichte sluier; grond, wegen en
     dorpen zie je, troepen niet;
   - in zicht: helder, rond de Franse eenheden en gebouwen.
-  Zachte randen, op het reliëf (een heuveltop krijgt zijn zichtveld óp de heuvel), en
-  geen vertraging bij schuiven: de mist is iets groter dan het scherm en schuift mee,
-  en wordt tijdens het schuiven 15 keer per seconde opnieuw getekend. Britten buiten
+  Ronde, zachte randen (elk verkend vak is een schijf, de schijven vloeien samen en
+  worden vervaagd; het zicht is een cirkel van 48 punten), op het reliëf (een
+  heuveltop krijgt zijn zichtveld óp de heuvel). Vloeiend: elke nieuwe mist vloeit
+  in de vorige over (overvloei over de tijd tot de volgende), zodat randen meeglijden
+  met de troepen in plaats van te verspringen; de mist is iets groter dan het scherm
+  en schuift mee met de camera. Britten buiten
   zicht worden niet getekend, net als in 2D.
 - **Hoogte geeft zicht** (alleen op deze kaart): wie hoger staat ziet verder, 3,5% per
   meter, hoogstens anderhalf keer zo ver (op de hoogste top 322 in plaats van 215). Dat
