@@ -46,30 +46,54 @@ test('with ?view=iso the game is drawn with the Blender sprites, terrain and pro
 test('iso view: clicking a soldier\'s body selects him, a box selects, right-click orders a move', async ({ page }) => {
   const errors = await openGame(page, 'test=iso-input&view=iso');
   await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 10, null, { timeout: 60_000 });
+  // A French musketeer whose body is on the open canvas (not under a HUD panel).
   const body = await page.evaluate(() => {
-    const u = units.find(v => v.side === 'france' && v.type === 'infantry' && !v.dead);
-    return { ...window.__ISO_VIEW_V1__.bodyOf(u), id: u.id };
+    const onCanvas = (x, y) => document.elementFromPoint(x, y)?.id === 'game';
+    for (const u of units) {
+      if (u.dead || u.side !== 'france' || u.type !== 'infantry') continue;
+      const b = window.__ISO_VIEW_V1__.bodyOf(u);
+      if (onCanvas(b.x, b.y)) return { ...b, id: u.id };
+    }
+    return null;
   });
+  expect(body, 'a French musketeer visible on the canvas').not.toBeNull();
   await page.mouse.click(body.x, body.y);
   let sel = await page.evaluate(() => [...selectedUnits].map(u => u.id));
-  expect(sel.length).toBeGreaterThan(0);
-  // Box round the French start: several units.
-  await page.mouse.move(body.x - 220, body.y - 140);
+  expect(sel, 'clicking his body selects him (or his regiment)').toContain(body.id);
+  // A box round him: corners kept on the open canvas.
+  const box = await page.evaluate(([x, y]) => {
+    const onCanvas = (a, b) => document.elementFromPoint(a, b)?.id === 'game';
+    for (const r of [160, 120, 80, 50]) {
+      const c = [x - r, y - r * 0.6, x + r, y + r * 0.6];
+      if (onCanvas(c[0], c[1]) && onCanvas(c[2], c[3]) && onCanvas(c[0], c[3]) && onCanvas(c[2], c[1])) return c;
+    }
+    return null;
+  }, [body.x, body.y]);
+  expect(box, 'room for a selection box').not.toBeNull();
+  await page.mouse.move(box[0], box[1]);
   await page.mouse.down();
-  await page.mouse.move(body.x + 220, body.y + 100, { steps: 5 });
+  await page.mouse.move(box[2], box[3], { steps: 6 });
   await page.mouse.up();
-  sel = await page.evaluate(() => [...selectedUnits].map(u => u.id));
-  expect(sel.length).toBeGreaterThan(5);
-  // Right-click: the selection is ordered to the clicked ground point (iso projection).
-  const goal = await page.evaluate(([x, y]) => screenToWorld(x, y), [body.x + 260, body.y + 90]);
-  await page.mouse.click(body.x + 260, body.y + 90, { button: 'right' });
-  await page.evaluate(() => window.__RTS_DEBUG__.tick(6));
-  const moved = await page.evaluate(([ids, gx, gy]) => {
-    const men = units.filter(u => ids.includes(u.id) && !u.dead && u.type !== 'worker');
+  sel = await page.evaluate(() => [...selectedUnits].filter(u => u.type !== 'worker').map(u => u.id));
+  expect(sel.length, 'the box selects soldiers').toBeGreaterThan(1);
+  // Right-click on open ground beside them: their move target is that ground point.
+  const spot = await page.evaluate(([x, y]) => {
+    const onCanvas = (a, b) => document.elementFromPoint(a, b)?.id === 'game';
+    for (const [dx, dy] of [[180, 40], [-180, 40], [180, -40], [-180, -40], [120, 0], [-120, 0]]) if (onCanvas(x + dx, y + dy)) return { x: x + dx, y: y + dy };
+    return null;
+  }, [body.x, body.y]);
+  expect(spot, 'open ground to order a move to').not.toBeNull();
+  const goal = await page.evaluate(([x, y]) => screenToWorld(x, y), [spot.x, spot.y]);
+  const dist = () => page.evaluate(([ids, gx, gy]) => {
+    const men = units.filter(u => ids.includes(u.id) && !u.dead);
     const c = men.reduce((a, u) => ({ x: a.x + u.x / men.length, y: a.y + u.y / men.length }), { x: 0, y: 0 });
     return Math.hypot(c.x - gx, c.y - gy);
   }, [sel, goal.x, goal.y]);
-  expect(moved).toBeLessThan(220);
+  const before = await dist();
+  await page.mouse.click(spot.x, spot.y, { button: 'right' });
+  await page.evaluate(() => window.__RTS_DEBUG__.tick(6));
+  const after = await dist();
+  expect(after, `they march towards the clicked point (${Math.round(before)} -> ${Math.round(after)} px)`).toBeLessThan(before * 0.7);
   expect(errors).toEqual([]);
 });
 
