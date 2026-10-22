@@ -1,0 +1,217 @@
+{
+  "assetId": "france-line-infantry-v321",
+  "sourceType": "generated",
+  "author": "OpenAI image generation, processed for Napoleonic RTS visual prototype",
+  "usageRights": "Original AI-generated illustration commissioned for this game prototype; visual and usage review pending before production release",
+  "sourceRef": "Original generated reference image from ChatGPT conversation, 2026-10-21; 1536x1024 annotated presentation",
+  "reviewedForUse": false,
+  "referenceFacing": "screen-right (prototype; actual poses are side-oblique)",
+  "pivot": {
+    "x": 48,
+    "y": 78
+  },
+  "feetAligned": true,
+  "reviewStatus": "DRAFT \u2014 frame edge cleanup, musket hand placements and anatomical motion need visual approval. Not for production.",
+  "transformations": [
+    "Cropped 17 painted soldiers from a model-generated contact sheet",
+    "OpenCV GrabCut foregound extraction",
+    "Alpha cleanup, consistent bottom-line alignment",
+    "Reduced to 96x96 RGBA frames",
+    "Packed untrimmed 6x3 atlas"
+  ],
+  "sourcePreviewFile": "fr_line_infantry_review.png",
+  "atlasSha256": "a73cfaedfc21ee38184732ef0b54aa66a7e8d75abcc772e23612d84e2545b310",
+  "frameCount": 17,
+  "frameNames": [
+    "fr_line_idle_01",
+    "fr_line_idle_02",
+    "fr_line_march_01",
+    "fr_line_march_02",
+    "fr_line_march_03",
+    "fr_line_march_04",
+    "fr_line_march_05",
+    "fr_line_march_06",
+    "fr_line_aim_01",
+    "fr_line_aim_02",
+    "fr_line_fire_01",
+    "fr_line_fire_02",
+    "fr_line_fire_03",
+    "fr_line_reload_01",
+    "fr_line_reload_02",
+    "fr_line_reload_03",
+    "fr_line_reload_04"
+  ],
+  "frameRecords": [
+    {
+      "frame": "fr_line_idle_01",
+      "sha256": "a112d310d59283173cd824812b34fb58084655af2dabb3a2e564b8ddcddec034",
+      "alphaBounds": {
+        "left": 33,
+        "top": 15,
+        "right": 60,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_idle_02",
+      "sha256": "898903573c860f4aa56bdd4e054ededc3e84b77f7f8e0aaefdec52bfe16f08d6",
+      "alphaBounds": {
+        "left": 33,
+        "top": 15,
+        "right": 62,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_march_01",
+      "sha256": "34548639ede86bd5346504287c85bb443ebf1ff8b93325ca7071c0299bf308df",
+      "alphaBounds": {
+        "left": 33,
+        "top": 13,
+        "right": 64,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_march_02",
+      "sha256": "6d3889eae7eaadab98172dd54b7277923dbf1ad9ccf2ccf0ce6377f160ee5e57",
+      "alphaBounds": {
+        "left": 30,
+        "top": 14,
+        "right": 65,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_march_03",
+      "sha256": "6cf072551a12e29703ad77de9c3bcf323b8b25ec2bf5f18b7a3866342fd488ca",
+      "alphaBounds": {
+        "left": 28,
+        "top": 15,
+        "right": 55,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_march_04",
+      "sha256": "fb2365fdc9b2d3b8a4312ae76048b29aab4514047b6b529c33e7909779f7a588",
+      "alphaBounds": {
+        "left": 24,
+        "top": 16,
+        "right": 54,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_march_05",
+      "sha256": "ce76353e3319b3fe52b691676eae6da76a5435ad1b35b5075fbefc890faee617",
+      "alphaBounds": {
+        "left": 33,
+        "top": 12,
+        "right": 66,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_march_06",
+      "sha256": "4fba0e253b8fa8071193f84ad4b195316111a2ae35a3fd3ae8b151831c9b4561",
+      "alphaBounds": {
+        "left": 28,
+        "top": 16,
+        "right": 64,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_aim_01",
+      "sha256": "e842c31d2d8497364dd4bd07ad85dca878c06ac5dfd208c24c4d80a607364309",
+      "alphaBounds": {
+        "left": 26,
+        "top": 12,
+        "right": 62,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_aim_02",
+      "sha256": "462952892515e1d9f590233310f03c4a80f7eed3472dac6fae5d11d5a42581cc",
+      "alphaBounds": {
+        "left": 28,
+        "top": 16,
+        "right": 81,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_fire_01",
+      "sha256": "535d942f647c6b2c3f066ec18a0e61f43e3219364beb672486fd6b7fe973ae97",
+      "alphaBounds": {
+        "left": 28,
+        "top": 17,
+        "right": 79,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_fire_02",
+      "sha256": "366d088df0aee2591df7218ab5d665e1b8387b4ca44d97b62bc5495ec35c9ba9",
+      "alphaBounds": {
+        "left": 28,
+        "top": 15,
+        "right": 67,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_fire_03",
+      "sha256": "d81ee8c283168ba4d79d27de3868f7f1f7f16be9a30e66f18c5e953dbcdf7536",
+      "alphaBounds": {
+        "left": 26,
+        "top": 9,
+        "right": 70,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_reload_01",
+      "sha256": "fcb3c8bceebc420c6c40e6ea85a995ce832b8df530878fd05c897128017ab5bf",
+      "alphaBounds": {
+        "left": 30,
+        "top": 12,
+        "right": 57,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_reload_02",
+      "sha256": "43c5a004ec3a1ddf9b82193fedd767600f6530d7a9f610459272f581332d5403",
+      "alphaBounds": {
+        "left": 31,
+        "top": 15,
+        "right": 58,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_reload_03",
+      "sha256": "15339c0420957a419eb8e7985adeb85008ad694b0dcc74f94559e9328ab86dff",
+      "alphaBounds": {
+        "left": 28,
+        "top": 15,
+        "right": 68,
+        "bottom": 77
+      }
+    },
+    {
+      "frame": "fr_line_reload_04",
+      "sha256": "ed8a0a25cfe0df280b7222a9bf57e69d22b003d4764ab1b0395d769a2249fecc",
+      "alphaBounds": {
+        "left": 27,
+        "top": 15,
+        "right": 69,
+        "bottom": 77
+      }
+    }
+  ],
+  "outcome": "real 17-raster-pose review atlas, not final 8-direction unit animation"
+}
