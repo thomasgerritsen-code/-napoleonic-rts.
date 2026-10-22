@@ -33,7 +33,8 @@ STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4),
           ("die", 4), ("diefwd", 4), ("dieside", 4),
           ("kaim", 2), ("kfire", 3), ("misfire", 3), ("charge", 6), ("thrust", 3),
           ("rout", 6), ("crawl", 4), ("cheer", 2),
-          ("look", 4), ("adjust", 4), ("lean", 2)]
+          ("look", 4), ("adjust", 4), ("lean", 2),
+          ("dig", 6)]
 
 PALETTES = {
     "france": {
@@ -217,7 +218,15 @@ def build_soldier(side: str, variant: int = 1) -> dict:
     flash = part("ball", (0.11, 1, 1, 1.9), (0, 0.032, MUZZLE_Z + 0.2), glow("#ffc45c", 7), musket, name="flash")
     flame = part("cyl", (0.06, 0.32, 0.0), (0, 0.032, MUZZLE_Z + 0.36), glow("#ff7f24", 6), musket, name="flame")
     pan = part("ball", (0.05,), (0.04, 0.03, 0.44), glow("#ffd27a", 6), musket, name="panflash")
-    return {"root": root, "fall": fall, "hips": hips, "torso": torso, "head": head, "joints": joints, "musket": musket,
+    # Entrenching spade in the right hand, only shown while digging.
+    spade = empty("spade", joints["R"][1], (0, 0.01, -0.29))
+    # Held mid-haft: the grip end reaches back past the body, the blade ahead.
+    part("cyl", (0.017, 1.0), (0, 0, -0.1), M["wood"], spade, name="spadehaft")
+    part("box", (0.1, 0.03, 0.04), (0, 0, 0.4), M["wood"], spade, name="spadegrip")
+    part("box", (0.19, 0.022, 0.27), (0, 0, -0.72), M["steel"], spade, name="spadeblade")
+    clod = part("ball", (0.12, 1, 0.7, 0.8), (0, 0.06, -0.74), material("#5a4630", 0.95, pattern="plain"), spade, name="clod")
+    hide_render_tree(spade, True)
+    return {"spade": spade, "clod": clod, "root": root, "fall": fall, "hips": hips, "torso": torso, "head": head, "joints": joints, "musket": musket,
             "ramrod": ramrod, "flash": [flash, flame], "pan": pan, "company": company}
 
 
@@ -333,6 +342,17 @@ def running(t, stride, lean_hips=0.9):
 KNEEL = ((0, -92), (84, -86), 0.53)                  # right knee on the ground
 
 
+# Dig cycle, per frame: right arm, left arm (shoulder x, y, elbow), torso lean,
+# legs ((thigh, knee) right, left, hips z), spade angle at the hand.
+DIG = [
+    ((40, 14, 10), (30, -20, 50), 35, ((-10, -14), (24, -30), 0.88), -55, False),   # blade set to the ground
+    ((34, 14, 8), (26, -20, 46), 30, ((-8, -12), (44, -64), 0.86), -57, False),      # foot on the blade, pushed in
+    ((20, 14, 20), (20, -20, 60), 45, ((-14, -24), (26, -40), 0.82), -40, True),    # lever back
+    ((60, 14, 30), (50, -20, 60), 30, ((-14, -18), (18, -24), 0.87), -50, True),    # lift the load
+    ((100, 14, 20), (80, -20, 50), 10, ((-16, -8), (12, -10), 0.93), -10, False),   # throw it onto the parapet
+    ((55, 14, 20), (45, -20, 50), 25, ((-12, -12), (16, -18), 0.9), -60, False),    # swing back
+]
+
 def pose_extra(rig: dict, state: str, frame: int, frames: int, direction: int = 0) -> bool:
     """Combat, morale and idle-variety poses added in v330."""
     rad = math.radians
@@ -409,6 +429,19 @@ def pose_extra(rig: dict, state: str, frame: int, frames: int, direction: int = 
         set_legs(rig, (0, 0), (0, 0), 0.95)
         head.rotation_euler = Euler((rad(-14), 0, 0))
         return True
+    if state == "dig":
+        # Spade work towards the parapet in front: push in, step on it, lever,
+        # lift and throw the earth forward, swing back. Musket stacked aside.
+        hide_render_tree(musket, True)
+        hide_render_tree(rig["spade"], False)
+        (rx, ry, re), (lx, ly, le), lean, legs, spade, load = DIG[frame]
+        set_arms(rig, (rx, ry, re), (lx, ly, le))
+        set_legs(rig, *legs)
+        torso.rotation_euler = Euler((rad(lean), 0, 0))
+        head.rotation_euler = Euler((rad(-0.4 * lean), 0, 0))
+        rig["spade"].rotation_euler = Euler((rad(spade), 0, 0))
+        hide_render_tree(rig["clod"], not load)
+        return True
     if state in ("look", "adjust", "lean"):
         breath = math.cos(t * math.tau)
         set_legs(rig, (0, 0), (0, 0), 0.95 + 0.004 * breath)
@@ -449,6 +482,8 @@ def pose(rig: dict, state: str, frame: int, frames: int, direction: int = 0) -> 
         obj.hide_render = True
     rig["pan"].hide_render = True
     rig["ramrod"].hide_render = True
+    if "spade" in rig:
+        hide_render_tree(rig["spade"], True)
     rig["torso"].rotation_euler = Euler((0, 0, 0))
     rig["head"].rotation_euler = Euler((0, 0, 0))
     rig["fall"].rotation_euler = Euler((0, 0, 0))
@@ -552,6 +587,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--out", default="art/frames/iso-proof")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--states", nargs="*", help="render only these states (review)")
+    ap.add_argument("--dirs", nargs="*", help="render only these directions (review)")
     ap.add_argument("--supersample", type=int, default=2,
                     help="render N x larger; pack-iso-atlas.py averages back down for cleaner edges")
     args = ap.parse_args(argv)
@@ -569,6 +605,8 @@ def main(argv: list[str]) -> int:
     prefix = ("fr" if args.side == "france" else "br") + suffix
     muzzle = {"fire": {}, "kfire": {}}
     for d, name in enumerate(DIRECTIONS):
+        if args.dirs and name not in args.dirs:
+            continue
         # Model faces +Y; screen direction d is clockwise from east.
         rig["root"].rotation_euler = Euler((0, 0, math.radians(-45 * d - 90)))
         for state, frames in STATES:

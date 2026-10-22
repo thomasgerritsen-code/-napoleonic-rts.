@@ -56,6 +56,8 @@
     return Math.abs(dx * ax + dy * ay) <= t.length / 2 && Math.abs(dx * Math.cos(t.facing) + dy * Math.sin(t.facing)) <= t.width / 2;
   };
   const trenchAt = (x, y) => trenches.find(t => t.progress >= 1 && inTrench(t, x, y)) || null;
+  // A trench being dug right now (its regiment worked on it in the last second or two).
+  const diggingAt = (x, y) => trenches.find(t => t.progress < 1 && elapsed - (t.dugAt ?? -99) < 2 && inTrench(t, x, y)) || null;
   const foeNear = (side, c, r) => units.some(e => !e.dead && !e.routing && e.side !== side && e.type !== 'worker' && Math.hypot(e.x - c.x, e.y - c.y) < r);
   function lineGeometry(reg, m) {
     const facing = Number.isFinite(reg.facing) ? reg.facing : -Math.PI / 2, ax = Math.cos(facing + Math.PI / 2), ay = Math.sin(facing + Math.PI / 2);
@@ -111,7 +113,7 @@
     // A second has passed since the last check (refresh runs the stance once a second).
     const rate = (foeNear(reg.side, c, 260) ? 0.4 : 1) / cfg.digSeconds;
     t.progress = Math.min(1, t.progress + rate);
-    t.diggers = reg.id;
+    t.diggers = reg.id; t.dugAt = elapsed;
     if (t.progress >= 1) reg.trenchId = t.id;
   }
   let trenchSeq = 0;
@@ -207,7 +209,7 @@
 
   global.__REGIMENT_ORDERS_V1__ = Object.freeze({
     version: 'regiment-orders-v1', config: cfg, isBraced, toggleDefend, reinforce,
-    trenches: () => trenches, trenchAt,
+    trenches: () => trenches, trenchAt, diggingAt,
     stats: () => ({ ...stats, trenches: trenches.length, finished: trenches.filter(t => t.progress >= 1).length, braced: regiments.filter(isBraced).length, defending: regiments.filter(r => !r.destroyed && r.defend).length })
   });
 })(window);

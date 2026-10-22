@@ -427,3 +427,29 @@ test('iso view: a defending line digs a trench, men in it lose less, and a regim
   expect(r.again).toBeGreaterThan(10);
   expect(errors).toEqual([]);
 });
+
+test('iso view: men digging a trench are seen at work with the spade', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await openGame(page, 'test=iso-dig&view=iso');
+  await page.waitForFunction(() => window.__REGIMENT_ORDERS_V1__ && window.__ISO_VIEW_V1__?.stats().digSprites, null, { timeout: 60_000 });
+  const at = await page.evaluate(() => {
+    const O = window.__REGIMENT_ORDERS_V1__, us = [];
+    for (let i = 0; i < 14; i++) us.push(createUnit('france', 'infantry', 900 + (i % 7) * 20, 1300 + (i < 7 ? 0 : 18)));
+    us.push(createUnit('france', 'officer', 880, 1300));
+    const a = createRegiment('france', us);
+    arrangeFacingRegimentV146(a, 960, 1300, 'line', Math.PI / 2);
+    selectWholeRegiment(a); O.toggleDefend();
+    for (let k = 0; k < 14; k++) window.__RTS_DEBUG__.tick(1);
+    const t = O.trenches()[0];
+    camera.x = t.x; camera.y = t.y; camera.zoom = 1.4;
+    return { progress: t.progress, digging: regimentMembers(a).filter(u => O.diggingAt(u.x, u.y)).length };
+  });
+  expect(at.progress).toBeGreaterThan(0);
+  expect(at.progress).toBeLessThan(1);
+  expect(at.digging).toBeGreaterThan(10);
+  // The officer keeps watch; the musketeers dig.
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().digging >= 12);
+  const st = await stats(page);
+  expect(st.missingNames.filter(n => n.startsWith('dig'))).toEqual([]);
+  expect(errors).toEqual([]);
+});

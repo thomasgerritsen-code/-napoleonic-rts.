@@ -8,7 +8,7 @@ too much for a phone. For every *_atlas.json this writes <image>_half.webp at
 50% (resized with premultiplied alpha, so edges get no dark fringe) and adds
 meta.half = {"image", "scale": 0.5}. The lab loads those unless ?hd=1.
 
-  .bvenv/bin/python scripts/make-iso-halfres.py
+  .bvenv/bin/python scripts/make-iso-halfres.py [glob, e.g. "*_dig_atlas.json"]
 """
 from __future__ import annotations
 
@@ -22,7 +22,8 @@ ATLASES = Path(__file__).resolve().parents[1] / "graphics-lab/assets/sprites/iso
 
 
 def main() -> int:
-    for path in sorted(ATLASES.glob("*_atlas.json")):
+    pattern = sys.argv[1] if len(sys.argv) > 1 else "*_atlas.json"
+    for path in sorted(ATLASES.glob(pattern)):
         sheet = json.loads(path.read_text())
         meta = sheet["meta"]
         src = ATLASES / meta["image"]

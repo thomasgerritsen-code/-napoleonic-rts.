@@ -94,8 +94,12 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   in zolang hij verdedigt of hergroepeert.
 - **Loopgraven**: een ingegraven regiment in linie begint 3 seconden later een loopgraaf
   te graven langs zijn front (ongeveer 25 seconden, onder vijandelijk vuur binnen
-  ~12 m ruim twee keer zo lang). Je ziet hem vanuit het midden groeien, met
-  opspattende aarde; de aarden wal komt aan de vijandkant. Wie in een voltooide
+  ~12 m ruim twee keer zo lang). De hele lijn wordt meteen uitgezet en wordt
+  donkerder en dieper naarmate er gegraven wordt; de musketiers leggen hun geweer
+  weg en graven zichtbaar met de spade (Blender-animatie in 6 beelden: steken,
+  intrappen, wrikken, optillen, de aarde naar voren op de wal gooien, terug), elk
+  in zijn eigen tempo, en zakken mee de grond in. De aarden wal komt aan de
+  vijandkant en groeit mee; de officier en tamboer kijken toe. Wie in een voltooide
   loopgraaf staat - van welke kant ook - lijdt 50% minder verlies en verliest nog
   minder moraal dan alleen ingegraven. In de iso-weergave staan de mannen erin lager,
   en de wal verbergt hun benen. Een loopgraaf blijft liggen als het regiment vertrekt;

@@ -8,6 +8,7 @@ cells plus a Pixi-compatible JSON:
 - combat:   kneeling aim 2 / fire 3, misfire 3, charge 6, bayonet thrust 3 -> 2992x1024
 - morale:   rout 6, wounded crawl 4, cheer 2 -> 2112x1024
 - idlex:    look around 4, set shako 4, lean on musket 2 -> 1760x1024
+- dig:      spade work in a trench 6 (set, push, lever, lift, throw, back) -> 1056x1024
 Frames rendered N x larger (--supersample) are averaged back down first. The
 renderer's muzzle.json (screen pixel of the muzzle on the shot frame, per
 direction) goes into the infantry (standing fire) and combat (kneeling fire)
@@ -48,6 +49,7 @@ SHEETS = {
     "combat": [("kaim", 2), ("kfire", 3), ("misfire", 3), ("charge", 6), ("thrust", 3)],
     "morale": [("rout", 6), ("crawl", 4), ("cheer", 2)],
     "idlex": [("look", 4), ("adjust", 4), ("lean", 2)],
+    "dig": [("dig", 6)],
 }
 MUZZLE_STATE = {"infantry": "fire", "combat": "kfire"}
 # Folder -> sprite prefix; folders 2 and 3 hold the alternative soldier looks.
@@ -207,6 +209,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--preview", help="directory for review sheets")
     ap.add_argument("--webp", action="store_true", help="write lossy WebP with alpha (Pillow)")
     ap.add_argument("--only", nargs="*", help="pack only these folders (e.g. france roles)")
+    ap.add_argument("--kinds", nargs="*", help="pack only these sheet kinds (e.g. dig)")
     args = ap.parse_args(argv)
     try:
         jobs = [(side, kind) for side in SIDES for kind in SHEETS]
@@ -218,6 +221,8 @@ def main(argv: list[str]) -> int:
                        **dict.fromkeys(CAVALRY, "cavalry"), "worker": "workers"}
             jobs = [(s, k) for s, k in jobs if (k in special and special[k] in args.only)
                     or (k not in special and s in args.only)]
+        if args.kinds:
+            jobs = [(s, k) for s, k in jobs if k in args.kinds]
         for side, kind in jobs:
             atlas, sheet, w = pack(Path(args.frames), side, kind)
             out = Path(args.out)

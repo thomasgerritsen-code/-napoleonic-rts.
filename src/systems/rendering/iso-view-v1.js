@@ -96,7 +96,10 @@
     first.push(loadProps(), loadVillage(), loadGround(), load('frw', ['worker']), load('brw', ['worker']));
     // Extra looks stream in afterwards; until then everyone uses the base look.
     return Promise.all(first).then(() => Promise.all(['2', '3', '4', '5'].flatMap(l => ['fr', 'br'].map(p => load(p + l, INFANTRY)))
-      .concat(['fr', 'br'].flatMap(p => [load(p + 'c2', ['cavalry', 'cavfight']), load(p + 'co', ['cavalry', 'cavfight'])]))));
+      .concat(['fr', 'br'].flatMap(p => [load(p + 'c2', ['cavalry', 'cavfight']), load(p + 'co', ['cavalry', 'cavfight'])]))
+      // Spade work in a trench being dug, per look.
+      .concat(['', '2', '3', '4', '5'].flatMap(l => ['fr', 'br'].map(p => loadSheet(p + l, 'dig')
+        .then(part => { view.atlases[p + l + ':dig'] = indexAtlas([part]); }).catch(err => console.warn(err.message)))))));
   }
   function loadProps() {
     return fetch(ASSETS + 'iso/props/props.json').then(r => r.json()).then(m => Promise.all(Object.entries(m.props)
@@ -696,6 +699,11 @@
     }
     // Musketeers.
     const key = lookOf(u);
+    const dk = view.atlases[key + ':dig'] ? key + ':dig' : p + ':dig';
+    if (m.digging && !m.moving && !u.routing && view.atlases[dk]) {
+      // Each man at his own pace through set, push, lever, lift, throw and back.
+      return [dk, 'dig_' + DIRS[dirOf(m.digging.facing)], Math.floor(now / 0.28 + hash(u.id, 6) * 6) % 6];
+    }
     if (u.routing) return [key, 'rout_' + d, step(1.6, 6)];
     if (m.moving) return [key, (u.chargeTimer > 0 ? 'charge_' : 'march_') + d, step(MARCH_STRIDE, 6)];
     if (since < 0.42) return [key, 'fire_' + d, Math.min(2, Math.floor(since / 0.14))];
@@ -1032,7 +1040,7 @@
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
-    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = st.stances = 0;
+    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = st.stances = st.digging = 0;
     panFix();
     ensureAttackHook();
     drawTerrain();
@@ -1047,8 +1055,13 @@
       if (!visible(u)) continue;
       const X = sx(u.x);
       if (X < -80 || X > innerWidth + 80 || gy(u.x, u.y) < -40 || gy(u.x, u.y) > innerHeight + 140) continue;
-      const deck = deckAt(u.x, u.y), sunk = !deck && global.__REGIMENT_ORDERS_V1__?.trenchAt?.(u.x, u.y);
-      const up = deck ? deck.h * LIFT * z() : sunk ? -TRENCH_SINK * PPM * LIFT * z() : 0, Y = gy(u.x, u.y) - up;
+      const orders = global.__REGIMENT_ORDERS_V1__, deck = deckAt(u.x, u.y);
+      const sunk = !deck && (orders?.trenchAt?.(u.x, u.y) || orders?.diggingAt?.(u.x, u.y));
+      // Musketeers in a trench being dug are at work with the spade, deeper as it grows.
+      m.digging = sunk && sunk.progress < 1 && u.type === 'infantry' && !crewIds.has(u.id) ? sunk : null;
+      if (m.digging) st.digging++;
+      const depth = sunk ? TRENCH_SINK * Math.min(1, sunk.progress) : 0;
+      const up = deck ? deck.h * LIFT * z() : sunk ? -depth * PPM * LIFT * z() : 0, Y = gy(u.x, u.y) - up;
       const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
       if (deck) st.onBridge++;
       // Men in a trench are drawn behind its bank (the bank hides their legs).
@@ -1208,7 +1221,7 @@
   const trenchList = () => global.__REGIMENT_ORDERS_V1__?.trenches?.() || [];
   function trenchFrame(t) {
     const ax = Math.cos(t.facing + Math.PI / 2), ay = Math.sin(t.facing + Math.PI / 2), nx = Math.cos(t.facing), ny = Math.sin(t.facing);
-    const half = t.length / 2 * Math.min(1, Math.max(0.08, t.progress));
+    const half = t.length / 2;
     const at = (u, v, up = 0) => { const x = t.x + ax * u + nx * v, y = t.y + ay * u + ny * v; return [sx(x), gy(x, y) - up * PPM * LIFT * z()]; };
     return { half, at, ny };
   }
@@ -1218,10 +1231,13 @@
       const X = sx(t.x), Y = gy(t.x, t.y);
       if (X < -400 || X > innerWidth + 400 || Y < -200 || Y > innerHeight + 200) continue;
       const { half, at } = trenchFrame(t), w = t.width / 2;
+      // Marked out along the whole line at once, darker and deeper as the spades go down.
+      ctx.globalAlpha = 0.35 + 0.65 * Math.min(1, t.progress);
       poly([at(-half - 6, -w - 4), at(half + 6, -w - 4), at(half + 6, w + 4), at(-half - 6, w + 4)], 'rgba(96,78,52,.85)');   // spoil and trodden edge
       poly([at(-half, -w), at(half, -w), at(half, w), at(-half, w)], '#3b2e20');                                               // the bed
       poly([at(-half, -w * 0.35), at(half, -w * 0.35), at(half, w * 0.35), at(-half, w * 0.35)], '#2c2218');
-      if (t.progress < 1) {
+      ctx.globalAlpha = 1;
+      if (t.progress < 1 && elapsed - (t.dugAt ?? -99) < 2) {
         // Earth flying from the spades along the dug stretch.
         ctx.fillStyle = 'rgba(120,96,62,.9)';
         for (let i = 0; i < 7; i++) {
@@ -1319,7 +1335,7 @@
     isOn: () => view.on, setOn, setOverview,
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
-      workerSprites: !!view.atlases.frw, labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
+      workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
       relief: view.relief ? view.relief.maxM : 0, heightSight: !!view.heightSight, villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
     screenOf: (wx, wy) => ({ x: sx(wx), y: gy(wx, wy) }),
     // Door direction of each village house against its gate on the road (for tests).
