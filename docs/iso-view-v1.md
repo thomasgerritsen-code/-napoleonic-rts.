@@ -139,17 +139,18 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   een erf met moestuin bij elk huis. Resultaat `ground.jpg` (4978 × 1757, 14 px per
   meter, met ruimte boven voor de verhoogde noordrand); de iso-weergave tekent alleen het deel dat in beeld is. Zonder die afbeelding
   valt hij terug op de 2D-kaart.
-- **Wegen** (`road_material` in het script): elke weg is één doorlopende band met
-  afgeronde bochten (geen naden meer per stukje), in twee lagen zoals een echte weg:
-  eerst de bermen van álle wegen (breed, uitgesleten, met gras erin dat geleidelijk
-  overgaat in het land), dan daarboven de rijbanen van álle wegen. Zo ligt de berm
-  van de ene weg nooit over de rijbaan van de andere en sluiten rijbanen op een
-  **kruispunt** gewoon op elkaar aan; het script zoekt de kruisingen en T-splitsingen
-  (29 op de open kaart) en vult de hoeken met een afgerond stuk wegdek (kasseien waar
-  een chaussee meedoet, anders aarde). Doodlopende einden lopen uit.
-  - chaussee: kasseien over de hele rijbaan, licht bol, grindbermen;
-  - zijweg: aangestampte aarde met twee karrensporen, hier en daar een plas erin, en
-    strepen van wielen en hoeven in de rijrichting;
+- **Wegen** als één wegdek (`RoadField` in het script): voor het hele slagveld wordt op
+  een raster van 25 cm uitgerekend hoe ver elk punt van de dichtstbijzijnde weg ligt
+  (per soort: chaussee of aarden weg), en het wegdek wordt daaruit getekend. Alle
+  wegen vormen zo samen één oppervlak: een **kruispunt is een kruispunt**, geen weg die
+  over een andere ligt; de binnenhoeken zijn afgerond (een zacht minimum van de
+  afstanden) en doodlopende einden rond. Eerst de bermen (uitgesleten, met gras dat
+  naar buiten toe terugkomt), daarover de rijbanen:
+  - chaussee: onregelmatige keien (Voronoi-cellen van ~20 cm, elk een eigen tint, met
+    donkere voegen) - zonder richting, dus geen naad in het patroon op een kruising;
+    grindbermen;
+  - zijweg: aangestampte aarde met twee karrensporen en hier en daar een plas erin; de
+    sporen vervagen waar twee wegen samenkomen;
   - pad: twee sporen met gras ertussen.
   Ook de erven en moestuinen bij de huizen lopen zacht uit in het gras.
 - **Bomenlanen**: langs de chaussees staan populieren aan weerszijden, om de 10 m met
