@@ -29,12 +29,13 @@ test('with ?view=iso the game is drawn with the Blender sprites, terrain and pro
   const errors = await openGame(page, 'test=iso&view=iso');
   await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().atlases >= 14, null, { timeout: 60_000 });
   // Let a few frames draw (the test page advances the simulation itself).
-  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sprites > 10 && window.__ISO_VIEW_V1__.stats().tilesDrawn > 0);
+  // Ground: the Blender battlefield, or the game's own terrain tiles until it has loaded.
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sprites > 10 &&
+    (window.__ISO_VIEW_V1__.stats().ground || window.__ISO_VIEW_V1__.stats().tilesDrawn > 0));
   const s = await stats(page);
   expect(s.on).toBe(true);
   expect(s.ppm).toBe(22.5);
   expect(s.props).toBeGreaterThan(5);
-  expect(s.workers).toBeGreaterThan(0);
   await expect(page.locator('#isoViewToggle')).toHaveText('🗺 2D-kaart');
   // Iso projection: the ground is squashed to half height.
   const dy = await page.evaluate(() => screenToWorld(innerWidth / 2, innerHeight / 2 + 100).y - screenToWorld(innerWidth / 2, innerHeight / 2).y);
@@ -166,5 +167,44 @@ test('iso view: soldiers stay readable - side rings, scenery in front of them tu
   // In the 2D map the Overzicht button is hidden.
   await page.locator('#isoViewToggle').click();
   await expect(page.locator('#isoOverviewToggle')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('iso view: the battlefield ground, woods and peasants come from Blender', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-ground&view=iso');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().ground === true, null, { timeout: 60_000 });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().workerSprites === true, null, { timeout: 60_000 });
+  const s = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
+  expect(s.woodTrees).toBeGreaterThan(50);
+  // Peasants drawn as sprites, not the stand-in figures.
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().workers === 0 && window.__ISO_VIEW_V1__.stats().sprites > 10);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: a right-click on an enemy sends the selection to musket reach facing it, with a target sight', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-attack&view=iso');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 5, null, { timeout: 60_000 });
+  const ids = await page.evaluate(() => {
+    const D = window.__RTS_DEBUG__, base = units.find(u => u.side === 'france' && u.type === 'infantry');
+    for (let i = 0; i < 12; i++) createUnit('france', 'infantry', base.x + i * 3, base.y + 40);
+    const id = D.createRegimentDirect('france'); D.selectRegiment(id);
+    const enemy = [];
+    for (let i = 0; i < 10; i++) enemy.push(createUnit('britain', 'infantry', base.x + 120 + i * 18, base.y + 170).id);
+    camera.x = base.x + 120; camera.y = base.y + 110; camera.zoom = 0.9;
+    return { id, enemy };
+  });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sprites > 20);
+  const e = await page.evaluate(id => window.__ISO_VIEW_V1__.bodyOf(units.find(u => u.id === id)), ids.enemy[4]);
+  const before = await page.evaluate(() => window.__ISO_VIEW_V1__.stats().attacks || 0);
+  await page.mouse.click(e.x, e.y, { button: 'right' });
+  expect(await page.evaluate(() => window.__ISO_VIEW_V1__.stats().attacks || 0)).toBe(before + 1);
+  // The regiment closes on the enemy and ends at about musket reach.
+  await page.evaluate(() => window.__RTS_DEBUG__.tick(12));
+  const gap = await page.evaluate(([id, enemy]) => {
+    const own = regimentMembers(getRegiment(id)).filter(u => !u.dead), foe = units.filter(u => enemy.includes(u.id) && !u.dead);
+    const a = centroid(own), b = centroid(foe);
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }, [ids.id, ids.enemy]);
+  expect(gap).toBeLessThan(160);
   expect(errors).toEqual([]);
 });
