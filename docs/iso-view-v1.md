@@ -29,8 +29,18 @@ veranderd.
   bessen, ijzer als rots. Gebouwen in aanbouw zijn doorschijnend.
 - **Rook en kogels**: rook bij elk schot (een grote wolk bij kanonnen), kogels als
   stipjes op schouderhoogte.
-- **Mist van oorlog** volgt de zichtradius van de Franse eenheden en gebouwen; Britten
-  buiten zicht worden niet getekend, net als in 2D.
+- **Mist van oorlog** in drie tinten, zoals in de klassieke RTS-spellen:
+  - nooit gezien: donkere, wolkerige mist (de wolken liggen vast op de grond);
+  - eerder gezien (de verkende vakken van de game): een lichte sluier; grond, wegen en
+    dorpen zie je, troepen niet;
+  - in zicht: helder, rond de Franse eenheden en gebouwen.
+  Zachte randen, op het reliëf (een heuveltop krijgt zijn zichtveld óp de heuvel), en
+  geen vertraging bij schuiven: de mist is iets groter dan het scherm en schuift mee,
+  en wordt tijdens het schuiven 15 keer per seconde opnieuw getekend. Britten buiten
+  zicht worden niet getekend, net als in 2D.
+- **Hoogte geeft zicht** (alleen op deze kaart): wie hoger staat ziet verder, 3,5% per
+  meter, hoogstens anderhalf keer zo ver (op de hoogste top 322 in plaats van 215). Dat
+  geldt voor beide kanten, ook voor wat de Britse AI ziet.
 - Selectieringen, het sleepkader en de minimap van de game.
 
 ## Open kaart (alleen in de iso-weergave)
@@ -180,5 +190,5 @@ weergaven; terug in 2D begint de terreincache opnieuw.
 
 1. De grond opnieuw renderen als de kaart van de game verandert (export + script).
 2. Tekenen via de GPU voor 520 eenheden op zwakke telefoons.
-3. Hoogte in het spel zelf: heuvels zijn nu zichtbaar, maar zicht en schootsveld
-   houden er (nog) geen rekening mee.
+3. Hoogte in het spel zelf: hoogte geeft verder zicht, maar heuvels blokkeren het zicht
+   (nog) niet en het schootsveld houdt er geen rekening mee.

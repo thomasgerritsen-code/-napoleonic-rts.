@@ -267,3 +267,21 @@ test('iso view: an open map with fewer roads, and men cross the river on Blender
   }
   expect(errors).toEqual([]);
 });
+
+test('iso view: fog of war in three shades on the relief, and high ground sees farther', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-fog&view=iso');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().ground === true && window.__ISO_VIEW_V1__.stats().heightSight, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const hill = TERRAIN_HILLS.reduce((a, b) => (b.height || 0) > (a.height || 0) ? b : a);
+    const top = createUnit('france', 'infantry', hill.x, hill.y), low = createUnit('france', 'infantry', 1900, 3000);
+    camera.x = 600; camera.y = 900; camera.zoom = 0.7;
+    return { top: visionRadius(top), low: visionRadius(low) };
+  });
+  // On the highest hilltop a musketeer sees farther; down by the river, as before (215).
+  expect(r.low).toBeLessThan(230);
+  expect(r.top).toBeGreaterThan(r.low * 1.25);
+  expect(r.top).toBeLessThanOrEqual(215 * 1.5 + 1);
+  // Explored ground (the French start) is drawn under a veil, and sight around the troops.
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().fogCells > 20 && window.__ISO_VIEW_V1__.stats().fogSources > 0);
+  expect(errors).toEqual([]);
+});

@@ -113,6 +113,7 @@
         if (R && R.data) {
           const bytes = Uint8Array.from(atob(R.data), ch => ch.charCodeAt(0));
           view.relief = { ...R, data: null, cm: new Uint16Array(bytes.buffer, 0, R.cols * R.rows) };
+          installHeightSight();
         }
         view.woodTrees = null;
       }))
@@ -773,24 +774,107 @@
       ctx.beginPath(); ctx.arc(sx(p.x), gy(p.x, p.y) - 1.2 * LIFT * PPM * z(), Math.max(1, 1.4 * z()), 0, 7); ctx.fill();
     }
   }
+  // ---- fog of war, in three shades as in the classic RTS games ----
+  // Never seen: a dark, cloudy mist. Seen before (the game's explored cells): a
+  // light veil - ground, roads and villages show, men do not. In sight: clear.
+  // Edges are soft, every shape lies on the relief, and the fog is redrawn as
+  // soon as the camera moves (otherwise five times a second), at half size.
   const fog = document.createElement('canvas'), fogCtx2 = fog.getContext('2d');
+  const seenLayer = document.createElement('canvas'), seenCtx = seenLayer.getContext('2d');
+  const sightLayer = document.createElement('canvas'), sightCtx = sightLayer.getContext('2d');
+  const FOG_SOFT = 'filter' in fogCtx2;
+  const SEEN_VEIL = 0.5;    // share of the mist lifted over ground seen before
+  // A tiling cloud texture (value noise, two octaves) laid in world space.
+  function cloudTile() {
+    if (view.cloud !== undefined) return view.cloud;
+    const N = 128, g = 8, rnd = [], c = document.createElement('canvas'); c.width = c.height = N;
+    for (let i = 0; i < g * g * 2; i++) rnd.push(hash(i, 811));
+    const at = (o, x, y) => rnd[o + ((y % g + g) % g) * g + ((x % g + g) % g)];
+    const noise = (o, u, v) => { const x = Math.floor(u), y = Math.floor(v), fx = u - x, fy = v - y,
+      sx2 = fx * fx * (3 - 2 * fx), sy2 = fy * fy * (3 - 2 * fy);
+      return (at(o, x, y) * (1 - sx2) + at(o, x + 1, y) * sx2) * (1 - sy2) + (at(o, x, y + 1) * (1 - sx2) + at(o, x + 1, y + 1) * sx2) * sy2; };
+    const cx = c.getContext('2d'), img = cx.createImageData(N, N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const n = 0.65 * noise(0, x / N * g, y / N * g) + 0.35 * noise(g * g, (x / N * g * 2) % g, (y / N * g * 2) % g), i = (y * N + x) * 4;
+      img.data[i] = 10 + n * 16; img.data[i + 1] = 14 + n * 18; img.data[i + 2] = 19 + n * 20; img.data[i + 3] = 255 * (0.8 + n * 0.14);
+    }
+    cx.putImageData(img, 0, 0);
+    view.cloud = fogCtx2.createPattern(c, 'repeat');
+    return view.cloud;
+  }
+  // The fog canvas reaches FOG_M (half-size px) past each screen edge, so while
+  // the camera pans it is shifted and only redrawn every 60 ms.
+  const FOG_M = 64;
+  // A ground shape (game px) lifted onto the relief, at half size.
+  function groundPath(c, pts) {
+    c.moveTo(sx(pts[0][0]) / 2 + FOG_M, gy(pts[0][0], pts[0][1]) / 2 + FOG_M);
+    for (let i = 1; i < pts.length; i++) c.lineTo(sx(pts[i][0]) / 2 + FOG_M, gy(pts[i][0], pts[i][1]) / 2 + FOG_M);
+    c.closePath();
+  }
   function drawFog() {
     if (typeof frenchVisionSources !== 'function' || typeof visionRadius !== 'function') return;
-    const w = Math.ceil(innerWidth / 2), h = Math.ceil(innerHeight / 2);
-    if (fog.width !== w || fog.height !== h) { fog.width = w; fog.height = h; }
-    // The fog changes slowly: redraw it five times a second.
-    if (performance.now() - view.fogAt > 200) {
-      view.fogAt = performance.now();
-      fogCtx2.globalCompositeOperation = 'source-over'; fogCtx2.clearRect(0, 0, w, h);
-      fogCtx2.fillStyle = 'rgba(4,7,9,.82)'; fogCtx2.fillRect(0, 0, w, h);
-      fogCtx2.globalCompositeOperation = 'destination-out'; fogCtx2.fillStyle = '#000';
-      for (const s of frenchVisionSources()) {
-        const r = visionRadius(s) * z() / 2;
-        fogCtx2.beginPath(); fogCtx2.ellipse(sx(s.x) / 2, gy(s.x, s.y) / 2, r, r * SQ, 0, 0, 7); fogCtx2.fill();
+    const w = Math.ceil(innerWidth / 2) + 2 * FOG_M, h = Math.ceil(innerHeight / 2) + 2 * FOG_M, now = performance.now();
+    for (const c of [fog, seenLayer, sightLayer]) if (c.width !== w || c.height !== h) { c.width = w; c.height = h; view.fogCam = null; }
+    // Shift since the last redraw (screen px); redraw when zoomed, shifted far, or stale.
+    const F = view.fogCam, dx = F ? (F.x - camera.x) * z() : 0, dy = F ? (F.y - camera.y) * z() * SQ : 0;
+    const moved = !F || F.zoom !== camera.zoom || dx !== 0 || dy !== 0;
+    if (!F || F.zoom !== camera.zoom || Math.abs(dx) > FOG_M || Math.abs(dy) > FOG_M || now - view.fogAt > (moved ? 60 : 200)) {
+      view.fogCam = { x: camera.x, y: camera.y, zoom: camera.zoom }; view.fogAt = now;
+      const pad = 2 * FOG_M + 2 * PPM * z(), a = isoScreenToWorld(-pad, -pad), b = flatScreenToWorld(innerWidth + pad, innerHeight + pad);
+      // Mist, its clouds fixed to the ground (a tile is 900 game px).
+      const f = fogCtx2;
+      f.globalCompositeOperation = 'source-over'; f.globalAlpha = 1; f.filter = 'none'; f.clearRect(0, 0, w, h);
+      const pat = cloudTile(), k = 900 * z() / 2 / 128;
+      if (pat && pat.setTransform && typeof DOMMatrix === 'function') pat.setTransform(new DOMMatrix().translate(sx(0) / 2 + FOG_M, sy(0) / 2 + FOG_M).scale(k, k * SQ));
+      f.fillStyle = pat && pat.setTransform ? pat : 'rgba(6,9,12,.86)'; f.fillRect(0, 0, w, h);
+      // Ground seen before: explored cells on screen, each lifted onto the relief.
+      seenCtx.clearRect(0, 0, w, h); seenCtx.fillStyle = '#000'; seenCtx.beginPath();
+      let cells = 0;
+      if (typeof exploredCells !== 'undefined' && typeof EXPLORE_CELL === 'number') {
+        const C = EXPLORE_CELL, gx0 = Math.floor(Math.min(a.x, b.x) / C) - 1, gx1 = Math.ceil(Math.max(a.x, b.x) / C) + 1;
+        const gy0 = Math.floor(Math.min(a.y, b.y) / C) - 1, gy1 = Math.ceil(Math.max(a.y, b.y) / C) + 1 + Math.ceil((view.relief ? view.relief.maxM : 0) * PPM / C * 2);
+        for (let cy = gy0; cy <= gy1; cy++) for (let cx = gx0; cx <= gx1; cx++) {
+          if (!exploredCells.has(`${cx},${cy}`)) continue;
+          const x0 = cx * C - 1, y0 = cy * C - 1, x1 = x0 + C + 2, y1 = y0 + C + 2;
+          groundPath(seenCtx, [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]); cells++;
+        }
       }
-      fogCtx2.globalCompositeOperation = 'source-over';
+      seenCtx.fill();
+      // In sight now: each source's circle, its rim lying on the relief.
+      sightCtx.clearRect(0, 0, w, h); sightCtx.fillStyle = '#000'; sightCtx.beginPath();
+      let sources = 0;
+      for (const src of frenchVisionSources()) {
+        const r = visionRadius(src);
+        if (src.x + r < a.x || src.x - r > b.x || src.y + r < a.y || src.y - r > b.y + (view.relief ? view.relief.maxM * PPM * 2 : 0)) continue;
+        const pts = [];
+        for (let i = 0; i < 28; i++) { const t = i / 28 * Math.PI * 2; pts.push([src.x + Math.cos(t) * r, src.y + Math.sin(t) * r]); }
+        groundPath(sightCtx, pts); sources++;
+      }
+      sightCtx.fill();
+      // Cut both out of the mist, blurred so the edges are soft.
+      const soft = Math.max(2, 18 * z());
+      f.globalCompositeOperation = 'destination-out';
+      if (FOG_SOFT) f.filter = `blur(${soft / 2}px)`;
+      f.globalAlpha = SEEN_VEIL; f.drawImage(seenLayer, 0, 0);
+      if (FOG_SOFT) f.filter = `blur(${soft}px)`;
+      f.globalAlpha = 1; f.drawImage(sightLayer, 0, 0);
+      f.filter = 'none'; f.globalCompositeOperation = 'source-over';
+      view.stats.fogCells = cells; view.stats.fogSources = sources;
     }
-    ctx.drawImage(fog, 0, 0, innerWidth, innerHeight);
+    const G = view.fogCam, ox = (G.x - camera.x) * z(), oy = (G.y - camera.y) * z() * SQ;
+    ctx.drawImage(fog, ox - 2 * FOG_M, oy - 2 * FOG_M, fog.width * 2, fog.height * 2);
+  }
+  // Height gives sight: on high ground a man sees farther (up to half as far
+  // again on a hilltop), on the relief of this map (iso view only).
+  const HEIGHT_SIGHT = 0.035, HEIGHT_SIGHT_MAX = 0.5;
+  function installHeightSight() {
+    if (view.heightSight || typeof visionRadius !== 'function') return;
+    const base = visionRadius;
+    visionRadius = function visionRadiusOnRelief(e) {
+      const r = base(e);
+      return view.relief && e && Number.isFinite(e.x) ? r * (1 + Math.min(HEIGHT_SIGHT_MAX, heightPx(e.x, e.y) / PPM * HEIGHT_SIGHT)) : r;
+    };
+    view.heightSight = true;
   }
   function drawSelection() {
     ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(245,220,112,.95)'; ctx.beginPath();
@@ -967,7 +1051,7 @@
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
       workerSprites: !!view.atlases.frw, labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
-      relief: view.relief ? view.relief.maxM : 0, villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
+      relief: view.relief ? view.relief.maxM : 0, heightSight: !!view.heightSight, villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
     screenOf: (wx, wy) => ({ x: sx(wx), y: gy(wx, wy) }),
     // Door direction of each village house against its gate on the road (for tests).
     doorCheck: () => villageHouses().filter(h => Number.isFinite(h.accessX)).map(h => {
