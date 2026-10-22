@@ -17,9 +17,16 @@ test('without ?view=iso the game is untouched: no iso view, no toggle, top-down 
     iso: typeof window.__ISO_VIEW_V1__, toggle: !!document.getElementById('isoViewToggle'),
     // The top-down projection: one screen pixel down is 1/zoom world pixels down.
     dy: screenToWorld(innerWidth / 2, innerHeight / 2 + 100).y - screenToWorld(innerWidth / 2, innerHeight / 2).y,
-    zoom: camera.zoom
+    zoom: camera.zoom,
+    // The full map: every road and village house (the open map is the iso view's).
+    roads: (window.NRTS_ROAD_NETWORK_V7 || []).length, mapVariant: window.NRTS_CONFIG.world.mapVariant,
+    houses: (window.VILLAGE_SCENERY_V4 || []).flatMap(v => v.houses).length, openMap: typeof window.__OPEN_MAP_V1__
   }));
   expect(r.iso).toBe('undefined');
+  expect(r.roads).toBe(37);
+  expect(r.houses).toBe(224);
+  expect(r.mapVariant).toBe('standard');
+  expect(r.openMap).toBe('undefined');
   expect(r.toggle).toBe(false);
   expect(r.dy).toBeCloseTo(100 / r.zoom, 3);
   expect(errors).toEqual([]);
@@ -132,8 +139,11 @@ test('iso view: villages stand as Blender buildings facing their road, with yard
   });
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().houses > 5 && window.__ISO_VIEW_V1__.stats().dressing > 5);
   const s = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
-  expect(s.villageHouses).toBeGreaterThan(100);
-  expect(s.dressingItems).toBeGreaterThan(100);
+  // The open map: a few small villages, well apart.
+  expect(s.villageHouses).toBeGreaterThan(20);
+  expect(s.villageHouses).toBeLessThan(80);
+  expect(s.openMap.villages).toBeLessThanOrEqual(9);
+  expect(s.dressingItems).toBeGreaterThan(20);
   // Every house with a gate in front of it has its door on that side.
   const doors = await page.evaluate(() => window.__ISO_VIEW_V1__.doorCheck());
   expect(doors.filter(d => d < -0.5)).toEqual([]);
@@ -206,5 +216,35 @@ test('iso view: a right-click on an enemy sends the selection to musket reach fa
     return Math.hypot(a.x - b.x, a.y - b.y);
   }, [ids.id, ids.enemy]);
   expect(gap).toBeLessThan(160);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: an open map with fewer roads, and men cross the river on Blender bridges, up on the deck', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-bridge&view=iso');
+  const map = await page.evaluate(() => ({
+    roads: window.NRTS_ROAD_NETWORK_V7.length, variant: window.NRTS_CONFIG.world.mapVariant,
+    villages: window.VILLAGE_SCENERY_V4.length, obstacles: window.VILLAGE_SCENERY_V4.flatMap(v => v.houses).length
+  }));
+  expect(map.variant).toBe('open');
+  expect(map.roads).toBeLessThan(25);
+  expect(map.villages).toBeLessThanOrEqual(9);
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().props >= 14, null, { timeout: 60_000 });
+  // A French soldier in the middle of a stone and of a timber bridge.
+  const ids = await page.evaluate(() => ['stone', 'wood'].map(mat => {
+    const b = WATER_CROSSINGS_V067.find(c => c.material === mat);
+    return { id: createUnit('france', 'infantry', b.x, b.y).id, x: b.x, y: b.y };
+  }));
+  for (const at of ids) {
+    await page.evaluate(at => { camera.x = at.x; camera.y = at.y; camera.zoom = 1.2; }, at);
+    await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().bridges > 0 && window.__ISO_VIEW_V1__.stats().onBridge > 0);
+    const lift = await page.evaluate(id => {
+      const u = units.find(q => q.id === id), iso = window.__ISO_VIEW_V1__;
+      return { deck: iso.deckAt(u.x, u.y).h, off: iso.deckAt(u.x, u.y + 400), body: iso.screenOf(u.x, u.y).y - iso.bodyOf(u).y };
+    }, at.id);
+    // The deck is a metre or so up (22.5 px a metre); off the bridge nothing is lifted.
+    expect(lift.deck).toBeGreaterThan(18);
+    expect(lift.off).toBe(null);
+    expect(lift.body).toBeGreaterThan(0.9 * 22.5 * 0.866 * 1.2 + 10);
+  }
   expect(errors).toEqual([]);
 });

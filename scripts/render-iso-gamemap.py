@@ -7,7 +7,7 @@ Input: graphics-lab/assets/iso/game/gamemap.json, exported from the running game
 
 Same camera, sun and materials as the Graphics Lab ground (render-iso-ground.py):
 grass with tufts and flowers, roads with verges by class, the river with muddy
-banks, stone and timber bridge decks, darker forest floor, low hills, and a
+banks, shallows and reeds (the bridges are props in the view), darker forest floor, low hills, and a
 trampled yard with a garden behind every village house. The image covers the
 whole map; its top-left pixel is game (0, 0) and depth is halved by the 30° view.
 
@@ -31,6 +31,7 @@ from iso_blender_common import camera, material, setup_render, slab  # noqa: E40
 ROOT = Path(__file__).resolve().parents[1]
 MAP = ROOT / "graphics-lab/assets/iso/game/gamemap.json"
 PPM_GAME = 22.5
+RIVER_WIDTH_M = 4.2   # water; the 2D ribbon is 2.6 m, the game's wading band 6.4 m
 VILLAGE_SCALE = 1.6   # as drawn by the iso view (houses larger than their game footprint)
 
 
@@ -59,14 +60,16 @@ def ellipse(cx, cy, rx, ry, n=48):
     return [(cx + rx * math.cos(t * math.tau / n), cy + ry * math.sin(t * math.tau / n)) for t in range(n)]
 
 
-def dome(name, cx, cy, rx, ry, h, mat, n=40, rings=8):
+def dome(name, cx, cy, rx, ry, h, mat, flat=None, n=96, rings=32):
+    """A low hill; flat(x, y) in 0..1 levels it where the river and roads cut through."""
     verts, faces = [], []
     for r in range(rings + 1):
         f = r / rings
-        z = h * (math.cos(f * math.pi / 2) ** 2)
         for k in range(n):
             t = k * math.tau / n
-            verts.append((cx + rx * f * math.cos(t), cy + ry * f * math.sin(t), z))
+            x, y = cx + rx * f * math.cos(t), cy + ry * f * math.sin(t)
+            z = h * (math.cos(f * math.pi / 2) ** 2) * (flat(x, y) if flat else 1)
+            verts.append((x, y, z))
     for r in range(rings):
         for k in range(n):
             a, b = r * n + k, r * n + (k + 1) % n
@@ -101,6 +104,19 @@ class Mask:
         t = np.clip(((px - a[0]) * dx + (py - a[1]) * dy) / L, 0, 1)
         d = np.hypot(px - (a[0] + t * dx), py - (a[1] + t * dy))
         self.grid[y0:y1 + 1, x0:x1 + 1] |= d < r
+
+    def leveller(self, reach=5):
+        """flat(x, y): 0 on roads and the river, rising to 1 within reach metres."""
+        g = self.grid.astype(float)
+        for _ in range(reach):
+            g = np.maximum.reduce([g, np.roll(g, 1, 0) * 0.8, np.roll(g, -1, 0) * 0.8, np.roll(g, 1, 1) * 0.8, np.roll(g, -1, 1) * 0.8])
+
+        def flat(x, y):
+            i, j = int(-y), int(x)
+            if not (0 <= i < self.h and 0 <= j < self.w):
+                return 1.0
+            return 1.0 - g[i, j]
+        return flat
 
     def free(self, x, y):
         i, j = int(-y), int(x)
@@ -144,6 +160,43 @@ def scatter(wm, hm, mask, woods, rnd):
             place(rnd.choice(flowers), x, y, rnd.uniform(0.8, 1.3))
 
 
+def reeds(pts, rw, breathe, crossings, z, rnd):
+    """Clumps of reeds and bulrushes along both banks, clear of the bridges."""
+    blades, faces = [], []
+    for k in range(9):
+        a, r = k * math.tau / 9, 0.05 + 0.04 * (k % 3)
+        bx, by = math.cos(a) * r, math.sin(a) * r
+        lean = 0.12 * (k % 2)
+        i = len(blades)
+        blades += [(bx - 0.025, by, 0), (bx + 0.025, by, 0), (bx * 1.6 + lean, by * 1.6, 0.9 + 0.25 * (k % 3))]
+        faces.append((i, i + 1, i + 2))
+    reed = []
+    for col in ("#6f7d3c", "#87874a", "#5c6a33"):
+        me = bpy.data.meshes.new("reed" + col)
+        me.from_pydata(blades, [], faces)
+        me.materials.append(material(col, 0.85, pattern="plain"))
+        reed.append(me)
+    for i in range(1, len(pts) - 1, 2):
+        x, y = pts[i]
+        if any(math.hypot(x - cx, y - cy) < 9 for cx, cy in crossings) or rnd.random() < 0.35:
+            continue
+        a, b = pts[i - 1], pts[i + 1]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        n = math.hypot(dx, dy) or 1
+        for side in (-1, 1):
+            if rnd.random() < 0.4:
+                continue
+            off = side * (rw * breathe[i] / 2 + rnd.uniform(-0.25, 0.5))
+            for _ in range(rnd.randint(2, 5)):
+                ob = bpy.data.objects.new("reeds", rnd.choice(reed))
+                along = rnd.uniform(-0.8, 0.8)
+                ob.location = (x - dy / n * off + dx / n * along, y + dx / n * off + dy / n * along, z)
+                ob.rotation_euler = (0, 0, rnd.uniform(0, math.tau))
+                s = rnd.uniform(0.7, 1.3)
+                ob.scale = (s, s, s)
+                bpy.context.collection.objects.link(ob)
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "graphics-lab/assets/iso/game"))
@@ -172,34 +225,6 @@ def main(argv: list[str]) -> int:
         x1, y1 = m((wd["x"] + wd["w"], wd["y"] + wd["h"]))
         woods.append((x0, y0, x1, y1))
         slab(f"wood{i}", [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], 0, 0.006, floor)
-    # Low hills: gentle domes the sun picks out (units are not lifted, so they stay low).
-    for i, hl in enumerate(data["hills"]):
-        cx, cy = m((hl["x"], hl["y"]))
-        dome(f"hill{i}", cx, cy, hl["rx"] / PPM_GAME, hl["ry"] / PPM_GAME, 1.6, grass)
-
-    # River: muddy banks under the water, each one continuous ribbon along the
-    # (y-monotone) centreline - overlapping segments leave stripes on glossy water.
-    bank = material("#6f6043", 0.9, pattern="dirt", alt="#56492f")
-    water = material("#365a6a", 0.14, pattern="plain")
-    rw = data["river"]["width"] / PPM_GAME
-    pts = [m(p) for p in data["river"]["points"]]
-
-    def ribbon(width):
-        left, right = [], []
-        for i, (x, y) in enumerate(pts):
-            a, b = pts[max(0, i - 1)], pts[min(len(pts) - 1, i + 1)]
-            dx, dy = b[0] - a[0], b[1] - a[1]
-            n = math.hypot(dx, dy) or 1
-            nx, ny = -dy / n * width / 2, dx / n * width / 2
-            left.append((x + nx, y + ny))
-            right.append((x - nx, y - ny))
-        return left + right[::-1]
-
-    slab("riverbank", ribbon(rw + 2.4), 0.010, 0.012, bank)
-    slab("river", ribbon(rw), 0.020, 0.022, water)
-    for a, b in zip(pts, pts[1:]):
-        mask.capsule(a, b, rw / 2 + 1.6)
-
     # Roads by class: a worn verge, then the surface.
     styles = {"chaussee": ("#b4a07a", "#9a8762", 1.6), "secondary": ("#a68b5e", "#8e7651", 1.2), "track": ("#977f58", "#7f6c4a", 0.8)}
     order = {"track": 0, "secondary": 1, "chaussee": 2}
@@ -220,18 +245,47 @@ def main(argv: list[str]) -> int:
             mask.capsule(a, b, width / 2 + edge / 2 + 0.3)
             n += 1
 
-    # Bridges: a deck over the water with kerbs; stone or timber.
-    for i, br in enumerate(data["bridges"]):
-        cx, cy = m((br["x"], br["y"]))
-        L, W = br["length"] / PPM_GAME, br["width"] / PPM_GAME
-        stone = br["material"] == "stone"
-        deck = material("#8f877a" if stone else "#6e5236", 0.9, pattern="wall" if stone else "planks", alt="#77705f" if stone else "#5a4129")
-        slab(f"bridge{i}", rect(cx, cy, L, W * 0.62, br["angle"]), 0.05, 0.22, deck)
-        kerb = material("#a39a88" if stone else "#4f3a26", 0.9, pattern="plain")
-        for side in (-1, 1):
-            c, s = math.cos(-br["angle"]), math.sin(-br["angle"])
-            ox, oy = -s * side * W * 0.31, c * side * W * 0.31
-            slab(f"kerb{i}{side}", rect(cx + ox, cy + oy, L, 0.35, br["angle"]), 0.22, 0.56 if stone else 0.46, kerb)
+    # River: one continuous ribbon along a lightly smoothed centreline, laid over
+    # the roads so it runs on under every bridge (the bridges stand as 3D props in
+    # the view). Muddy banks, a lighter shallow margin, deeper water in the middle,
+    # its width breathing a little; reeds along the banks away from the crossings.
+    bank = material("#6b5c40", 0.9, pattern="dirt", alt="#55482e")
+    shallow = material("#55776c", 0.3, pattern="plain")
+    water = material("#2f5262", 0.1, pattern="plain")
+    rw = RIVER_WIDTH_M
+    pts = [m(p) for p in data["river"]["points"]]
+    for _ in range(3):
+        pts = [pts[0]] + [((a[0] + 2 * b[0] + c[0]) / 4, (a[1] + 2 * b[1] + c[1]) / 4)
+                          for a, b, c in zip(pts, pts[1:], pts[2:])] + [pts[-1]]
+    breathe = [1 + 0.12 * math.sin(i * 0.11) + 0.06 * math.sin(i * 0.37 + 1.3) for i in range(len(pts))]
+
+    def ribbon(width):
+        left, right = [], []
+        for i, (x, y) in enumerate(pts):
+            a, b = pts[max(0, i - 1)], pts[min(len(pts) - 1, i + 1)]
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            n = math.hypot(dx, dy) or 1
+            half = width * breathe[i] / 2
+            nx, ny = -dy / n * half, dx / n * half
+            left.append((x + nx, y + ny))
+            right.append((x - nx, y - ny))
+        return left + right[::-1]
+
+    top = 0.04 + len(data["roads"]) * 0.003 + 0.02
+    slab("riverbank", ribbon(rw + 2.2), top, top + 0.004, bank)
+    slab("shallows", ribbon(rw), top + 0.006, top + 0.010, shallow)
+    slab("river", ribbon(rw * 0.62), top + 0.012, top + 0.016, water)
+    for a, b in zip(pts, pts[1:]):
+        mask.capsule(a, b, rw / 2 + 1.4)
+    crossings = [m((br["x"], br["y"])) for br in data["bridges"]]
+    reeds(pts, rw, breathe, crossings, top + 0.016, rnd)
+
+    # Low hills: gentle domes the sun picks out (units are not lifted, so they stay
+    # low), levelled where the river and the roads cut through them.
+    flat = mask.leveller()
+    for i, hl in enumerate(data["hills"]):
+        cx, cy = m((hl["x"], hl["y"]))
+        dome(f"hill{i}", cx, cy, hl["rx"] / PPM_GAME, hl["ry"] / PPM_GAME, 1.6, grass, flat)
 
     # Village yards: trampled earth round each house, a garden plot behind it.
     yard = material("#86774f", 0.95, pattern="dirt", alt="#6f7a43")

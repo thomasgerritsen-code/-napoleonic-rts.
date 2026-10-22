@@ -227,6 +227,32 @@
       ctx.drawImage(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
   }
 
+  // ---- bridges: Blender props at the game's crossings (scripts/render-iso-props.py) ----
+  // Stone or timber, scaled to each crossing's length; men on a bridge walk on its
+  // deck (flat over the water, ramps at both ends) and are drawn after it.
+  // Length, deck height and ramp in metres, as BRIDGE_DECKS in the script.
+  const BRIDGE_DECKS = { bridge_stone: [12.8, 1.25, 2.6], bridge_wood: [12.0, 1.0, 2.2] };
+  const crossings = () => (typeof WATER_CROSSINGS_V067 !== 'undefined' ? WATER_CROSSINGS_V067 : []);
+  const bridgeKind = b => b.material === 'stone' ? 'bridge_stone' : 'bridge_wood';
+  // Height of the deck (game px) under a ground point, and the bridge; null off every bridge.
+  function deckAt(wx, wy) {
+    for (const b of crossings()) {
+      const [len, deck, ramp] = BRIDGE_DECKS[bridgeKind(b)], f = b.length / (len * PPM);
+      const c = Math.cos(b.angle || 0), s = Math.sin(b.angle || 0), dx = wx - b.x, dy = wy - b.y;
+      const u = Math.abs(dx * c + dy * s), v = Math.abs(-dx * s + dy * c);
+      if (u < b.length / 2 && v < b.width / 2) return { b, h: deck * f * PPM * Math.min(1, (b.length / 2 - u) / (ramp * f * PPM)) };
+    }
+    return null;
+  }
+  function bridgeDrawable(b) {
+    const X = sx(b.x), Y = sy(b.y);
+    if (X < -400 || X > innerWidth + 400 || Y < -150 || Y > innerHeight + 200) return null;
+    const kind = bridgeKind(b), prop = view.props[kind]; if (!prop) return null;
+    const k = spriteK() * b.length / (BRIDGE_DECKS[kind][0] * PPM);
+    return { y: b.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+      ctx.drawImage(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.bridges++; } };
+  }
+
   // ---- orders as in the Graphics Lab: flags, a facing arrow, attack targets ----
   // Each selected regiment's destination gets a flag and a dashed line from where it stands.
   function drawOrders(now) {
@@ -757,7 +783,7 @@
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
-    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = 0;
+    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = 0;
     panFix();
     ensureAttackHook();
     drawTerrain();
@@ -768,10 +794,13 @@
       seen.add(u.id);
       const m = infoOf(u); track(u, m, t, dt);
       if (!visible(u)) continue;
-      const X = sx(u.x), Y = sy(u.y);
-      if (X < -80 || X > innerWidth + 80 || Y < -40 || Y > innerHeight + 140) continue;
+      const X = sx(u.x);
+      if (X < -80 || X > innerWidth + 80 || sy(u.y) < -40 || sy(u.y) > innerHeight + 140) continue;
+      const deck = deckAt(u.x, u.y), up = deck ? deck.h * LIFT * z() : 0, Y = sy(u.y) - up;
       const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
-      list.push({ y: u.y, unit: { x: X, y: Y - lift, wy: u.y }, draw: () => {
+      if (deck) st.onBridge++;
+      const key = deck ? Math.max(u.y, deck.b.y + deck.b.width / 2 + 1) : u.y;
+      list.push({ y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
         // A faint ring in the side's colour under every man, horse and gun.
         const rr = (u.type === 'cavalry' ? 0.95 : u.type === 'artillery' ? 1.1 : 0.42) * PPM * z();
         ctx.fillStyle = u.side === 'france' ? 'rgba(70,110,230,.38)' : 'rgba(225,60,50,.38)';
@@ -797,6 +826,7 @@
     st.corpses = view.corpses.length;
     for (const b of buildings) { const d = buildingDrawable(b); if (d) list.push(d); }
     for (const h of villageHouses()) { const d = houseDrawable(h); if (d) list.push(d); }
+    for (const b of crossings()) { const d = bridgeDrawable(b); if (d) list.push(d); }
     if (view.village && view.props.well && !view.dressing) view.dressing = buildDressing();
     for (const it of view.dressing || []) { const d = dressingDrawable(it); if (d) list.push(d); }
     if (view.props.oak && !view.woodTrees) view.woodTrees = buildWoodTrees();
@@ -854,7 +884,7 @@
     let best = null, bd = reach;
     for (const u of units) {
       if (u.dead) continue;
-      const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
+      const lift = ((u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * PPM + (deckAt(u.x, u.y)?.h || 0)) * LIFT * z();
       const d = Math.hypot(sx(u.x) - px, sy(u.y) - lift - py);
       if (d < bd) { best = u; bd = d; }
     }
@@ -906,7 +936,7 @@
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
       workerSprites: !!view.atlases.frw, labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
-      villageHouses: villageHouses().length, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
+      villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
     screenOf: (wx, wy) => ({ x: sx(wx), y: sy(wy) }),
     // Door direction of each village house against its gate on the road (for tests).
     doorCheck: () => villageHouses().filter(h => Number.isFinite(h.accessX)).map(h => {
@@ -914,6 +944,7 @@
       const fx = Math.sin(psi), fy = Math.cos(psi), gx = h.accessX - h.x, gy = h.accessY - h.y, l = Math.hypot(gx, gy) || 1;
       return (fx * gx + fy * gy) / l;
     }),
-    bodyOf: u => ({ x: sx(u.x), y: sy(u.y) - (u.type === 'cavalry' ? 1.6 : 0.9) * LIFT * PPM * z() })
+    bodyOf: u => ({ x: sx(u.x), y: sy(u.y) - ((u.type === 'cavalry' ? 1.6 : 0.9) * PPM + (deckAt(u.x, u.y)?.h || 0)) * LIFT * z() }),
+    deckAt
   });
 })(window);

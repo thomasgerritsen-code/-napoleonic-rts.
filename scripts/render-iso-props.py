@@ -223,12 +223,119 @@ def build_bridge(root):
             part("box", (0.5, 0.55, 1.05), (x, y, deck + 0.62), dark, root, name="endpost")
 
 
+def bridge_profile(length, deck, ramp):
+    """Deck height along the bridge: flat over the water, ramps down at both ends."""
+    return lambda x: deck * max(0.0, min(1.0, (length / 2 - abs(x)) / ramp))
+
+
+def along(root, xs, height, y, size, mat, lift=0.0, name="beam"):
+    """Boxes from post to post along x, following the deck's slope."""
+    for a, b in zip(xs, xs[1:]):
+        za, zb = height(a) + lift, height(b) + lift
+        run = math.hypot(b - a, zb - za)
+        part("box", (run + 0.04, size[0], size[1]), ((a + b) / 2, y, (za + zb) / 2), mat, root,
+             rot=(0, -math.degrees(math.atan2(zb - za, b - a)), 0), name=name)
+
+
+def ramp_wedge(root, x0, x1, z0, z1, width, mat, name="ramp"):
+    """A solid ramp from (x0, z0) to (x1, z1), ground to top, width across y."""
+    w = width / 2
+    verts = [(x0, -w, 0), (x1, -w, 0), (x1, w, 0), (x0, w, 0), (x0, -w, z0), (x1, -w, z1), (x1, w, z1), (x0, w, z0)]
+    faces = [(0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)]
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.materials.append(mat)
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    ob.parent = root
+    return ob
+
+
+# Game bridges (src/systems/rendering/iso-view-v1.js scales them to each crossing's length):
+# deck height and ramp length are read back by the view to lift men onto the deck.
+BRIDGE_DECKS = {"bridge_stone": (12.8, 1.25, 2.6), "bridge_wood": (12.0, 1.0, 2.2)}
+
+
+def build_bridge_stone(root):
+    """Stone arch bridge for the game's crossings: one arch over the water, solid
+    approach ramps between wing walls, a dirt roadway and parapets with coping."""
+    stone = M("#9a9182", "wall", 0.9, 1.2, alt="#7d766a")
+    dark = M("#6f685d", "wall", 0.9, 1.2, alt="#5d574e")
+    road = M("#a68b5e", "dirt", 0.95, alt="#8e7651")
+    length, deck, ramp = BRIDGE_DECKS["bridge_stone"]
+    width, span, rise = 4.8, 4.6, 0.95
+    height = bridge_profile(length, deck, ramp)
+    flat = length / 2 - ramp
+    # Arch ring over the water and the spandrel walls up to the deck.
+    n = 15
+    for k in range(n):
+        a = math.pi * (k + 0.5) / n
+        x, z = -math.cos(a) * span / 2, math.sin(a) * rise
+        dx, dz = math.sin(a) * span / 2, math.cos(a) * rise
+        part("box", (span * 1.6 / n, width + 0.04, 0.32), (x, 0, z), dark if k % 2 else stone, root,
+             rot=(0, -math.degrees(math.atan2(dz, dx)), 0), name="voussoir")
+    for x in (-span / 2 + 0.4, span / 2 - 0.4):
+        part("box", (0.9, width, deck - rise), (x, 0, (deck + rise) / 2 - 0.1), stone, root, name="spandrel")
+    for side in (-1, 1):
+        part("box", (flat - span / 2, width, deck), (side * (flat + span / 2) / 2, 0, deck / 2), stone, root, name="abutment")
+        ramp_wedge(root, side * flat, side * length / 2, deck, 0.05, width, stone)
+        ramp_wedge(root, side * flat, side * length / 2, deck + 0.02, 0.07, width - 0.9, road, name="roadramp")
+        # Cutwater-like quoins at the springing of the arch.
+        part("box", (0.5, width + 0.3, deck * 0.7), (side * (span / 2 + 0.25), 0, deck * 0.35), dark, root, name="quoin")
+    part("box", (2 * flat, width, 0.22), (0, 0, deck - 0.1), stone, root, name="deck")
+    part("box", (2 * flat, width - 0.9, 0.04), (0, 0, deck + 0.02), road, root, name="roadway")
+    xs = [-length / 2 + 0.3, -flat, flat, length / 2 - 0.3]
+    for y in (width / 2 - 0.2, -width / 2 + 0.2):
+        along(root, xs, height, y, (0.4, 0.7), stone, lift=0.35, name="parapet")
+        along(root, xs, height, y, (0.5, 0.1), dark, lift=0.74, name="coping")
+        for x in (xs[0], xs[-1]):
+            part("box", (0.5, 0.55, 0.95), (x, y, height(x) + 0.47), dark, root, name="endpost")
+
+
+def build_bridge_wood(root):
+    """Timber trestle bridge along X: pile bents standing in the water, stringers,
+    a plank deck that ramps down at both ends, edge beams and post-and-rail parapets."""
+    post = M("#5a4630", "bark", 0.95)
+    timber = M("#5f4a31", "planks", 0.9, alt="#4b3a26")
+    planks = [M(c, "planks", 0.9, alt=a) for c, a in (("#8a6c4b", "#73593c"), ("#7a6243", "#644f35"), ("#937a59", "#7b6447"))]
+    length, deck, ramp = BRIDGE_DECKS["bridge_wood"]
+    width = 4.4
+    height = bridge_profile(length, deck, ramp)
+    # Bents: three piles, a cap beam and a cross brace.
+    for x in (-3.0, -1.0, 1.0, 3.0):
+        top = height(x) - 0.2
+        for y in (-1.8, 0.0, 1.8):
+            part("box", (0.26, 0.26, top + 0.4), (x, y, (top - 0.4) / 2), post, root, name="pile")
+        part("box", (0.3, width - 0.2, 0.2), (x, 0, top - 0.1), timber, root, name="cap")
+        part("box", (0.1, 3.9, 0.14), (x + 0.15, 0, top / 2), timber, root, rot=(math.degrees(math.atan2(top, 3.6)), 0, 0), name="brace")
+    # Stringers, then planks across them with a hand's gap between.
+    xs = [-length / 2, -length / 2 + ramp, length / 2 - ramp, length / 2]
+    for y in (-1.6, -0.55, 0.55, 1.6):
+        along(root, xs, height, y, (0.22, 0.22), timber, lift=-0.16, name="stringer")
+    x, k = -length / 2 + 0.14, 0
+    while x < length / 2 - 0.1:
+        z = height(x)
+        slope = 0 if abs(x) < length / 2 - ramp else math.degrees(math.atan2(deck, ramp)) * (-1 if x < 0 else 1)
+        part("box", (0.24, width - 0.1 * (k % 3 == 1), 0.07), (x, 0.03 * (k % 2), max(0.04, z - 0.04)),
+             planks[(k * 7) % 3], root, rot=(0, slope, 0), name="plank")
+        x += 0.29
+        k += 1
+    # Edge beams and parapets: posts every 1.5 m, hand rail and mid rail along the deck.
+    posts = [-length / 2 + 0.2 + i * (length - 0.4) / 8 for i in range(9)]
+    for y in (width / 2 - 0.08, -width / 2 + 0.08):
+        along(root, xs, height, y, (0.16, 0.3), timber, lift=-0.05, name="edge")
+        for px in posts:
+            part("box", (0.16, 0.16, 1.0), (px, y, height(px) + 0.5), post, root, name="railpost")
+        along(root, posts, height, y, (0.1, 0.1), timber, lift=0.95, name="rail")
+        along(root, posts, height, y, (0.08, 0.08), timber, lift=0.5, name="rail")
+
+
 BUILDERS = {
     "barracks_fr": lambda r: build_barracks(r, "fr"),
     "barracks_br": lambda r: build_barracks(r, "br"),
     "farmhouse": build_farmhouse, "barn": build_barn, "cottage": build_cottage, "well": build_well,
     "haystack": build_haystack, "oak": build_oak, "poplar": build_poplar, "bush": build_bush, "fence": build_fence,
-    "bridge": build_bridge,
+    "bridge": build_bridge, "bridge_stone": build_bridge_stone, "bridge_wood": build_bridge_wood,
 }
 
 

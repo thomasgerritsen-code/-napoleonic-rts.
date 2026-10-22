@@ -2,6 +2,9 @@
 // Central tuning/config entry point. Migrated subsystems read their authoritative
 // values here so tuning no longer requires editing solver code.
 (function installFoundationConfig(global) {
+  // The iso view (?view=iso, src/systems/rendering/iso-view-v1.js) plays on an open
+  // map: fewer roads and villages. Without it every value below is unchanged.
+  const OPEN_MAP = /(?:^|[?&])view=iso(?:&|$)/.test(global.location?.search || '');
   const config = Object.freeze({
     simulation: Object.freeze({
       fixedHz: 60,
@@ -82,9 +85,15 @@
       })
     }),
     world: Object.freeze({
+      mapVariant: OPEN_MAP ? 'open' : 'standard',
       battlefield: Object.freeze({ width:8000, height:5000 }),
       roads: Object.freeze({
-        omittedIds: Object.freeze(['chemin-de-la-crete-ouest','chemin-de-la-crete-est','voie-de-la-ferme','voie-du-verger','voie-de-la-lisiere']),
+        omittedIds: Object.freeze(['chemin-de-la-crete-ouest','chemin-de-la-crete-est','voie-de-la-ferme','voie-du-verger','voie-de-la-lisiere',
+          // Open map (iso view only, ?view=iso): the main chaussées and the bridge roads stay.
+          ...(OPEN_MAP ? ['chemin-du-bois','chemin-des-fermes-est','chemin-des-fermes-sud','voie-du-moulin','route-de-la-vallee-ouest',
+            'route-de-la-colline-sud','route-de-l-est-lointain','imperial-frontier-post','imperial-eastern-market','imperial-eastern-grain',
+            'imperial-eastern-south-valley','imperial-eastern-far-post','imperial-western-northern-plateau','imperial-western-hill-lane',
+            'imperial-western-south-detour','imperial-western-valley','imperial-rural-verger','imperial-rural-moulin','imperial-rural-forest'] : [])]),
         rendering: Object.freeze({ shoulderExtra:13, rutFraction:0.19, junctionApronScale:0.62, textureSpacing:34 })
       }),
       village: Object.freeze({
@@ -93,6 +102,8 @@
           cottage:Object.freeze([2.0,2.35]), farmhouse:Object.freeze([2.15,2.65]), barn:Object.freeze([1.8,2.0]), inn:Object.freeze([2.0,2.15]), chapel:Object.freeze([1.8,2.5])
         }),
         plotGap:10,
+        // Open map: fewer, smaller villages, well apart (null on the normal map).
+        open: OPEN_MAP ? Object.freeze({ maxVillages:9, maxHouses:6, minSpacing:900 }) : null,
         berryExclusionPadding:70,
         baseBerryMin:10,
         baseBerryAmount:600,
