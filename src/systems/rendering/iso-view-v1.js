@@ -31,7 +31,7 @@
   const box = (X, Y, px, py, w, h, k) => [X - px * k, Y - py * k, X + (w - px) * k, Y + (h - py) * k];
   const view = { on: true, atlases: {}, props: {}, village: null, dressing: null, chimneyAt: new Map(), chimneySmoke: [], info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(),
     tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), miniAt: 0, fogAt: 0,
-    stats: { renderMs: 0, seeThrough: 0, houses: 0, dressing: 0, chimneySmoke: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
+    stats: { renderMs: 0, seeThrough: 0, flags: 0, ground: false, houses: 0, dressing: 0, chimneySmoke: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
 
   const hash = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; h ^= h >>> 13;
     return (Math.imul(h, 1103515245) >>> 0) / 4294967296; };
@@ -72,7 +72,7 @@
       first.push(load(p + 'o', ['officer']), load(p + 'd', ['drummer']), load(p + 'c', ['cavalry', 'cavfight']),
         load(p + 'g', ['gun']), load(p + 'a', ['gunner', 'gunner2']));
     }
-    first.push(loadProps(), loadVillage());
+    first.push(loadProps(), loadVillage(), loadGround(), load('frw', ['worker']), load('brw', ['worker']));
     // Extra looks stream in afterwards; until then everyone uses the base look.
     return Promise.all(first).then(() => Promise.all(['2', '3', '4', '5'].flatMap(l => ['fr', 'br'].map(p => load(p + l, INFANTRY)))
       .concat(['fr', 'br'].flatMap(p => [load(p + 'c2', ['cavalry', 'cavfight']), load(p + 'co', ['cavalry', 'cavfight'])]))));
@@ -81,6 +81,13 @@
     return fetch(ASSETS + 'iso/props/props.json').then(r => r.json()).then(m => Promise.all(Object.entries(m.props)
       .map(([kind, meta]) => loadImage(ASSETS + 'iso/props/' + meta.image).then(image => { view.props[kind] = { ...meta, image }; }))))
       .catch(err => console.warn('iso: props', err));
+  }
+  // The whole battlefield rendered in Blender (scripts/render-iso-gamemap.py).
+  function loadGround() {
+    const dir = ASSETS + 'iso/game/';
+    return fetch(dir + 'ground.json').then(r => r.ok ? r.json() : null).then(meta => meta && loadImage(dir + meta.image)
+      .then(img => { view.ground = { ...meta, img, k: meta.pxPerM / meta.gamePxPerM }; view.woodTrees = null; }))
+      .catch(err => console.warn('iso: grond', err));
   }
   // Village buildings: one sheet per kind with 16 headings (scripts/render-iso-village.py).
   function loadVillage() {
@@ -197,6 +204,177 @@
       ctx.drawImage(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k); view.stats.dressing++; } };
   }
 
+  // ---- the game's woods: stands of oak and poplar (they slow movement in the game) ----
+  function buildWoodTrees() {
+    const woods = typeof TERRAIN_WOODS !== 'undefined' ? TERRAIN_WOODS : [], trees = [];
+    woods.forEach((w, i) => {
+      for (let y = w.y + 30; y < w.y + w.h - 10; y += 62) for (let x = w.x + 30; x < w.x + w.w - 10; x += 70) {
+        const r = hash(Math.round(x), Math.round(y) + i), tx = x + (r - 0.5) * 50, ty = y + (hash(Math.round(y), Math.round(x)) - 0.5) * 40;
+        if (r < 0.12) continue;   // clearings
+        if (typeof roadNetworkAtV066 === 'function' && roadNetworkAtV066(tx, ty)) continue;
+        if (typeof riverHitV067 === 'function') { const h = riverHitV067(tx, ty); if (h && h.distance < 110) continue; }
+        trees.push({ x: tx, y: ty, kind: r > 0.8 ? 'poplar' : 'oak', scale: 0.5 + r * 0.25 });
+      }
+    });
+    return trees;
+  }
+  function woodTreeDrawable(tr) {
+    const X = sx(tr.x), Y = sy(tr.y);
+    if (X < -150 || X > innerWidth + 150 || Y < -30 || Y > innerHeight + 260) return null;
+    const prop = view.props[tr.kind]; if (!prop) return null;
+    const k = spriteK() * tr.scale;
+    return { y: tr.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+      ctx.drawImage(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
+  }
+
+  // ---- orders as in the Graphics Lab: flags, a facing arrow, attack targets ----
+  // Each selected regiment's destination gets a flag and a dashed line from where it stands.
+  function drawOrders(now) {
+    const regs = typeof selectedRegiments === 'function' ? selectedRegiments().filter(r => r && !r.destroyed) : [];
+    view.stats.flags = 0;
+    for (const reg of regs) {
+      if (!Number.isFinite(reg.targetX) || !Number.isFinite(reg.targetY)) continue;
+      const men = regimentMembers(reg).filter(u => !u.dead); if (!men.length) continue;
+      const c = centroid(men);
+      if (Math.hypot(reg.targetX - c.x, reg.targetY - c.y) < 28) continue;
+      const fx = sx(reg.targetX), fy = sy(reg.targetY);
+      ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(245,220,112,.75)'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(sx(c.x), sy(c.y)); ctx.lineTo(fx, fy); ctx.stroke(); ctx.setLineDash([]);
+      const wave = Math.sin(now * 6 + reg.id) * 2, pole = 30;
+      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(fx, fy, 6, 3, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#2b2118'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - pole); ctx.stroke();
+      ctx.fillStyle = '#2c4fb8'; ctx.beginPath(); ctx.moveTo(fx, fy - pole); ctx.lineTo(fx + 15, fy - pole + 5 + wave); ctx.lineTo(fx, fy - pole + 11); ctx.fill();
+      view.stats.flags++;
+    }
+    // Enemy picked as a target: dashed red rings for a few seconds.
+    if (view.attack && now < view.attack.until) {
+      ctx.setLineDash([4, 3]); ctx.strokeStyle = 'rgba(225,45,35,.95)'; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (const u of units) {
+        if (u.dead || !view.attack.ids.has(u.id)) continue;
+        const r = (u.type === 'cavalry' ? 1.1 : 0.55) * PPM * z();
+        ctx.moveTo(sx(u.x) + r, sy(u.y)); ctx.ellipse(sx(u.x), sy(u.y), r, r * SQ, 0, 0, 7);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+      // And a sight over their heads, so the target stands out from the red rings.
+      const foes = units.filter(u => !u.dead && view.attack.ids.has(u.id));
+      if (foes.length) {
+        const c = centroid(foes), X = sx(c.x), Y = sy(c.y) - 2.6 * LIFT * PPM * z(), r = 11 + Math.sin(now * 5) * 1.5;
+        ctx.strokeStyle = 'rgba(235,40,30,.95)'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(X, Y, r, 0, 7);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(X + dx * (r - 4), Y + dy * (r - 4)); ctx.lineTo(X + dx * (r + 6), Y + dy * (r + 6)); }
+        ctx.stroke();
+      }
+    }
+  }
+  // Right-drag (the game's facing order): an arrow from the destination along the facing.
+  function drawFacingArrow() {
+    const d = typeof rightDragV06 !== 'undefined' ? rightDragV06 : null;
+    if (!d || !d.moved) return;
+    const ang = Math.atan2(d.ey - d.sy, d.ex - d.sx);
+    ctx.strokeStyle = 'rgba(255,236,150,.95)'; ctx.lineWidth = 3; ctx.beginPath();
+    ctx.arc(d.sx, d.sy, 10, 0, 7); ctx.moveTo(d.sx, d.sy); ctx.lineTo(d.ex, d.ey);
+    ctx.moveTo(d.ex, d.ey); ctx.lineTo(d.ex - 12 * Math.cos(ang - 0.45), d.ey - 12 * Math.sin(ang - 0.45));
+    ctx.moveTo(d.ex, d.ey); ctx.lineTo(d.ex - 12 * Math.cos(ang + 0.45), d.ey - 12 * Math.sin(ang + 0.45)); ctx.stroke();
+  }
+  // A move order on an enemy (right-click or tap) becomes an attack: the selection
+  // marches to its weapon's reach of that enemy and faces it - the game's own move
+  // and facing orders; the fighting itself is the game's.
+  function enemyAt(wx, wy) {
+    const px = sx(wx), py = sy(wy), reach = Math.max(14, 26 * z());
+    let best = null, bd = reach;
+    for (const u of units) {
+      if (u.dead || u.side !== 'britain') continue;
+      if (typeof isVisibleToFrance === 'function' && !isVisibleToFrance(u)) continue;
+      const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
+      const d = Math.min(Math.hypot(sx(u.x) - px, sy(u.y) - lift - py), Math.hypot(sx(u.x) - px, sy(u.y) - py));
+      if (d < bd) { best = u; bd = d; }
+    }
+    return best;
+  }
+  function attackOrder(enemy) {
+    const own = [...selectedUnits].filter(u => !u.dead && u.side === 'france' && u.type !== 'worker');
+    if (!own.length || typeof issueMoveWithFacingV06 !== 'function') return false;
+    const reg = enemy.regimentId && typeof getRegiment === 'function' ? getRegiment(enemy.regimentId) : null;
+    const foes = reg ? regimentMembers(reg).filter(u => !u.dead) : [enemy];
+    const E = centroid(foes), S = centroid(own), d = Math.hypot(S.x - E.x, S.y - E.y) || 1;
+    const foot = own.some(u => u.type === 'infantry' || u.type === 'officer'), guns = own.every(u => u.type === 'artillery');
+    const reach = guns ? TYPES.artillery.range * 0.8 : foot ? TYPES.infantry.range * 0.85 : 0;
+    const dest = d <= reach ? S : { x: E.x + (S.x - E.x) / d * reach, y: E.y + (S.y - E.y) / d * reach };
+    issueMoveWithFacingV06(dest.x, dest.y, Math.atan2(E.y - dest.y, E.x - dest.x));
+    view.attack = { ids: new Set(foes.map(u => u.id)), until: view.lastNow + 8 };
+    view.stats.attacks = (view.stats.attacks || 0) + 1;
+    return true;
+  }
+  // Later scripts replace issueMove after this file runs: the hook is laid on top
+  // of whatever is current, checked every frame.
+  function ensureAttackHook() {
+    if (typeof issueMove !== 'function' || issueMove.isoAttackV1) return;
+    const baseIssueMove = issueMove;
+    const hooked = function issueMoveIsoAttackV1(x, y) {
+      if (view.on) { const e = enemyAt(x, y); if (e && attackOrder(e)) return; }
+      return baseIssueMove(x, y);
+    };
+    hooked.isoAttackV1 = true;
+    issueMove = hooked;
+  }
+
+  // ---- sound from the Graphics Lab on top of the game's own (shots, guns, drums) ----
+  // Hooves under galloping horse, a trumpet when horse charges, spoken commands when
+  // a regiment opens fire or goes in with the bayonet. Follows the game's sound button.
+  const labAudio = { ctl: null, hoofAt: 0, sayAt: 0, trumpetAt: 0, charging: new Set(), regFired: new Map() };
+  (function loadLabAudio() {
+    const s = document.createElement('script'); s.src = 'graphics-lab/iso-audio.js?v=iso1';
+    s.onload = () => { if (global.NRTSIsoAudio) labAudio.ctl = global.NRTSIsoAudio.create(); };
+    document.head.appendChild(s);
+  })();
+  const panOf = x => Math.max(-1, Math.min(1, (x - innerWidth / 2) / (innerWidth / 2)));
+  function soundTick(now) {
+    const A = labAudio.ctl; if (!A) return;
+    const on = !!global.__TOPDOWN_AUDIO_V265__?.enabled?.();
+    if (on !== A.isOn()) A.setOn(on);
+    if (!on) return;
+    const onScreen = u => { const X = sx(u.x), Y = sy(u.y); return X > 0 && X < innerWidth && Y > 0 && Y < innerHeight; };
+    // Hooves: one beat stream for the galloping horse in view.
+    const gallop = units.filter(u => !u.dead && u.type === 'cavalry' && onScreen(u) && (view.info.get(u.id)?.speed || 0) > 4.2);
+    if (gallop.length && now >= labAudio.hoofAt) {
+      const c = centroid(gallop); A.hooves(panOf(sx(c.x)), Math.min(1, 0.4 + gallop.length * 0.05)); labAudio.hoofAt = now + 0.12;
+    }
+    for (const u of units) {
+      if (u.dead || !onScreen(u)) continue;
+      const charging = u.chargeTimer > 0, was = labAudio.charging.has(u.id);
+      if (charging && !was) {
+        labAudio.charging.add(u.id);
+        if (u.type === 'cavalry' && now >= labAudio.trumpetAt) { A.trumpet(panOf(sx(u.x))); labAudio.trumpetAt = now + 4; }
+        else if (u.type !== 'cavalry' && now >= labAudio.sayAt) {
+          A.say(u.side === 'france' ? 'En avant! À la baïonnette!' : 'Charge!', u.side === 'france' ? 'fr-FR' : 'en-GB'); labAudio.sayAt = now + 6;
+        }
+      } else if (!charging && was) labAudio.charging.delete(u.id);
+    }
+    // A regiment opening fire after a quiet spell: the order is heard.
+    for (const [id, at] of view.regFire) {
+      const last = labAudio.regFired.get(id) ?? -99;
+      if (at > last + 8 && now - at < 0.5 && now >= labAudio.sayAt) {
+        const reg = typeof getRegiment === 'function' ? getRegiment(id) : null;
+        if (reg) { A.say(reg.side === 'france' ? 'Joue! Feu!' : 'Present! Fire!', reg.side === 'france' ? 'fr-FR' : 'en-GB'); labAudio.sayAt = now + 6; }
+      }
+      if (at > last) labAudio.regFired.set(id, at);
+    }
+  }
+
+  // ---- panning: the game pans in top-down distances; the iso ground is half as
+  // high on screen, so vertical panning by keys or one finger is doubled here.
+  const panTouches = new Set();
+  canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') panTouches.add(e.pointerId); });
+  for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => panTouches.delete(e.pointerId));
+  function panFix() {
+    const last = view.lastCam; view.lastCam = { y: camera.y, zoom: camera.zoom };
+    if (!last || last.zoom !== camera.zoom) return;
+    const keyPan = typeof keys !== 'undefined' && (keys.has('w') || keys.has('s') || keys.has('arrowup') || keys.has('arrowdown'));
+    const dy = camera.y - last.y;
+    if (dy && (keyPan || panTouches.size === 1) && Math.abs(dy) < 300 / camera.zoom) {
+      camera.y += dy; view.lastCam.y = camera.y; view.stats.panFixes = (view.stats.panFixes || 0) + 1;
+    }
+  }
+
   // ---- chimney smoke: thin, slow, drifting downwind ----
   // Chimneys on each model (metres along its length) and their tops.
   const CHIMNEYS = { cottage: [[-2.0, 7.1]], cottage2: [[2.0, 6.9]], farmhouse: [[2.6, 8.5]], farmhouse2: [[-2.8, 8.6], [2.8, 8.6]],
@@ -288,7 +466,21 @@
     view.stats.tilesBaked++;
     return tile;
   }
+  function drawGround() {
+    const G = view.ground, dpr = canvas.width / Math.max(1, innerWidth);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#31402a'; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    const a = isoScreenToWorld(0, 0), b = isoScreenToWorld(innerWidth, innerHeight);
+    const x0 = Math.max(0, a.x), y0 = Math.max(0, a.y), x1 = Math.min(WORLD.width, b.x), y1 = Math.min(WORLD.height, b.y);
+    if (x1 <= x0 || y1 <= y0) return;
+    // Only the part on screen is copied: image pixels per game pixel are k across and k/2 down.
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(G.img, x0 * G.k, y0 * G.k / 2, (x1 - x0) * G.k, (y1 - y0) * G.k / 2,
+      sx(x0), sy(y0), (x1 - x0) * z(), (y1 - y0) * z() * SQ);
+  }
   function drawTerrain() {
+    if (view.ground) { drawGround(); view.stats.ground = true; return; }
+    view.stats.ground = false;
     const T = tileSetup(), a = isoScreenToWorld(0, 0), b = isoScreenToWorld(innerWidth, innerHeight);
     const x0 = Math.max(0, Math.floor(a.x / T.world)), x1 = Math.min(Math.ceil(WORLD.width / T.world) - 1, Math.floor(b.x / T.world));
     const y0 = Math.max(0, Math.floor(a.y / T.world)), y1 = Math.min(Math.ceil(WORLD.height / T.world) - 1, Math.floor(b.y / T.world));
@@ -389,6 +581,13 @@
       }
       if (since < 0.6 || u.chargeTimer > 0) return [key, 'slash_' + d, Math.floor(now / 0.18) % 3];
       return [key, 'idle_' + d, Math.floor(now / 0.7 + hash(u.id, 3) * 2) % 2];
+    }
+    if (u.type === 'worker') {
+      const key = p + 'w';
+      if (m.moving) return [key, 'march_' + d, step(MARCH_STRIDE, 6)];
+      // At work: chopping, harvesting or building where his task has taken him.
+      if (u.task && u.task !== 'idle') return [key, 'work_' + d, Math.floor(now / 0.3 + hash(u.id, 3) * 4) % 4];
+      return [key, 'idle_' + d, Math.floor(now / 0.7 + hash(u.id, 2) * 2) % 2];
     }
     if (u.type === 'artillery') {
       if (m.moving) return [p + 'g', 'roll_' + d, step(1.2, 4)];
@@ -559,6 +758,8 @@
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
     const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = 0;
+    panFix();
+    ensureAttackHook();
     drawTerrain();
     const k = spriteK(), seen = new Set(), list = [];
     const visible = u => u.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance(u);
@@ -575,7 +776,7 @@
         const rr = (u.type === 'cavalry' ? 0.95 : u.type === 'artillery' ? 1.1 : 0.42) * PPM * z();
         ctx.fillStyle = u.side === 'france' ? 'rgba(70,110,230,.38)' : 'rgba(225,60,50,.38)';
         ctx.beginPath(); ctx.ellipse(X, Y, rr, rr * SQ, 0, 0, 7); ctx.fill();
-        if (u.type === 'worker') { drawWorker(u, m); return; }
+        if (u.type === 'worker' && !view.atlases[(u.side === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); return; }
         const [key, anim, f] = frameFor(u, m, t);
         // Until its atlas has loaded a unit is simply not drawn yet.
         if (drawSprite(view.atlases[key], anim, f, X, Y, k)) st.sprites++;
@@ -598,12 +799,15 @@
     for (const h of villageHouses()) { const d = houseDrawable(h); if (d) list.push(d); }
     if (view.village && view.props.well && !view.dressing) view.dressing = buildDressing();
     for (const it of view.dressing || []) { const d = dressingDrawable(it); if (d) list.push(d); }
+    if (view.props.oak && !view.woodTrees) view.woodTrees = buildWoodTrees();
+    for (const tr of view.woodTrees || []) { const d = woodTreeDrawable(tr); if (d) list.push(d); }
     for (const r of resources) {
       const X = sx(r.x), Y = sy(r.y);
       if (X < -120 || X > innerWidth + 120 || Y < -30 || Y > innerHeight + 260) continue;
       const d = resourceDrawable(r); if (d) list.push(d);
     }
     drawSelection();
+    drawOrders(t);
     list.sort((p, q) => p.y - q.y);
     const men = list.filter(d => d.unit).map(d => d.unit);
     st.seeThrough = 0;
@@ -620,6 +824,8 @@
     drawSmoke(t);
     drawFog();
     drawDragBox();
+    drawFacingArrow();
+    soundTick(t);
     if (now - view.miniAt > 200 && typeof drawMinimap === 'function') { view.miniAt = now; try { drawMinimap(); } catch (_) {} }
   }
 
@@ -698,7 +904,8 @@
     version: 'iso-view-v1', optIn: 'view=iso',
     isOn: () => view.on, setOn, setOverview,
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
-      tiles: view.tiles.size, info: view.info.size, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
+      tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
+      workerSprites: !!view.atlases.frw, labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
       villageHouses: villageHouses().length, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
     screenOf: (wx, wy) => ({ x: sx(wx), y: sy(wy) }),
     // Door direction of each village house against its gate on the road (for tests).

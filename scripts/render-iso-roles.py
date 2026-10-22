@@ -36,7 +36,12 @@ _spec.loader.exec_module(infantry)
 CELL_W, CELL_H = 176, 160
 PIVOT = (88, 140)
 STATES = [("idle", 2), ("march", 6), ("command", 2)]
-ROLES = {"officer": "o", "drummer": "d", "ensign": "e"}
+ROLES = {"officer": "o", "drummer": "d", "ensign": "e", "worker": "w"}
+# The peasant (the game's worker) walks and works instead of giving commands.
+ROLE_STATES = {"worker": [("idle", 2), ("march", 6), ("work", 4)]}
+# Uniform pieces the peasant does not wear.
+UNIFORM = ("shako", "plate", "plume", "pompom", "cord", "chinscale", "visor", "band", "epaulette", "wing",
+           "winglace", "fringe", "lace", "button", "scabbard", "turnback", "gaitertop", "tuft")
 GOLD = "#d4ad45"
 STRIPPED = ("pack", "packstrap", "roll", "messtin", "cartridge", "haversack", "canteen", "belt", "beltplate")
 
@@ -101,7 +106,26 @@ def build_role(side: str, role: str) -> dict:
     sh_r, el_r, _, _ = rig["joints"]["R"]
     sh_l, el_l, _, _ = rig["joints"]["L"]
     props = {}
-    if role == "officer":
+    if role == "worker":
+        # A linen smock over brown breeches, a straw hat, an axe.
+        smock = material("#cfc4a6" if not british else "#b9b08f", 0.9, pattern="cloth")
+        breeches = material("#5d4733", 0.9, pattern="cloth")
+        for obj in bpy.data.objects:
+            base = obj.name.split(".")[0]
+            if base in UNIFORM:
+                obj.hide_render = True
+            elif base in ("coat", "chest", "tails", "upperarm", "forearm", "lapel", "collar", "cuff") and obj.data:
+                obj.data.materials[0] = smock
+            elif base in ("thigh", "waist") and obj.data:
+                obj.data.materials[0] = breeches
+        straw = material("#c8b06a", 0.9, pattern="straw")
+        part("cyl", (0.2, 0.025), (0, 0, 0.17), straw, head, name="brim", segments=20)
+        part("cyl", (0.1, 0.12, 0.085), (0, 0, 0.23), straw, head, name="crown", segments=16)
+        axe = empty("axe", el_r, (0, 0.01, -0.29))
+        part("cyl", (0.018, 0.85), (0, 0, -0.2), material("#7a5a36", 0.7, pattern="plain"), axe, name="haft")
+        part("box", (0.03, 0.16, 0.12), (0, 0.06, -0.6), material("#8d9296", 0.35, 0.8, pattern="plain"), axe, name="axehead")
+        props["axe"] = axe
+    elif role == "officer":
         for sh in (sh_r, sh_l):
             part("cyl", (0.075, 0.05, 0.09), (0, 0, 0.0), gold, sh, name="epaulette")
         part("box", (0.11, 0.02, 0.06), (0, 0.12, 0.55), gold, torso, name="gorget")
@@ -161,11 +185,29 @@ def build_role(side: str, role: str) -> dict:
 def pose_role(rig: dict, role: str, state: str, frame: int, frames: int) -> None:
     rad = math.radians
     # Legs and body come from the fusilier's idle/march poses.
-    infantry.pose(rig, "march" if state == "march" else "idle", frame, frames if state == "march" else 2)
+    infantry.pose(rig, "march" if state == "march" else "idle", frame if state == "march" else frame % 2,
+                  frames if state == "march" else 2)
     sh_r, el_r, _, _ = rig["joints"]["R"]
     sh_l, el_l, _, _ = rig["joints"]["L"]
     t = frame / max(1, frames)
-    if role == "officer":
+    if role == "worker":
+        axe = rig["props"]["axe"]
+        if state == "work":
+            # Chopping: both hands on the haft, raised and brought down.
+            lift = [150, 110, 40, 90][frame % 4]
+            sh_r.rotation_euler = Euler((rad(lift), rad(10), 0))
+            sh_l.rotation_euler = Euler((rad(lift - 10), rad(-20), 0))
+            el_r.rotation_euler = el_l.rotation_euler = Euler((rad(20), 0, 0))
+            axe.rotation_euler = Euler((rad(70), 0, 0))
+        else:
+            # Axe carried on the shoulder.
+            sh_r.rotation_euler = Euler((rad(30), rad(14), 0))
+            el_r.rotation_euler = Euler((rad(100), 0, 0))
+            axe.rotation_euler = Euler((rad(150), 0, 0))
+            swing = math.sin(t * math.tau) * 18 if state == "march" else 0
+            sh_l.rotation_euler = Euler((rad(-swing), rad(-8), 0))
+            el_l.rotation_euler = Euler((rad(15), 0, 0))
+    elif role == "officer":
         sword = rig["props"]["sword"]
         if state == "command":
             # Sword raised towards the enemy: "Feu!"
@@ -225,13 +267,13 @@ def main(argv: list[str]) -> int:
     out.mkdir(parents=True, exist_ok=True)
     for d, name in enumerate(infantry.DIRECTIONS):
         rig["root"].rotation_euler = Euler((0, 0, math.radians(-45 * d - 90)))
-        for state, frames in STATES:
+        for state, frames in ROLE_STATES.get(args.role, STATES):
             for f in range(frames):
                 pose_role(rig, args.role, state, f, frames)
                 bpy.context.view_layer.update()
                 bpy.context.scene.render.filepath = str(out / f"{prefix}_iso_{state}_{name}_{f + 1:02d}.png")
                 bpy.ops.render.render(write_still=True)
-    print(f"{args.side} {args.role}: {8 * sum(n for _, n in STATES)} frames -> {out}")
+    print(f"{args.side} {args.role}: {8 * sum(n for _, n in ROLE_STATES.get(args.role, STATES))} frames -> {out}")
     return 0
 
 

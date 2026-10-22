@@ -65,8 +65,10 @@ def frame_names(prefix: str, states) -> list[tuple[str, str, int, int]]:
     return out
 
 
-ROLES = {"officer": "o", "drummer": "d", "ensign": "e"}
+ROLES = {"officer": "o", "drummer": "d", "ensign": "e", "worker": "w"}
 ROLE_STATES = [("idle", 2), ("march", 6), ("command", 2)]
+# The peasant (iso view of the game) walks and works instead of giving commands.
+ROLE_STATES_BY = {"worker": [("idle", 2), ("march", 6), ("work", 4)]}
 ROLE_CELL = (176, 160)
 ROLE_PIVOT = {"x": 88, "y": 140}
 CAV_CELL, CAV_PIVOT = (224, 192), {"x": 112, "y": 152}
@@ -125,7 +127,7 @@ def clean(rgba: bytes, name: str, cell=(CELL_W, CELL_H)) -> bytes:
 def pack(frames_dir: Path, side: str, kind: str) -> tuple[bytes, dict, int]:
     if kind in ROLES:
         return pack_cells(frames_dir / "roles" / f"{side}_{kind}", SIDES[side] + ROLES[kind], kind,
-                          ROLE_STATES, ROLE_CELL, ROLE_PIVOT)
+                          ROLE_STATES_BY.get(kind, ROLE_STATES), ROLE_CELL, ROLE_PIVOT)
     if kind in CAVALRY:
         return pack_cells(frames_dir / "cavalry" / side, CAV_SIDES[side], kind, CAVALRY[kind], CAV_CELL, CAV_PIVOT)
     if kind in ARTILLERY:
@@ -213,7 +215,7 @@ def main(argv: list[str]) -> int:
         jobs += [(side, kind) for side in CAV_SIDES for kind in CAVALRY]
         if args.only:
             special = {**dict.fromkeys(ROLES, "roles"), **dict.fromkeys(ARTILLERY, "artillery"),
-                       **dict.fromkeys(CAVALRY, "cavalry")}
+                       **dict.fromkeys(CAVALRY, "cavalry"), "worker": "workers"}
             jobs = [(s, k) for s, k in jobs if (k in special and special[k] in args.only)
                     or (k not in special and s in args.only)]
         for side, kind in jobs:
