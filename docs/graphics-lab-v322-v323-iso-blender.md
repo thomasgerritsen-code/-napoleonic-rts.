@@ -499,3 +499,28 @@ Alleen in het Graphics Lab; de speelbare game verandert niet.
 - `getStats()` toont `selected`, `orders`, `flags`, `commands`, `centres`,
   `batteryFire`, `batteryAt` en `squadronAt`; `groupScreen(id)` en
   `screenOfGround(x,y)` geven schermpunten voor de tests.
+
+## v340 — aanvalsdoelen, draaien en sneltoetsen
+
+- **Aanvallen**: met een selectie tik of klik je op een eenheid van de **andere**
+  kant (of klik je er rechts op). Doelen krijgen rode stippelringen en staan in de
+  balk achter 🎯.
+  - Een regiment marcheert tot schootsafstand (20 m), vormt linie naar het doel en
+    vuurt; volgt het doel opzij, dan zwenkt de linie mee. Op ruiters of kanonniers
+    gericht vuur kan die raken.
+  - Een batterij richt op het doel en vuurt; staat het verder dan 50 m, dan rijdt
+    ze eerst tot 40 m op. Kogels raken nu ook ruiters en kanonniers.
+  - Een eskadron galoppeert erheen (om gebouwen heen) en houwt in op wat het
+    bereikt: infanterie, ruiters of kanonniers. Vijandelijke ruiters slaan terug.
+    De Franse ruiters op het Britse regiment geven de volledige charge (met carré).
+  - Kanonniers kunnen nu sneuvelen; een stuk met minder dan twee man vuurt niet.
+  - Een doel waar niemand meer van over is, vervalt.
+- **Draaien**: ⟲ en ⟳ (of Q en E) draaien regiment, batterij of eskadron 45°.
+  Slepen met rechts zet een vlag waar het slepen begint en geeft de kijkrichting:
+  ze marcheren erheen en zwenken daar die kant op.
+- **Sneltoetsen**: 1–3 Frans regiment, batterij, ruiters; 4–6 de Britse (Shift
+  voegt toe). L linie, C colonne, F vuren, B charge, Q/E draaien, H halt/voorwaarts,
+  P of spatie pauze, pijltjes schuiven, + en − zoomen, Esc selectie weg. De knoppen
+  tonen hun toets als tooltip.
+- `getStats()` toont `attacks`, `turns`, `targets`, `facings`, `batteryTarget`,
+  `squadronTarget`, `crewFalls`, `targetHits` en `lastKey`.
