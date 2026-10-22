@@ -18,9 +18,14 @@
   const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
   const HD = params.has('hd');
   const MARCH_STRIDE = 1.5, DIE_FRAME = 0.17, CORPSE_MAX = 320, SMOKE_MAX = 260;
-  const view = { on: true, atlases: {}, props: {}, info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(),
+  // Village houses in the game are about a third of real size next to its
+  // soldiers; drawn at their footprint they would be shorter than a man. They are
+  // drawn this much larger than the footprint (the footprint still decides where
+  // men can walk).
+  const VILLAGE_SCALE = 2.0;
+  const view = { on: true, atlases: {}, props: {}, village: null, info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(),
     tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), miniAt: 0, fogAt: 0,
-    stats: { renderMs: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
+    stats: { renderMs: 0, houses: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
 
   const hash = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; h ^= h >>> 13;
     return (Math.imul(h, 1103515245) >>> 0) / 4294967296; };
@@ -61,7 +66,7 @@
       first.push(load(p + 'o', ['officer']), load(p + 'd', ['drummer']), load(p + 'c', ['cavalry', 'cavfight']),
         load(p + 'g', ['gun']), load(p + 'a', ['gunner', 'gunner2']));
     }
-    first.push(loadProps());
+    first.push(loadProps(), loadVillage());
     // Extra looks stream in afterwards; until then everyone uses the base look.
     return Promise.all(first).then(() => Promise.all(['2', '3', '4', '5'].flatMap(l => ['fr', 'br'].map(p => load(p + l, INFANTRY)))
       .concat(['fr', 'br'].flatMap(p => [load(p + 'c2', ['cavalry', 'cavfight']), load(p + 'co', ['cavalry', 'cavfight'])]))));
@@ -70,6 +75,56 @@
     return fetch(ASSETS + 'iso/props/props.json').then(r => r.json()).then(m => Promise.all(Object.entries(m.props)
       .map(([kind, meta]) => loadImage(ASSETS + 'iso/props/' + meta.image).then(image => { view.props[kind] = { ...meta, image }; }))))
       .catch(err => console.warn('iso: props', err));
+  }
+  // Village buildings: one sheet per kind with 16 headings (scripts/render-iso-village.py).
+  function loadVillage() {
+    const dir = ASSETS + 'iso/village/';
+    return fetch(dir + 'village.json').then(r => r.json()).then(m => Promise.all(Object.entries(m.kinds)
+      .map(([kind, meta]) => loadImage(dir + meta.image).then(image => [kind, { ...meta, image }])))
+      .then(list => { view.village = { kinds: Object.fromEntries(list), pxPerM: m.pxPerM, headings: m.headings }; }))
+      .catch(err => console.warn('iso: dorpen', err));
+  }
+  const villageHouses = () => (global.VILLAGE_SCENERY_V4 || global.__VILLAGE_SCENERY_V4_DATA__ || []).flatMap(v => v.houses || []);
+  // The model's door side is its -y; the game's road side is local -y for side > 0
+  // (+y otherwise), with y pointing down: that gives the model's heading.
+  function headingOf(house, n) {
+    const a = house.side > 0 ? Math.PI - house.angle : -house.angle;
+    return ((Math.round(a / (2 * Math.PI / n)) % n) + n) % n;
+  }
+  function houseDrawable(house) {
+    const V = view.village, meta = V && V.kinds[house.kind || 'cottage'];
+    if (!meta) return null;
+    const X = sx(house.x), Y = sy(house.y), reach = house.w * VILLAGE_SCALE * z();
+    if (X < -reach || X > innerWidth + reach || Y < -reach * 0.6 || Y > innerHeight + reach * 1.4) return null;
+    const f = meta.frames[headingOf(house, V.headings)];
+    return { y: house.y, draw: () => {
+      // Game pixels per model metre, then screen pixels per sheet pixel.
+      const k = house.w * VILLAGE_SCALE / meta.lengthM * z() / V.pxPerM;
+      ctx.drawImage(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k);
+      view.stats.houses++;
+    } };
+  }
+  // While the terrain is baked the village roofs are cut out (their yards stay):
+  // the buildings stand there instead.
+  const WINGS = { farmhouse: [[-0.27, 0.53, 0.43, 0.78]], inn: [[0.2, 0.51, 0.46, 0.66]], chapel: [[0, 0, 0.34, 1.45]] };
+  function withoutRoofs(fn) {
+    if (!view.village || typeof drawHouseV069 !== 'function') return fn();
+    const base = drawHouseV069;
+    drawHouseV069 = function drawHouseYardOnlyIsoV1(house, index, village) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(house.x - 4000, house.y - 4000, 8000, 8000);
+      const c = Math.cos(house.angle), s = Math.sin(house.angle), rear = house.side > 0 ? 1 : -1;
+      const hole = (cx, cy, w, h) => {
+        const pts = [[-w / 2, -h / 2], [-w / 2, h / 2], [w / 2, h / 2], [w / 2, -h / 2]]
+          .map(([u, v]) => [house.x + (cx + u) * c - (cy + v) * s, house.y + (cx + u) * s + (cy + v) * c]);
+        ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts.slice(1)) ctx.lineTo(q[0], q[1]); ctx.closePath();
+      };
+      hole(0, 0, house.w + 2, house.h + 2);
+      for (const [x, y, w, h] of WINGS[house.kind] || []) hole(x * house.w, y * rear * house.h, w * house.w + 2, h * house.h + 2);
+      ctx.clip('evenodd');
+      try { return base(house, index, village); } finally { ctx.restore(); }
+    };
+    try { return fn(); } finally { drawHouseV069 = base; }
   }
   function drawSprite(atlas, anim, f, x, y, k) {
     const src = atlas && atlas.byAnim.get(anim), name = src && src.sheet.animations[anim] && src.sheet.animations[anim][f];
@@ -99,7 +154,7 @@
       ctx.setTransform(T.raster, 0, 0, T.raster, -left * T.raster, -top * T.raster);
       ctx.beginPath(); ctx.rect(left, top, T.world, T.world); ctx.clip();
       global.__STATIC_TERRAIN_CAPTURE_V301__ = true;
-      try { draw(); } finally { global.__STATIC_TERRAIN_CAPTURE_V301__ = false; }
+      try { withoutRoofs(draw); } finally { global.__STATIC_TERRAIN_CAPTURE_V301__ = false; }
       tile.getContext('2d').drawImage(canvas, 0, 0, T.px, T.px, 0, 0, T.px, T.px);
     } catch (err) { console.warn('iso: terrein', err); return null; }
     finally { [camera.x, camera.y, camera.zoom] = old; ctx.restore();
@@ -119,7 +174,7 @@
     want.sort((p, q) => Math.hypot(p[0] - cx, p[1] - cy) - Math.hypot(q[0] - cx, q[1] - cy));
     const tiles = [];
     for (const [tx, ty] of want) {
-      const key = T.raster + ':' + T.px + ':' + tx + ':' + ty;
+      const key = (view.village ? 'v' : '') + T.raster + ':' + T.px + ':' + tx + ':' + ty;
       let t = view.tiles.get(key);
       if (!t && budget > 0) { budget--; const c = bakeTile(key, tx, ty, T); if (c) { t = { c, used: 0 }; view.tiles.set(key, t); } }
       tiles.push([tx, ty, t]);
@@ -375,7 +430,7 @@
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
-    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = 0;
+    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = 0;
     drawTerrain();
     const k = spriteK(), seen = new Set(), list = [];
     const visible = u => u.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance(u);
@@ -407,6 +462,7 @@
     }
     st.corpses = view.corpses.length;
     for (const b of buildings) { const d = buildingDrawable(b); if (d) list.push(d); }
+    for (const h of villageHouses()) { const d = houseDrawable(h); if (d) list.push(d); }
     for (const r of resources) {
       const X = sx(r.x), Y = sy(r.y);
       if (X < -120 || X > innerWidth + 120 || Y < -30 || Y > innerHeight + 260) continue;
@@ -486,7 +542,8 @@
     version: 'iso-view-v1', optIn: 'view=iso',
     isOn: () => view.on, setOn,
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
-      tiles: view.tiles.size, info: view.info.size, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
+      tiles: view.tiles.size, info: view.info.size, villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
+      villageHouses: villageHouses().length, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
     screenOf: (wx, wy) => ({ x: sx(wx), y: sy(wy) }),
     bodyOf: u => ({ x: sx(u.x), y: sy(u.y) - (u.type === 'cavalry' ? 1.6 : 0.9) * LIFT * PPM * z() })
   });
