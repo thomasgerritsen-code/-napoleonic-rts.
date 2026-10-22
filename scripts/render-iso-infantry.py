@@ -34,7 +34,7 @@ STATES = [("idle", 2), ("march", 6), ("aim", 2), ("fire", 3), ("reload", 4),
           ("kaim", 2), ("kfire", 3), ("misfire", 3), ("charge", 6), ("thrust", 3),
           ("rout", 6), ("crawl", 4), ("cheer", 2),
           ("look", 4), ("adjust", 4), ("lean", 2),
-          ("dig", 6)]
+          ("dig", 6), ("rest", 2), ("rfire", 3)]
 
 PALETTES = {
     "france": {
@@ -342,6 +342,8 @@ def running(t, stride, lean_hips=0.9):
 KNEEL = ((0, -92), (84, -86), 0.53)                  # right knee on the ground
 
 
+PARAPET_LEAN = -30                                 # degrees (negative leans forward) onto the bank
+
 # Dig cycle, per frame: right arm, left arm (shoulder x, y, elbow), torso lean,
 # legs ((thigh, knee) right, left, hips z), spade angle at the hand.
 DIG = [
@@ -441,6 +443,26 @@ def pose_extra(rig: dict, state: str, frame: int, frames: int, direction: int = 
         head.rotation_euler = Euler((rad(-0.4 * lean), 0, 0))
         rig["spade"].rotation_euler = Euler((rad(spade), 0, 0))
         hide_render_tree(rig["clod"], not load)
+        return True
+    if state in ("rest", "rfire"):
+        # Front rank of a trench: chest against the parapet, musket laid on it
+        # (rest, breathing) or fired over it (rfire). The lean is mostly taken
+        # back out of the musket so it stays near level, tipped onto the bank.
+        drill = DRILL["aim"][1] if state == "rest" else DRILL["fire"][frame]
+        lean = PARAPET_LEAN + (0.8 * math.cos(t * math.tau) if state == "rest" else 0)
+        (loc, rot) = drill[0]
+        place(musket, (loc, (rot[0] - PARAPET_LEAN * 0.8, rot[1], rot[2])))
+        set_arms(rig, drill[1], drill[2])
+        torso.rotation_euler = Euler((rad(lean + drill[3]), 0, 0))
+        head.rotation_euler = Euler((rad(-0.6 * PARAPET_LEAN), 0, 0))
+        set_legs(rig, (-18, -4), (6, -10), 0.92)
+        flash = drill[4]
+        if flash == 3:
+            rig["pan"].hide_render = False
+        elif flash:
+            for obj in rig["flash"]:
+                obj.hide_render = False
+                obj.scale = (1, 1, 1) if flash == 2 else (0.55, 0.55, 0.55)
         return True
     if state in ("look", "adjust", "lean"):
         breath = math.cos(t * math.tau)

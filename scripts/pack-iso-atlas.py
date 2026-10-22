@@ -8,7 +8,8 @@ cells plus a Pixi-compatible JSON:
 - combat:   kneeling aim 2 / fire 3, misfire 3, charge 6, bayonet thrust 3 -> 2992x1024
 - morale:   rout 6, wounded crawl 4, cheer 2 -> 2112x1024
 - idlex:    look around 4, set shako 4, lean on musket 2 -> 1760x1024
-- dig:      spade work in a trench 6 (set, push, lever, lift, throw, back) -> 1056x1024
+- dig:      spade work in a trench 6 (set, push, lever, lift, throw, back), leaning on
+            the parapet 2 and firing over it 3 -> 1936x1024
 Frames rendered N x larger (--supersample) are averaged back down first. The
 renderer's muzzle.json (screen pixel of the muzzle on the shot frame, per
 direction) goes into the infantry (standing fire) and combat (kneeling fire)
@@ -49,7 +50,7 @@ SHEETS = {
     "combat": [("kaim", 2), ("kfire", 3), ("misfire", 3), ("charge", 6), ("thrust", 3)],
     "morale": [("rout", 6), ("crawl", 4), ("cheer", 2)],
     "idlex": [("look", 4), ("adjust", 4), ("lean", 2)],
-    "dig": [("dig", 6)],
+    "dig": [("dig", 6), ("rest", 2), ("rfire", 3)],
 }
 MUZZLE_STATE = {"infantry": "fire", "combat": "kfire"}
 # Folder -> sprite prefix; folders 2 and 3 hold the alternative soldier looks.

@@ -428,7 +428,7 @@ test('iso view: a defending line digs a trench, men in it lose less, and a regim
   expect(errors).toEqual([]);
 });
 
-test('iso view: men digging a trench are seen at work with the spade', async ({ page }) => {
+test('iso view: men digging a trench are seen at work with the spade, then the front rank leans on the parapet', async ({ page }) => {
   test.setTimeout(120_000);
   const errors = await openGame(page, 'test=iso-dig&view=iso');
   await page.waitForFunction(() => window.__REGIMENT_ORDERS_V1__ && window.__ISO_VIEW_V1__?.stats().digSprites, null, { timeout: 60_000 });
@@ -451,7 +451,10 @@ test('iso view: men digging a trench are seen at work with the spade', async ({ 
   expect(at.digging).toBeGreaterThan(10);
   // The officer and drummer keep watch; the musketeers dig.
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().digging >= 12);
+  // Finished: the front rank steps up to the parapet and leans on it, musket laid on the bank.
+  await page.evaluate(() => { for (let k = 0; k < 40; k++) window.__RTS_DEBUG__.tick(1); });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().leaning >= 6 && window.__ISO_VIEW_V1__.stats().digging === 0);
   const st = await stats(page);
-  expect(st.missingNames.filter(n => n.startsWith('dig'))).toEqual([]);
+  expect(st.missingNames.filter(n => /^(dig|rest|rfire)/.test(n))).toEqual([]);
   expect(errors).toEqual([]);
 });

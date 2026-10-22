@@ -99,7 +99,13 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   weg en graven zichtbaar met de spade (Blender-animatie in 6 beelden: steken,
   intrappen, wrikken, optillen, de aarde naar voren op de wal gooien, terug), elk
   in zijn eigen tempo, en zakken mee de grond in. De aarden wal komt aan de
-  vijandkant en groeit mee; de officier en tamboer kijken toe. Wie in een voltooide
+  vijandkant en groeit mee; de officier en tamboer kijken toe. De loopgraaf is een
+  afgeronde kuil (ronde kopse kanten, met de hand gegraven ongelijke rand): je ziet
+  de achterwand met grondlagen naar beneden lopen naar een smallere bodem ~1,1 m
+  diep, de voorwand verbergt de benen van de mannen erin. De wal is een ronde
+  aarden rug die aan de uiteinden afloopt. In een voltooide loopgraaf stapt de
+  voorste rij naar de wal en leunt erop, het geweer over de rug gelegd (en vuurt
+  er ook overheen); de rijen erachter staan op de bodem. Wie in een voltooide
   loopgraaf staat - van welke kant ook - lijdt 50% minder verlies en verliest nog
   minder moraal dan alleen ingegraven. In de iso-weergave staan de mannen erin lager,
   en de wal verbergt hun benen. Een loopgraaf blijft liggen als het regiment vertrekt;
