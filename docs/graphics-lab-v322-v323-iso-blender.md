@@ -433,3 +433,27 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
   Britten weer linie.
 - `state.reaction` (standaard aan) schakelt de Britse reactie; `getStats()` toont
   `cavCounter`, `squareShots` en `clashes`.
+
+---
+
+# v338 — groter slagveld, minimap en volgcamera
+
+- **Terrein** (`render-iso-ground.py`, `layout.json` versie 2): het veld is
+  128×128 m (was 96×96) en het terrein is opnieuw in Blender gerenderd. Nieuw:
+  - een **beek** (`streams`) die van zuid naar noord door het westen kronkelt:
+    een donkere, glanzende waterband op een modderige oever, met afgeronde
+    bochten; gras en bloemen blijven er vandaan;
+  - een **heuvel** (`hills`) in het noordoosten: een gladde koepel van 6 m
+    hoog die de zon laat zien; gras en bloemen volgen de helling;
+  - de wegen naar oost en west lopen door tot de rand.
+- **Stenen boogbrug** (`render-iso-props.py`, prop `bridge`): landhoofden, een
+  boog van gewelfstenen, borstweringen met dekstenen en hoekpalen, en de
+  zandweg over het dek; hij ligt waar de westweg de beek kruist.
+- **Tweede boerderij** aan de overkant van de beek (boerderij, schuur,
+  hooibergen, put, hek) en meer bomen en struiken in het grotere veld.
+- **Minimap** rechtsonder: het hele terrein, elke soldaat, elk kanon en elke
+  ruiter als stip in de eigen kleur, en het zichtbare deel als kader. Klik of
+  tik erop om daarheen te kijken.
+- **🎥 Volg**: de camera glijdt mee met het Franse regiment, het Britse
+  regiment of de Franse ruiters; slepen zet het volgen uit.
+- `getStats()` toont `minimap`, `follow`, `cam` en `half`.

@@ -42,6 +42,20 @@
    },
    "w": 939
   },
+  "bridge": {
+   "footprint": {
+    "d": 4.95,
+    "w": 12.1
+   },
+   "h": 235,
+   "heightM": 2.7,
+   "image": "bridge.webp",
+   "pivot": {
+    "x": 277,
+    "y": 149
+   },
+   "w": 592
+  },
   "bush": {
    "footprint": {
     "d": 1.92,

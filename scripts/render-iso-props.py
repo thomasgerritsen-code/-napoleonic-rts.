@@ -193,11 +193,42 @@ def build_fence(root):
         part("box", (6.1, 0.07, 0.12), (0, 0, z), M("#7a5c40", "planks", 0.95), root, name="rail")
 
 
+def build_bridge(root):
+    """Stone arch bridge along X: abutments, a ring of voussoirs over the water,
+    spandrels, and a straight deck with a dirt road and parapets with coping."""
+    stone = M("#9a9182", "wall", 0.9, 1.2, alt="#7d766a")
+    dark = M("#6f685d", "wall", 0.9, 1.2, alt="#5d574e")
+    road = M("#a68b5e", "dirt", 0.95, alt="#8e7651")
+    span, width, rise, length, deck = 4.2, 4.8, 1.25, 11.6, 1.55
+    for x in (-span / 2 - 1.6, span / 2 + 1.6):
+        part("box", (3.2, width, deck - 0.1), (x, 0, (deck - 0.1) / 2), stone, root, name="abutment")
+    # Arch ring: voussoirs laid along a half-ellipse, each tangent to the curve.
+    n = 15
+    for k in range(n):
+        a = math.pi * (k + 0.5) / n
+        x, z = -math.cos(a) * span / 2, math.sin(a) * rise
+        dx, dz = math.sin(a) * span / 2, math.cos(a) * rise
+        part("box", (span * 1.6 / n, width + 0.04, 0.36), (x, 0, z), dark if k % 2 else stone, root,
+             rot=(0, -math.degrees(math.atan2(dz, dx)), 0), name="voussoir")
+    # Spandrels fill the faces between the arch and the deck at the haunches.
+    for x in (-span / 2 + 0.35, span / 2 - 0.35):
+        part("box", (0.8, width, 0.9), (x, 0, deck - 0.55), stone, root, name="spandrel")
+    part("box", (length, width, 0.25), (0, 0, deck), stone, root, name="deck")
+    part("box", (length, width - 0.9, 0.04), (0, 0, deck + 0.14), road, root, name="roadway")
+    for y in (width / 2 - 0.2, -width / 2 + 0.2):
+        part("box", (length, 0.4, 0.75), (0, y, deck + 0.5), stone, root, name="parapet")
+        part("box", (length + 0.1, 0.5, 0.1), (0, y, deck + 0.92), dark, root, name="coping")
+    for x in (-length / 2, length / 2):
+        for y in (width / 2 - 0.2, -width / 2 + 0.2):
+            part("box", (0.5, 0.55, 1.05), (x, y, deck + 0.62), dark, root, name="endpost")
+
+
 BUILDERS = {
     "barracks_fr": lambda r: build_barracks(r, "fr"),
     "barracks_br": lambda r: build_barracks(r, "br"),
     "farmhouse": build_farmhouse, "barn": build_barn, "cottage": build_cottage, "well": build_well,
     "haystack": build_haystack, "oak": build_oak, "poplar": build_poplar, "bush": build_bush, "fence": build_fence,
+    "bridge": build_bridge,
 }
 
 

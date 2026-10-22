@@ -9,11 +9,11 @@ async function open(page){
   return errors;
 }
 const frames=page=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
-test('v337 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
+test('v338 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
   const errors=await open(page);
   await frames(page);
   const s=await page.evaluate(()=>({...window.__GRAPHICS_LAB_ISO__.getStats(),version:window.__GRAPHICS_LAB_ISO__.version}));
-  expect(s.version).toBe('337.0');
+  expect(s.version).toBe('338.0');
   // Five looks per nation (incl. grenadiers and voltigeurs), all on the field.
   expect(s.loaded).toBe(28);
   // Officer, drummer and ensign lead each regiment.
@@ -27,7 +27,7 @@ test('v337 iso scene loads both Blender atlases and draws every soldier',async({
   expect(await page.locator('#iso-status').textContent()).toContain('gebouwen en terrein');
   expect(errors).toEqual([]);
 });
-test('v337 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
+test('v338 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
   const errors=await open(page);
   const seen=await page.evaluate(async()=>{
     const api=window.__GRAPHICS_LAB_ISO__,step=()=>new Promise(r=>requestAnimationFrame(r));
@@ -60,7 +60,7 @@ const advance=(page,seconds)=>page.evaluate(async seconds=>{
     const s=api.getStats();for(const k of Object.keys(s.animStates))seen[k]=1;smoke=Math.max(smoke,s.smoke);die=Math.max(die,s.animStates.die||0);}
   return{seen:Object.keys(seen).sort(),smoke,die,stats:api.getStats()};
 },seconds);
-test('v337 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
+test('v338 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.misfireChance=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -83,7 +83,7 @@ test('v337 Vuur! deploys both columns into line, then the ranks fire in turn onc
   expect((await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).firing).toBe(false);
   expect(errors).toEqual([]);
 });
-test('v337 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
+test('v338 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=1;s.woundedShare=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -112,7 +112,7 @@ test('v337 casualties fall, the rank behind closes up, the fallen stay and Herst
   expect(after.drawn).toBe(64);
   expect(errors).toEqual([]);
 });
-test('v337 French front rank kneels, some muskets misfire and smoke hangs over the line',async({page})=>{
+test('v338 French front rank kneels, some muskets misfire and smoke hangs over the line',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.misfireChance=0.5;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -126,7 +126,7 @@ test('v337 French front rank kneels, some muskets misfire and smoke hangs over t
   expect(r.stats.missing).toBe(0);
   expect(errors).toEqual([]);
 });
-test('v337 men at rest look around, set their shako or lean on the musket',async({page})=>{
+test('v338 men at rest look around, set their shako or lean on the musket',async({page})=>{
   const errors=await open(page);
   await page.getByRole('button',{name:'Halt'}).click();
   const r=await advance(page,16);
@@ -148,7 +148,7 @@ const CHARGE_RUN=`(async()=>{
     if(s.charge==='rout'&&routAt===null)routAt=i;if(routAt!==null&&i-routAt>260)break;}
   return{phases,seen:Object.keys(seen).sort(),maxGone,stats:api.getStats()};
 })()`;
-test('v337 Bajonet! charges, the front ranks fight, the beaten side routs and the victors cheer',async({page})=>{
+test('v338 Bajonet! charges, the front ranks fight, the beaten side routs and the victors cheer',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   await page.getByRole('button',{name:'Bajonet!'}).click();
@@ -168,7 +168,7 @@ test('v337 Bajonet! charges, the front ranks fight, the beaten side routs and th
   expect(after.drawn).toBe(64);
   expect(errors).toEqual([]);
 });
-test('v337 the wounded go down and crawl to the rear',async({page})=>{
+test('v338 the wounded go down and crawl to the rear',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=1;s.woundedShare=1;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -182,7 +182,7 @@ test('v337 the wounded go down and crawl to the rear',async({page})=>{
   expect(r.stats.animStates.crawl+(r.stats.animStates.die||0)).toBe(total);
   expect(errors).toEqual([]);
 });
-test('v337 sound is off by default; switched on, shots, drums and commands play',async({page})=>{
+test('v338 sound is off by default; switched on, shots, drums and commands play',async({page})=>{
   const errors=await open(page);
   const off=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats().sound);
   expect(off.on).toBe(false);
@@ -205,7 +205,7 @@ test('v337 sound is off by default; switched on, shots, drums and commands play'
   expect(quiet.on).toBe(false);
   expect(errors).toEqual([]);
 });
-test('v337 batteries: the crews work the guns, the guns fire, recoil and are run back up',async({page})=>{
+test('v338 batteries: the crews work the guns, the guns fire, recoil and are run back up',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   const idle=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats());
@@ -235,7 +235,7 @@ test('v337 batteries: the crews work the guns, the guns fire, recoil and are run
   expect(s.missing).toBe(0);
   expect(errors).toEqual([]);
 });
-test('v337 round shot grazes and bounces through the enemy line',async({page})=>{
+test('v338 round shot grazes and bounces through the enemy line',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -248,7 +248,7 @@ test('v337 round shot grazes and bounces through the enemy line',async({page})=>
   expect(fallen).toBeLessThanOrEqual(r.stats.ballHits);
   expect(errors).toEqual([]);
 });
-test('v337 Cavalerie!: the squadron walks, trots, gallops in, cuts at the line and rallies back',async({page})=>{
+test('v338 Cavalerie!: the squadron walks, trots, gallops in, cuts at the line and rallies back',async({page})=>{
   const errors=await open(page);
   // Without the British reaction: the squadron reaches the line itself.
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.reaction=false;});
@@ -290,7 +290,7 @@ const REACTION_RUN=`(async()=>{
     if(i>40&&!s.cavCharge&&!s.cavCounter&&s.formations[1]!=='square')break;}
   return{fr,br,forms:[...forms],stats:api.getStats()};
 })()`;
-test('v337 the British form square and their squadron rides out to meet the French',async({page})=>{
+test('v338 the British form square and their squadron rides out to meet the French',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   await page.getByRole('button',{name:'Cavalerie!'}).click();
@@ -308,7 +308,7 @@ test('v337 the British form square and their squadron rides out to meet the Fren
   expect(r.stats.missing).toBe(0);
   expect(errors).toEqual([]);
 });
-test('v337 winning the clash, the French ride on at the square, where the horses refuse',async({page})=>{
+test('v338 winning the clash, the French ride on at the square, where the horses refuse',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{
     const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;
@@ -323,9 +323,37 @@ test('v337 winning the clash, the French ride on at the square, where the horses
   expect(r.stats.missing).toBe(0);
   expect(errors).toEqual([]);
 });
+test('v338 larger field: minimap shows it all, a tap there moves the camera, Volg follows a regiment',async({page})=>{
+  const errors=await open(page);
+  await frames(page);
+  const s=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats());
+  expect(s.half).toBe(64);
+  expect(s.minimap).toBe(true);
+  expect(s.props).toBeGreaterThan(50);
+  expect(s.propsDrawn).toBe(s.props);
+  // A click near the minimap's top-left corner looks at the north-west of the field.
+  const box=await page.locator('#iso-view').boundingBox();
+  const mm=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.state.minimapRect);
+  await page.mouse.click(box.x+mm.x+mm.w*0.1,box.y+mm.y+mm.h*0.1);
+  const cam=(await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).cam;
+  expect(cam.x).toBeCloseTo(-0.4*2*64*20,0);
+  expect(cam.y).toBeCloseTo(-0.4*64*20,0);
+  // Volg: the camera glides to the French regiment and stays with it.
+  await page.getByRole('button',{name:'Volg: uit'}).click();
+  await expect(page.locator('#iso-follow')).toHaveText('🎥 Volg: Frans regiment');
+  const r=await advance(page,4);
+  const c=await page.evaluate(()=>{
+    const api=window.__GRAPHICS_LAB_ISO__,reg=api.state.regiments[0],men=reg.men.filter(m=>!m.dead);
+    return{x:men.reduce((a,m)=>a+m.gx,0)/men.length*20,y:-men.reduce((a,m)=>a+m.gy,0)/men.length*10};
+  });
+  expect(r.stats.follow).toBe('fr');
+  expect(Math.abs(r.stats.cam.x-c.x)).toBeLessThan(40);
+  expect(Math.abs(r.stats.cam.y-c.y)).toBeLessThan(40);
+  expect(errors).toEqual([]);
+});
 test.describe('phone',()=>{
   test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-  test('v337 iso scene pinch-zooms on a phone',async({page})=>{
+  test('v338 iso scene pinch-zooms on a phone',async({page})=>{
     const errors=await open(page);
     const before=(await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).zoom;
     const r=await page.locator('#iso-view').boundingBox();

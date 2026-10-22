@@ -155,3 +155,17 @@ for (const key of ['frc', 'frc2', 'frco', 'frct', 'brc', 'brc2', 'brco', 'brct']
     }
   });
 }
+
+test('v338 larger field: stream with a bridge where the west road crosses it, a hill, a second farm', () => {
+  assert.equal(layout.ground.halfSize, 64);
+  assert.equal(layout.streams.length, 1);
+  assert.equal(layout.hills.length, 1);
+  const bridge = layout.props.find(p => p.type === 'bridge');
+  assert.ok(bridge, 'bridge prop');
+  // The bridge sits on the west road where the stream crosses it.
+  const st = layout.streams[0].points;
+  const crossing = st.findIndex((p, i) => i < st.length - 1 && Math.sign(p[1]) !== Math.sign(st[i + 1][1]) || p[1] === 0);
+  assert.ok(Math.abs(bridge.y) < 0.5 && Math.abs(bridge.x - st[crossing][0]) < 3);
+  assert.ok(layout.props.filter(p => p.type === 'farmhouse').length >= 2);
+  for (const p of layout.props) assert.ok(Math.abs(p.x) < 64 && Math.abs(p.y) < 64, `${p.type} inside the field`);
+});

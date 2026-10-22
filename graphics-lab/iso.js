@@ -1,4 +1,4 @@
-// Graphics Lab v337 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v338 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -7,7 +7,7 @@
 const view=document.getElementById('iso-view'),canvas=document.getElementById('iso-canvas'),ctx=canvas.getContext('2d');
 const ui={status:document.getElementById('iso-status'),halt:document.getElementById('iso-halt'),
  pause:document.getElementById('iso-pause'),center:document.getElementById('iso-center'),count:document.getElementById('iso-count'),
- fire:document.getElementById('iso-fire'),reset:document.getElementById('iso-reset'),charge:document.getElementById('iso-charge'),cav:document.getElementById('iso-cav'),
+ fire:document.getElementById('iso-fire'),reset:document.getElementById('iso-reset'),charge:document.getElementById('iso-charge'),cav:document.getElementById('iso-cav'),follow:document.getElementById('iso-follow'),
  sound:document.getElementById('iso-sound')};
 // Sprite contract from scripts/render-iso-infantry.py: 41.3 px per metre, cell
 // size and feet pivot come from the atlas meta; camera elevation 30° squashes
@@ -18,7 +18,7 @@ const MARCH={frames:6,strideM:1.5},IDLE={frames:2,frameMs:500},SPEED=1.3;
 // Rolling fire: the ranks of a line open fire this far apart. Each shot has a
 // small chance to drop an enemy soldier, who then plays the fall.
 const BAND_DELAY=0.8,HIT_CHANCE=0.05,HIT_DELAY=0.25,DIE_FRAME=0.17;
-const ROAD_R=14,GROUND=48,TILE=2;
+const ROAD_R=14,GROUND=64,TILE=2;
 const state={zoom:1,customZoom:false,camX:0,camY:0,time:0,last:performance.now(),paused:false,halted:false,
  travelled:0,perSide:32,atlases:{},ground:null,terrain:null,props:[],firing:false,controller:null,smoke:[],volleys:0,
  fireStart:0,regiments:null,simTime:0,dead:new Map(),batteries:null,squadrons:null,cavCharge:null,reaction:true,cavCounter:null,squareShots:0,clashes:0,deadRiders:[],riderFalls:0,sabreHits:0,balls:[],cannonShots:0,ballHits:0,charge:null,woundedShare:0.3,drill:new Map(),bank:[],misfires:0,misfireChance:0.06,hits:[],shots:0,hitChance:HIT_CHANCE,fps:0,frames:0,frameClock:performance.now(),drawn:0,directionsSeen:new Set()};
@@ -86,7 +86,7 @@ async function loadScene(){
  const image=await loadImage('./assets/iso/'+layout.ground.image);
  const sprites={};
  await Promise.all(Object.entries(manifest.props).map(async([kind,meta])=>{sprites[kind]={...meta,image:await loadImage('./assets/iso/props/'+meta.image)};}));
- state.terrain={image,scale:S/layout.ground.pxPerM};
+ state.terrain={image,scale:S/layout.ground.pxPerM,half:layout.ground.halfSize};
  state.props=layout.props.filter(p=>sprites[p.type]).map(p=>({...p,gx:p.x,gy:p.y,sprite:sprites[p.type],...project(p.x,p.y)}));
 }
 
@@ -922,6 +922,7 @@ function draw(now){
  state.frames++;
  if(now-state.frameClock>=750){state.fps=Math.round(state.frames*1000/(now-state.frameClock));state.frames=0;state.frameClock=now;}
  const dpr=canvas.width/Math.max(1,view.clientWidth),z=state.zoom;
+ followCamera();
  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#5d6b45';ctx.fillRect(0,0,canvas.width,canvas.height);
  ctx.setTransform(dpr*z,0,0,dpr*z,dpr*(view.clientWidth/2-state.camX*z),dpr*(view.clientHeight/2-state.camY*z));
  if(state.terrain){const t=state.terrain,w=t.image.naturalWidth*t.scale,h=t.image.naturalHeight*t.scale;ctx.drawImage(t.image,-w/2,-h/2,w,h);}
@@ -979,6 +980,7 @@ function draw(now){
  drawSmoke();
  drawSmokeBank();
  drawCompass(dpr);
+ drawMinimap(dpr);
  requestAnimationFrame(draw);
 }
 
@@ -997,10 +999,46 @@ function drawCompass(dpr){
  DIRS.forEach((d,i)=>drawSprite(a,anim+'_'+d,f,12+size*(i+.5),12+size*.85,size/cell));
 }
 
+// Minimap (bottom right): the whole terrain, every soldier, gun and rider as a
+// dot, and the part of the field in view. Click or tap it to look there.
+function drawMinimap(dpr){
+ const t=state.terrain;if(!t||!state.regiments){state.minimapRect=null;return;}
+ const vw=view.clientWidth,vh=view.clientHeight,w=Math.min(200,vw*0.32),h=w/2,x=vw-w-10,y=vh-h-10,half=t.half;
+ state.minimapRect={x,y,w,h};
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ ctx.fillStyle='rgba(20,24,22,.72)';ctx.fillRect(x-4,y-4,w+8,h+8);
+ ctx.drawImage(t.image,x,y,w,h);
+ const dot=(gx,gy,size,color)=>{ctx.fillStyle=color;ctx.fillRect(x+(gx/(2*half)+0.5)*w-size/2,y+(-gy/(2*half)+0.5)*h-size/2,size,size);};
+ state.regiments.forEach((reg,i)=>{for(const m of aliveMen(reg))dot(m.gx,m.gy,2,i?'#d0362e':'#2f55c8');});
+ for(const g of state.batteries||[])dot(g.gx,g.gy,3.5,'#1c1c1c');
+ (state.squadrons||[]).forEach((sq,i)=>{for(const m of liveRiders(sq))dot(m.gx,m.gy,3,i?'#f08070':'#7fa0ff');});
+ // The visible part of the field.
+ const sw=vw/state.zoom,sh=vh/state.zoom,u=sx=>x+(sx/(2*half*S)+0.5)*w,v=sy=>y+(sy/(half*S)+0.5)*h;
+ ctx.strokeStyle='rgba(255,246,214,.9)';ctx.lineWidth=1.2;
+ ctx.strokeRect(u(state.camX-sw/2),v(state.camY-sh/2),u(state.camX+sw/2)-u(state.camX-sw/2),v(state.camY+sh/2)-v(state.camY-sh/2));
+}
+function minimapHit(e){
+ const mm=state.minimapRect;if(!mm)return false;
+ const r=view.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
+ if(px<mm.x||px>mm.x+mm.w||py<mm.y||py>mm.y+mm.h)return false;
+ const half=state.terrain.half;
+ state.camX=((px-mm.x)/mm.w-0.5)*2*half*S;state.camY=((py-mm.y)/mm.h-0.5)*half*S;
+ setFollow(0);return true;
+}
+// Camera follow: off, the French regiment, the British regiment, the French squadron.
+const FOLLOW=[[null,'uit'],['fr','Frans regiment'],['br','Brits regiment'],['cav','Franse ruiters']];
+function setFollow(i){state.follow=i;ui.follow.textContent='🎥 Volg: '+FOLLOW[i][1];ui.follow.setAttribute('aria-pressed',String(i>0));}
+function followCamera(){
+ const key=FOLLOW[state.follow||0][0];if(!key||!state.regiments)return;
+ const c=key==='cav'?centreOf({men:state.squadrons?liveRiders(state.squadrons[0]):[]}):centreOf(state.regiments[key==='fr'?0:1]);
+ const p=project(c.x,c.y);
+ state.camX+=(p.x-state.camX)*0.12;state.camY+=(p.y-state.camY)*0.12;
+}
+
 // Pan with one pointer, pinch or wheel to zoom around the gesture centre.
 const pointers=new Map();let pinch=null;
 const toWorld=(x,y)=>({x:(x-view.clientWidth/2)/state.zoom+state.camX,y:(y-view.clientHeight/2)/state.zoom+state.camY});
-view.addEventListener('pointerdown',e=>{view.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+view.addEventListener('pointerdown',e=>{if(minimapHit(e))return;view.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
  if(pointers.size===2){const[a,b]=[...pointers.values()],r=view.getBoundingClientRect();
    pinch={dist:Math.hypot(a.x-b.x,a.y-b.y),zoom:state.zoom,anchor:toWorld((a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top)};}});
 view.addEventListener('pointermove',e=>{const p=pointers.get(e.pointerId);if(!p)return;
@@ -1009,7 +1047,7 @@ view.addEventListener('pointermove',e=>{const p=pointers.get(e.pointerId);if(!p)
    state.zoom=Math.min(3,Math.max(.35,pinch.zoom*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(10,pinch.dist)));
    const cx=(a.x+b.x)/2-r.left,cy=(a.y+b.y)/2-r.top;
    state.camX=pinch.anchor.x-(cx-r.width/2)/state.zoom;state.camY=pinch.anchor.y-(cy-r.height/2)/state.zoom;state.customZoom=true;}
- else if(pointers.size===1&&!pinch){state.camX-=dx/state.zoom;state.camY-=dy/state.zoom;}});
+ else if(pointers.size===1&&!pinch){state.camX-=dx/state.zoom;state.camY-=dy/state.zoom;if(state.follow)setFollow(0);}});
 const up=e=>{pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;};
 view.addEventListener('pointerup',up);view.addEventListener('pointercancel',up);
 view.addEventListener('wheel',e=>{e.preventDefault();const r=view.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,a=toWorld(x,y);
@@ -1057,6 +1095,7 @@ ui.halt.addEventListener('click',()=>setHalt(!state.halted));
 ui.fire.addEventListener('click',()=>setFire(!state.firing));
 ui.charge.addEventListener('click',setCharge);
 ui.cav.addEventListener('click',setCavCharge);
+ui.follow.addEventListener('click',()=>setFollow(((state.follow||0)+1)%FOLLOW.length));
 ui.sound.addEventListener('click',()=>{
  if(!audio)return;
  const on=audio.setOn(!audio.isOn());
@@ -1067,7 +1106,7 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'337.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'338.0',state,
  getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -1084,6 +1123,7 @@ window.__GRAPHICS_LAB_ISO__={version:'337.0',state,
    riders:state.squadrons?state.squadrons.reduce((n,sq)=>n+liveRiders(sq).length,0):0,ridersDrawn:state.ridersDrawn||0,
    cavStates:{...(state.cavStates||{})},cavCharge:state.cavCharge?state.cavCharge.phase:null,
    riderFalls:state.riderFalls,sabreHits:state.sabreHits,
+   minimap:!!state.minimapRect,follow:FOLLOW[state.follow||0][0],cam:{x:state.camX,y:state.camY},half:state.terrain?state.terrain.half:0,
    cavCounter:state.cavCounter?state.cavCounter.phase:null,squareShots:state.squareShots,clashes:state.clashes,
    recoiled:state.batteries?state.batteries.filter(g=>g.recoil>0.5).length:0,
    charge:state.charge?state.charge.phase:null,loser:state.charge&&state.charge.loser!==null?['fr','br'][state.charge.loser]:null,
