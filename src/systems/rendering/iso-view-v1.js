@@ -775,8 +775,8 @@
     }
   }
   // ---- fog of war, in three shades as in the classic RTS games ----
-  // Never seen: a dark, cloudy mist. Seen before (the game's explored cells): a
-  // light veil - ground, roads and villages show, men do not. In sight: clear.
+  // Never seen: under drifting clouds. Seen before (the game's explored cells):
+  // a thin haze - ground, roads and villages show, men do not. In sight: clear.
   // Edges are round and soft (explored cells as overlapping discs, blurred),
   // every shape lies on the relief, and redraws are blended into each other.
   // Two mist canvases: the newest and the one before, blended over the time
@@ -787,24 +787,38 @@
   const seenLayer = document.createElement('canvas'), seenCtx = seenLayer.getContext('2d');
   const sightLayer = document.createElement('canvas'), sightCtx = sightLayer.getContext('2d');
   const FOG_SOFT = 'filter' in fogCtx2;
-  const SEEN_VEIL = 0.5;    // share of the mist lifted over ground seen before
-  // A tiling cloud texture (value noise, two octaves) laid in world space.
-  function cloudTile() {
-    if (view.cloud !== undefined) return view.cloud;
-    const N = 128, g = 8, rnd = [], c = document.createElement('canvas'); c.width = c.height = N;
-    for (let i = 0; i < g * g * 2; i++) rnd.push(hash(i, 811));
-    const at = (o, x, y) => rnd[o + ((y % g + g) % g) * g + ((x % g + g) % g)];
-    const noise = (o, u, v) => { const x = Math.floor(u), y = Math.floor(v), fx = u - x, fy = v - y,
-      sx2 = fx * fx * (3 - 2 * fx), sy2 = fy * fy * (3 - 2 * fy);
-      return (at(o, x, y) * (1 - sx2) + at(o, x + 1, y) * sx2) * (1 - sy2) + (at(o, x, y + 1) * (1 - sx2) + at(o, x + 1, y + 1) * sx2) * sy2; };
-    const cx = c.getContext('2d'), img = cx.createImageData(N, N);
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const n = 0.65 * noise(0, x / N * g, y / N * g) + 0.35 * noise(g * g, (x / N * g * 2) % g, (y / N * g * 2) % g), i = (y * N + x) * 4;
-      img.data[i] = 10 + n * 16; img.data[i + 1] = 14 + n * 18; img.data[i + 2] = 19 + n * 20; img.data[i + 3] = 255 * (0.8 + n * 0.14);
-    }
-    cx.putImageData(img, 0, 0);
-    view.cloud = fogCtx2.createPattern(c, 'repeat');
-    return view.cloud;
+  const SEEN_VEIL = 0.66;   // share of the cloud lifted over ground seen before (a thin haze stays)
+  // Cloud textures: tiling fractal noise (five octaves), lit from the upper left
+  // like the props - bright tops, blue-grey undersides - and thicker where the
+  // noise is high. 'base' is the deck of cloud, 'wisp' a lighter, finer layer
+  // drifting over it.
+  function cloudTiles() {
+    if (view.clouds !== undefined) return view.clouds;
+    const N = 256, g = 4, rnd = [];
+    for (let i = 0; i < 4096; i++) rnd.push(hash(i, 1811));
+    const noise = (o, u, v, p) => { const x = Math.floor(u), y = Math.floor(v), fx = u - x, fy = v - y,
+      ax = fx * fx * (3 - 2 * fx), ay = fy * fy * (3 - 2 * fy), at = (i, j) => rnd[(o + ((j % p + p) % p) * p + ((i % p + p) % p)) % 4096];
+      return (at(x, y) * (1 - ax) + at(x + 1, y) * ax) * (1 - ay) + (at(x, y + 1) * (1 - ax) + at(x + 1, y + 1) * ax) * ay; };
+    const fbm = (o, x, y) => { let n = 0, amp = 0.5, p = g;
+      for (let k = 0; k < 5; k++) { n += amp * noise(o + k * 997, x / N * p, y / N * p, p); amp *= 0.5; p *= 2; }
+      return n / 0.97; };
+    const make = (o, dense) => {
+      const c = document.createElement('canvas'); c.width = c.height = N;
+      const cx = c.getContext('2d'), img = cx.createImageData(N, N), F = new Float32Array(N * N);
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) F[y * N + x] = fbm(o, x, y);
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const n = F[y * N + x], up = F[((y - 3 + N) % N) * N + (x - 3 + N) % N];
+        // Light: brighter where the cloud rises towards the sun (upper left).
+        const lit = Math.max(0, Math.min(1, 0.58 + (n - up) * 6.5 + (n - 0.5) * 0.9)), i = (y * N + x) * 4;
+        img.data[i] = 104 + lit * 146; img.data[i + 1] = 114 + lit * 138; img.data[i + 2] = 134 + lit * 120;
+        const thick = Math.max(0, Math.min(1, dense ? 0.55 + (n - 0.42) * 2.2 : (n - 0.45) * 2.6));
+        img.data[i + 3] = 255 * (dense ? 0.86 + 0.14 * thick : 0.75 * thick);
+      }
+      cx.putImageData(img, 0, 0);
+      return mixCtx.createPattern(c, 'repeat');
+    };
+    view.clouds = { base: make(0, true), wisp: make(5003, false) };
+    return view.clouds;
   }
   // The fog canvas reaches FOG_M (half-size px) past each screen edge, so while
   // the camera pans it is shifted and only redrawn every 60 ms.
@@ -830,12 +844,10 @@
       fog = fog === fogA ? fogB : fogA; fogCtx2 = fog.getContext('2d');
       view.fogCam = { x: camera.x, y: camera.y, zoom: camera.zoom }; view.fogAt = now;
       const pad = 2 * FOG_M + 2 * PPM * z(), a = isoScreenToWorld(-pad, -pad), b = flatScreenToWorld(innerWidth + pad, innerHeight + pad);
-      // Mist, its clouds fixed to the ground (a tile is 900 game px).
+      // The cover mask: full where never seen, part where seen before, none in sight.
       const f = fogCtx2;
       f.globalCompositeOperation = 'source-over'; f.globalAlpha = 1; f.filter = 'none'; f.clearRect(0, 0, w, h);
-      const pat = cloudTile(), k = 900 * z() / 2 / 128;
-      if (pat && pat.setTransform && typeof DOMMatrix === 'function') pat.setTransform(new DOMMatrix().translate(sx(0) / 2 + FOG_M, sy(0) / 2 + FOG_M).scale(k, k * SQ));
-      f.fillStyle = pat && pat.setTransform ? pat : 'rgba(6,9,12,.86)'; f.fillRect(0, 0, w, h);
+      f.fillStyle = '#fff'; f.fillRect(0, 0, w, h);
       // Ground seen before: a disc on every explored cell on screen (they overlap
       // into a rounded outline), lifted onto the relief.
       seenCtx.clearRect(0, 0, w, h); seenCtx.fillStyle = '#000'; seenCtx.beginPath();
@@ -873,14 +885,44 @@
     const off = cam => [(cam.x - camera.x) * z() / 2, (cam.y - camera.y) * z() * SQ / 2];
     const t = view.fogPrev ? Math.min(1, (now - view.fogAt) / view.fogFade) : 1;
     const [ox, oy] = off(view.fogCam);
-    if (t >= 1) { ctx.drawImage(fog, 2 * ox - 2 * FOG_M, 2 * oy - 2 * FOG_M, fog.width * 2, fog.height * 2); return; }
-    const [px, py] = off(view.fogPrev.cam);
     mixCtx.globalCompositeOperation = 'source-over'; mixCtx.globalAlpha = 1; mixCtx.clearRect(0, 0, w, h);
-    mixCtx.globalCompositeOperation = 'lighter';
-    mixCtx.globalAlpha = 1 - t; mixCtx.drawImage(view.fogPrev.canvas, px, py);
-    mixCtx.globalAlpha = t; mixCtx.drawImage(fog, ox, oy);
-    mixCtx.globalCompositeOperation = 'source-over'; mixCtx.globalAlpha = 1;
-    ctx.drawImage(fogMix, -2 * FOG_M, -2 * FOG_M, w * 2, h * 2);
+    if (t >= 1) mixCtx.drawImage(fog, ox, oy);
+    else {
+      const [px, py] = off(view.fogPrev.cam);
+      mixCtx.globalCompositeOperation = 'lighter';
+      mixCtx.globalAlpha = 1 - t; mixCtx.drawImage(view.fogPrev.canvas, px, py);
+      mixCtx.globalAlpha = t; mixCtx.drawImage(fog, ox, oy);
+      mixCtx.globalCompositeOperation = 'source-over'; mixCtx.globalAlpha = 1;
+    }
+    drawClouds(now, w, h);
+  }
+  // Clouds through the cover mask: a deck and a lighter layer of wisps, each
+  // drifting with the wind at its own speed, and their shadow on the ground
+  // just below and to the right (the sun is upper left).
+  const cloudCv = document.createElement('canvas'), cloudCtx = cloudCv.getContext('2d');
+  const shadeCv = document.createElement('canvas'), shadeCtx = shadeCv.getContext('2d');
+  // Drawn at a quarter of the screen size (half the mask's): clouds are soft anyway.
+  function drawClouds(now, mw, mh) {
+    const w = Math.ceil(mw / 2), h = Math.ceil(mh / 2), M = FOG_M / 2;
+    for (const c of [cloudCv, shadeCv]) if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    const T = cloudTiles(), sec = now / 1000, ok = T.base && T.base.setTransform && typeof DOMMatrix === 'function';
+    const layer = (pat, span, vx, vy) => {
+      const k = span * z() / 4 / 256, dx = (sec * vx) % span, dy = (sec * vy) % span;
+      pat.setTransform(new DOMMatrix().translate(sx(dx) / 4 + M, sy(dy) / 4 + M).scale(k, k * SQ));
+      cloudCtx.fillStyle = pat; cloudCtx.fillRect(0, 0, w, h);
+    };
+    cloudCtx.globalCompositeOperation = 'source-over'; cloudCtx.globalAlpha = 1; cloudCtx.clearRect(0, 0, w, h);
+    if (ok) { layer(T.base, 2600, 9, 2); cloudCtx.globalAlpha = 0.8; layer(T.wisp, 1000, 16, -3); cloudCtx.globalAlpha = 1; }
+    else { cloudCtx.fillStyle = '#c9cfd6'; cloudCtx.fillRect(0, 0, w, h); }
+    cloudCtx.globalCompositeOperation = 'destination-in'; cloudCtx.drawImage(fogMix, 0, 0, w, h);
+    cloudCtx.globalCompositeOperation = 'source-over';
+    // Shadow: the cover, dark and faint, offset down-right.
+    shadeCtx.globalCompositeOperation = 'source-over'; shadeCtx.clearRect(0, 0, w, h);
+    shadeCtx.fillStyle = 'rgba(12,18,28,.32)'; shadeCtx.fillRect(0, 0, w, h);
+    shadeCtx.globalCompositeOperation = 'destination-in'; shadeCtx.drawImage(fogMix, 0, 0, w, h);
+    const so = Math.max(3, 14 * z());
+    ctx.drawImage(shadeCv, -2 * FOG_M + so, -2 * FOG_M + so * 1.6, w * 4, h * 4);
+    ctx.drawImage(cloudCv, -2 * FOG_M, -2 * FOG_M, w * 4, h * 4);
   }
   // Height gives sight: on high ground a man sees farther (up to half as far
   // again on a hilltop), on the relief of this map (iso view only).
