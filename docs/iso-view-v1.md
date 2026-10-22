@@ -32,6 +32,26 @@ weergave van dezelfde wereld.
   buiten zicht worden niet getekend, net als in 2D.
 - Selectieringen, het sleepkader en de minimap van de game.
 
+## Dorpen (Blender)
+
+- De 224 dorpshuizen van de game (`VILLAGE_SCENERY_V4`) staan er als Blender-gebouwen:
+  huisje, boerderij (met achtervleugel), schuur, herberg (met vleugel en uithangbord) en
+  kapel (met dwarsschip en vieringtoren), elk in **16 draaihoeken**
+  (`scripts/render-iso-village.py` → `graphics-lab/assets/iso/village/`). De modellen
+  volgen de verhoudingen en vleugels van de 2D-plattegrond van de game.
+- **Variatie:** de helft van de huisjes is witgekalkt onder rode pannen, een deel van de
+  boerderijen is van steen onder leien.
+- **Voordeur naar de weg:** de voorkant wijst naar het toegangspunt van het huis op de
+  weg (194 van de 224 huizen hebben dat recht voor; de rest aan de zijgevel).
+- **Aankleding** (vast per dorp, vrij van wegen, rivier en muren): een put bij het
+  dorpsplein, hooibergen achter boerderijen en schuren, fruitbomen in de achtertuinen,
+  een heg achter huisjes en een hek achter boerderijen.
+- **Rook** uit de meeste schoorstenen, dun en met de wind mee.
+- Bij het bakken van het terrein worden de platte daken weggeknipt; de tuinen blijven.
+- Dorpshuizen zijn in de game ongeveer een derde van ware grootte naast de soldaten;
+  ze worden 2× hun voetafdruk getekend (`VILLAGE_SCALE`). Waar mannen kunnen lopen
+  blijft door de voetafdruk van de game bepaald.
+
 ## Schaal
 
 In linie staan de mannen in de game 18 px uit elkaar en in het lab 0,8 m: 1 m is
@@ -63,8 +83,8 @@ weergaven; terug in 2D begint de terreincache opnieuw.
 
 ## Nog niet (volgende stappen)
 
-1. Terrein en dorpen opnieuw in Blender renderen; de huizen zijn nu nog platte daken
-   van de 2D-kaart.
+1. Het terrein zelf (gras, akkers, bossen, rivier) in Blender renderen; nu is dat nog
+   de 2D-kaart plat op de grond. De dorpen zijn wel al Blender (zie boven).
 2. De bediening uit het lab (vlaggetjes, draaien, aanvalsdoel) koppelen aan de bevelen
    van de game, en het pannen met slepen ook verticaal op iso-snelheid.
 3. Boeren-sprites, geluid uit het lab, en tekenen via de GPU voor 520 eenheden op

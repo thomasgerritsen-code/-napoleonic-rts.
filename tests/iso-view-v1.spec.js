@@ -119,3 +119,24 @@ test('iso view: a fallen soldier stays on the field as a body', async ({ page })
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().corpses > 0);
   expect(errors).toEqual([]);
 });
+
+test('iso view: villages stand as Blender buildings facing their road, with yards dressed and chimneys smoking', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-village&view=iso');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().villageKinds >= 9, null, { timeout: 60_000 });
+  // Look at the first village (with a few French horse there so the fog lifts).
+  await page.evaluate(() => {
+    const v = (window.VILLAGE_SCENERY_V4 || window.__VILLAGE_SCENERY_V4_DATA__)[0];
+    for (let i = 0; i < 4; i++) createUnit('france', 'cavalry', v.x + i * 20, v.y + 120);
+    camera.x = v.x; camera.y = v.y + 40; camera.zoom = 1.1;
+  });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().houses > 5 && window.__ISO_VIEW_V1__.stats().dressing > 5);
+  const s = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
+  expect(s.villageHouses).toBeGreaterThan(100);
+  expect(s.dressingItems).toBeGreaterThan(100);
+  // Every house with a gate in front of it has its door on that side.
+  const doors = await page.evaluate(() => window.__ISO_VIEW_V1__.doorCheck());
+  expect(doors.filter(d => d < -0.5)).toEqual([]);
+  expect(doors.filter(d => d > 0.5).length).toBeGreaterThan(doors.length * 0.7);
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().chimneySmoke > 0);
+  expect(errors).toEqual([]);
+});
