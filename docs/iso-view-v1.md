@@ -49,8 +49,21 @@ weergave van dezelfde wereld.
 - **Rook** uit de meeste schoorstenen, dun en met de wind mee.
 - Bij het bakken van het terrein worden de platte daken weggeknipt; de tuinen blijven.
 - Dorpshuizen zijn in de game ongeveer een derde van ware grootte naast de soldaten;
-  ze worden 2× hun voetafdruk getekend (`VILLAGE_SCALE`). Waar mannen kunnen lopen
+  ze worden 1,6× hun voetafdruk getekend (`VILLAGE_SCALE`). Waar mannen kunnen lopen
   blijft door de voetafdruk van de game bepaald.
+
+## Overzicht in het gevecht
+
+- Onder elke soldaat, ruiter en elk kanon ligt een **ring in de kleur van zijn kant**
+  (blauw Frans, rood Brits).
+- **Decor wordt doorzichtig** (32%) zodra er een soldaat achter staat: huizen,
+  kazernes, bomen en dorpsaankleding.
+- **Kruitdamp** is kleiner en dunner, zodat je de mannen erdoor blijft zien.
+- **Minder drukte**: dorpshuizen 1,6× hun voetafdruk (was 2×); minder fruitbomen,
+  heggen en hekken.
+- **👁 Overzicht** (knop rechtsboven): decor half doorzichtig, geen dorpsaankleding en
+  geen schoorsteenrook, kruitdamp nog dunner. Ver uitgezoomd (zoom < 0,55) verdwijnen
+  aankleding en schoorsteenrook vanzelf.
 
 ## Schaal
 

@@ -22,10 +22,16 @@
   // soldiers; drawn at their footprint they would be shorter than a man. They are
   // drawn this much larger than the footprint (the footprint still decides where
   // men can walk).
-  const VILLAGE_SCALE = 2.0;
+  const VILLAGE_SCALE = 1.6;
+  // Readability: scenery in front of soldiers turns see-through, and below this
+  // zoom (or with Overzicht on) the small village dressing and chimney smoke go.
+  const COVER_ALPHA = 0.32, OVERVIEW_ALPHA = 0.5, DETAIL_ZOOM = 0.55;
+  const detailed = () => !view.overview && z() >= DETAIL_ZOOM;
+  // Screen box of a sprite drawn at (X, Y) with its pivot, for the see-through test.
+  const box = (X, Y, px, py, w, h, k) => [X - px * k, Y - py * k, X + (w - px) * k, Y + (h - py) * k];
   const view = { on: true, atlases: {}, props: {}, village: null, dressing: null, chimneyAt: new Map(), chimneySmoke: [], info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(),
     tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), miniAt: 0, fogAt: 0,
-    stats: { renderMs: 0, houses: 0, dressing: 0, chimneySmoke: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
+    stats: { renderMs: 0, seeThrough: 0, houses: 0, dressing: 0, chimneySmoke: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
 
   const hash = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; h ^= h >>> 13;
     return (Math.imul(h, 1103515245) >>> 0) / 4294967296; };
@@ -113,10 +119,9 @@
     const X = sx(house.x), Y = sy(house.y), reach = house.w * VILLAGE_SCALE * z();
     if (X < -reach || X > innerWidth + reach || Y < -reach * 0.6 || Y > innerHeight + reach * 1.4) return null;
     const heading = headingOf(house, V.headings), f = meta.frames[heading];
-    chimneys(house, kind, meta, heading);
-    return { y: house.y, draw: () => {
-      // Screen pixels per sheet pixel.
-      const k = houseScale(house, meta) * z() / V.pxPerM;
+    if (detailed()) chimneys(house, kind, meta, heading);
+    const k = houseScale(house, meta) * z() / V.pxPerM;
+    return { y: house.y, box: box(X, Y, f.px, f.py, f.w, f.h, k), draw: () => {
       ctx.drawImage(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k);
       view.stats.houses++;
     } };
@@ -161,12 +166,12 @@
           const p = at((r - 0.4) * h.w * VILLAGE_SCALE, depth + 22);
           if (clearSpot(p.x, p.y, 10, near)) items.push({ prop: 'haystack', ...p, scale: 0.85 + r * 0.3 });
         }
-        if (!farm && h.kind !== 'chapel' && r > 0.3) {
+        if (!farm && h.kind !== 'chapel' && r > 0.6) {
           const p = at((0.5 - r) * h.w * 1.2, depth + 26);
           if (clearSpot(p.x, p.y, 12, near)) items.push({ prop: r > 0.75 ? 'poplar' : 'oak', ...p, scale: 0.42 + r * 0.12 });
         }
         // The back of the plot: a hedge behind cottages, a fence behind farms.
-        if (h.kind !== 'chapel' && r > 0.15) {
+        if (h.kind !== 'chapel' && r > 0.5) {
           const p = at(0, depth + 42), half = 3 * DRESS_PPM;
           const a = { x: p.x - c * half, y: p.y - s * half }, b = { x: p.x + c * half, y: p.y + s * half };
           if (clearSpot(p.x, p.y, 6, near) && clearSpot(a.x, a.y, 6, near) && clearSpot(b.x, b.y, 6, near))
@@ -177,11 +182,13 @@
     return items;
   }
   function dressingDrawable(it) {
+    if (!detailed()) return null;
     const X = sx(it.x), Y = sy(it.y);
     if (X < -150 || X > innerWidth + 150 || Y < -60 || Y > innerHeight + 220) return null;
     if (it.prop) {
       const prop = view.props[it.prop]; if (!prop) return null;
-      return { y: it.y, draw: () => { const k = DRESS_PPM * it.scale * z() / SPRITE_PPM;
+      const k = DRESS_PPM * it.scale * z() / SPRITE_PPM;
+      return { y: it.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
         ctx.drawImage(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.dressing++; } };
     }
     const V = view.village, meta = V && V.kinds[it.edge]; if (!meta) return null;
@@ -347,7 +354,7 @@
     for (let i = 0; i < n; i++) {
       const s = hash(u.id + i * 7, Math.floor(now * 10));
       view.smoke.push({ wx: u.x + Math.cos(a) * (reach + i * 0.6) * PPM, wy: u.y + Math.sin(a) * (reach + i * 0.6) * PPM,
-        h: height, born: now, life: (gun ? 6 : 4) + s * 2, size: (gun ? 1.6 : 0.55) + s * (gun ? 1.2 : 0.4), seed: s });
+        h: height, born: now, life: (gun ? 5 : 3) + s * 1.5, size: (gun ? 1.1 : 0.35) + s * (gun ? 0.8 : 0.25), seed: s });
     }
     if (gun) view.gunFire.set(u.regimentId || u.id, now);
     if (view.smoke.length > SMOKE_MAX) view.smoke.splice(0, view.smoke.length - SMOKE_MAX);
@@ -431,11 +438,11 @@
     if (b.type === 'farm') return { y: b.y, draw: () => drawFarm(b) };
     const base = BUILDING_PROP[b.type] || 'cottage', kind = base === 'barracks' ? 'barracks_' + (b.side === 'france' ? 'fr' : 'br') : base;
     const prop = view.props[kind]; if (!prop) return null;
-    return { y: b.y + b.h * 0.3, draw: () => {
-      // Fit the rendered building to the game's footprint (a little larger: the
-      // props carry their eaves and yard beyond the walls).
-      const k = b.w * z() * 1.45 / prop.w;
-      ctx.globalAlpha = b.complete === false ? 0.45 + 0.5 * (b.construction || 0) : 1;
+    // Fit the rendered building to the game's footprint (a little larger: the
+    // props carry their eaves and yard beyond the walls).
+    const k = b.w * z() * 1.45 / prop.w;
+    return { y: b.y + b.h * 0.3, box: box(sx(b.x), sy(b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+      ctx.globalAlpha *= b.complete === false ? 0.45 + 0.5 * (b.construction || 0) : 1;
       ctx.drawImage(prop.image, sx(b.x) - prop.pivot.x * k, sy(b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       ctx.globalAlpha = 1; view.stats.props++;
     } };
@@ -451,7 +458,8 @@
     if (r.dead || r.amount <= 0) return null;
     if (r.type === 'wood') {
       const prop = view.props[hash(r.id, 3) < 0.65 ? 'oak' : 'poplar']; if (!prop) return null;
-      return { y: r.y, draw: () => { const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25);
+      const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25);
+      return { y: r.y, box: box(sx(r.x), sy(r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
         ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, sy(r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
     }
     if (r.type === 'iron') return { y: r.y, draw: () => drawRock(r) };
@@ -495,9 +503,10 @@
     view.smoke = view.smoke.filter(s => now - s.born < s.life);
     const img = puff('m'), wind = 0.35;
     for (const s of view.smoke) {
-      const age = (now - s.born) / s.life, r = (s.size + age * 2.2) * PPM * z();
+      // Smoke stays thin enough to see the men through it (thinner still in Overzicht).
+      const age = (now - s.born) / s.life, r = (s.size + age * 1.2) * PPM * z();
       const x = sx(s.wx + wind * (now - s.born) * PPM), y = sy(s.wy) - (s.h + age * 1.6) * LIFT * PPM * z();
-      ctx.globalAlpha = (1 - age) * 0.75; ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
+      ctx.globalAlpha = (1 - age) * (view.overview ? 0.22 : 0.42); ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
     }
     ctx.globalAlpha = 1; view.stats.smoke = view.smoke.length;
   }
@@ -560,7 +569,12 @@
       if (!visible(u)) continue;
       const X = sx(u.x), Y = sy(u.y);
       if (X < -80 || X > innerWidth + 80 || Y < -40 || Y > innerHeight + 140) continue;
-      list.push({ y: u.y, draw: () => {
+      const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
+      list.push({ y: u.y, unit: { x: X, y: Y - lift, wy: u.y }, draw: () => {
+        // A faint ring in the side's colour under every man, horse and gun.
+        const rr = (u.type === 'cavalry' ? 0.95 : u.type === 'artillery' ? 1.1 : 0.42) * PPM * z();
+        ctx.fillStyle = u.side === 'france' ? 'rgba(70,110,230,.38)' : 'rgba(225,60,50,.38)';
+        ctx.beginPath(); ctx.ellipse(X, Y, rr, rr * SQ, 0, 0, 7); ctx.fill();
         if (u.type === 'worker') { drawWorker(u, m); return; }
         const [key, anim, f] = frameFor(u, m, t);
         // Until its atlas has loaded a unit is simply not drawn yet.
@@ -591,9 +605,18 @@
     }
     drawSelection();
     list.sort((p, q) => p.y - q.y);
-    for (const d of list) d.draw();
+    const men = list.filter(d => d.unit).map(d => d.unit);
+    st.seeThrough = 0;
+    for (const d of list) {
+      if (!d.box) { d.draw(); continue; }
+      // Scenery with a soldier behind it (inside its picture) turns see-through.
+      const [x0, y0, x1, y1] = d.box, ix = (x1 - x0) * 0.12, iy = (y1 - y0) * 0.08;
+      let a = view.overview ? OVERVIEW_ALPHA : 1;
+      for (const p of men) if (p.wy < d.y && p.x > x0 + ix && p.x < x1 - ix && p.y > y0 + iy && p.y < y1 - iy) { a = Math.min(a, COVER_ALPHA); st.seeThrough++; break; }
+      ctx.globalAlpha = a; d.draw(); ctx.globalAlpha = 1;
+    }
     drawProjectiles();
-    drawChimneySmoke(t);
+    if (detailed()) drawChimneySmoke(t);
     drawSmoke(t);
     drawFog();
     drawDragBox();
@@ -647,6 +670,7 @@
     if (!on) { try { global.__DESKTOP_TERRAIN_TILES_V301__?.invalidate?.(); } catch (_) {} }
     button.textContent = on ? '🗺 2D-kaart' : '🏰 Iso-weergave';
     button.setAttribute('aria-pressed', String(on));
+    if (typeof overview !== 'undefined') overview.style.display = on ? '' : 'none';
   }
   const button = document.createElement('button');
   button.id = 'isoViewToggle'; button.type = 'button';
@@ -654,6 +678,16 @@
     'background:rgba(16,20,17,.86);color:#f5f1e8;font:650 13px system-ui,sans-serif;cursor:pointer';
   button.addEventListener('click', () => setOn(!view.on));
   document.body.appendChild(button);
+  // Overzicht: decoration dimmed and the small village detail hidden, for a clear view of the battle.
+  const overview = document.createElement('button');
+  overview.id = 'isoOverviewToggle'; overview.type = 'button';
+  overview.style.cssText = 'position:fixed;z-index:40;top:58px;right:136px;padding:6px 10px;border-radius:8px;border:1px solid rgba(244,216,109,.55);' +
+    'background:rgba(16,20,17,.86);color:#f5f1e8;font:650 13px system-ui,sans-serif;cursor:pointer';
+  const setOverview = on => { view.overview = on; overview.textContent = on ? '👁 Overzicht: aan' : '👁 Overzicht: uit';
+    overview.setAttribute('aria-pressed', String(on)); };
+  overview.addEventListener('click', () => setOverview(!view.overview));
+  document.body.appendChild(overview);
+  setOverview(false);
   // Other layers may be created after this file runs: hide them as they appear.
   new MutationObserver(() => { if (view.on) for (const c of otherLayers()) c.style.visibility = 'hidden'; })
     .observe(document.body, { childList: true, subtree: true });
@@ -662,9 +696,9 @@
 
   global.__ISO_VIEW_V1__ = Object.freeze({
     version: 'iso-view-v1', optIn: 'view=iso',
-    isOn: () => view.on, setOn,
+    isOn: () => view.on, setOn, setOverview,
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
-      tiles: view.tiles.size, info: view.info.size, villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
+      tiles: view.tiles.size, info: view.info.size, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
       villageHouses: villageHouses().length, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
     screenOf: (wx, wy) => ({ x: sx(wx), y: sy(wy) }),
     // Door direction of each village house against its gate on the road (for tests).

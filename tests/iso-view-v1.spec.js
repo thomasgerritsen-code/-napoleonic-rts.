@@ -140,3 +140,31 @@ test('iso view: villages stand as Blender buildings facing their road, with yard
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().chimneySmoke > 0);
   expect(errors).toEqual([]);
 });
+
+test('iso view: soldiers stay readable - side rings, scenery in front of them turns see-through, Overzicht dims the rest', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-clear&view=iso');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().villageKinds >= 9, null, { timeout: 60_000 });
+  // A line of French foot just behind (north of) a village house.
+  await page.evaluate(() => {
+    const h = (window.VILLAGE_SCENERY_V4 || window.__VILLAGE_SCENERY_V4_DATA__)[0].houses[0];
+    for (let i = 0; i < 8; i++) createUnit('france', 'infantry', h.x - 60 + i * 18, h.y - 14);
+    camera.x = h.x; camera.y = h.y; camera.zoom = 1.1;
+  });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().seeThrough > 0);
+  expect((await page.evaluate(() => window.__ISO_VIEW_V1__.stats())).detailed).toBe(true);
+  await page.locator('#isoOverviewToggle').click();
+  await expect(page.locator('#isoOverviewToggle')).toHaveText('👁 Overzicht: aan');
+  let s = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
+  expect(s.overview).toBe(true);
+  expect(s.detailed).toBe(false);
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().dressing === 0);
+  // Far out the small village detail goes by itself.
+  await page.locator('#isoOverviewToggle').click();
+  await page.evaluate(() => { camera.zoom = 0.45; });
+  s = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
+  expect(s.detailed).toBe(false);
+  // In the 2D map the Overzicht button is hidden.
+  await page.locator('#isoViewToggle').click();
+  await expect(page.locator('#isoOverviewToggle')).toBeHidden();
+  expect(errors).toEqual([]);
+});
