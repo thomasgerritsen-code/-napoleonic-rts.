@@ -103,8 +103,40 @@ def v_chapel(root):
         part("box", (0.9, 0.07, 1.4), (0, y + s * 0.03, th - 2.0), M("#20262d", "plain", 0.3), root, name="belfry")
 
 
+# Second styles so a village is not one house repeated: a whitewashed cottage
+# under red tiles, and a stone farmhouse under slate.
+def v_cottage2(root):
+    w, d, h = 6.5, 4.0, 3.3
+    house(root, w, d, h, "#e8e0cc", "#a2482f", roof_pat="tiles", roof_h=2.5, chimneys=(2.0,), overhang=0.45)
+    windows(root, w, d, (1.9,), 2, frame="#efe8d8", shutters="#47604a")
+    door(root, -0.9, -d / 2 - 0.08, 1.0, 1.9, "#5a3a26")
+
+
+def v_farmhouse2(root):
+    w, d, h = 9.0, 4.8, 4.6
+    house(root, w, d, h, "#b9ae98", "#5e646d", roof_pat="slate", roof_h=2.9, wall_pat="wall", chimneys=(-2.8, 2.8))
+    windows(root, w, d, (1.8, 3.5), 3, frame="#ddd5c2", shutters="#6b4a32")
+    door(root, 0.0, -d / 2 - 0.08, 1.2, 2.1)
+    wing(root, -0.27 * w, 0.53 * d + 0.4, 0.43 * w, 0.78 * d, 3.5, "#ada28c", "#585e66",
+         roof_pat="slate", roof_h=2.2, wall_pat="wall")
+
+
+# Yard edges: a post-and-rail fence and a hawthorn hedge, 6 m long along x.
+def v_fence(root):
+    for x in (-3, -1.5, 0, 1.5, 3):
+        part("box", (0.14, 0.14, 1.2), (x, 0, 0.6), M("#6a5038", "bark", 0.95), root, name="post")
+    for z in (0.45, 0.95):
+        part("box", (6.1, 0.07, 0.12), (0, 0, z), M("#7a5c40", "planks", 0.95), root, name="rail")
+
+
+def v_hedge(root):
+    for i, x in enumerate((-2.4, -0.8, 0.8, 2.4)):
+        props.blob(root, 0.95, (x, 0, 0.75), "#466628" if i % 2 else "#4f6f2d", "#67843a", 0.22).scale = (1.15, 0.7, 0.9)
+
+
 KINDS = {"cottage": (v_cottage, 6.5), "farmhouse": (v_farmhouse, 9.0), "barn": (v_barn, 10.0),
-         "inn": (v_inn, 11.0), "chapel": (v_chapel, 12.0)}
+         "inn": (v_inn, 11.0), "chapel": (v_chapel, 12.0), "cottage2": (v_cottage2, 6.5),
+         "farmhouse2": (v_farmhouse2, 9.0), "fence": (v_fence, 6.0), "hedge": (v_hedge, 6.0)}
 
 
 def render_kind(kind: str, out: Path, samples: int) -> dict:

@@ -23,9 +23,9 @@
   // drawn this much larger than the footprint (the footprint still decides where
   // men can walk).
   const VILLAGE_SCALE = 2.0;
-  const view = { on: true, atlases: {}, props: {}, village: null, info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(),
+  const view = { on: true, atlases: {}, props: {}, village: null, dressing: null, chimneyAt: new Map(), chimneySmoke: [], info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(),
     tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), miniAt: 0, fogAt: 0,
-    stats: { renderMs: 0, houses: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
+    stats: { renderMs: 0, houses: 0, dressing: 0, chimneySmoke: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
 
   const hash = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; h ^= h >>> 13;
     return (Math.imul(h, 1103515245) >>> 0) / 4294967296; };
@@ -88,21 +88,138 @@
   // The model's door side is its -y; the game's road side is local -y for side > 0
   // (+y otherwise), with y pointing down: that gives the model's heading.
   function headingOf(house, n) {
-    const a = house.side > 0 ? Math.PI - house.angle : -house.angle;
+    // The front faces the house's gate on the road when the game gives one.
+    let front = house.side > 0 ? -1 : 1;
+    if (Number.isFinite(house.accessX)) {
+      const v = -(house.accessX - house.x) * Math.sin(house.angle) + (house.accessY - house.y) * Math.cos(house.angle);
+      if (Math.abs(v) > 1) front = v < 0 ? -1 : 1;
+    }
+    const a = front < 0 ? Math.PI - house.angle : -house.angle;
     return ((Math.round(a / (2 * Math.PI / n)) % n) + n) % n;
   }
+  const strHash = text => { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };
+  // Half the cottages are whitewashed under red tiles, some farmhouses are stone under slate.
+  function kindOf(house) {
+    const kinds = view.village.kinds, k = house.kind || 'cottage', r = strHash(String(house.id || house.x + ':' + house.y));
+    if (k === 'cottage' && kinds.cottage2 && r < 0.5) return 'cottage2';
+    if (k === 'farmhouse' && kinds.farmhouse2 && r < 0.4) return 'farmhouse2';
+    return k;
+  }
+  // Game pixels per model metre for a house (its footprint length, enlarged).
+  const houseScale = (house, meta) => house.w * VILLAGE_SCALE / meta.lengthM;
   function houseDrawable(house) {
-    const V = view.village, meta = V && V.kinds[house.kind || 'cottage'];
+    const V = view.village, kind = V && kindOf(house), meta = V && V.kinds[kind];
     if (!meta) return null;
     const X = sx(house.x), Y = sy(house.y), reach = house.w * VILLAGE_SCALE * z();
     if (X < -reach || X > innerWidth + reach || Y < -reach * 0.6 || Y > innerHeight + reach * 1.4) return null;
-    const f = meta.frames[headingOf(house, V.headings)];
+    const heading = headingOf(house, V.headings), f = meta.frames[heading];
+    chimneys(house, kind, meta, heading);
     return { y: house.y, draw: () => {
-      // Game pixels per model metre, then screen pixels per sheet pixel.
-      const k = house.w * VILLAGE_SCALE / meta.lengthM * z() / V.pxPerM;
+      // Screen pixels per sheet pixel.
+      const k = houseScale(house, meta) * z() / V.pxPerM;
       ctx.drawImage(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k);
       view.stats.houses++;
     } };
+  }
+
+  // ---- village dressing: wells, haystacks, orchard trees, fences and hedges ----
+  // The game draws these flat (or not at all); here they are props placed from
+  // the houses' own plots, deterministically, clear of roads, the river and walls.
+  const DRESS_PPM = PPM * 0.6;   // the village's own scale: houses are drawn at about 0.6 of life size
+  function clearSpot(x, y, r, houses) {
+    if (typeof roadNetworkAtV066 === 'function') {
+      for (const [dx, dy] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) if (roadNetworkAtV066(x + dx, y + dy)) return false;
+    }
+    if (typeof riverHitV067 === 'function') {
+      const hit = riverHitV067(x, y), half = typeof RIVER_NAV_HALF_WIDTH_V067 === 'number' ? RIVER_NAV_HALF_WIDTH_V067 : 72;
+      if (hit && hit.distance < half + r + 10) return false;
+    }
+    for (const h of houses) {
+      const c = Math.cos(h.angle), s = Math.sin(h.angle), dx = x - h.x, dy = y - h.y;
+      const u = dx * c + dy * s, v = -dx * s + dy * c;
+      if (Math.abs(u) < h.w * VILLAGE_SCALE / 2 + r && Math.abs(v) < h.h * VILLAGE_SCALE / 2 + r) return false;
+    }
+    return true;
+  }
+  function buildDressing() {
+    const villages = global.VILLAGE_SCENERY_V4 || global.__VILLAGE_SCENERY_V4_DATA__ || [];
+    const all = villages.flatMap(v => v.houses || []), items = [];
+    for (const v of villages) {
+      const seed = strHash(v.name || v.x + ':' + v.y), near = all.filter(h => Math.hypot(h.x - v.x, h.y - v.y) < 700);
+      // The village well, near the middle.
+      for (let i = 0; i < 16; i++) {
+        const a = seed * 6.283 + i * 0.785, d = 34 + (i >> 3) * 22, x = v.x + Math.cos(a) * d, y = v.y + Math.sin(a) * d;
+        if (clearSpot(x, y, 12, near)) { items.push({ prop: 'well', x, y, scale: 0.9 }); break; }
+      }
+      for (const h of v.houses || []) {
+        const r = strHash(String(h.id || h.x)), c = Math.cos(h.angle), s = Math.sin(h.angle);
+        const back = headingOf(h, 16) === ((Math.round((Math.PI - h.angle) / (Math.PI / 8)) % 16) + 16) % 16 ? 1 : -1;
+        // Behind the house: its local +y for side > 0 (the road is in front).
+        const at = (along, behind) => ({ x: h.x + c * along - s * behind * back, y: h.y + s * along + c * behind * back });
+        const depth = h.h * VILLAGE_SCALE / 2, farm = h.kind === 'farmhouse' || h.kind === 'barn';
+        if (farm && r < 0.8) {
+          const p = at((r - 0.4) * h.w * VILLAGE_SCALE, depth + 22);
+          if (clearSpot(p.x, p.y, 10, near)) items.push({ prop: 'haystack', ...p, scale: 0.85 + r * 0.3 });
+        }
+        if (!farm && h.kind !== 'chapel' && r > 0.3) {
+          const p = at((0.5 - r) * h.w * 1.2, depth + 26);
+          if (clearSpot(p.x, p.y, 12, near)) items.push({ prop: r > 0.75 ? 'poplar' : 'oak', ...p, scale: 0.42 + r * 0.12 });
+        }
+        // The back of the plot: a hedge behind cottages, a fence behind farms.
+        if (h.kind !== 'chapel' && r > 0.15) {
+          const p = at(0, depth + 42), half = 3 * DRESS_PPM;
+          const a = { x: p.x - c * half, y: p.y - s * half }, b = { x: p.x + c * half, y: p.y + s * half };
+          if (clearSpot(p.x, p.y, 6, near) && clearSpot(a.x, a.y, 6, near) && clearSpot(b.x, b.y, 6, near))
+            items.push({ edge: farm ? 'fence' : 'hedge', ...p, angle: h.angle });
+        }
+      }
+    }
+    return items;
+  }
+  function dressingDrawable(it) {
+    const X = sx(it.x), Y = sy(it.y);
+    if (X < -150 || X > innerWidth + 150 || Y < -60 || Y > innerHeight + 220) return null;
+    if (it.prop) {
+      const prop = view.props[it.prop]; if (!prop) return null;
+      return { y: it.y, draw: () => { const k = DRESS_PPM * it.scale * z() / SPRITE_PPM;
+        ctx.drawImage(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.dressing++; } };
+    }
+    const V = view.village, meta = V && V.kinds[it.edge]; if (!meta) return null;
+    const f = meta.frames[((Math.round(-it.angle / (2 * Math.PI / V.headings)) % V.headings) + V.headings) % V.headings];
+    return { y: it.y, draw: () => { const k = DRESS_PPM * z() / V.pxPerM;
+      ctx.drawImage(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k); view.stats.dressing++; } };
+  }
+
+  // ---- chimney smoke: thin, slow, drifting downwind ----
+  // Chimneys on each model (metres along its length) and their tops.
+  const CHIMNEYS = { cottage: [[-2.0, 7.1]], cottage2: [[2.0, 6.9]], farmhouse: [[2.6, 8.5]], farmhouse2: [[-2.8, 8.6], [2.8, 8.6]],
+    inn: [[-3.6, 10.5], [3.6, 10.5]] };
+  function chimneys(house, kind, meta, heading) {
+    const list = CHIMNEYS[kind]; if (!list) return;
+    const r = strHash(String(house.id || house.x) + 's'); if (r > 0.7) return;
+    const now = view.lastNow, every = 0.55 + r * 0.5;
+    const key = house.id || house.x + ':' + house.y;
+    // Each chimney starts at its own moment, then puffs at its own pace.
+    if (!view.chimneyAt.has(key)) { view.chimneyAt.set(key, now - r * every); return; }
+    if (now - view.chimneyAt.get(key) < every) return;
+    view.chimneyAt.set(key, now);
+    const s = houseScale(house, meta), psi = heading * 2 * Math.PI / view.village.headings;
+    for (const [cx, top] of list) {
+      // Model x and y axes on the game's ground (y down).
+      const wx = house.x + Math.cos(psi) * cx * s - Math.sin(psi) * 0.4 * s, wy = house.y - Math.sin(psi) * cx * s - Math.cos(psi) * 0.4 * s;
+      view.chimneySmoke.push({ wx, wy, lift: top * s * LIFT, born: now, life: 5 + r * 3, size: 0.28 * s, seed: r });
+    }
+    if (view.chimneySmoke.length > 400) view.chimneySmoke.splice(0, view.chimneySmoke.length - 400);
+  }
+  function drawChimneySmoke(now) {
+    view.chimneySmoke = view.chimneySmoke.filter(p => now - p.born < p.life);
+    const img = puff('m');
+    for (const p of view.chimneySmoke) {
+      const age = (now - p.born) / p.life, r = (p.size + age * p.size * 3) * z();
+      const x = sx(p.wx + age * p.life * 6 + Math.sin(age * 5 + p.seed * 9) * 3), y = sy(p.wy) - (p.lift + age * p.life * 9) * z();
+      ctx.globalAlpha = 0.32 * (1 - age) * Math.min(1, age * 6); ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1; view.stats.chimneySmoke = view.chimneySmoke.length;
   }
   // While the terrain is baked the village roofs are cut out (their yards stay):
   // the buildings stand there instead.
@@ -111,6 +228,8 @@
     if (!view.village || typeof drawHouseV069 !== 'function') return fn();
     const base = drawHouseV069;
     drawHouseV069 = function drawHouseYardOnlyIsoV1(house, index, village) {
+      // Kinds without a rendered sheet keep their 2D roof.
+      if (!view.village.kinds[kindOf(house)]) return base(house, index, village);
       ctx.save();
       ctx.beginPath(); ctx.rect(house.x - 4000, house.y - 4000, 8000, 8000);
       const c = Math.cos(house.angle), s = Math.sin(house.angle), rear = house.side > 0 ? 1 : -1;
@@ -430,7 +549,7 @@
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
-    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = 0;
+    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = 0;
     drawTerrain();
     const k = spriteK(), seen = new Set(), list = [];
     const visible = u => u.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance(u);
@@ -463,6 +582,8 @@
     st.corpses = view.corpses.length;
     for (const b of buildings) { const d = buildingDrawable(b); if (d) list.push(d); }
     for (const h of villageHouses()) { const d = houseDrawable(h); if (d) list.push(d); }
+    if (view.village && view.props.well && !view.dressing) view.dressing = buildDressing();
+    for (const it of view.dressing || []) { const d = dressingDrawable(it); if (d) list.push(d); }
     for (const r of resources) {
       const X = sx(r.x), Y = sy(r.y);
       if (X < -120 || X > innerWidth + 120 || Y < -30 || Y > innerHeight + 260) continue;
@@ -472,6 +593,7 @@
     list.sort((p, q) => p.y - q.y);
     for (const d of list) d.draw();
     drawProjectiles();
+    drawChimneySmoke(t);
     drawSmoke(t);
     drawFog();
     drawDragBox();
@@ -543,8 +665,14 @@
     isOn: () => view.on, setOn,
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
-      villageHouses: villageHouses().length, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
+      villageHouses: villageHouses().length, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
     screenOf: (wx, wy) => ({ x: sx(wx), y: sy(wy) }),
+    // Door direction of each village house against its gate on the road (for tests).
+    doorCheck: () => villageHouses().filter(h => Number.isFinite(h.accessX)).map(h => {
+      const psi = headingOf(h, view.village ? view.village.headings : 16) * 2 * Math.PI / (view.village ? view.village.headings : 16);
+      const fx = Math.sin(psi), fy = Math.cos(psi), gx = h.accessX - h.x, gy = h.accessY - h.y, l = Math.hypot(gx, gy) || 1;
+      return (fx * gx + fy * gy) / l;
+    }),
     bodyOf: u => ({ x: sx(u.x), y: sy(u.y) - (u.type === 'cavalry' ? 1.6 : 0.9) * LIFT * PPM * z() })
   });
 })(window);
