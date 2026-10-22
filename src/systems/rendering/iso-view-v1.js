@@ -1,0 +1,493 @@
+'use strict';
+// ---------- Iso view v1 (opt-in: ?view=iso) ----------
+// Draws the running game in the Graphics Lab's 30° camera with its Blender
+// sprites: soldiers, staff, horse, guns and crews in eight directions, trees and
+// buildings as rendered props, the game's own terrain laid flat on the ground.
+// Read-only on the simulation: no unit, order, path, combat or AI value is
+// written. Input keeps working because screenToWorld/worldToScreen are swapped
+// for the iso projection while the view is on (the 2D camera maths is an
+// axis-aligned scale, so a screen box is still a world box).
+// Without ?view=iso this file does nothing.
+(function installIsoViewV1(global) {
+  const params = new URLSearchParams(location.search);
+  if (params.get('view') !== 'iso') return;
+
+  const ASSETS = 'graphics-lab/assets/';
+  // Scale: a line's files stand 18 px apart in the game and 0.8 m apart in the lab.
+  const PPM = 22.5, SQ = 0.5, SPRITE_PPM = 128 / 3.1, LIFT = 0.866;
+  const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
+  const HD = params.has('hd');
+  const MARCH_STRIDE = 1.5, DIE_FRAME = 0.17, CORPSE_MAX = 320, SMOKE_MAX = 260;
+  const view = { on: true, atlases: {}, props: {}, info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(),
+    tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), miniAt: 0, fogAt: 0,
+    stats: { renderMs: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
+
+  const hash = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; h ^= h >>> 13;
+    return (Math.imul(h, 1103515245) >>> 0) / 4294967296; };
+  // Game facing/heading (radians, y down) -> sprite direction index.
+  const dirOf = a => ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
+
+  // ---- projection ----
+  const z = () => camera.zoom;
+  const sx = wx => (wx - camera.x) * z() + innerWidth / 2;
+  const sy = wy => (wy - camera.y) * z() * SQ + innerHeight / 2;
+  const spriteK = () => z() * PPM / SPRITE_PPM;
+  function isoScreenToWorld(px, py) {
+    return { x: (px - innerWidth / 2) / camera.zoom + camera.x, y: (py - innerHeight / 2) / (camera.zoom * SQ) + camera.y };
+  }
+  function isoWorldToScreen(wx, wy) { return { x: sx(wx), y: sy(wy) }; }
+  const topDown = { s2w: screenToWorld, w2s: worldToScreen };
+
+  // ---- atlases (the lab's, half resolution unless ?hd=1) ----
+  const loadImage = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im);
+    im.onerror = () => rej(new Error('iso: ontbreekt ' + src)); im.src = src; });
+  function loadSheet(prefix, kind) {
+    const dir = ASSETS + 'sprites/iso/';
+    return fetch(dir + prefix + '_iso_' + kind + '_atlas.json').then(r => { if (!r.ok) throw new Error('iso: atlas ' + prefix + ' ' + kind); return r.json(); })
+      .then(sheet => { const half = !HD && sheet.meta.half;
+        return loadImage(dir + (half ? half.image : sheet.meta.image)).then(image => ({ sheet, image, scale: half ? half.scale : 1 })); });
+  }
+  function indexAtlas(parts) {
+    const byAnim = new Map();
+    for (const p of parts) for (const a of Object.keys(p.sheet.animations)) byAnim.set(a, p);
+    return { ...parts[0], byAnim };
+  }
+  const load = (key, kinds) => Promise.all(kinds.map(k => loadSheet(key, k))).then(indexAtlas)
+    .then(a => { view.atlases[key] = a; }).catch(err => console.warn(err.message));
+  const INFANTRY = ['infantry', 'fallen', 'combat', 'morale'];
+  function loadAll() {
+    const first = [load('fr', INFANTRY), load('br', INFANTRY)];
+    for (const p of ['fr', 'br']) {
+      first.push(load(p + 'o', ['officer']), load(p + 'd', ['drummer']), load(p + 'c', ['cavalry', 'cavfight']),
+        load(p + 'g', ['gun']), load(p + 'a', ['gunner', 'gunner2']));
+    }
+    first.push(loadProps());
+    // Extra looks stream in afterwards; until then everyone uses the base look.
+    return Promise.all(first).then(() => Promise.all(['2', '3', '4', '5'].flatMap(l => ['fr', 'br'].map(p => load(p + l, INFANTRY)))
+      .concat(['fr', 'br'].flatMap(p => [load(p + 'c2', ['cavalry', 'cavfight']), load(p + 'co', ['cavalry', 'cavfight'])]))));
+  }
+  function loadProps() {
+    return fetch(ASSETS + 'iso/props/props.json').then(r => r.json()).then(m => Promise.all(Object.entries(m.props)
+      .map(([kind, meta]) => loadImage(ASSETS + 'iso/props/' + meta.image).then(image => { view.props[kind] = { ...meta, image }; }))))
+      .catch(err => console.warn('iso: props', err));
+  }
+  function drawSprite(atlas, anim, f, x, y, k) {
+    const src = atlas && atlas.byAnim.get(anim), name = src && src.sheet.animations[anim] && src.sheet.animations[anim][f];
+    if (!name) { view.stats.missing++; if (view.missingNames.size < 20) view.missingNames.add((atlas ? '' : 'noatlas:') + anim); return false; }
+    const fr = src.sheet.frames[name].frame, p = src.sheet.meta.pivot, s = src.scale || 1;
+    ctx.drawImage(src.image, fr.x * s, fr.y * s, fr.w * s, fr.h * s, x - p.x * k, y - p.y * k, fr.w * k, fr.h * k);
+    return true;
+  }
+
+  // ---- terrain: the game's static terrain, baked into tiles and laid flat ----
+  const terrainSource = () => global.__MAP_AMBIENT_MOTION_V1__?.baseTerrainDraw || null;
+  function tileSetup() {
+    const r = z() * Math.min(devicePixelRatio || 1, 2);
+    const raster = r <= 0.35 ? 0.25 : r <= 0.7 ? 0.5 : 1;
+    const px = Math.min(512, 2 ** Math.floor(Math.log2(Math.max(128, Math.min(innerWidth, innerHeight)))));
+    return { raster, px, world: px / raster };
+  }
+  function bakeTile(key, tx, ty, T) {
+    const draw = terrainSource(); if (!draw) return null;
+    const tile = document.createElement('canvas'); tile.width = tile.height = T.px;
+    const left = tx * T.world, top = ty * T.world, old = [camera.x, camera.y, camera.zoom];
+    ctx.save();
+    try {
+      camera.zoom = T.raster; camera.x = left + innerWidth / (2 * T.raster); camera.y = top + innerHeight / (2 * T.raster);
+      if (typeof refreshWorldViewBounds === 'function') refreshWorldViewBounds();
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, T.px, T.px);
+      ctx.setTransform(T.raster, 0, 0, T.raster, -left * T.raster, -top * T.raster);
+      ctx.beginPath(); ctx.rect(left, top, T.world, T.world); ctx.clip();
+      global.__STATIC_TERRAIN_CAPTURE_V301__ = true;
+      try { draw(); } finally { global.__STATIC_TERRAIN_CAPTURE_V301__ = false; }
+      tile.getContext('2d').drawImage(canvas, 0, 0, T.px, T.px, 0, 0, T.px, T.px);
+    } catch (err) { console.warn('iso: terrein', err); return null; }
+    finally { [camera.x, camera.y, camera.zoom] = old; ctx.restore();
+      if (typeof refreshWorldViewBounds === 'function') refreshWorldViewBounds(); }
+    view.stats.tilesBaked++;
+    return tile;
+  }
+  function drawTerrain() {
+    const T = tileSetup(), a = isoScreenToWorld(0, 0), b = isoScreenToWorld(innerWidth, innerHeight);
+    const x0 = Math.max(0, Math.floor(a.x / T.world)), x1 = Math.min(Math.ceil(WORLD.width / T.world) - 1, Math.floor(b.x / T.world));
+    const y0 = Math.max(0, Math.floor(a.y / T.world)), y1 = Math.min(Math.ceil(WORLD.height / T.world) - 1, Math.floor(b.y / T.world));
+    let budget = 3; view.stats.tilesDrawn = 0; view.tileTick++;
+    const want = [];
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) want.push([tx, ty]);
+    // Nearest the centre first, so the middle of the screen fills in first.
+    const cx = (a.x + b.x) / 2 / T.world, cy = (a.y + b.y) / 2 / T.world;
+    want.sort((p, q) => Math.hypot(p[0] - cx, p[1] - cy) - Math.hypot(q[0] - cx, q[1] - cy));
+    const tiles = [];
+    for (const [tx, ty] of want) {
+      const key = T.raster + ':' + T.px + ':' + tx + ':' + ty;
+      let t = view.tiles.get(key);
+      if (!t && budget > 0) { budget--; const c = bakeTile(key, tx, ty, T); if (c) { t = { c, used: 0 }; view.tiles.set(key, t); } }
+      tiles.push([tx, ty, t]);
+    }
+    const dpr = canvas.width / Math.max(1, innerWidth);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#31402a'; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    ctx.fillStyle = '#5f7448';
+    ctx.fillRect(sx(0), sy(0), WORLD.width * z(), WORLD.height * z() * SQ);
+    ctx.imageSmoothingEnabled = true;
+    for (const [tx, ty, t] of tiles) {
+      if (!t) continue;
+      t.used = view.tileTick;
+      const X = sx(tx * T.world), Y = sy(ty * T.world), W = T.world * z(), H = T.world * z() * SQ;
+      ctx.drawImage(t.c, Math.floor(X), Math.floor(Y), Math.ceil(W + 1), Math.ceil(H + 1));
+      view.stats.tilesDrawn++;
+    }
+    // Keep at most 96 tiles (about 100 MB at 512 px): drop the least recently used.
+    if (view.tiles.size > 96) {
+      [...view.tiles.entries()].sort((p, q) => p[1].used - q[1].used).slice(0, view.tiles.size - 96).forEach(([k]) => view.tiles.delete(k));
+    }
+  }
+
+  // ---- per-unit animation memory ----
+  function infoOf(u) {
+    let m = view.info.get(u.id);
+    if (!m) { m = { walk: 0, x: u.x, y: u.y, dir: dirOf(u.facing || 0), firedAt: -99, reload: u.reload, speed: 0, alive: true, u };
+      view.info.set(u.id, m); }
+    return m;
+  }
+  function track(u, m, now, dt) {
+    const d = Math.hypot(u.x - m.x, u.y - m.y);
+    m.speed = dt > 0 ? m.speed * 0.7 + (d / PPM / dt) * 0.3 : m.speed;
+    if (d > 0.05) { m.walk += d / PPM; if (d > 0.4) m.dir = dirOf(Math.atan2(u.y - m.y, u.x - m.x)); }
+    else if (!m.moving) m.dir = dirOf(u.facing || 0);
+    m.moving = m.speed > 0.25;
+    // A shot resets the reload clock upwards: that is when the man fired.
+    const t = TYPES[u.type];
+    if (t && t.reload > 0 && u.reload > m.reload + t.reload * 0.4) {
+      m.firedAt = now; if (!m.moving) m.dir = dirOf(u.facing || 0);
+      if (u.regimentId) view.regFire.set(u.regimentId, now);
+      onShot(u, m, now);
+    }
+    m.x = u.x; m.y = u.y; m.reload = u.reload; m.u = u;
+  }
+  // Muzzle smoke, a little ahead of the man at shoulder height; a cloud for a gun.
+  function onShot(u, m, now) {
+    const a = u.facing || 0, gun = u.type === 'artillery';
+    if (u.type === 'cavalry' || u.type === 'drummer' || u.type === 'worker') return;
+    const reach = gun ? 2.4 : 1.1, height = gun ? 0.9 : 1.45, n = gun ? 5 : 1;
+    for (let i = 0; i < n; i++) {
+      const s = hash(u.id + i * 7, Math.floor(now * 10));
+      view.smoke.push({ wx: u.x + Math.cos(a) * (reach + i * 0.6) * PPM, wy: u.y + Math.sin(a) * (reach + i * 0.6) * PPM,
+        h: height, born: now, life: (gun ? 6 : 4) + s * 2, size: (gun ? 1.6 : 0.55) + s * (gun ? 1.2 : 0.4), seed: s });
+    }
+    if (gun) view.gunFire.set(u.regimentId || u.id, now);
+    if (view.smoke.length > SMOKE_MAX) view.smoke.splice(0, view.smoke.length - SMOKE_MAX);
+  }
+
+  const lookOf = u => {
+    const p = u.side === 'france' ? 'fr' : 'br', h = hash(u.id, 7);
+    const key = h < 0.1 ? p + '4' : h < 0.2 ? p + '5' : p + ['', '2', '3'][Math.floor(hash(u.id, 13) * 3)];
+    return view.atlases[key] ? key : p;
+  };
+  const crewIds = new Set();
+  function refreshCrew() {
+    crewIds.clear();
+    for (const reg of regiments) {
+      if (reg.destroyed) continue;
+      const members = regimentMembers(reg);
+      if (!members.some(u => u.type === 'artillery')) continue;
+      for (const u of members) if (u.type !== 'artillery') crewIds.add(u.id);
+    }
+  }
+
+  // Animation for one live unit: [atlas key, animation, frame].
+  function frameFor(u, m, now) {
+    const p = u.side === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
+    const since = now - m.firedAt, step = (stride, n) => Math.floor((m.walk % stride) / stride * n) % n;
+    if (u.type === 'cavalry') {
+      const key = view.atlases[p + 'c' + (hash(u.id, 5) < 0.5 ? '' : '2')] ? p + 'c' + (hash(u.id, 5) < 0.5 ? '' : '2') : p + 'c';
+      if (m.moving) {
+        const gait = m.speed > 4.5 || u.chargeTimer > 0 ? 'gallop' : m.speed > 2.4 ? 'trot' : 'walk';
+        const stride = gait === 'gallop' ? 3.6 : gait === 'trot' ? 2.8 : 2.4;
+        return [key, gait + '_' + d, step(stride, 6)];
+      }
+      if (since < 0.6 || u.chargeTimer > 0) return [key, 'slash_' + d, Math.floor(now / 0.18) % 3];
+      return [key, 'idle_' + d, Math.floor(now / 0.7 + hash(u.id, 3) * 2) % 2];
+    }
+    if (u.type === 'artillery') {
+      if (m.moving) return [p + 'g', 'roll_' + d, step(1.2, 4)];
+      if (since < 0.3) return [p + 'g', 'fire_' + d, since < 0.12 ? 0 : 1];
+      return [p + 'g', 'idle_' + d, 0];
+    }
+    if (crewIds.has(u.id)) {
+      if (m.moving) return [p + 'a', 'march_' + d, step(MARCH_STRIDE, 6)];
+      const gun = view.gunFire.get(u.regimentId) ?? -99, t = now - gun;
+      if (t < 2.4 && hash(u.id, 9) < 0.5) return [p + 'a', 'ram_' + d, Math.floor(t / 0.3) % 4];
+      if (t < 2.4) return [p + 'a', 'load_' + d, Math.floor(t / 0.6) % 2];
+      return [p + 'a', (hash(u.id, 11) < 0.5 ? 'ready_' : 'idle_') + d, Math.floor(now / 0.8 + hash(u.id, 2)) % 2];
+    }
+    if (u.type === 'officer' || u.type === 'drummer') {
+      const key = p + (u.type === 'officer' ? 'o' : 'd');
+      if (m.moving) return [key, 'march_' + d, step(MARCH_STRIDE, 6)];
+      const busy = now - (view.regFire.get(u.regimentId) ?? -99) < 6;
+      return [key, (busy ? 'command_' : 'idle_') + d, Math.floor(now / (busy ? 0.45 : 0.6)) % 2];
+    }
+    // Musketeers.
+    const key = lookOf(u);
+    if (u.routing) return [key, 'rout_' + d, step(1.6, 6)];
+    if (m.moving) return [key, (u.chargeTimer > 0 ? 'charge_' : 'march_') + d, step(MARCH_STRIDE, 6)];
+    if (since < 0.42) return [key, 'fire_' + d, Math.min(2, Math.floor(since / 0.14))];
+    if (since < 2.1) return [key, 'reload_' + d, Math.min(3, Math.floor((since - 0.42) / 0.42))];
+    if (now - (view.regFire.get(u.regimentId) ?? -99) < 6) return [key, 'aim_' + d, 1];
+    return [key, 'idle_' + d, Math.floor((now * 1000 + u.id * 137) / 500) % 2];
+  }
+  // Fall: the man's own look and a fall chosen by his id; it plays once and stays.
+  function addCorpse(m, now) {
+    const u = m.u, p = u.side === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
+    let key, anim;
+    if (u.type === 'cavalry') { key = p + 'c'; anim = 'die_' + d; }
+    else if (u.type === 'artillery') return;
+    else if (crewIds.has(u.id)) { key = p + 'a'; anim = ['die', 'diefwd', 'dieside'][Math.floor(hash(u.id, 4) * 3)] + '_' + d; }
+    else if (u.type === 'worker') return;
+    else { key = u.type === 'officer' || u.type === 'drummer' ? p : lookOf(u); anim = ['die', 'diefwd', 'dieside'][Math.floor(hash(u.id, 4) * 3)] + '_' + d; }
+    view.corpses.push({ x: m.x, y: m.y, key, anim, t0: now });
+    if (view.corpses.length > CORPSE_MAX) view.corpses.splice(0, view.corpses.length - CORPSE_MAX);
+  }
+
+  // ---- props for buildings and resources ----
+  const BUILDING_PROP = { towncenter: 'barracks', barracks: 'barracks', house: 'cottage' };
+  function buildingDrawable(b) {
+    if (b.dead) return null;
+    if (b.side === 'britain' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(b)) return null;
+    if (b.type === 'farm') return { y: b.y, draw: () => drawFarm(b) };
+    const base = BUILDING_PROP[b.type] || 'cottage', kind = base === 'barracks' ? 'barracks_' + (b.side === 'france' ? 'fr' : 'br') : base;
+    const prop = view.props[kind]; if (!prop) return null;
+    return { y: b.y + b.h * 0.3, draw: () => {
+      // Fit the rendered building to the game's footprint (a little larger: the
+      // props carry their eaves and yard beyond the walls).
+      const k = b.w * z() * 1.45 / prop.w;
+      ctx.globalAlpha = b.complete === false ? 0.45 + 0.5 * (b.construction || 0) : 1;
+      ctx.drawImage(prop.image, sx(b.x) - prop.pivot.x * k, sy(b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
+      ctx.globalAlpha = 1; view.stats.props++;
+    } };
+  }
+  function drawFarm(b) {
+    const x = sx(b.x - b.w / 2), y = sy(b.y - b.h / 2), w = b.w * z(), h = b.h * z() * SQ;
+    ctx.fillStyle = b.complete === false ? 'rgba(150,130,80,.55)' : '#b59b52'; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(90,70,30,.45)'; ctx.lineWidth = 1;
+    for (let i = 1; i < 8; i++) { ctx.beginPath(); ctx.moveTo(x, y + h * i / 8); ctx.lineTo(x + w, y + h * i / 8); ctx.stroke(); }
+    view.stats.props++;
+  }
+  function resourceDrawable(r) {
+    if (r.dead || r.amount <= 0) return null;
+    if (r.type === 'wood') {
+      const prop = view.props[hash(r.id, 3) < 0.65 ? 'oak' : 'poplar']; if (!prop) return null;
+      return { y: r.y, draw: () => { const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25);
+        ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, sy(r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
+    }
+    if (r.type === 'iron') return { y: r.y, draw: () => drawRock(r) };
+    const prop = view.props.bush; if (!prop) return null;
+    return { y: r.y, draw: () => { const k = spriteK() * 0.75;
+      ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, sy(r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
+      ctx.fillStyle = '#8c1f2a'; for (let i = 0; i < 5; i++) { ctx.beginPath();
+        ctx.arc(sx(r.x) + (hash(r.id, i) - .5) * 18 * z(), sy(r.y) - (4 + hash(i, r.id) * 10) * z(), 1.6 * z() + .6, 0, 7); ctx.fill(); }
+      view.stats.props++; } };
+  }
+  function drawRock(r) {
+    const x = sx(r.x), y = sy(r.y), s = 9 * z() + 2;
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x + s * .2, y + s * .1, s * 1.2, s * .45, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#7c7a73'; ctx.beginPath(); ctx.moveTo(x - s, y); ctx.lineTo(x - s * .5, y - s * 1.1); ctx.lineTo(x + s * .4, y - s * 1.3);
+    ctx.lineTo(x + s, y - s * .3); ctx.lineTo(x + s * .6, y + s * .2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#9a978d'; ctx.beginPath(); ctx.moveTo(x - s * .5, y - s * 1.1); ctx.lineTo(x + s * .4, y - s * 1.3); ctx.lineTo(x + s * .1, y - s * .5); ctx.closePath(); ctx.fill();
+    view.stats.props++;
+  }
+  // Workers have no sprites yet: a peasant in a smock and hat, facing his way.
+  function drawWorker(u, m) {
+    const x = sx(u.x), y = sy(u.y), s = z() * PPM, bob = m.moving ? Math.sin(m.walk * 7) * .04 * s : 0;
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(x, y, .32 * s, .14 * s, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#4b3b2a'; ctx.fillRect(x - .16 * s, y - .8 * s * LIFT + bob, .12 * s, .8 * s * LIFT); ctx.fillRect(x + .04 * s, y - .8 * s * LIFT - bob, .12 * s, .8 * s * LIFT);
+    ctx.fillStyle = u.side === 'france' ? '#c9c2a8' : '#b9b49c'; ctx.fillRect(x - .24 * s, y - 1.45 * s * LIFT, .48 * s, .72 * s * LIFT);
+    ctx.fillStyle = '#d9a782'; ctx.beginPath(); ctx.arc(x, y - 1.6 * s * LIFT, .13 * s, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3d3022'; ctx.beginPath(); ctx.ellipse(x, y - 1.72 * s * LIFT, .22 * s, .07 * s, 0, 0, 7); ctx.fill();
+    if (u.carry > 0) { ctx.fillStyle = u.carryType === 'wood' ? '#7a5532' : '#b58b4a'; ctx.fillRect(x + .2 * s, y - 1.3 * s * LIFT, .22 * s, .3 * s); }
+    view.stats.workers++;
+  }
+
+  // ---- smoke, shot, fog, selection ----
+  const PUFFS = {};
+  function puff(kind) {
+    if (PUFFS[kind]) return PUFFS[kind];
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), grad = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+    grad.addColorStop(0, kind === 'gun' ? 'rgba(232,228,218,.85)' : 'rgba(240,238,230,.8)'); grad.addColorStop(1, 'rgba(225,222,212,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, 64, 64); return (PUFFS[kind] = c);
+  }
+  function drawSmoke(now) {
+    view.smoke = view.smoke.filter(s => now - s.born < s.life);
+    const img = puff('m'), wind = 0.35;
+    for (const s of view.smoke) {
+      const age = (now - s.born) / s.life, r = (s.size + age * 2.2) * PPM * z();
+      const x = sx(s.wx + wind * (now - s.born) * PPM), y = sy(s.wy) - (s.h + age * 1.6) * LIFT * PPM * z();
+      ctx.globalAlpha = (1 - age) * 0.75; ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1; view.stats.smoke = view.smoke.length;
+  }
+  function drawProjectiles() {
+    ctx.fillStyle = 'rgba(30,28,24,.9)';
+    for (const p of projectiles) {
+      if (p.dead) continue;
+      ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y) - 1.2 * LIFT * PPM * z(), Math.max(1, 1.4 * z()), 0, 7); ctx.fill();
+    }
+  }
+  const fog = document.createElement('canvas'), fogCtx2 = fog.getContext('2d');
+  function drawFog() {
+    if (typeof frenchVisionSources !== 'function' || typeof visionRadius !== 'function') return;
+    const w = Math.ceil(innerWidth / 2), h = Math.ceil(innerHeight / 2);
+    if (fog.width !== w || fog.height !== h) { fog.width = w; fog.height = h; }
+    // The fog changes slowly: redraw it five times a second.
+    if (performance.now() - view.fogAt > 200) {
+      view.fogAt = performance.now();
+      fogCtx2.globalCompositeOperation = 'source-over'; fogCtx2.clearRect(0, 0, w, h);
+      fogCtx2.fillStyle = 'rgba(4,7,9,.82)'; fogCtx2.fillRect(0, 0, w, h);
+      fogCtx2.globalCompositeOperation = 'destination-out'; fogCtx2.fillStyle = '#000';
+      for (const s of frenchVisionSources()) {
+        const r = visionRadius(s) * z() / 2;
+        fogCtx2.beginPath(); fogCtx2.ellipse(sx(s.x) / 2, sy(s.y) / 2, r, r * SQ, 0, 0, 7); fogCtx2.fill();
+      }
+      fogCtx2.globalCompositeOperation = 'source-over';
+    }
+    ctx.drawImage(fog, 0, 0, innerWidth, innerHeight);
+  }
+  function drawSelection() {
+    ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(245,220,112,.95)'; ctx.beginPath();
+    for (const u of selectedUnits) {
+      if (u.dead) continue;
+      const r = (u.type === 'cavalry' ? 1.2 : u.type === 'artillery' ? 1.4 : 0.5) * PPM * z();
+      ctx.moveTo(sx(u.x) + r, sy(u.y)); ctx.ellipse(sx(u.x), sy(u.y), r, r * SQ, 0, 0, 7);
+    }
+    ctx.stroke();
+    const b = typeof selectedBuilding !== 'undefined' ? selectedBuilding : null;
+    if (b && !b.dead) { ctx.strokeRect(sx(b.x - b.w / 2), sy(b.y - b.h / 2), b.w * z(), b.h * z() * SQ); }
+  }
+  function drawDragBox() {
+    if (!drag.active || !drag.moved || buildMode) return;
+    const x = Math.min(drag.startX, drag.x), y = Math.min(drag.startY, drag.y), w = Math.abs(drag.x - drag.startX), h = Math.abs(drag.y - drag.startY);
+    ctx.strokeStyle = 'rgba(245,220,112,.9)'; ctx.fillStyle = 'rgba(245,220,112,.12)'; ctx.fillRect(x, y, w, h); ctx.strokeRect(x, y, w, h);
+  }
+
+  // ---- the frame ----
+  function render(now) {
+    const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
+    view.frames++;
+    if (view.frames % 30 === 1) refreshCrew();
+    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = 0;
+    drawTerrain();
+    const k = spriteK(), seen = new Set(), list = [];
+    const visible = u => u.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance(u);
+    for (const u of units) {
+      if (u.dead) continue;
+      seen.add(u.id);
+      const m = infoOf(u); track(u, m, t, dt);
+      if (!visible(u)) continue;
+      const X = sx(u.x), Y = sy(u.y);
+      if (X < -80 || X > innerWidth + 80 || Y < -40 || Y > innerHeight + 140) continue;
+      list.push({ y: u.y, draw: () => {
+        if (u.type === 'worker') { drawWorker(u, m); return; }
+        const [key, anim, f] = frameFor(u, m, t);
+        // Until its atlas has loaded a unit is simply not drawn yet.
+        if (drawSprite(view.atlases[key], anim, f, X, Y, k)) st.sprites++;
+      } });
+      st.drawn++;
+    }
+    // Men who fell (or left the list) since the last frame.
+    for (const [id, m] of view.info) {
+      if (seen.has(id)) continue;
+      if (m.alive && visible(m.u)) addCorpse(m, t);
+      view.info.delete(id);
+    }
+    for (const c of view.corpses) {
+      const X = sx(c.x), Y = sy(c.y);
+      if (X < -60 || X > innerWidth + 60 || Y < -40 || Y > innerHeight + 80) continue;
+      list.push({ y: c.y - 0.5, draw: () => drawSprite(view.atlases[c.key], c.anim, Math.min(3, Math.floor((t - c.t0) / DIE_FRAME)), X, Y, k) });
+    }
+    st.corpses = view.corpses.length;
+    for (const b of buildings) { const d = buildingDrawable(b); if (d) list.push(d); }
+    for (const r of resources) {
+      const X = sx(r.x), Y = sy(r.y);
+      if (X < -120 || X > innerWidth + 120 || Y < -30 || Y > innerHeight + 260) continue;
+      const d = resourceDrawable(r); if (d) list.push(d);
+    }
+    drawSelection();
+    list.sort((p, q) => p.y - q.y);
+    for (const d of list) d.draw();
+    drawProjectiles();
+    drawSmoke(t);
+    drawFog();
+    drawDragBox();
+    if (now - view.miniAt > 200 && typeof drawMinimap === 'function') { view.miniAt = now; try { drawMinimap(); } catch (_) {} }
+  }
+
+  // ---- hooks: the game's frame calls renderStableFrameV1(draw) when it exists ----
+  let inner = global.renderStableFrameV1;
+  function stableFrame(drawGame, now) {
+    if (!view.on) return typeof inner === 'function' ? inner(drawGame, now) : drawGame();
+    // Once a second the 2D renderer runs too (its output is painted over), so
+    // effects it keeps for its own frames are still consumed and pruned.
+    // It runs with its own (top-down) projection.
+    if (view.frames % 60 === 0) {
+      screenToWorld = topDown.s2w; worldToScreen = topDown.w2s;
+      try { typeof inner === 'function' ? inner(drawGame, now) : drawGame(); } catch (_) {}
+      finally { screenToWorld = isoScreenToWorld; worldToScreen = isoWorldToScreen; }
+    }
+    const t0 = performance.now();
+    try { render(now); view.stats.renderMs = Math.round((view.stats.renderMs * 0.9 + (performance.now() - t0) * 0.1) * 10) / 10; }
+    finally { const dpr = canvas.width / Math.max(1, innerWidth); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  }
+  Object.defineProperty(global, 'renderStableFrameV1', { configurable: true, get: () => stableFrame, set: v => { inner = v; } });
+
+  // A click on a man's body (above his feet) selects him, as a click on his feet would.
+  function snapToBody(wx, wy) {
+    if (!view.on) return null;
+    const px = sx(wx), py = sy(wy), reach = Math.max(14, 26 * z());
+    let best = null, bd = reach;
+    for (const u of units) {
+      if (u.dead) continue;
+      const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
+      const d = Math.hypot(sx(u.x) - px, sy(u.y) - lift - py);
+      if (d < bd) { best = u; bd = d; }
+    }
+    return best;
+  }
+  if (typeof selectPoint === 'function') {
+    const baseSelectPoint = selectPoint;
+    selectPoint = function selectPointIsoV1(x, y, add) { const u = snapToBody(x, y); return u ? baseSelectPoint(u.x, u.y, add) : baseSelectPoint(x, y, add); };
+  }
+
+  // ---- switching ----
+  const otherLayers = () => [...document.querySelectorAll('canvas')].filter(c => c !== canvas && c.id !== 'minimap');
+  function setOn(on) {
+    view.on = on;
+    screenToWorld = on ? isoScreenToWorld : topDown.s2w;
+    worldToScreen = on ? isoWorldToScreen : topDown.w2s;
+    for (const c of otherLayers()) c.style.visibility = on ? 'hidden' : '';
+    // Back in 2D: let the 2D terrain caches start afresh.
+    if (!on) { try { global.__DESKTOP_TERRAIN_TILES_V301__?.invalidate?.(); } catch (_) {} }
+    button.textContent = on ? '🗺 2D-kaart' : '🏰 Iso-weergave';
+    button.setAttribute('aria-pressed', String(on));
+  }
+  const button = document.createElement('button');
+  button.id = 'isoViewToggle'; button.type = 'button';
+  button.style.cssText = 'position:fixed;z-index:40;top:58px;right:10px;padding:6px 10px;border-radius:8px;border:1px solid rgba(244,216,109,.55);' +
+    'background:rgba(16,20,17,.86);color:#f5f1e8;font:650 13px system-ui,sans-serif;cursor:pointer';
+  button.addEventListener('click', () => setOn(!view.on));
+  document.body.appendChild(button);
+  // Other layers may be created after this file runs: hide them as they appear.
+  new MutationObserver(() => { if (view.on) for (const c of otherLayers()) c.style.visibility = 'hidden'; })
+    .observe(document.body, { childList: true, subtree: true });
+  setOn(true);
+  loadAll();
+
+  global.__ISO_VIEW_V1__ = Object.freeze({
+    version: 'iso-view-v1', optIn: 'view=iso',
+    isOn: () => view.on, setOn,
+    stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
+      tiles: view.tiles.size, info: view.info.size, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
+    screenOf: (wx, wy) => ({ x: sx(wx), y: sy(wy) }),
+    bodyOf: u => ({ x: sx(u.x), y: sy(u.y) - (u.type === 'cavalry' ? 1.6 : 0.9) * LIFT * PPM * z() })
+  });
+})(window);
