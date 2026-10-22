@@ -246,6 +246,35 @@
         trees.push({ x: tx, y: ty, kind: r > 0.8 ? 'poplar' : 'oak', scale: 0.5 + r * 0.25 });
       }
     });
+    // Avenues: poplars line both sides of the chaussees, as along Napoleon's
+    // routes imperiales - a tree every 10 m or so, gaps here and there, none on
+    // a road, in the river, at a bridge, in a village, a wood or by a base.
+    const roads = (global.NRTS_ROAD_NETWORK_V7 || []).filter(r => r.roadClass === 'chaussee');
+    const houses = villageHouses(), bridges = crossings(), inWood = (x, y) => woods.some(w => x > w.x - 30 && x < w.x + w.w + 30 && y > w.y - 30 && y < w.y + w.h + 30);
+    const step = 230;
+    let avenue = 0;
+    roads.forEach((road, ri) => {
+      const pts = road.points || [], off = (road.width || 66) / 2 + 42;
+      let carry = step / 2;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i], L = Math.hypot(b.x - a.x, b.y - a.y); if (!L) continue;
+        const ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
+        for (let t = carry; t < L; t += step) {
+          for (const side of [-1, 1]) {
+            const r = hash(ri * 977 + i * 31 + Math.round(t), side + 7);
+            if (r < 0.14) continue;   // a gap in the row
+            const x = a.x + ux * t - uy * side * off, y = a.y + uy * t + ux * side * off;
+            if (x < 40 || y < 40 || x > WORLD.width - 40 || y > WORLD.height - 40) continue;
+            if (bridges.some(c => Math.hypot(x - c.x, y - c.y) < 230)) continue;
+            if ((typeof buildings !== 'undefined' ? buildings : []).some(q => Math.hypot(x - q.x, y - q.y) < 320)) continue;
+            if (inWood(x, y) || !clearSpot(x, y, 22, houses)) continue;
+            trees.push({ x, y, kind: 'poplar', scale: 0.46 + r * 0.1, avenue: true }); avenue++;
+          }
+        }
+        carry = (carry - L) % step; if (carry < 0) carry += step;
+      }
+    });
+    view.stats.avenueTrees = avenue;
     return trees;
   }
   function woodTreeDrawable(tr) {

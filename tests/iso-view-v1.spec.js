@@ -192,6 +192,8 @@ test('iso view: the battlefield ground, woods and peasants come from Blender', a
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().workerSprites === true, null, { timeout: 60_000 });
   const s = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
   expect(s.woodTrees).toBeGreaterThan(50);
+  // Poplar avenues along the chaussees.
+  expect(s.avenueTrees).toBeGreaterThan(80);
   // Peasants drawn as sprites, not the stand-in figures.
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().workers === 0 && window.__ISO_VIEW_V1__.stats().sprites > 10);
   // Relief: hills metres high; on a hilltop a man is drawn higher than on flat

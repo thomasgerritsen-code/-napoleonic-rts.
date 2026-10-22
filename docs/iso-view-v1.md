@@ -139,6 +139,18 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   een erf met moestuin bij elk huis. Resultaat `ground.jpg` (4978 × 1757, 14 px per
   meter, met ruimte boven voor de verhoogde noordrand); de iso-weergave tekent alleen het deel dat in beeld is. Zonder die afbeelding
   valt hij terug op de 2D-kaart.
+- **Wegen** (`road_material` in het script): elke weg is één doorlopende band met
+  afgeronde bochten (geen naden meer per stukje), breder dan de weg van de game zodat
+  de uitgesleten rand met gras erin geleidelijk overgaat in het land; op kruisingen
+  schijnt de weg eronder door, en doodlopende einden lopen ook uit.
+  - chaussee: een bolle strook kasseien in het midden, grindbermen ernaast;
+  - zijweg: aangestampte aarde met twee karrensporen, hier en daar een plas erin, en
+    strepen van wielen en hoeven in de rijrichting;
+  - pad: twee sporen met gras ertussen.
+  Ook de erven en moestuinen bij de huizen lopen zacht uit in het gras.
+- **Bomenlanen**: langs de chaussees staan populieren aan weerszijden, om de 10 m met
+  hier en daar een gat, zoals langs de routes impériales (niet op wegen, bij bruggen,
+  in dorpen, bossen of bij een basis).
 - In de **bossen** van de game staan eiken en populieren als sprites (met open plekken,
   niet op wegen of in de rivier), en ze worden doorzichtig over soldaten erachter.
 
