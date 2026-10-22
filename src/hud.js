@@ -281,7 +281,7 @@
       }
     } else {
       setHudText(selectionTitleEl, 'Niets geselecteerd');
-      setSelectionDetails('Voor regiment: 12 musketiers + 1 officier + 1 drummer selecteren.');
+      setSelectionDetails(window.NRTS_CONFIG?.regimentOrders ? `Voor regiment: 12 tot ${window.NRTS_CONFIG.regimentOrders.maxInfantry} musketiers + 1 officier + 1 drummer selecteren.` : 'Voor regiment: 12 musketiers + 1 officier + 1 drummer selecteren.');
     }
 
     renderDynamicActions(forceActions);

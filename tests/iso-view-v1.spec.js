@@ -313,3 +313,70 @@ test('iso view: the British attack in waves on a clock, and buildings can be sho
   expect(hp.after).toBeLessThan(hp.before - 50);
   expect(errors).toEqual([]);
 });
+
+test('iso view: a regiment in the defensive stance braces when it stands, and then loses less', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-defend&view=iso');
+  await page.waitForFunction(() => window.__REGIMENT_ORDERS_V1__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const make = y => { const us = []; for (let i = 0; i < 14; i++) us.push(createUnit('france', 'infantry', 900 + (i % 7) * 20, y + (i < 7 ? 0 : 18)));
+      us.push(createUnit('france', 'officer', 880, y)); us.push(createUnit('france', 'drummer', 880, y + 10)); return createRegiment('france', us); };
+    const a = make(1300), b = make(1500);
+    selectWholeRegiment(a);
+    const on = window.__REGIMENT_ORDERS_V1__.toggleDefend();
+    const beforeBrace = window.__REGIMENT_ORDERS_V1__.isBraced(a);
+    window.__RTS_DEBUG__.tick(7);
+    const braced = window.__REGIMENT_ORDERS_V1__.isBraced(a);
+    const ua = regimentMembers(a).find(u => u.type === 'infantry'), ub = regimentMembers(b).find(u => u.type === 'infantry');
+    const ha = ua.hp, hb = ub.hp;
+    applyDamage(ua, 20); applyDamage(ub, 20);
+    return { on, beforeBrace, braced, lostA: ha - ua.hp, lostB: hb - ub.hp };
+  });
+  expect(r.on).toBe(true);
+  expect(r.beforeBrace).toBe(false);
+  expect(r.braced).toBe(true);
+  expect(r.lostA).toBeLessThan(r.lostB * 0.8);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: regiments take more than 12 men, and loose men can reinforce one', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-big&view=iso');
+  await page.waitForFunction(() => window.__REGIMENT_ORDERS_V1__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const us = []; for (let i = 0; i < 20; i++) us.push(createUnit('france', 'infantry', 900 + (i % 10) * 20, 1300 + Math.floor(i / 10) * 20));
+    us.push(createUnit('france', 'officer', 880, 1300)); us.push(createUnit('france', 'drummer', 880, 1320));
+    selectedUnits.clear(); us.forEach(u => selectedUnits.add(u)); makePlayerRegiment();
+    const reg = getRegiment(us[0].regimentId), formed = regimentMembers(reg).filter(u => u.type === 'infantry').length;
+    const extra = []; for (let i = 0; i < 8; i++) extra.push(createUnit('france', 'infantry', 900 + i * 20, 1400));
+    selectWholeRegiment(reg); extra.forEach(u => selectedUnits.add(u));
+    const added = window.__REGIMENT_ORDERS_V1__.reinforce();
+    return { formed, added, now: regimentMembers(reg).filter(u => u.type === 'infantry').length };
+  });
+  expect(r.formed).toBe(20);
+  expect(r.added).toBe(8);
+  expect(r.now).toBe(28);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: a man by a barracks is picked before the barracks, a tree by its crown', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-pick&view=iso');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().props >= 14 && window.__ISO_VIEW_V1__.stats().ground, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const bar = createBuilding('france', 'barracks', 1100, 1150, true);
+    const man = createUnit('france', 'infantry', bar.x + 10, bar.y + bar.h / 2 + 4);
+    camera.x = bar.x; camera.y = bar.y; camera.zoom = 1.1;
+    const body = window.__ISO_VIEW_V1__.bodyOf(man), w = screenToWorld(body.x, body.y);
+    selectPoint(w.x, w.y, false);
+    const pickedMan = selectedUnits.has(man) && !selectedBuilding;
+    const debug = { sel: [...selectedUnits].map(u => u.type + u.id), man: man.id, bld: selectedBuilding?.type || null, body, w, on: window.__ISO_VIEW_V1__.isOn() };
+    // A tree: aim at its crown, well above where its trunk meets the ground.
+    const tree = resources.find(q => q.type === 'wood' && q.amount > 0);
+    camera.x = tree.x; camera.y = tree.y;
+    const base = window.__ISO_VIEW_V1__.screenOf(tree.x, tree.y), crown = screenToWorld(base.x, base.y - 70 * camera.zoom);
+    const hit = resourceAt(crown.x, crown.y);
+    return { pickedMan, debug, tree: !!hit && hit.type === 'wood' && Math.hypot(hit.x - tree.x, hit.y - tree.y) < 160 };
+  });
+  expect(r.pickedMan, JSON.stringify(r.debug)).toBe(true);
+  // The crown hits that tree (or one in front of it), not the ground behind.
+  expect(r.tree).toBe(true);
+  expect(errors).toEqual([]);
+});

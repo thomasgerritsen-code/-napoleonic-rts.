@@ -81,6 +81,33 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
 - Hellingen naar het noorden blijven onder 30° (steiler zou je vanuit de camera niet
   meer zien).
 
+## Regimenten: verdedigen, grotere regimenten (open kaart)
+
+`src/systems/combat/regiment-orders-v1.js`, aan met `NRTS_CONFIG.regimentOrders`.
+
+- **Verdedigende houding** (knop **🛡 Verdedig** of toets **V**): een regiment dat stilstaat
+  in linie of carré graaft zich na 4 seconden in: het lijdt dan 30% minder verlies,
+  verliest bijna de helft minder moraal per treffer en herlaadt 15% sneller. Bij een
+  verplaatsing vervalt het voordeel; waar het weer stilstaat bouwt het zich opnieuw op.
+  In de iso-weergave staat er een schild boven het regiment: open terwijl het zich
+  ingraaft, gevuld zodra het ingegraven is. De Britse commandant graaft zijn regimenten
+  in zolang hij verdedigt of hergroepeert.
+- **Grotere regimenten**: 12 tot 36 musketiers. "Selecteer nabij" vult aan tot 36, een
+  officier verzamelt alle vrije musketiers in zijn buurt (tot 36), en **Versterk
+  regiment** (één regiment + losse musketiers geselecteerd) voegt ze toe.
+
+## Selecteren en aanwijzen in de iso-weergave
+
+- Een klik op een soldaat gaat vóór het gebouw erachter (soldaten bij de deur van een
+  kazerne staan binnen diens voetafdruk, en gebouwen gingen eerst).
+- Bomen, struiken, rotsen en gebouwen worden aangewezen op hoe ze getekend zijn: een
+  klik op de kroon van een boom of het dak van een gebouw telt (daarvoor kwam de klik op
+  de grond áchter de boom uit). Bij overlap telt wat vooraan staat. Zo is een boer met
+  rechtsklik of tik makkelijk aan het hout, ijzer of een gebouw te zetten.
+- Een Brits regiment in gevecht blijft in linie: kleine verschuivingen van de
+  commandant worden genegeerd, grotere gaan in linie in plaats van via een marskolonne
+  (eerder sprongen regimenten om de paar seconden van linie naar colonne en terug).
+
 ## Veldslagen en de Britse AI (open kaart)
 
 `src/systems/ai/campaign-pressure-v1.js`, aan met `NRTS_CONFIG.ai.pressure` (alleen met

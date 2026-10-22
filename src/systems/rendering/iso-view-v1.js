@@ -1032,7 +1032,7 @@
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
-    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = 0;
+    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = st.stances = 0;
     panFix();
     ensureAttackHook();
     drawTerrain();
@@ -1099,6 +1099,7 @@
       ctx.globalAlpha = a; d.draw(); ctx.globalAlpha = 1;
     }
     drawProjectiles();
+    drawStances();
     if (detailed()) drawChimneySmoke(t);
     drawSmoke(t);
     drawFog();
@@ -1139,9 +1140,78 @@
     }
     return best;
   }
+  // A man clicked on is chosen before the building behind him: the click lands on
+  // his feet, and men by a barracks door stand within its footprint.
+  function selectUnitDirect(u, add) {
+    if (!add) selectedUnits.clear();
+    selectedBuilding = null;
+    const reg = u.regimentId && typeof getRegiment === 'function' ? getRegiment(u.regimentId) : null;
+    if (reg) { regimentMembers(reg).forEach(m => selectedUnits.add(m)); currentFormation = reg.formation; }
+    else if (add && selectedUnits.has(u)) selectedUnits.delete(u);
+    else selectedUnits.add(u);
+    actionSignature = ''; updateHud(true);
+  }
   if (typeof selectPoint === 'function') {
     const baseSelectPoint = selectPoint;
-    selectPoint = function selectPointIsoV1(x, y, add) { const u = snapToBody(x, y); return u ? baseSelectPoint(u.x, u.y, add) : baseSelectPoint(x, y, add); };
+    selectPoint = function selectPointIsoV1(x, y, add) {
+      const u = snapToBody(x, y);
+      if (u && u.side === 'france') { view.stats.unitPicks = (view.stats.unitPicks || 0) + 1; return selectUnitDirect(u, add); }
+      return u ? baseSelectPoint(u.x, u.y, add) : baseSelectPoint(x, y, add);
+    };
+  }
+  // What the pointer is on, by what is drawn there: a tree's crown or a
+  // building's roof counts, not only the ground under the cursor (which lies
+  // behind what stands up from it).
+  function pickDrawn(list, drawableOf, px, py) {
+    let best = null, bd = Infinity;
+    for (const o of list) {
+      if (o.dead) continue;
+      const X = sx(o.x), Y = gy(o.x, o.y);
+      if (X < -250 || X > innerWidth + 250 || Y < -120 || Y > innerHeight + 450) continue;
+      const d = drawableOf(o); if (!d) continue;
+      const r = 14 + 22 * z();
+      const [x0, y0, x1, y1] = d.box || [X - r, Y - r * 1.6, X + r, Y + r * 0.4];
+      const ix = (x1 - x0) * 0.15;
+      if (px < x0 + ix || px > x1 - ix || py < y0 + (y1 - y0) * 0.12 || py > y1) continue;
+      // Of overlapping pictures, the one in front (drawn last) is what the eye sees.
+      if (-o.y < bd) { bd = -o.y; best = o; }
+    }
+    return best;
+  }
+  if (typeof resourceAt === 'function') {
+    const baseResourceAt = resourceAt;
+    resourceAt = function resourceAtIsoV1(wx, wy) {
+      if (!view.on) return baseResourceAt(wx, wy);
+      const p = isoWorldToScreen(wx, wy);
+      return pickDrawn(resources.filter(r => r.amount > 0), resourceDrawable, p.x, p.y) || baseResourceAt(wx, wy);
+    };
+  }
+  if (typeof buildingAt === 'function') {
+    const baseBuildingAt = buildingAt;
+    buildingAt = function buildingAtIsoV1(wx, wy, side = null) {
+      if (!view.on) return baseBuildingAt(wx, wy, side);
+      const p = isoWorldToScreen(wx, wy);
+      return pickDrawn(buildings.filter(b => !side || b.side === side), buildingDrawable, p.x, p.y) || baseBuildingAt(wx, wy, side);
+    };
+  }
+  // A shield over each regiment in the defensive stance: outlined while it
+  // braces, filled once braced (regiment-orders-v1).
+  function drawStances() {
+    const R = global.__REGIMENT_ORDERS_V1__; if (!R) return;
+    for (const reg of regiments) {
+      if (reg.destroyed || !reg.defend) continue;
+      const m = regimentMembers(reg); if (!m.length) continue;
+      if (reg.side === 'britain' && typeof isVisibleToFrance === 'function' && !m.some(u => isVisibleToFrance(u))) continue;
+      const c = centroid(m), X = sx(c.x), Y = gy(c.x, c.y) - 2.4 * LIFT * PPM * z() - 14, s = 7 + 4 * z();
+      if (X < -40 || X > innerWidth + 40 || Y < -40 || Y > innerHeight + 40) continue;
+      const braced = R.isBraced(reg);
+      ctx.beginPath();
+      ctx.moveTo(X - s, Y - s); ctx.lineTo(X + s, Y - s); ctx.lineTo(X + s, Y);
+      ctx.quadraticCurveTo(X + s, Y + s * 0.9, X, Y + s * 1.4); ctx.quadraticCurveTo(X - s, Y + s * 0.9, X - s, Y); ctx.closePath();
+      ctx.fillStyle = reg.side === 'france' ? (braced ? 'rgba(52,92,200,.92)' : 'rgba(52,92,200,.25)') : (braced ? 'rgba(200,52,46,.92)' : 'rgba(200,52,46,.25)');
+      ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(255,248,230,.95)'; ctx.stroke();
+      view.stats.stances = (view.stats.stances || 0) + 1;
+    }
   }
 
   // ---- switching ----

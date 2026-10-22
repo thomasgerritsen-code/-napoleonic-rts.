@@ -9,6 +9,8 @@
 //     interval +- jitter), with one regiment or more;
 //   - a fight that lasts while it goes well (up to maxAttack seconds), then a
 //     regroup at home and the next wave;
+//   - engaged regiments keep their line instead of re-forming for every small
+//     shift the commander orders;
 //   - workers moved between food and wood to what the AI is short of;
 //   - infantry, officers and drummers trained while it saves for a building,
 //     so loose men make up regiments; farmers put on the grain fields it builds;
@@ -216,9 +218,33 @@
       return best;
     };
   }
+  // In contact a regiment keeps its line: the commander re-issues positions every
+  // few seconds, and each small shift sent the men into march column and back.
+  // An engaged regiment ignores shifts of less than holdShift and moves larger
+  // distances in line - except in a retreat.
+  function installSteadyLines() {
+    if (state.steadyLines || typeof orderGroupPathV06 !== 'function') return;
+    state.steadyLines = true;
+    const baseOrder = orderGroupPathV06;
+    orderGroupPathV06 = function orderGroupPathSteady(reg, x, y, formation, facing) {
+      if (reg && !reg.destroyed && reg.side === 'britain' && C.state !== 'RETREAT') {
+        const m = regimentMembers(reg);
+        if (m.length) {
+          const c = centroid(m);
+          const engaged = fighting('france').some(e => Math.hypot(e.x - c.x, e.y - c.y) < cfg.contactRange);
+          if (engaged) {
+            if (Math.hypot(x - c.x, y - c.y) < cfg.holdShift) { state.heldOrders = (state.heldOrders || 0) + 1; return false; }
+            if (formation === 'column' && reg.formation !== 'column') { formation = reg.formation === 'square' ? 'square' : 'line'; state.keptLines = (state.keptLines || 0) + 1; }
+          }
+        }
+      }
+      return baseOrder(reg, x, y, formation, facing);
+    };
+  }
   const baseDevelop = aiDevelop;
   aiDevelop = function aiDevelopWithPressure() {
     installBuildingTargets();
+    installSteadyLines();
     baseDevelop();
     if (gameOver) return;
     fleeHome();
@@ -231,6 +257,6 @@
   global.__AI_PRESSURE_V1__ = Object.freeze({
     version: 'ai-campaign-pressure-v1', config: cfg,
     stats: () => ({ waves: state.waves, nextWaveAt: Math.round(state.nextWaveAt), state: C.state, rebalanced: state.rebalanced,
-      trained: state.trained, farmers: state.farmers || 0, sentHome: state.sentHome || 0, rallied: state.rallied || 0, buildingTargets: !!state.buildingTargets, log: state.log.slice() })
+      trained: state.trained, farmers: state.farmers || 0, sentHome: state.sentHome || 0, heldOrders: state.heldOrders || 0, keptLines: state.keptLines || 0, rallied: state.rallied || 0, buildingTargets: !!state.buildingTargets, log: state.log.slice() })
   });
 })(window);
