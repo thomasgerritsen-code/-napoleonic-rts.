@@ -266,6 +266,9 @@ function clearOfBuildings(P,wide=0){
  }
  return P;
 }
+// Room a formation keeps from walls beyond its half width: the men on its edges
+// step a little wide of their slots while it wheels.
+const DETOUR_SPARE=1.2;
 // Half the width of a formation, for detours.
 const halfWidth=reg=>reg.formation==='line'?reg.line.files*LINE.spacing/2:COLUMN.files*COLUMN.spacing/2;
 const SQUAD={ranks:2,files:3,walk:3.2,trot:4.5,gallop:7.5,stride:2.4,trotStride:2.8,gallopStride:3.6,walkFor:1.2,trotFor:1.5,
@@ -445,7 +448,7 @@ function updateRegiments(){
      // Round buildings: head for a way point first (held until reached).
      if(cmd.via&&Math.hypot(cmd.via.x-A.cx,cmd.via.y-A.cy)<1)cmd.via=null;
      if(!cmd.via){
-       cmd.via=route({x:A.cx,y:A.cy},cmd.dest,wide,Math.ceil(aliveMen(reg).length/COLUMN.files)*COLUMN.gap/2+1);
+       cmd.via=route({x:A.cx,y:A.cy},cmd.dest,wide+DETOUR_SPARE,Math.ceil(aliveMen(reg).length/COLUMN.files)*COLUMN.gap/2+1);
        if(cmd.via)state.detours=(state.detours||0)+1;
        // A line cannot cross a bridge: it goes over in column and forms line again beyond.
        if(cmd.via&&cmd.via.bridge){state.bridgeCrossings=(state.bridgeCrossings||0)+(bankOf(state.streams[0],{x:A.cx,y:A.cy})*(cmd.via.x-state.bridges[0].x)>0?1:0);
