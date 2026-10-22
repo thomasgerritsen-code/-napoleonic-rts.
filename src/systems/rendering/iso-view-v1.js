@@ -1064,9 +1064,12 @@
       const up = deck ? deck.h * LIFT * z() : sunk ? -depth * PPM * LIFT * z() : 0, Y = gy(u.x, u.y) - up;
       const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
       if (deck) st.onBridge++;
-      // Men in a trench are drawn behind its bank (the bank hides their legs).
+      // Men in a trench: with the bank on the near side (enemy to the south)
+      // they are drawn before it and it hides their legs; with the bank on the
+      // far side they are drawn after it, standing in front of it.
+      const ridge = sunk && sunk.y + Math.sin(sunk.facing) * (sunk.width / 2 + 7);
       const key = deck ? Math.max(u.y, deck.b.y + deck.b.width / 2 + 1)
-        : sunk ? Math.min(u.y, sunk.y + Math.sin(sunk.facing) * (sunk.width / 2 + 7) - 0.5) : u.y;
+        : sunk ? (Math.sin(sunk.facing) > 0 ? Math.min(u.y, ridge - 0.5) : Math.max(u.y, ridge + 0.5)) : u.y;
       if (sunk) st.inTrench = (st.inTrench || 0) + 1;
       list.push({ y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
         // A faint ring in the side's colour under every man, horse and gun.
