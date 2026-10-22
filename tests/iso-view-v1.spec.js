@@ -44,10 +44,14 @@ test('with ?view=iso the game is drawn with the Blender sprites, terrain and pro
   expect(s.ppm).toBe(22.5);
   expect(s.props).toBeGreaterThan(5);
   await expect(page.locator('#isoViewToggle')).toHaveText('🗺 2D-kaart');
-  // Iso projection: the ground is squashed to half height.
+  // Iso projection: the ground is squashed to half height (give or take the
+  // slope of the relief), and a screen point maps back to itself.
   const dy = await page.evaluate(() => screenToWorld(innerWidth / 2, innerHeight / 2 + 100).y - screenToWorld(innerWidth / 2, innerHeight / 2).y);
   const zoom = await page.evaluate(() => camera.zoom);
-  expect(dy).toBeCloseTo(200 / zoom, 3);
+  expect(dy).toBeGreaterThan(200 / zoom * 0.75);
+  expect(dy).toBeLessThan(200 / zoom * 1.35);
+  const round = await page.evaluate(() => { const w = screenToWorld(400, 300), p = worldToScreen(w.x, w.y); return Math.hypot(p.x - 400, p.y - 300); });
+  expect(round).toBeLessThan(0.5);
   expect(errors).toEqual([]);
 });
 
@@ -109,14 +113,16 @@ test('iso view: the toggle switches to the 2D map and back, with the matching pr
   const errors = await openGame(page, 'test=iso-toggle&view=iso');
   await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 0, null, { timeout: 60_000 });
   const dy = () => page.evaluate(() => (screenToWorld(innerWidth / 2, innerHeight / 2 + 100).y - screenToWorld(innerWidth / 2, innerHeight / 2).y) * camera.zoom);
-  expect(await dy()).toBeCloseTo(200, 3);
+  // Iso: about 200 (the relief bends it a little); 2D: exactly 100.
+  const isoDy = async () => { const d = await dy(); expect(d).toBeGreaterThan(150); expect(d).toBeLessThan(270); };
+  await isoDy();
   await page.locator('#isoViewToggle').click();
   await expect(page.locator('#isoViewToggle')).toHaveText('🏰 Iso-weergave');
   expect(await page.evaluate(() => window.__ISO_VIEW_V1__.isOn())).toBe(false);
   expect(await dy()).toBeCloseTo(100, 3);
   await page.locator('#isoViewToggle').click();
   expect(await page.evaluate(() => window.__ISO_VIEW_V1__.isOn())).toBe(true);
-  expect(await dy()).toBeCloseTo(200, 3);
+  await isoDy();
   expect(errors).toEqual([]);
 });
 
@@ -188,6 +194,19 @@ test('iso view: the battlefield ground, woods and peasants come from Blender', a
   expect(s.woodTrees).toBeGreaterThan(50);
   // Peasants drawn as sprites, not the stand-in figures.
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().workers === 0 && window.__ISO_VIEW_V1__.stats().sprites > 10);
+  // Relief: hills metres high; on a hilltop a man is drawn higher than on flat
+  // ground, and a click on the screen finds the ground point it shows.
+  expect(s.relief).toBeGreaterThan(5);
+  const r = await page.evaluate(() => {
+    const hill = TERRAIN_HILLS.reduce((a, b) => (b.height || 0) > (a.height || 0) ? b : a);
+    camera.x = hill.x; camera.y = hill.y; camera.zoom = 1;
+    const p = worldToScreen(hill.x, hill.y), back = screenToWorld(p.x, p.y);
+    const flat = (hill.y - camera.y) * camera.zoom * 0.5 + innerHeight / 2;
+    return { up: flat - p.y, dx: back.x - hill.x, dy: back.y - hill.y };
+  });
+  expect(r.up).toBeGreaterThan(3 * 22.5 * 0.866);
+  expect(Math.abs(r.dx)).toBeLessThan(1);
+  expect(Math.abs(r.dy)).toBeLessThan(3);
   expect(errors).toEqual([]);
 });
 

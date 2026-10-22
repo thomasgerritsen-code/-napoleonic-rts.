@@ -1,6 +1,6 @@
 'use strict';
 // ---------- Open map v1 (iso view only: ?view=iso) ----------
-// The iso view plays on an open map: fewer, smaller villages, well apart. Runs
+// The iso view plays on an open map: fewer, smaller villages, well apart, and more hills. Runs
 // right after village-collision-v4 so navigation obstacles, ecology, building
 // placement and rendering all see the same thinned villages. On the normal map
 // (config.world.village.open is null) it does nothing.
@@ -26,7 +26,22 @@
   }));
   global.__VILLAGE_SCENERY_V4_DATA__ = thinned;
   global.VILLAGE_SCENERY_V4 = thinned;
-  global.__OPEN_MAP_V1__ = Object.freeze({
+  // More relief: hills across the open country east and south of the river, clear
+  // of the bases and villages. They are hill terrain to the game as the first three
+  // (a little slower going); the iso view raises them (height in metres).
+  const HILLS = [
+    { x: 4200, y: 650, rx: 460, ry: 260, height: 10 }, { x: 5500, y: 1300, rx: 520, ry: 300, height: 13 },
+    { x: 6900, y: 900, rx: 480, ry: 280, height: 11 }, { x: 4600, y: 2500, rx: 420, ry: 260, height: 8 },
+    { x: 6100, y: 2900, rx: 560, ry: 320, height: 14 }, { x: 3500, y: 3700, rx: 380, ry: 240, height: 8 },
+    { x: 5100, y: 4100, rx: 420, ry: 240, height: 10 }, { x: 900, y: 3800, rx: 380, ry: 240, height: 8 },
+    { x: 3300, y: 2200, rx: 300, ry: 200, height: 7 }
+  ];
+  let hillsAdded = 0;
+  if (typeof TERRAIN_HILLS !== 'undefined' && Array.isArray(TERRAIN_HILLS) && !Object.isFrozen(TERRAIN_HILLS)) {
+    TERRAIN_HILLS.push(...HILLS);
+    hillsAdded = HILLS.length;
+  }
+  global.__OPEN_MAP_V1__ = Object.freeze({ hillsAdded,
     version: 'open-map-v1', before,
     after: { villages: thinned.length, houses: thinned.reduce((n, v) => n + v.houses.length, 0) }
   });

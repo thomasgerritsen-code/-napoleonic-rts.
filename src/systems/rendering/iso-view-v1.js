@@ -43,10 +43,31 @@
   const sx = wx => (wx - camera.x) * z() + innerWidth / 2;
   const sy = wy => (wy - camera.y) * z() * SQ + innerHeight / 2;
   const spriteK = () => z() * PPM / SPRITE_PPM;
-  function isoScreenToWorld(px, py) {
-    return { x: (px - innerWidth / 2) / camera.zoom + camera.x, y: (py - innerHeight / 2) / (camera.zoom * SQ) + camera.y };
+  // Relief: ground heights from the Blender ground (ground.json "relief", metres
+  // on a grid in game metres, stored as cm). A point h metres up shows h*LIFT
+  // higher on screen, so everything standing on the ground is lifted by it.
+  function heightPx(wx, wy) {
+    const R = view.relief; if (!R) return 0;
+    const fj = (wx / PPM - R.x0) / R.cell, fi = (wy / PPM - R.y0) / R.cell;
+    const j = Math.min(Math.max(Math.floor(fj), 0), R.cols - 2), i = Math.min(Math.max(Math.floor(fi), 0), R.rows - 2);
+    const u = Math.min(Math.max(fj - j, 0), 1), v = Math.min(Math.max(fi - i, 0), 1), H = R.cm, c = R.cols;
+    const top = H[i * c + j] * (1 - u) + H[i * c + j + 1] * u, bottom = H[(i + 1) * c + j] * (1 - u) + H[(i + 1) * c + j + 1] * u;
+    return (top * (1 - v) + bottom * v) / 100 * PPM;
   }
-  function isoWorldToScreen(wx, wy) { return { x: sx(wx), y: sy(wy) }; }
+  const liftAt = (wx, wy) => heightPx(wx, wy) * LIFT * z();
+  const gy = (wx, wy) => sy(wy) - liftAt(wx, wy);
+  // Flat inverse (the ground image itself), and the inverse onto the relief: the
+  // ground point whose lifted screen position is (px, py). Raised ground shows
+  // higher, so that point lies south of the flat one; found by bisection.
+  const flatScreenToWorld = (px, py) => ({ x: (px - innerWidth / 2) / camera.zoom + camera.x, y: (py - innerHeight / 2) / (camera.zoom * SQ) + camera.y });
+  function isoScreenToWorld(px, py) {
+    const p = flatScreenToWorld(px, py);
+    if (!view.relief) return p;
+    let lo = p.y, hi = p.y + (view.relief.maxM + 1) * PPM * LIFT / SQ;
+    for (let k = 0; k < 24; k++) { const mid = (lo + hi) / 2; if (gy(p.x, mid) < py) lo = mid; else hi = mid; }
+    return { x: p.x, y: (lo + hi) / 2 };
+  }
+  function isoWorldToScreen(wx, wy) { return { x: sx(wx), y: gy(wx, wy) }; }
   const topDown = { s2w: screenToWorld, w2s: worldToScreen };
 
   // ---- atlases (the lab's, half resolution unless ?hd=1) ----
@@ -86,7 +107,15 @@
   function loadGround() {
     const dir = ASSETS + 'iso/game/';
     return fetch(dir + 'ground.json').then(r => r.ok ? r.json() : null).then(meta => meta && loadImage(dir + meta.image)
-      .then(img => { view.ground = { ...meta, img, k: meta.pxPerM / meta.gamePxPerM }; view.woodTrees = null; }))
+      .then(img => {
+        view.ground = { ...meta, img, k: meta.pxPerM / meta.gamePxPerM, pad: meta.padTop || 0 };
+        const R = meta.relief;
+        if (R && R.data) {
+          const bytes = Uint8Array.from(atob(R.data), ch => ch.charCodeAt(0));
+          view.relief = { ...R, data: null, cm: new Uint16Array(bytes.buffer, 0, R.cols * R.rows) };
+        }
+        view.woodTrees = null;
+      }))
       .catch(err => console.warn('iso: grond', err));
   }
   // Village buildings: one sheet per kind with 16 headings (scripts/render-iso-village.py).
@@ -123,7 +152,7 @@
   function houseDrawable(house) {
     const V = view.village, kind = V && kindOf(house), meta = V && V.kinds[kind];
     if (!meta) return null;
-    const X = sx(house.x), Y = sy(house.y), reach = house.w * VILLAGE_SCALE * z();
+    const X = sx(house.x), Y = gy(house.x, house.y), reach = house.w * VILLAGE_SCALE * z();
     if (X < -reach || X > innerWidth + reach || Y < -reach * 0.6 || Y > innerHeight + reach * 1.4) return null;
     const heading = headingOf(house, V.headings), f = meta.frames[heading];
     if (detailed()) chimneys(house, kind, meta, heading);
@@ -190,7 +219,7 @@
   }
   function dressingDrawable(it) {
     if (!detailed()) return null;
-    const X = sx(it.x), Y = sy(it.y);
+    const X = sx(it.x), Y = gy(it.x, it.y);
     if (X < -150 || X > innerWidth + 150 || Y < -60 || Y > innerHeight + 220) return null;
     if (it.prop) {
       const prop = view.props[it.prop]; if (!prop) return null;
@@ -219,7 +248,7 @@
     return trees;
   }
   function woodTreeDrawable(tr) {
-    const X = sx(tr.x), Y = sy(tr.y);
+    const X = sx(tr.x), Y = gy(tr.x, tr.y);
     if (X < -150 || X > innerWidth + 150 || Y < -30 || Y > innerHeight + 260) return null;
     const prop = view.props[tr.kind]; if (!prop) return null;
     const k = spriteK() * tr.scale;
@@ -245,7 +274,7 @@
     return null;
   }
   function bridgeDrawable(b) {
-    const X = sx(b.x), Y = sy(b.y);
+    const X = sx(b.x), Y = gy(b.x, b.y);
     if (X < -400 || X > innerWidth + 400 || Y < -150 || Y > innerHeight + 200) return null;
     const kind = bridgeKind(b), prop = view.props[kind]; if (!prop) return null;
     const k = spriteK() * b.length / (BRIDGE_DECKS[kind][0] * PPM);
@@ -263,9 +292,9 @@
       const men = regimentMembers(reg).filter(u => !u.dead); if (!men.length) continue;
       const c = centroid(men);
       if (Math.hypot(reg.targetX - c.x, reg.targetY - c.y) < 28) continue;
-      const fx = sx(reg.targetX), fy = sy(reg.targetY);
+      const fx = sx(reg.targetX), fy = gy(reg.targetX, reg.targetY);
       ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(245,220,112,.75)'; ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(sx(c.x), sy(c.y)); ctx.lineTo(fx, fy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(sx(c.x), gy(c.x, c.y)); ctx.lineTo(fx, fy); ctx.stroke(); ctx.setLineDash([]);
       const wave = Math.sin(now * 6 + reg.id) * 2, pole = 30;
       ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(fx, fy, 6, 3, 0, 0, 7); ctx.fill();
       ctx.strokeStyle = '#2b2118'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - pole); ctx.stroke();
@@ -278,13 +307,13 @@
       for (const u of units) {
         if (u.dead || !view.attack.ids.has(u.id)) continue;
         const r = (u.type === 'cavalry' ? 1.1 : 0.55) * PPM * z();
-        ctx.moveTo(sx(u.x) + r, sy(u.y)); ctx.ellipse(sx(u.x), sy(u.y), r, r * SQ, 0, 0, 7);
+        ctx.moveTo(sx(u.x) + r, gy(u.x, u.y)); ctx.ellipse(sx(u.x), gy(u.x, u.y), r, r * SQ, 0, 0, 7);
       }
       ctx.stroke(); ctx.setLineDash([]);
       // And a sight over their heads, so the target stands out from the red rings.
       const foes = units.filter(u => !u.dead && view.attack.ids.has(u.id));
       if (foes.length) {
-        const c = centroid(foes), X = sx(c.x), Y = sy(c.y) - 2.6 * LIFT * PPM * z(), r = 11 + Math.sin(now * 5) * 1.5;
+        const c = centroid(foes), X = sx(c.x), Y = gy(c.x, c.y) - 2.6 * LIFT * PPM * z(), r = 11 + Math.sin(now * 5) * 1.5;
         ctx.strokeStyle = 'rgba(235,40,30,.95)'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(X, Y, r, 0, 7);
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(X + dx * (r - 4), Y + dy * (r - 4)); ctx.lineTo(X + dx * (r + 6), Y + dy * (r + 6)); }
         ctx.stroke();
@@ -305,13 +334,13 @@
   // marches to its weapon's reach of that enemy and faces it - the game's own move
   // and facing orders; the fighting itself is the game's.
   function enemyAt(wx, wy) {
-    const px = sx(wx), py = sy(wy), reach = Math.max(14, 26 * z());
+    const px = sx(wx), py = gy(wx, wy), reach = Math.max(14, 26 * z());
     let best = null, bd = reach;
     for (const u of units) {
       if (u.dead || u.side !== 'britain') continue;
       if (typeof isVisibleToFrance === 'function' && !isVisibleToFrance(u)) continue;
       const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
-      const d = Math.min(Math.hypot(sx(u.x) - px, sy(u.y) - lift - py), Math.hypot(sx(u.x) - px, sy(u.y) - py));
+      const d = Math.min(Math.hypot(sx(u.x) - px, gy(u.x, u.y) - lift - py), Math.hypot(sx(u.x) - px, gy(u.x, u.y) - py));
       if (d < bd) { best = u; bd = d; }
     }
     return best;
@@ -358,7 +387,7 @@
     const on = !!global.__TOPDOWN_AUDIO_V265__?.enabled?.();
     if (on !== A.isOn()) A.setOn(on);
     if (!on) return;
-    const onScreen = u => { const X = sx(u.x), Y = sy(u.y); return X > 0 && X < innerWidth && Y > 0 && Y < innerHeight; };
+    const onScreen = u => { const X = sx(u.x), Y = gy(u.x, u.y); return X > 0 && X < innerWidth && Y > 0 && Y < innerHeight; };
     // Hooves: one beat stream for the galloping horse in view.
     const gallop = units.filter(u => !u.dead && u.type === 'cavalry' && onScreen(u) && (view.info.get(u.id)?.speed || 0) > 4.2);
     if (gallop.length && now >= labAudio.hoofAt) {
@@ -427,7 +456,7 @@
     const img = puff('m');
     for (const p of view.chimneySmoke) {
       const age = (now - p.born) / p.life, r = (p.size + age * p.size * 3) * z();
-      const x = sx(p.wx + age * p.life * 6 + Math.sin(age * 5 + p.seed * 9) * 3), y = sy(p.wy) - (p.lift + age * p.life * 9) * z();
+      const x = sx(p.wx + age * p.life * 6 + Math.sin(age * 5 + p.seed * 9) * 3), y = gy(p.wx, p.wy) - (p.lift + age * p.life * 9) * z();
       ctx.globalAlpha = 0.32 * (1 - age) * Math.min(1, age * 6); ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
     }
     ctx.globalAlpha = 1; view.stats.chimneySmoke = view.chimneySmoke.length;
@@ -496,13 +525,15 @@
     const G = view.ground, dpr = canvas.width / Math.max(1, innerWidth);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#31402a'; ctx.fillRect(0, 0, innerWidth, innerHeight);
-    const a = isoScreenToWorld(0, 0), b = isoScreenToWorld(innerWidth, innerHeight);
-    const x0 = Math.max(0, a.x), y0 = Math.max(0, a.y), x1 = Math.min(WORLD.width, b.x), y1 = Math.min(WORLD.height, b.y);
-    if (x1 <= x0 || y1 <= y0) return;
-    // Only the part on screen is copied: image pixels per game pixel are k across and k/2 down.
+    // Only the part on screen is copied: image pixels per game pixel are k across and
+    // k/2 down; game (0, 0) at height 0 sits on image row pad (room above for the
+    // raised northern edge). The image already shows the relief.
+    const a = flatScreenToWorld(0, 0), b = flatScreenToWorld(innerWidth, innerHeight), k = G.k, h = k / 2;
+    const c0 = Math.max(0, a.x * k), c1 = Math.min(G.img.width, b.x * k);
+    const r0 = Math.max(0, G.pad + a.y * h), r1 = Math.min(G.img.height, G.pad + b.y * h);
+    if (c1 <= c0 || r1 <= r0) return;
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(G.img, x0 * G.k, y0 * G.k / 2, (x1 - x0) * G.k, (y1 - y0) * G.k / 2,
-      sx(x0), sy(y0), (x1 - x0) * z(), (y1 - y0) * z() * SQ);
+    ctx.drawImage(G.img, c0, r0, c1 - c0, r1 - r0, sx(c0 / k), sy((r0 - G.pad) / h), (c1 - c0) / k * z(), (r1 - r0) / h * z() * SQ);
   }
   function drawTerrain() {
     if (view.ground) { drawGround(); view.stats.ground = true; return; }
@@ -666,14 +697,14 @@
     // Fit the rendered building to the game's footprint (a little larger: the
     // props carry their eaves and yard beyond the walls).
     const k = b.w * z() * 1.45 / prop.w;
-    return { y: b.y + b.h * 0.3, box: box(sx(b.x), sy(b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+    return { y: b.y + b.h * 0.3, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       ctx.globalAlpha *= b.complete === false ? 0.45 + 0.5 * (b.construction || 0) : 1;
-      ctx.drawImage(prop.image, sx(b.x) - prop.pivot.x * k, sy(b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
+      ctx.drawImage(prop.image, sx(b.x) - prop.pivot.x * k, gy(b.x, b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       ctx.globalAlpha = 1; view.stats.props++;
     } };
   }
   function drawFarm(b) {
-    const x = sx(b.x - b.w / 2), y = sy(b.y - b.h / 2), w = b.w * z(), h = b.h * z() * SQ;
+    const x = sx(b.x - b.w / 2), y = sy(b.y - b.h / 2) - liftAt(b.x, b.y), w = b.w * z(), h = b.h * z() * SQ;
     ctx.fillStyle = b.complete === false ? 'rgba(150,130,80,.55)' : '#b59b52'; ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = 'rgba(90,70,30,.45)'; ctx.lineWidth = 1;
     for (let i = 1; i < 8; i++) { ctx.beginPath(); ctx.moveTo(x, y + h * i / 8); ctx.lineTo(x + w, y + h * i / 8); ctx.stroke(); }
@@ -684,19 +715,19 @@
     if (r.type === 'wood') {
       const prop = view.props[hash(r.id, 3) < 0.65 ? 'oak' : 'poplar']; if (!prop) return null;
       const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25);
-      return { y: r.y, box: box(sx(r.x), sy(r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
-        ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, sy(r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
+      return { y: r.y, box: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+        ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
     }
     if (r.type === 'iron') return { y: r.y, draw: () => drawRock(r) };
     const prop = view.props.bush; if (!prop) return null;
     return { y: r.y, draw: () => { const k = spriteK() * 0.75;
-      ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, sy(r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
+      ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       ctx.fillStyle = '#8c1f2a'; for (let i = 0; i < 5; i++) { ctx.beginPath();
-        ctx.arc(sx(r.x) + (hash(r.id, i) - .5) * 18 * z(), sy(r.y) - (4 + hash(i, r.id) * 10) * z(), 1.6 * z() + .6, 0, 7); ctx.fill(); }
+        ctx.arc(sx(r.x) + (hash(r.id, i) - .5) * 18 * z(), gy(r.x, r.y) - (4 + hash(i, r.id) * 10) * z(), 1.6 * z() + .6, 0, 7); ctx.fill(); }
       view.stats.props++; } };
   }
   function drawRock(r) {
-    const x = sx(r.x), y = sy(r.y), s = 9 * z() + 2;
+    const x = sx(r.x), y = gy(r.x, r.y), s = 9 * z() + 2;
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x + s * .2, y + s * .1, s * 1.2, s * .45, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#7c7a73'; ctx.beginPath(); ctx.moveTo(x - s, y); ctx.lineTo(x - s * .5, y - s * 1.1); ctx.lineTo(x + s * .4, y - s * 1.3);
     ctx.lineTo(x + s, y - s * .3); ctx.lineTo(x + s * .6, y + s * .2); ctx.closePath(); ctx.fill();
@@ -705,7 +736,7 @@
   }
   // Workers have no sprites yet: a peasant in a smock and hat, facing his way.
   function drawWorker(u, m) {
-    const x = sx(u.x), y = sy(u.y), s = z() * PPM, bob = m.moving ? Math.sin(m.walk * 7) * .04 * s : 0;
+    const x = sx(u.x), y = gy(u.x, u.y), s = z() * PPM, bob = m.moving ? Math.sin(m.walk * 7) * .04 * s : 0;
     ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(x, y, .32 * s, .14 * s, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#4b3b2a'; ctx.fillRect(x - .16 * s, y - .8 * s * LIFT + bob, .12 * s, .8 * s * LIFT); ctx.fillRect(x + .04 * s, y - .8 * s * LIFT - bob, .12 * s, .8 * s * LIFT);
     ctx.fillStyle = u.side === 'france' ? '#c9c2a8' : '#b9b49c'; ctx.fillRect(x - .24 * s, y - 1.45 * s * LIFT, .48 * s, .72 * s * LIFT);
@@ -730,7 +761,7 @@
     for (const s of view.smoke) {
       // Smoke stays thin enough to see the men through it (thinner still in Overzicht).
       const age = (now - s.born) / s.life, r = (s.size + age * 1.2) * PPM * z();
-      const x = sx(s.wx + wind * (now - s.born) * PPM), y = sy(s.wy) - (s.h + age * 1.6) * LIFT * PPM * z();
+      const x = sx(s.wx + wind * (now - s.born) * PPM), y = gy(s.wx, s.wy) - (s.h + age * 1.6) * LIFT * PPM * z();
       ctx.globalAlpha = (1 - age) * (view.overview ? 0.22 : 0.42); ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
     }
     ctx.globalAlpha = 1; view.stats.smoke = view.smoke.length;
@@ -739,7 +770,7 @@
     ctx.fillStyle = 'rgba(30,28,24,.9)';
     for (const p of projectiles) {
       if (p.dead) continue;
-      ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y) - 1.2 * LIFT * PPM * z(), Math.max(1, 1.4 * z()), 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx(p.x), gy(p.x, p.y) - 1.2 * LIFT * PPM * z(), Math.max(1, 1.4 * z()), 0, 7); ctx.fill();
     }
   }
   const fog = document.createElement('canvas'), fogCtx2 = fog.getContext('2d');
@@ -755,7 +786,7 @@
       fogCtx2.globalCompositeOperation = 'destination-out'; fogCtx2.fillStyle = '#000';
       for (const s of frenchVisionSources()) {
         const r = visionRadius(s) * z() / 2;
-        fogCtx2.beginPath(); fogCtx2.ellipse(sx(s.x) / 2, sy(s.y) / 2, r, r * SQ, 0, 0, 7); fogCtx2.fill();
+        fogCtx2.beginPath(); fogCtx2.ellipse(sx(s.x) / 2, gy(s.x, s.y) / 2, r, r * SQ, 0, 0, 7); fogCtx2.fill();
       }
       fogCtx2.globalCompositeOperation = 'source-over';
     }
@@ -766,11 +797,11 @@
     for (const u of selectedUnits) {
       if (u.dead) continue;
       const r = (u.type === 'cavalry' ? 1.2 : u.type === 'artillery' ? 1.4 : 0.5) * PPM * z();
-      ctx.moveTo(sx(u.x) + r, sy(u.y)); ctx.ellipse(sx(u.x), sy(u.y), r, r * SQ, 0, 0, 7);
+      ctx.moveTo(sx(u.x) + r, gy(u.x, u.y)); ctx.ellipse(sx(u.x), gy(u.x, u.y), r, r * SQ, 0, 0, 7);
     }
     ctx.stroke();
     const b = typeof selectedBuilding !== 'undefined' ? selectedBuilding : null;
-    if (b && !b.dead) { ctx.strokeRect(sx(b.x - b.w / 2), sy(b.y - b.h / 2), b.w * z(), b.h * z() * SQ); }
+    if (b && !b.dead) { ctx.strokeRect(sx(b.x - b.w / 2), sy(b.y - b.h / 2) - liftAt(b.x, b.y), b.w * z(), b.h * z() * SQ); }
   }
   function drawDragBox() {
     if (!drag.active || !drag.moved || buildMode) return;
@@ -795,8 +826,8 @@
       const m = infoOf(u); track(u, m, t, dt);
       if (!visible(u)) continue;
       const X = sx(u.x);
-      if (X < -80 || X > innerWidth + 80 || sy(u.y) < -40 || sy(u.y) > innerHeight + 140) continue;
-      const deck = deckAt(u.x, u.y), up = deck ? deck.h * LIFT * z() : 0, Y = sy(u.y) - up;
+      if (X < -80 || X > innerWidth + 80 || gy(u.x, u.y) < -40 || gy(u.x, u.y) > innerHeight + 140) continue;
+      const deck = deckAt(u.x, u.y), up = deck ? deck.h * LIFT * z() : 0, Y = gy(u.x, u.y) - up;
       const lift = (u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * LIFT * PPM * z();
       if (deck) st.onBridge++;
       const key = deck ? Math.max(u.y, deck.b.y + deck.b.width / 2 + 1) : u.y;
@@ -819,7 +850,7 @@
       view.info.delete(id);
     }
     for (const c of view.corpses) {
-      const X = sx(c.x), Y = sy(c.y);
+      const X = sx(c.x), Y = gy(c.x, c.y);
       if (X < -60 || X > innerWidth + 60 || Y < -40 || Y > innerHeight + 80) continue;
       list.push({ y: c.y - 0.5, draw: () => drawSprite(view.atlases[c.key], c.anim, Math.min(3, Math.floor((t - c.t0) / DIE_FRAME)), X, Y, k) });
     }
@@ -832,7 +863,7 @@
     if (view.props.oak && !view.woodTrees) view.woodTrees = buildWoodTrees();
     for (const tr of view.woodTrees || []) { const d = woodTreeDrawable(tr); if (d) list.push(d); }
     for (const r of resources) {
-      const X = sx(r.x), Y = sy(r.y);
+      const X = sx(r.x), Y = gy(r.x, r.y);
       if (X < -120 || X > innerWidth + 120 || Y < -30 || Y > innerHeight + 260) continue;
       const d = resourceDrawable(r); if (d) list.push(d);
     }
@@ -880,12 +911,12 @@
   // A click on a man's body (above his feet) selects him, as a click on his feet would.
   function snapToBody(wx, wy) {
     if (!view.on) return null;
-    const px = sx(wx), py = sy(wy), reach = Math.max(14, 26 * z());
+    const px = sx(wx), py = gy(wx, wy), reach = Math.max(14, 26 * z());
     let best = null, bd = reach;
     for (const u of units) {
       if (u.dead) continue;
       const lift = ((u.type === 'cavalry' ? 1.6 : u.type === 'artillery' ? 0.5 : 0.9) * PPM + (deckAt(u.x, u.y)?.h || 0)) * LIFT * z();
-      const d = Math.hypot(sx(u.x) - px, sy(u.y) - lift - py);
+      const d = Math.hypot(sx(u.x) - px, gy(u.x, u.y) - lift - py);
       if (d < bd) { best = u; bd = d; }
     }
     return best;
@@ -936,15 +967,15 @@
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
       workerSprites: !!view.atlases.frw, labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
-      villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
-    screenOf: (wx, wy) => ({ x: sx(wx), y: sy(wy) }),
+      relief: view.relief ? view.relief.maxM : 0, villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
+    screenOf: (wx, wy) => ({ x: sx(wx), y: gy(wx, wy) }),
     // Door direction of each village house against its gate on the road (for tests).
     doorCheck: () => villageHouses().filter(h => Number.isFinite(h.accessX)).map(h => {
       const psi = headingOf(h, view.village ? view.village.headings : 16) * 2 * Math.PI / (view.village ? view.village.headings : 16);
       const fx = Math.sin(psi), fy = Math.cos(psi), gx = h.accessX - h.x, gy = h.accessY - h.y, l = Math.hypot(gx, gy) || 1;
       return (fx * gx + fy * gy) / l;
     }),
-    bodyOf: u => ({ x: sx(u.x), y: sy(u.y) - ((u.type === 'cavalry' ? 1.6 : 0.9) * PPM + (deckAt(u.x, u.y)?.h || 0)) * LIFT * z() }),
+    bodyOf: u => ({ x: sx(u.x), y: gy(u.x, u.y) - ((u.type === 'cavalry' ? 1.6 : 0.9) * PPM + (deckAt(u.x, u.y)?.h || 0)) * LIFT * z() }),
     deckAt
   });
 })(window);

@@ -49,6 +49,22 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   weergave allemaal dezelfde dunne dorpen.
 - `NRTS_CONFIG.world.mapVariant` is `'open'` of `'standard'`.
 
+## Reliëf
+
+- Het landschap golft: zacht glooiend land (zo'n 1 à 3 m), de heuvels van de game als
+  brede ruggen (7 tot 14 m; op de open kaart 9 extra heuvels ten oosten en zuiden van de
+  rivier, die voor de game ook "heuvel" zijn: iets trager terrein), een dal dat naar de
+  rivier afloopt, en een vlak terras onder elk dorpshuis. Hoogste punt ~16 m.
+- `scripts/render-iso-gamemap.py` maakt die hoogtes (1 m-raster) en rendert het terrein
+  erop: wegen, rivier, erven en bosgrond liggen over de heuvels; een lagere zon laat
+  de hellingen zien, en het gras is in het dal groener en op de toppen droger.
+- Dezelfde hoogtes staan in `ground.json` (`relief`, 2 m-raster in cm). De
+  iso-weergave tilt alles wat op de grond staat erop: soldaten, ruiters, kanonnen,
+  lijken, huizen, bomen, bruggen, rook, vlaggetjes, ringen en de mist. Een klik zoekt
+  het punt op de helling dat je aanwijst.
+- Hellingen naar het noorden blijven onder 30° (steiler zou je vanuit de camera niet
+  meer zien).
+
 ## Rivier en bruggen
 
 - De **rivier** loopt als één band door, boven de wegen en door de heuvels heen
@@ -103,9 +119,9 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
 - `scripts/render-iso-gamemap.py` rendert het hele slagveld (356 × 222 m) in Blender uit
   `graphics-lab/assets/iso/game/gamemap.json` (geëxporteerd uit de draaiende game met
   `?view=iso`: 18 wegen, de rivier met 5 bruggen, bossen, heuvels en 54 dorpshuizen): gras met
-  plukjes en bloemen, wegen per klasse met bermen, de rivier (zie boven), donkere bosgrond, lage heuvels, en
-  een erf met moestuin bij elk huis. Resultaat `ground.jpg` (4978 × 1556, 14 px per
-  meter); de iso-weergave tekent alleen het deel dat in beeld is. Zonder die afbeelding
+  plukjes en bloemen, wegen per klasse met bermen, de rivier (zie boven), donkere bosgrond, het reliëf (zie boven), en
+  een erf met moestuin bij elk huis. Resultaat `ground.jpg` (4978 × 1757, 14 px per
+  meter, met ruimte boven voor de verhoogde noordrand); de iso-weergave tekent alleen het deel dat in beeld is. Zonder die afbeelding
   valt hij terug op de 2D-kaart.
 - In de **bossen** van de game staan eiken en populieren als sprites (met open plekken,
   niet op wegen of in de rivier), en ze worden doorzichtig over soldaten erachter.
@@ -164,4 +180,5 @@ weergaven; terug in 2D begint de terreincache opnieuw.
 
 1. De grond opnieuw renderen als de kaart van de game verandert (export + script).
 2. Tekenen via de GPU voor 520 eenheden op zwakke telefoons.
-3. Hoogte: de heuvels zijn laag gehouden omdat eenheden nog niet meeklimmen.
+3. Hoogte in het spel zelf: heuvels zijn nu zichtbaar, maar zicht en schootsveld
+   houden er (nog) geen rekening mee.
