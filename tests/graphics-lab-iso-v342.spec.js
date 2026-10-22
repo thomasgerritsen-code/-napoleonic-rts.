@@ -9,11 +9,11 @@ async function open(page){
   return errors;
 }
 const frames=page=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
-test('v341 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
+test('v342 iso scene loads both Blender atlases and draws every soldier',async({page})=>{
   const errors=await open(page);
   await frames(page);
   const s=await page.evaluate(()=>({...window.__GRAPHICS_LAB_ISO__.getStats(),version:window.__GRAPHICS_LAB_ISO__.version}));
-  expect(s.version).toBe('341.0');
+  expect(s.version).toBe('342.0');
   // Five looks per nation (incl. grenadiers and voltigeurs), all on the field.
   expect(s.loaded).toBe(28);
   // Officer, drummer and ensign lead each regiment.
@@ -27,7 +27,7 @@ test('v341 iso scene loads both Blender atlases and draws every soldier',async({
   expect(await page.locator('#iso-status').textContent()).toContain('gebouwen en terrein');
   expect(errors).toEqual([]);
 });
-test('v341 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
+test('v342 octagon march shows all 8 sprite directions; pause freezes the frame',async({page})=>{
   const errors=await open(page);
   const seen=await page.evaluate(async()=>{
     const api=window.__GRAPHICS_LAB_ISO__,step=()=>new Promise(r=>requestAnimationFrame(r));
@@ -60,7 +60,7 @@ const advance=(page,seconds)=>page.evaluate(async seconds=>{
     const s=api.getStats();for(const k of Object.keys(s.animStates))seen[k]=1;smoke=Math.max(smoke,s.smoke);die=Math.max(die,s.animStates.die||0);}
   return{seen:Object.keys(seen).sort(),smoke,die,stats:api.getStats()};
 },seconds);
-test('v341 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
+test('v342 Vuur! deploys both columns into line, then the ranks fire in turn once each',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.misfireChance=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -83,7 +83,7 @@ test('v341 Vuur! deploys both columns into line, then the ranks fire in turn onc
   expect((await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).firing).toBe(false);
   expect(errors).toEqual([]);
 });
-test('v341 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
+test('v342 casualties fall, the rank behind closes up, the fallen stay and Herstel restores',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=1;s.woundedShare=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -112,7 +112,7 @@ test('v341 casualties fall, the rank behind closes up, the fallen stay and Herst
   expect(after.drawn).toBe(64);
   expect(errors).toEqual([]);
 });
-test('v341 French front rank kneels, some muskets misfire and smoke hangs over the line',async({page})=>{
+test('v342 French front rank kneels, some muskets misfire and smoke hangs over the line',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.misfireChance=0.5;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -127,7 +127,7 @@ test('v341 French front rank kneels, some muskets misfire and smoke hangs over t
   expect(r.stats.missing).toBe(0);
   expect(errors).toEqual([]);
 });
-test('v341 men at rest look around, set their shako or lean on the musket',async({page})=>{
+test('v342 men at rest look around, set their shako or lean on the musket',async({page})=>{
   const errors=await open(page);
   await page.getByRole('button',{name:'Halt'}).click();
   const r=await advance(page,16);
@@ -149,7 +149,7 @@ const CHARGE_RUN=`(async()=>{
     if(s.charge==='rout'&&routAt===null)routAt=i;if(routAt!==null&&i-routAt>260)break;}
   return{phases,seen:Object.keys(seen).sort(),maxGone,stats:api.getStats()};
 })()`;
-test('v341 Bajonet! charges, the front ranks fight, the beaten side routs and the victors cheer',async({page})=>{
+test('v342 Bajonet! charges, the front ranks fight, the beaten side routs and the victors cheer',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   await page.getByRole('button',{name:'Bajonet!'}).click();
@@ -169,7 +169,7 @@ test('v341 Bajonet! charges, the front ranks fight, the beaten side routs and th
   expect(after.drawn).toBe(64);
   expect(errors).toEqual([]);
 });
-test('v341 the wounded go down and crawl to the rear',async({page})=>{
+test('v342 the wounded go down and crawl to the rear',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=1;s.woundedShare=1;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -183,7 +183,7 @@ test('v341 the wounded go down and crawl to the rear',async({page})=>{
   expect(r.stats.animStates.crawl+(r.stats.animStates.die||0)).toBe(total);
   expect(errors).toEqual([]);
 });
-test('v341 sound is off by default; switched on, shots, drums and commands play',async({page})=>{
+test('v342 sound is off by default; switched on, shots, drums and commands play',async({page})=>{
   const errors=await open(page);
   const off=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats().sound);
   expect(off.on).toBe(false);
@@ -206,7 +206,7 @@ test('v341 sound is off by default; switched on, shots, drums and commands play'
   expect(quiet.on).toBe(false);
   expect(errors).toEqual([]);
 });
-test('v341 batteries: the crews work the guns, the guns fire, recoil and are run back up',async({page})=>{
+test('v342 batteries: the crews work the guns, the guns fire, recoil and are run back up',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   const idle=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats());
@@ -236,7 +236,7 @@ test('v341 batteries: the crews work the guns, the guns fire, recoil and are run
   expect(s.missing).toBe(0);
   expect(errors).toEqual([]);
 });
-test('v341 round shot grazes and bounces through the enemy line',async({page})=>{
+test('v342 round shot grazes and bounces through the enemy line',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   await page.getByRole('button',{name:'Vuur!'}).click();
@@ -249,7 +249,7 @@ test('v341 round shot grazes and bounces through the enemy line',async({page})=>
   expect(fallen).toBeLessThanOrEqual(r.stats.ballHits);
   expect(errors).toEqual([]);
 });
-test('v341 Cavalerie!: the squadron walks, trots, gallops in, cuts at the line and rallies back',async({page})=>{
+test('v342 Cavalerie!: the squadron walks, trots, gallops in, cuts at the line and rallies back',async({page})=>{
   const errors=await open(page);
   // Without the British reaction: the squadron reaches the line itself.
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;s.reaction=false;});
@@ -291,7 +291,7 @@ const REACTION_RUN=`(async()=>{
     if(i>40&&!s.cavCharge&&!s.cavCounter&&s.formations[1]!=='square')break;}
   return{fr,br,forms:[...forms],stats:api.getStats()};
 })()`;
-test('v341 the British form square and their squadron rides out to meet the French',async({page})=>{
+test('v342 the British form square and their squadron rides out to meet the French',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{window.__GRAPHICS_LAB_ISO__.state.hitChance=0;});
   await page.getByRole('button',{name:'Cavalerie!'}).click();
@@ -309,7 +309,7 @@ test('v341 the British form square and their squadron rides out to meet the Fren
   expect(r.stats.missing).toBe(0);
   expect(errors).toEqual([]);
 });
-test('v341 winning the clash, the French ride on at the square, where the horses refuse',async({page})=>{
+test('v342 winning the clash, the French ride on at the square, where the horses refuse',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{
     const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;
@@ -324,7 +324,7 @@ test('v341 winning the clash, the French ride on at the square, where the horses
   expect(r.stats.missing).toBe(0);
   expect(errors).toEqual([]);
 });
-test('v341 larger field: minimap shows it all, a tap there moves the camera, Volg follows a regiment',async({page})=>{
+test('v342 larger field: minimap shows it all, a tap there moves the camera, Volg follows a regiment',async({page})=>{
   const errors=await open(page);
   await frames(page);
   const s=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats());
@@ -354,7 +354,7 @@ test('v341 larger field: minimap shows it all, a tap there moves the camera, Vol
 });
 test.describe('phone',()=>{
   test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-  test('v341 iso scene pinch-zooms on a phone',async({page})=>{
+  test('v342 iso scene pinch-zooms on a phone',async({page})=>{
     const errors=await open(page);
     const before=(await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats())).zoom;
     const r=await page.locator('#iso-view').boundingBox();
@@ -370,7 +370,7 @@ test.describe('phone',()=>{
     expect(errors).toEqual([]);
   });
 });
-test('v341 the explanation is hidden until Uitleg is pressed',async({page})=>{
+test('v342 the explanation is hidden until Uitleg is pressed',async({page})=>{
   const errors=await open(page);
   await expect(page.locator('#iso-info')).toBeHidden();
   await page.getByRole('button',{name:'Uitleg'}).click();
@@ -382,7 +382,7 @@ test('v341 the explanation is hidden until Uitleg is pressed',async({page})=>{
 const screen=(page,id)=>page.evaluate(id=>window.__GRAPHICS_LAB_ISO__.groupScreen(id),id);
 const ground=(page,x,y)=>page.evaluate(([x,y])=>window.__GRAPHICS_LAB_ISO__.screenOfGround(x,y),[x,y]);
 const stats=page=>page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.getStats());
-test('v341 click a regiment, click the field: it marches there in column, forms line and fires',async({page})=>{
+test('v342 click a regiment, click the field: it marches there in column, forms line and fires',async({page})=>{
   const errors=await open(page);
   await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.hitChance=0;});
   await page.getByRole('button',{name:'Halt'}).click();
@@ -426,7 +426,7 @@ test('v341 click a regiment, click the field: it marches there in column, forms 
   expect(s.formations[0]).toBe('column');
   expect(errors).toEqual([]);
 });
-test('v341 a box picks the French guns and horse; right-click sends them, the guns fire, the horse charges',async({page})=>{
+test('v342 a box picks the French guns and horse; right-click sends them, the guns fire, the horse charges',async({page})=>{
   const errors=await open(page);
   await page.getByRole('button',{name:'Halt'}).click();
   await frames(page);
@@ -467,7 +467,7 @@ test('v341 a box picks the French guns and horse; right-click sends them, the gu
 });
 test.describe('phone orders',()=>{
   test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-  test('v341 tap a regiment, tap the field: the order is given by touch',async({page})=>{
+  test('v342 tap a regiment, tap the field: the order is given by touch',async({page})=>{
     const errors=await open(page);
     await page.getByRole('button',{name:'Halt'}).click();
     await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state,m=s.regiments[1].men[0];s.camX=m.gx*20;s.camY=-m.gy*10;});
@@ -494,7 +494,7 @@ const run=(page,seconds)=>page.evaluate(async seconds=>{
   return api.getStats();
 },seconds);
 const look=(page,x,y,zoom)=>page.evaluate(([x,y,zoom])=>{const s=window.__GRAPHICS_LAB_ISO__.state;s.camX=x*20;s.camY=-y*10;s.zoom=zoom;s.customZoom=true;},[x,y,zoom]);
-test('v341 a regiment ordered at the enemy horse closes to musket range, faces it and fires; riders fall',async({page})=>{
+test('v342 a regiment ordered at the enemy horse closes to musket range, faces it and fires; riders fall',async({page})=>{
   const errors=await open(page);
   await page.keyboard.press('h');
   await run(page,0.5);
@@ -519,7 +519,7 @@ test('v341 a regiment ordered at the enemy horse closes to musket range, faces i
   expect(toTarget).toBeGreaterThan(0.7);
   expect(errors).toEqual([]);
 });
-test('v341 guns laid on a chosen target fire at it; horse ordered at a battery cuts down the crew',async({page})=>{
+test('v342 guns laid on a chosen target fire at it; horse ordered at a battery cuts down the crew',async({page})=>{
   const errors=await open(page);
   await page.keyboard.press('h');
   await run(page,0.5);
@@ -543,7 +543,7 @@ test('v341 guns laid on a chosen target fire at it; horse ordered at a battery c
   expect(s.crewStates.die||s.crewStates.diefwd||s.crewStates.dieside).toBeTruthy();
   expect(errors).toEqual([]);
 });
-test('v341 keys select and order; Q/E and the buttons wheel 45°; right-drag sets where to go and which way to face',async({page})=>{
+test('v342 keys select and order; Q/E and the buttons wheel 45°; right-drag sets where to go and which way to face',async({page})=>{
   const errors=await open(page);
   await page.keyboard.press('h');
   await run(page,0.5);
@@ -588,7 +588,7 @@ test('v341 keys select and order; Q/E and the buttons wheel 45°; right-drag set
   await expect(page.locator('#iso-pause')).toHaveText('▶ Hervatten');
   expect(errors).toEqual([]);
 });
-test('v341 a regiment sent past the farmhouse marches round it; nobody walks through the walls',async({page})=>{
+test('v342 a regiment sent past the farmhouse marches round it; nobody walks through the walls',async({page})=>{
   const errors=await open(page);
   await page.keyboard.press('h');
   await run(page,0.5);
@@ -613,7 +613,7 @@ test('v341 a regiment sent past the farmhouse marches round it; nobody walks thr
   expect(Math.hypot(dest.x-1,dest.y-3)).toBeGreaterThan(5);
   expect(errors).toEqual([]);
 });
-test('v341 press and hold on the field, then drag: the selection goes there facing the drag',async({page})=>{
+test('v342 press and hold on the field, then drag: the selection goes there facing the drag',async({page})=>{
   const errors=await open(page);
   await page.keyboard.press('h');
   await run(page,0.5);
@@ -636,7 +636,7 @@ test('v341 press and hold on the field, then drag: the selection goes there faci
 });
 test.describe('phone hold',()=>{
   test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-  test('v341 on a phone a held finger dragged sets the facing',async({page})=>{
+  test('v342 on a phone a held finger dragged sets the facing',async({page})=>{
     const errors=await open(page);
     await page.getByRole('button',{name:'Halt'}).click();
     await page.evaluate(()=>{const s=window.__GRAPHICS_LAB_ISO__.state,m=s.regiments[1].men[0];s.camX=m.gx*20;s.camY=-m.gy*10;});
@@ -659,4 +659,60 @@ test.describe('phone hold',()=>{
     expect(s.cam).toEqual(cam);
     expect(errors).toEqual([]);
   });
+});
+// Steps the scene and counts unit-frames standing in the stream off the bridge.
+const wade=(page,seconds,which)=>page.evaluate(async([seconds,which])=>{
+  const api=window.__GRAPHICS_LAB_ISO__,st=api.state,step=()=>new Promise(r=>requestAnimationFrame(r));
+  const P=st.streams[0].points,half=st.streams[0].width/2,b=st.bridges[0];
+  const sx=y=>{if(y<=P[0][1])return P[0][0];for(let i=1;i<P.length;i++)if(y<=P[i][1]){const[a,c]=P[i-1],[d,e]=P[i];return a+(d-a)*(y-c)/(e-c);}return P[P.length-1][0];};
+  let wet=0,onBridge=0;
+  for(let t=0;t<seconds;t+=0.05){st.time+=0.05;await step();
+    const units=which==='fr'?st.regiments[0].men.filter(m=>!m.dead):which==='frcav'?st.squadrons[0].riders.filter(m=>!m.dead):st.batteries.filter(g=>g.prefix==='fr');
+    for(const m of units)if(Math.abs(m.gx-sx(m.gy))<half&&!(Math.abs(m.gx-b.x)<5.8&&Math.abs(m.gy-b.y)<2.4))wet++;
+    onBridge=Math.max(onBridge,api.getStats().onBridge);}
+  return{wet,onBridge,stats:api.getStats()};
+},[seconds,which]);
+test('v342 a regiment sent across the stream crosses on the bridge in column and forms line again beyond',async({page})=>{
+  const errors=await open(page);
+  await page.keyboard.press('h');
+  await run(page,0.5);
+  await page.keyboard.press('1');
+  await page.keyboard.press('l');
+  const s0=await stats(page);
+  expect(s0.streams).toBe(1);
+  expect(s0.bridges).toBe(1);
+  await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.orderMove({x:-50,y:-12}));
+  const a=await wade(page,32,'fr');
+  expect(a.stats.bridgeCrossings).toBe(1);
+  expect(a.stats.formations[0]).toBe('fcolumn');
+  expect(a.onBridge).toBeGreaterThan(4);
+  const b=await wade(page,40,'fr');
+  expect(a.wet+b.wet).toBe(0);
+  expect(b.stats.formations[0]).toBe('line');
+  expect(b.stats.commands[0].moving).toBe(false);
+  expect(b.stats.centres[0].x).toBeLessThan(-48);
+  expect(errors).toEqual([]);
+});
+test('v342 horse and guns go over the bridge too; a flag in the water lands on the bank',async({page})=>{
+  const errors=await open(page);
+  await page.keyboard.press('h');
+  await run(page,0.5);
+  await page.keyboard.press('3');
+  await page.keyboard.press('Shift+2');
+  await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.orderMove({x:-50,y:20}));
+  const c=await wade(page,40,'frcav');
+  expect(c.wet).toBe(0);
+  const g=await wade(page,30,'frbat');
+  expect(g.wet).toBe(0);
+  const pos=await page.evaluate(()=>{const st=window.__GRAPHICS_LAB_ISO__.state;
+    return{cav:st.squadrons[0].riders.filter(m=>!m.dead).map(m=>m.gx),guns:st.batteries.filter(b=>b.prefix==='fr').map(b=>b.home.x)};});
+  pos.cav.forEach(x=>expect(x).toBeLessThan(-44));
+  pos.guns.forEach(x=>expect(x).toBeLessThan(-44));
+  // A flag dropped in the stream is moved onto the bank.
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('4');
+  await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.orderMove({x:-44,y:-30}));
+  const d=await page.evaluate(()=>window.__GRAPHICS_LAB_ISO__.state.regiments[1].cmd.dest);
+  expect(Math.abs(d.x+44)).toBeGreaterThan(2);
+  expect(errors).toEqual([]);
 });

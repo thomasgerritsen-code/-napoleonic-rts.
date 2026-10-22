@@ -539,3 +539,18 @@ Alleen in het Graphics Lab; de speelbare game verandert niet.
 - Een regiment dat op een doel vuurt, rukt pas weer op als het doel duidelijk
   verder weg is (geen heen-en-weer meer rond de grens van de schootsafstand).
 - `getStats()` toont `detours` en `arrow`; `orderMove(dest)` staat op de API voor tests.
+
+## v342 — de beek alleen over de brug
+
+- De beek uit `layout.json` (`streams`) telt nu mee: wie naar de overkant moet,
+  gaat via de stenen brug. Eerst naar het begin van de brug, dan erover, dan pas
+  naar de vlag; dat geldt voor regimenten, kanonnen en ruiters (ook bij een
+  aanval of de Cavalerie!-charge).
+- Een regiment in linie gaat in **colonne** over de brug en vormt aan de overkant
+  weer linie. De colonne loopt aan beide kanten een halve colonnelengte rechtdoor
+  voordat ze draait, zodat de achterhoede niet door het water zwenkt.
+- Op de brug staan mannen, kanonnen en paarden **op het brugdek** (1,55 m hoger,
+  met een korte oprit aan beide kanten) en worden ze na de brug getekend.
+- Een vlag in of vlak naast de beek wordt op de oever gezet waar hij viel
+  (ver genoeg voor de breedte van de formatie).
+- `getStats()` toont `streams`, `bridges`, `bridgeCrossings` en `onBridge`.

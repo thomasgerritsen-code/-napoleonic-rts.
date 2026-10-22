@@ -1,4 +1,4 @@
-// Graphics Lab v341 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v342 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -88,6 +88,8 @@ async function loadScene(){
  await Promise.all(Object.entries(manifest.props).map(async([kind,meta])=>{sprites[kind]={...meta,image:await loadImage('./assets/iso/props/'+meta.image)};}));
  state.terrain={image,scale:S/layout.ground.pxPerM,half:layout.ground.halfSize};
  state.props=layout.props.filter(p=>sprites[p.type]).map(p=>({...p,gx:p.x,gy:p.y,sprite:sprites[p.type],...project(p.x,p.y)}));
+ state.streams=layout.streams||[];
+ state.bridges=layout.props.filter(p=>p.type==='bridge').map(p=>({x:p.x,y:p.y}));
 }
 
 // Each nation has an infantry atlas (drill) and a fallen atlas (three falls).
@@ -207,8 +209,56 @@ function detour(c,e,wide=0){
  }
  return best;
 }
-// A destination inside a building is moved out to just beyond its walls.
+// v342: the stream can only be crossed on the bridge. The stream runs north-south,
+// the bridge (11.6 m long, deck 1.55 m high, 4.8 m wide) carries the road east-west.
+const BRIDGE={half:5.8,width:4.8,deck:1.55,ramp:1.6,reach:6.6};
+function streamX(st,y){
+ const P=st.points;
+ if(y<=P[0][1])return P[0][0];
+ for(let i=1;i<P.length;i++)if(y<=P[i][1]){const [x0,y0]=P[i-1],[x1,y1]=P[i];return x0+(x1-x0)*(y-y0)/(y1-y0||1);}
+ return P[P.length-1][0];
+}
+const bankOf=(st,p)=>p.x<streamX(st,p.y)?-1:1;
+// Way point at the near end of the bridge, then the far end, when c -> e crosses the stream.
+// `long` is half the length of what crosses: it goes straight on that far past
+// each end before it turns, so a column's tail never swings into the water.
+function crossing(c,e,long=0){
+ for(const st of state.streams||[]){
+   const a=bankOf(st,c);if(a===bankOf(st,e))continue;
+   const mid={x:(c.x+e.x)/2,y:(c.y+e.y)/2};
+   const b=(state.bridges||[]).reduce((best,q)=>!best||Math.hypot(q.x-mid.x,q.y-mid.y)<Math.hypot(best.x-mid.x,best.y-mid.y)?q:best,null);
+   if(!b)return null;
+   const near={x:b.x+a*(BRIDGE.reach+long),y:b.y,bridge:true},far={x:b.x-a*(BRIDGE.reach+long),y:b.y,bridge:true};
+   return Math.hypot(c.x-near.x,c.y-near.y)>1.5?near:far;
+ }
+ return null;
+}
+// Next way point: the bridge first, then round buildings.
+const route=(c,e,wide=0,long=0)=>crossing(c,e,long)||detour(c,e,wide);
+// A destination in or right by the stream is moved onto the bank it is on.
+function clearOfWater(P,wide=0){
+ for(const st of state.streams||[]){
+   const x=streamX(st,P.y),need=st.width/2+wide+0.8;
+   if(Math.abs(P.x-x)<need&&!deckAt(P.x,P.y))P={x:x+(P.x<x?-1:1)*need,y:P.y};
+ }
+ return P;
+}
+// Height of the bridge deck under a ground point (0 off the bridge; ramps at the ends).
+function deckAt(gx,gy){
+ for(const b of state.bridges||[]){
+   const dx=Math.abs(gx-b.x),dy=Math.abs(gy-b.y);
+   if(dx<BRIDGE.half&&dy<BRIDGE.width/2)return{b,h:BRIDGE.deck*Math.min(1,(BRIDGE.half-dx)/BRIDGE.ramp)};
+ }
+ return null;
+}
+// Screen point of a ground point, lifted onto the bridge deck and drawn after the bridge.
+function place(gx,gy){
+ const p=project(gx,gy),o=deckAt(gx,gy);if(!o)return p;
+ const bp=project(o.b.x,o.b.y);return{x:p.x,y:p.y-o.h*0.866*S,sortY:Math.max(p.y,bp.y+0.5)};
+}
+// A destination inside a building (or in the stream) is moved out to just beyond it.
 function clearOfBuildings(P,wide=0){
+ P=clearOfWater(P,wide);
  for(const p of state.props){
    const R=OBSTACLE_R[p.type];if(!R)continue;
    const dx=P.x-p.gx,dy=P.y-p.gy,d=Math.hypot(dx,dy),need=R+1+wide;
@@ -383,7 +433,7 @@ function updateRegiments(){
    else if((firing||state.charge)&&reg.formation!=='line')formLine(reg,cmd&&cmd.target&&!state.charge?targetCentre(cmd.target):centres[1-i]);
    else if(cmd){
      // An ordered regiment keeps its own formation off the road.
-     if(cmd.form==='line'&&reg.formation!=='line')formLine(reg,cmd.face);
+     if(cmd.form==='line'&&reg.formation!=='line'&&!cmd.reline)formLine(reg,cmd.face);
      else if(cmd.form==='column'&&reg.formation!=='fcolumn')formFreeColumn(reg,cmd.face);
    }
    else if(!state.halted&&reg.formation!=='column')formColumn(reg);
@@ -394,10 +444,20 @@ function updateRegiments(){
      const A=reg.formation==='line'?reg.line:reg.col,wide=halfWidth(reg);
      // Round buildings: head for a way point first (held until reached).
      if(cmd.via&&Math.hypot(cmd.via.x-A.cx,cmd.via.y-A.cy)<1)cmd.via=null;
-     if(!cmd.via){cmd.via=detour({x:A.cx,y:A.cy},cmd.dest,wide);if(cmd.via)state.detours=(state.detours||0)+1;}
+     if(!cmd.via){
+       cmd.via=route({x:A.cx,y:A.cy},cmd.dest,wide,Math.ceil(aliveMen(reg).length/COLUMN.files)*COLUMN.gap/2+1);
+       if(cmd.via)state.detours=(state.detours||0)+1;
+       // A line cannot cross a bridge: it goes over in column and forms line again beyond.
+       if(cmd.via&&cmd.via.bridge){state.bridgeCrossings=(state.bridgeCrossings||0)+(bankOf(state.streams[0],{x:A.cx,y:A.cy})*(cmd.via.x-state.bridges[0].x)>0?1:0);
+         if(reg.formation==='line'){cmd.reline=true;formFreeColumn(reg,cmd.via);}}
+     }
      const goal=cmd.via||cmd.dest,dx=goal.x-A.cx,dy=goal.y-A.cy,dist=Math.hypot(dx,dy);
+     if(!cmd.via&&cmd.reline&&reg.formation==='fcolumn'&&!crossing({x:A.cx,y:A.cy},cmd.dest)&&Math.hypot(A.cx-state.bridges[0].x,A.cy-state.bridges[0].y)>BRIDGE.reach+Math.ceil(aliveMen(reg).length/COLUMN.files)*COLUMN.gap/2+3){
+       cmd.reline=false;formLine(reg,cmd.face&&Math.hypot(cmd.face.x-A.cx,cmd.face.y-A.cy)>2?cmd.face:cmd.dest);
+     }
      if(!cmd.via&&dist<=ORDER.arrive){
        cmd.dest=null;
+       if(cmd.reline&&reg.formation==='fcolumn'){cmd.reline=false;formLine(reg,cmd.face||enemyCentre(i));}
        if(cmd.turnTo){cmd.face=cmd.turnTo;if(reg.formation==='line')formLine(reg,cmd.turnTo);else formFreeColumn(reg,cmd.turnTo);cmd.turnTo=null;}
      }
      else if(dist>1e-6){
@@ -532,7 +592,7 @@ function updateBatteries(dt){
    const goal=gunTarget(reg,g.index);
    // Guns sent across the field drive round buildings too.
    if(g.via&&Math.hypot(g.via.x-g.home.x,g.via.y-g.home.y)<1)g.via=null;
-   if(!g.via&&(reg.batCmd||reg.cmd)&&Math.hypot(goal.x-g.home.x,goal.y-g.home.y)>3)g.via=detour(g.home,goal,1.5);
+   if(!g.via&&(reg.batCmd||reg.cmd)&&Math.hypot(goal.x-g.home.x,goal.y-g.home.y)>3)g.via=route(g.home,goal,1.5,2);
    const aim=g.via||goal,dx=aim.x-g.home.x,dy=aim.y-g.home.y,dist=Math.hypot(dx,dy);
    g.moving=dist>0.15;
    if(g.moving){
@@ -720,6 +780,7 @@ function updateSquadrons(dt){
    if(!charging&&!sq.cmd&&standGround(sq))return;
    if(!charging&&sq.cmd&&sq.cmd.target&&rideAt(sq,dt))return;
    if(!charging){
+     if(sq.cmd&&sq.cmd.goal)steerSquadron(sq);
      for(const m of liveRiders(sq)){
        // A long way to their place: trot there; otherwise walk.
        const h=riderHome(reg,m),far=Math.hypot(h.x-m.gx,h.y-m.gy)>SQUAD.trotFrom&&m.placed;
@@ -732,7 +793,7 @@ function updateSquadrons(dt){
    const enemy=state.regiments[1],E=enemy.formation==='square'?{x:enemy.square.cx,y:enemy.square.cy}:centreOf(enemy);
    const C=centreOf({men:liveRiders(sq).map(m=>({gx:m.gx,gy:m.gy}))});
    const contact=enemy.formation==='square'?enemy.square.half+1.6:SQUAD.contact;
-   if(!ch.aim){const l=Math.hypot(E.x-C.x,E.y-C.y)||1;ch.aim={x:(E.x-C.x)/l,y:(E.y-C.y)/l};ch.via=detour(C,E);}
+   if(!ch.aim){const l=Math.hypot(E.x-C.x,E.y-C.y)||1;ch.aim={x:(E.x-C.x)/l,y:(E.y-C.y)/l};ch.via=route(C,E,0,3);}
    // Ride round a building first, then straight at the enemy.
    if(ch.via&&Math.hypot(ch.via.x-C.x,ch.via.y-C.y)<2.5){
      ch.via=null;const l=Math.hypot(E.x-C.x,E.y-C.y)||1;ch.aim={x:(E.x-C.x)/l,y:(E.y-C.y)/l};
@@ -932,7 +993,7 @@ function rideAt(sq,dt){
  const own=liveRiders(sq),C=centreOf({men:own});
  // Round a building first (the way point holds until they are past it), then straight in.
  if(Q.via&&Math.hypot(Q.via.x-C.x,Q.via.y-C.y)<2.5)Q.via=null;
- if(!Q.via)Q.via=detour(C,T);
+ if(!Q.via)Q.via=route(C,T,0,3);
  const goal=Q.via||T,f=facing(C,goal),stop=Q.via?0:1.2;
  Q.x=goal.x-f.nx*stop;Q.y=goal.y-f.ny*stop;Object.assign(Q,f);
  const foes=groupMembers(Q.target);
@@ -947,6 +1008,16 @@ function rideAt(sq,dt){
    const p=project(C.x,C.y);audio.hooves(...ear(p.x,p.y));Q.hoofAt=state.time+0.11;
  }
  return true;
+}
+// A squadron sent across the field rides via the bridge and round buildings: its
+// spot moves from way point to way point, in a column of twos facing the way.
+function steerSquadron(sq){
+ const Q=sq.cmd,G=Q.goal,own=liveRiders(sq);if(!own.length)return;
+ const C=centreOf({men:own});
+ if(Q.via&&Math.hypot(Q.via.x-C.x,Q.via.y-C.y)<2)Q.via=null;
+ if(!Q.via&&Math.hypot(G.x-C.x,G.y-C.y)>3)Q.via=route(C,G,1.5,3);
+ if(Q.via){Object.assign(Q,{x:Q.via.x,y:Q.via.y},facing(C,Q.via));}
+ else Object.assign(Q,G);
 }
 // Horsemen without orders fight back when enemy riders are on them.
 function standGround(sq){
@@ -1155,14 +1226,16 @@ function draw(now){
  const alive=units();
  updateBalls();resolveHits(alive);beatDrums();
  const fallen=[...state.dead.values()].map(d=>{
-   const p=crawled(d);return{...d,fallen:true,...project(d.gx+p.x,d.gy+p.y)};});
- const battery=(state.batteries||[]).flatMap(g=>[g,...g.crew]).map(u=>({...u,...project(u.gx,u.gy)}));
- const horse=(state.squadrons||[]).flatMap(sq=>liveRiders(sq)).map(u=>({...u,...project(u.gx,u.gy)}))
-   .concat(state.deadRiders.map(d=>({...d,deadRider:true,...project(d.gx,d.gy)})));
+   const p=crawled(d);return{...d,fallen:true,...place(d.gx+p.x,d.gy+p.y)};});
+ const battery=(state.batteries||[]).flatMap(g=>[g,...g.crew]).map(u=>({...u,...place(u.gx,u.gy)}));
+ const horse=(state.squadrons||[]).flatMap(sq=>liveRiders(sq)).map(u=>({...u,...place(u.gx,u.gy)}))
+   .concat(state.deadRiders.map(d=>({...d,deadRider:true,...place(d.gx,d.gy)})));
  // The order bar follows targets that are destroyed or orders that end.
  if(state.selected.size&&Math.abs(state.time-(state.ordersAt||0))>0.5){state.ordersAt=state.time;refreshOrders();}
  drawSelection();
- const list=alive.filter(u=>!u.dead).map(u=>({...u,...project(u.gx,u.gy)})).concat(battery,horse,fallen,state.props).sort((a,b)=>a.y-b.y);
+ const list=alive.filter(u=>!u.dead).map(u=>({...u,...place(u.gx,u.gy)})).concat(battery,horse,fallen,state.props)
+   .sort((a,b)=>(a.sortY??a.y)-(b.sortY??b.y));
+ state.onBridge=list.filter(u=>u.sortY!==undefined).length;
  state.animStates={};state.crewStates={};state.cavStates={};state.ridersDrawn=0;
  state.drawn=0;state.propsDrawn=0;state.rolesDrawn=0;state.gunsDrawn=0;state.crewDrawn=0;
  for(const u of list){
@@ -1324,7 +1397,8 @@ function moveGroup(id,P,dir){
    const sq=state.squadrons[g.side];
    if(g.side===0&&state.cavCharge)return false;
    if(g.side===1&&state.cavCounter)return false;
-   sq.cmd={x:P.x,y:P.y,...(ahead?facing(P,ahead):facing(centreOf({men:liveRiders(sq)}),P,enemyCentre(g.side)))};
+   const end=ahead?facing(P,ahead):facing(centreOf({men:liveRiders(sq)}),P,enemyCentre(g.side));
+   sq.cmd={x:P.x,y:P.y,...end,goal:{x:P.x,y:P.y,...end}};
  }
  return true;
 }
@@ -1513,7 +1587,7 @@ function drawSelection(){
    ctx.strokeStyle=GROUP[id].side?'rgba(255,190,170,.95)':'rgba(255,236,150,.95)';
    ctx.beginPath();
    for(const m of groupMembers(id)){
-     const p=project(m.gx,m.gy),rx=(m.rider?1.3:m.gun?1.4:0.5)*S;
+     const p=place(m.gx,m.gy),rx=(m.rider?1.3:m.gun?1.4:0.5)*S;
      ctx.moveTo(p.x+rx,p.y);ctx.ellipse(p.x,p.y,rx,rx*SQUASH,0,0,Math.PI*2);
    }
    ctx.stroke();
@@ -1692,7 +1766,7 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'341.0',state,groupScreen,screenOfGround,orderMove,
+window.__GRAPHICS_LAB_ISO__={version:'342.0',state,groupScreen,screenOfGround,orderMove,
  getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -1717,7 +1791,7 @@ window.__GRAPHICS_LAB_ISO__={version:'341.0',state,groupScreen,screenOfGround,or
    wounded:[...state.dead.values()].filter(d=>d.wounded).length,
    frontGaps:state.regiments?state.regiments.reduce((n,r)=>n+frontGaps(r),0):0,
    fallKinds:[...new Set([...state.dead.values()].map(d=>d.fall))].sort(),
-   selected:[...state.selected],orders:state.orders,detours:state.detours||0,arrow:!!state.arrow,attacks:state.attacks||0,turns:state.turns||0,lastKey:state.lastKey||null,
+   selected:[...state.selected],orders:state.orders,bridgeCrossings:state.bridgeCrossings||0,onBridge:state.onBridge||0,streams:(state.streams||[]).length,bridges:(state.bridges||[]).length,detours:state.detours||0,arrow:!!state.arrow,attacks:state.attacks||0,turns:state.turns||0,lastKey:state.lastKey||null,
    targets:[...selectedTargets()],crewFalls:state.crewFalls||0,targetHits:state.targetHits||0,
    facings:state.regiments?state.regiments.map(r=>{const A=r.formation==='line'?r.line:r.formation==='fcolumn'?r.col:null;return A?{x:A.nx,y:A.ny}:null;}):[],
    batteryTarget:state.regiments?state.regiments.map(r=>r.batTarget||null):[],
