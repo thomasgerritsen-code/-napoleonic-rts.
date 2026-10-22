@@ -81,6 +81,38 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
 - Hellingen naar het noorden blijven onder 30° (steiler zou je vanuit de camera niet
   meer zien).
 
+## Veldslagen en de Britse AI (open kaart)
+
+`src/systems/ai/campaign-pressure-v1.js`, aan met `NRTS_CONFIG.ai.pressure` (alleen met
+`?view=iso`). Een versneld potje met een passieve speler liet zien dat de Britse
+commandant één keer aanviel en daarna bleef wachten: hij wilde twee volle regimenten,
+zijn boeren bleven op voedsel staan (hout raakte op), de productie wachtte op een stal
+die hij niet kon betalen, losse musketiers vormden nooit een regiment, en soldaten
+konden geen gebouwen beschieten (het snelle doel-zoeken voor grote legers sloeg ze
+over), zodat een hoofdgebouw - en dus de slag - nooit te nemen was. De laag houdt de
+eigen commandant (verzamelen → opmars → aanval → flank) en voegt toe:
+
+- **Aanvalsgolven op de klok**: de eerste na 2,5 minuut, daarna elke 3 minuten (±30 s),
+  ook met één regiment, zodra het leger minstens 80% zo sterk is als het Franse (na
+  2 minuten wachten gaat hij toch). Nieuwe regimenten die thuis worden gevormd, volgen
+  als versterking en houden de aanval niet op.
+- **Gevechten die uitgevochten worden**: een golf vecht door zolang hij niet duidelijk
+  verliest (pas na 12 seconden achter elkaar onder de helft van de vijand ter plekke,
+  en nooit in de eerste 25 seconden), hoogstens 2,5 minuut; dan hergroeperen thuis en
+  de volgende golf. Terugtrekken alleen bij lage moraal én een verloren gevecht ter
+  plekke (eerder keerden kolonnes een vijand die ze aan het verslaan waren de rug toe).
+- **Een onverdedigd hoofdgebouw wordt belegerd** tot het valt; de linie stelt zich
+  binnen musketbereik van de muren op, en gebouwen zijn weer te beschieten (bereik
+  gemeten tot de muur). Een speler die niets doet, verliest na 8 à 13 minuten.
+- **Vluchters vluchten naar huis**, over de dichtstbijzijnde brug als dat over de
+  rivier is (ze bleven tegen de oever of midden tussen de vijand staan), en herstellen
+  zich thuis of waar ze vastlopen buiten schot. Voor beide kanten.
+- **Economie**: 18 boeren in plaats van 10, verdeeld over voedsel en hout naar wat
+  ontbreekt, boeren op de graanakkers als voedsel krap is, en musketiers, officieren
+  en tamboers in opleiding terwijl hij voor een gebouw spaart.
+- `window.__AI_PRESSURE_V1__.stats()`: golven, volgende golf, stand van de commandant
+  en een logboek (`aanvalsgolf 2: 4 regiment(en), 61 man`, `golf 1 afgebroken: …`).
+
 ## Rivier en bruggen
 
 - De **rivier** loopt als één band door, boven de wegen en door de heuvels heen

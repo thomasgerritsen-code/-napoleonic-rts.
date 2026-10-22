@@ -27,6 +27,8 @@ test('without ?view=iso the game is untouched: no iso view, no toggle, top-down 
   expect(r.houses).toBe(224);
   expect(r.mapVariant).toBe('standard');
   expect(r.openMap).toBe('undefined');
+  expect(await page.evaluate(() => window.NRTS_CONFIG.ai.pressure)).toBe(null);
+  expect(await page.evaluate(() => typeof window.__AI_PRESSURE_V1__)).toBe('undefined');
   expect(r.toggle).toBe(false);
   expect(r.dy).toBeCloseTo(100 / r.zoom, 3);
   expect(errors).toEqual([]);
@@ -285,5 +287,29 @@ test('iso view: fog of war in three shades on the relief, and high ground sees f
   expect(r.top).toBeLessThanOrEqual(215 * 1.5 + 1);
   // Explored ground (the French start) is drawn under a veil, and sight around the troops.
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().fogCells > 20 && window.__ISO_VIEW_V1__.stats().fogSources > 0);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: the British attack in waves on a clock, and buildings can be shot at', async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors = await openGame(page, 'test=iso-ai&view=iso');
+  // Off in the normal game; on for the open map.
+  expect(await page.evaluate(() => window.NRTS_CONFIG.ai.pressure?.firstWave)).toBe(150);
+  // Three minutes of play: the first wave goes out with at least one regiment.
+  await page.evaluate(() => { while (elapsed < 190) window.__RTS_DEBUG__.tick(10); });
+  const s = await page.evaluate(() => window.__AI_PRESSURE_V1__.stats());
+  expect(s.waves).toBeGreaterThanOrEqual(1);
+  expect(['MASS', 'ADVANCE', 'ATTACK', 'FLANK']).toContain(s.state);
+  expect(s.buildingTargets).toBe(true);
+  // Men in reach of an undefended town center damage it.
+  const hp = await page.evaluate(() => {
+    const tc = livingBuildings('france').find(b => b.type === 'towncenter');
+    livingUnits('france').filter(u => u.type !== 'worker').forEach(u => { u.dead = true; });
+    const men = Array.from({ length: 10 }, (_, i) => createUnit('britain', 'infantry', tc.x + 90 + (i % 5) * 14, tc.y + (i < 5 ? 0 : 18)));
+    const before = tc.hp;
+    for (let k = 0; k < 40; k++) { men.forEach(u => { u.targetX = u.x; u.targetY = u.y; }); window.__RTS_DEBUG__.tick(0.5); }
+    return { before, after: tc.hp };
+  });
+  expect(hp.after).toBeLessThan(hp.before - 50);
   expect(errors).toEqual([]);
 });

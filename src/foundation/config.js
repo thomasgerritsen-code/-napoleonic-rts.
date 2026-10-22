@@ -113,7 +113,9 @@
       vegetation: Object.freeze({ buildingPadding:18, villageHousePadding:12, resourceGap:8, relocationStep:22, relocationRings:18, treeCanopyScale:1.18, berryRadius:19 })
     }),
     artillery: Object.freeze({ crewApproach:Object.freeze({ speedFactor:0.90, arrivalDistance:8, stagingBack:19, stagingLateral:18 }) }),
-    ai: Object.freeze({ minWorkers:10, desiredInfantryRegiments:4, desiredCavalry:8, desiredArtillery:3, attackStartSeconds:32, productionQueueLimit:2 }),
+    ai: Object.freeze({ minWorkers:OPEN_MAP ? 18 : 10, desiredInfantryRegiments:4, desiredCavalry:8, desiredArtillery:3, attackStartSeconds:32, productionQueueLimit:2,
+      // Open map: attack waves on a clock (src/systems/ai/campaign-pressure-v1.js); seconds.
+      pressure: OPEN_MAP ? Object.freeze({ firstWave:150, interval:180, jitter:30, minWaveUnits:12, minRatio:0.8, maxDelay:120, maxAttack:150, breakRatio:0.5, breakAfter:12, minFight:25, maxMarch:300 }) : null }),
     architecture: Object.freeze({
       version:'2.1', serviceGeneration:21, allowNewVersionPatchFiles:false, legacyBaseline:'0.7.1', legacyBaselineCommit:'29b038d3655d05be968bff6a80cb8f3162f1c8e8', migrationStrategy:'strangler-by-subsystem'
     })
