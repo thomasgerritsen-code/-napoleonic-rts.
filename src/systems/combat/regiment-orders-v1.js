@@ -87,6 +87,7 @@
     reg.trenchStill = last && Math.hypot(c.x - last.x, c.y - last.y) < 8 && !m.some(u => u.routing) ? (reg.trenchStill || 0) + 1 : 0;
     const own = reg.trenchId ? trenches.find(t => t.id === reg.trenchId) : null;
     if (reg.trenchId && (!own || Math.hypot(own.x - c.x, own.y - c.y) > cfg.trenchSnap)) reg.trenchId = null;
+    if (reg.trenchId && own && reg.trenchStill >= 1) drummerIntoTrench(reg, m, own);
     if (reg.trenchId || reg.trenchStill < 2) return;
     const t = trenches.filter(q => q.progress >= 1 && Math.hypot(q.x - c.x, q.y - c.y) < cfg.trenchSnap)
       .sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
@@ -96,6 +97,15 @@
     reg.formation = 'line';
     if (typeof arrangeFacingRegimentV146 === 'function') arrangeFacingRegimentV146(reg, t.x, t.y, 'line', t.facing);
     // The trench covers them as soon as they stand in it; bracing follows when they halt.
+  }
+  // The drummer goes down into the trench too, at one end behind the ranks,
+  // instead of standing out in front on the open field.
+  function drummerIntoTrench(reg, m, t) {
+    const d = m.find(u => u.type === 'drummer' && !u.dead && !u.routing); if (!d) return;
+    const w = t.width / 2, along = -(t.length / 2 - w * 0.45), across = -w * 0.2;
+    const x = t.x + Math.cos(t.facing + Math.PI / 2) * along + Math.cos(t.facing) * across;
+    const y = t.y + Math.sin(t.facing + Math.PI / 2) * along + Math.sin(t.facing) * across;
+    if (Math.hypot((d.targetX ?? d.x) - x, (d.targetY ?? d.y) - y) > 3) { d.targetX = x; d.targetY = y; stats.drummers = (stats.drummers || 0) + 1; }
   }
   function trenchWork(reg, m, c) {
     // By a trench already: finish digging it, or (finished) nothing to dig here.

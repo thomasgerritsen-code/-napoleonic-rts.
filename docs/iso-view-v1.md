@@ -106,7 +106,8 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   aarden rug die aan de uiteinden afloopt. In een voltooide loopgraaf stapt de
   voorste rij op de vuurtrede langs de wal (een richel halverwege de diepte) en
   leunt erop, het geweer over de rug gelegd (en vuurt er ook overheen); de rijen
-  erachter staan dieper, op de bodem. Wie in een voltooide
+  erachter staan dieper, op de bodem. De tamboer gaat mee de loopgraaf in en staat
+  aan het uiteinde achter de rijen (al tijdens het graven); de officier blijft erbuiten. Wie in een voltooide
   loopgraaf staat - van welke kant ook - lijdt 50% minder verlies en verliest nog
   minder moraal dan alleen ingegraven. In de iso-weergave staan de mannen erin lager,
   en de wal verbergt hun benen. Een loopgraaf blijft liggen als het regiment vertrekt;
