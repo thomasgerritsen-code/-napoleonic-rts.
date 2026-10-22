@@ -140,10 +140,14 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   meter, met ruimte boven voor de verhoogde noordrand); de iso-weergave tekent alleen het deel dat in beeld is. Zonder die afbeelding
   valt hij terug op de 2D-kaart.
 - **Wegen** (`road_material` in het script): elke weg is één doorlopende band met
-  afgeronde bochten (geen naden meer per stukje), breder dan de weg van de game zodat
-  de uitgesleten rand met gras erin geleidelijk overgaat in het land; op kruisingen
-  schijnt de weg eronder door, en doodlopende einden lopen ook uit.
-  - chaussee: een bolle strook kasseien in het midden, grindbermen ernaast;
+  afgeronde bochten (geen naden meer per stukje), in twee lagen zoals een echte weg:
+  eerst de bermen van álle wegen (breed, uitgesleten, met gras erin dat geleidelijk
+  overgaat in het land), dan daarboven de rijbanen van álle wegen. Zo ligt de berm
+  van de ene weg nooit over de rijbaan van de andere en sluiten rijbanen op een
+  **kruispunt** gewoon op elkaar aan; het script zoekt de kruisingen en T-splitsingen
+  (29 op de open kaart) en vult de hoeken met een afgerond stuk wegdek (kasseien waar
+  een chaussee meedoet, anders aarde). Doodlopende einden lopen uit.
+  - chaussee: kasseien over de hele rijbaan, licht bol, grindbermen;
   - zijweg: aangestampte aarde met twee karrensporen, hier en daar een plas erin, en
     strepen van wielen en hoeven in de rijrichting;
   - pad: twee sporen met gras ertussen.

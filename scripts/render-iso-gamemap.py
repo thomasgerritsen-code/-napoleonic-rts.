@@ -251,12 +251,90 @@ def road_ribbon(relief, name, pts, width, off, mat, extend):
     return pts
 
 
+def find_junctions(roads):
+    """Where roads cross, and where one ends on another (a T): (x, y, radius,
+    setts) with nearby finds merged. roads: (cls, width, rounded points)."""
+    found = []
+
+    def cross(p1, p2, p3, p4):
+        d = (p2[0] - p1[0]) * (p4[1] - p3[1]) - (p2[1] - p1[1]) * (p4[0] - p3[0])
+        if abs(d) < 1e-9:
+            return None
+        t = ((p3[0] - p1[0]) * (p4[1] - p3[1]) - (p3[1] - p1[1]) * (p4[0] - p3[0])) / d
+        u = ((p3[0] - p1[0]) * (p2[1] - p1[1]) - (p3[1] - p1[1]) * (p2[0] - p1[0])) / d
+        return (p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1])) if 0 <= t <= 1 and 0 <= u <= 1 else None
+
+    def nearest(p, pts):
+        best = (1e9, None)
+        for a, b in zip(pts, pts[1:]):
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy or 1e-9)))
+            q = (a[0] + t * dx, a[1] + t * dy)
+            d = math.dist(p, q)
+            if d < best[0]:
+                best = (d, q)
+        return best
+
+    for i, (ci, wi, pi) in enumerate(roads):
+        for j, (cj, wj, pj) in enumerate(roads):
+            if j <= i:
+                continue
+            for a, b in zip(pi, pi[1:]):
+                for c, d in zip(pj, pj[1:]):
+                    q = cross(a, b, c, d)
+                    if q:
+                        found.append((q, max(wi, wj), "chaussee" in (ci, cj)))
+    for i, (ci, wi, pi) in enumerate(roads):
+        for end in (pi[0], pi[-1]):
+            for j, (cj, wj, pj) in enumerate(roads):
+                if i == j:
+                    continue
+                d, q = nearest(end, pj)
+                if d < wj / 2 + wi:
+                    found.append((q, max(wi, wj), "chaussee" in (ci, cj)))
+    merged = []
+    for q, w, setts in found:
+        for k, (x, y, W, S, n) in enumerate(merged):
+            if math.dist(q, (x, y)) < max(w, W) * 0.9:
+                merged[k] = ((x * n + q[0]) / (n + 1), (y * n + q[1]) / (n + 1), max(w, W), S or setts, n + 1)
+                break
+        else:
+            merged.append((q[0], q[1], w, setts, 1))
+    return [(x, y, W * 1.25, S) for x, y, W, S, _ in merged]
+
+
+def junction_square(relief, name, x, y, R, off, mat):
+    """A round patch where roads meet, on the relief: 'across' runs from 0 in the
+    middle to 1 at the rim, so the material wears its edge out like a road's."""
+    n, rings = 40, 6
+    verts, rim = [(x, y, relief.at(x, y) + off)], [0.0]
+    for r in range(1, rings + 1):
+        for k in range(n):
+            t = k / n * math.tau
+            px, py = x + math.cos(t) * R * r / rings, y + math.sin(t) * R * r / rings
+            verts.append((px, py, relief.at(px, py) + off))
+            rim.append(r / rings)
+    faces = [(0, 1 + k, 1 + (k + 1) % n) for k in range(n)]
+    for r in range(rings - 1):
+        b0, b1 = 1 + r * n, 1 + (r + 1) * n
+        faces += [(b0 + k, b0 + (k + 1) % n, b1 + (k + 1) % n, b1 + k) for k in range(n)]
+    ob = up_mesh(name, verts, faces, mat, smooth=True)
+    for key, vals in (("across", rim), ("along", [0.0] * len(rim)), ("ends", [9.0] * len(rim))):
+        at = ob.data.attributes.new(key, "FLOAT", "POINT")
+        at.data.foreach_set("value", vals)
+
+
 def road_material(kind):
-    """Road surface by class, with worn, grass-grown edges that fade out (the
-    ground or the road below shows through, so junctions blend).
-    chaussee: a crowned band of setts down the middle, gravel shoulders.
-    secondary: packed earth with two wheel ruts, puddles in them here and there.
-    track: two ruts with grass between and along the edges."""
+    """Ground surfaces that wear out at their edge (the ground, or what lies
+    below, shows through). Roads come in two parts, laid in two passes so that a
+    crossing joins instead of one road lying over the other: '<class>-verge',
+    the wide worn shoulder with grass creeping in, under every road's '<class>-core',
+    the carriageway with a short ragged edge:
+      chaussee: setts across the carriageway, gravel shoulders;
+      secondary: packed earth with two wheel ruts, puddles in them here and there;
+      track: two ruts with grass between.
+    'junction-setts' / 'junction-earth': the rounded patch filling the corners
+    where roads meet (between the two passes); 'yard' and 'garden' by the houses."""
     m = bpy.data.materials.new("road-" + kind)
     m.use_nodes = True
     nt = m.node_tree
@@ -316,16 +394,66 @@ def road_material(kind):
     Ln.new(op("MULTIPLY", along, 0.12), lane.inputs["X"])
     Ln.new(op("MULTIPLY", across, 7.0), lane.inputs["Y"])
     streak = noise(lane.outputs["Vector"], 1.0, 4.0, 0.6)
-    # Worn edge: where it ends wanders with the patch noise and the grit.
-    edge = op("ADD", a, op("ADD", op("MULTIPLY", op("SUBTRACT", patch, 0.5), 0.55), op("MULTIPLY", op("SUBTRACT", grit, 0.5), 0.22)))
-    alpha = op("MULTIPLY", ramp(edge, 0.66, 0.92, 1.0, 0.0),
-               ramp(op("ADD", attr("ends"), op("MULTIPLY", op("SUBTRACT", patch, 0.5), 0.6)), 0.05, 0.55))
+    wobble = op("ADD", op("MULTIPLY", op("SUBTRACT", patch, 0.5), 0.55), op("MULTIPLY", op("SUBTRACT", grit, 0.5), 0.22))
+    edge = op("ADD", a, wobble)
     grass = linear("#5b6b37")
-    # Wheel ruts at +-r of the half width, and puddles in the low patches of them.
-    def rut(at, w):
-        return ramp(op("ABSOLUTE", op("SUBTRACT", a, at)), 0.0, w, 1.0, 0.0)
-    rough = 0.92
-    if kind in ("yard", "garden"):
+    cls, part = (kind.split("-") + [""])[:2]
+
+    def setts(vec):
+        brick = node("ShaderNodeTexBrick")
+        brick.inputs["Color1"].default_value, brick.inputs["Color2"].default_value = linear("#80776a"), linear("#6c6457")
+        brick.inputs["Mortar"].default_value = linear("#4a4337")
+        brick.inputs["Scale"].default_value = 3.2
+        brick.inputs["Mortar Size"].default_value = 0.035
+        brick.inputs["Brick Width"].default_value, brick.inputs["Row Height"].default_value = 0.5, 0.42
+        Ln.new(vec, brick.inputs["Vector"])
+        return mix(op("MULTIPLY", grit, 0.4), brick.outputs["Color"], linear("#8a7f6b")), \
+            op("ADD", op("MULTIPLY", brick.outputs["Fac"], 0.6), op("MULTIPLY", grit, 0.3))
+
+    def dirt(base):
+        c = mix(grit, linear(base), linear("#7a6646"))
+        return mix(op("MULTIPLY", streak, 0.45), c, linear("#74613f"))
+
+    rough, bump_s, green = 0.92, 0.2, 0.0
+    fade = ramp(edge, 0.66, 0.92, 1.0, 0.0)
+    if part == "verge":
+        # The shoulder: gravel by a chaussee, trampled earth by the others,
+        # grass creeping in towards its ragged edge.
+        col = mix(grit, linear("#8d7f63"), linear("#72664f")) if cls == "chaussee" else \
+            mix(ramp(patch, 0.4, 0.7), dirt("#8f7a55"), linear("#6f7046"))
+        bump_h = grit
+        green = ramp(edge, 0.5, 0.85, 0.0, 0.75)
+    elif part == "core":
+        # The carriageway: a short ragged edge, no grass.
+        fade = ramp(op("ADD", a, op("MULTIPLY", wobble, 0.3)), 0.84, 1.0, 1.0, 0.0)
+        if cls == "chaussee":
+            vec = node("ShaderNodeCombineXYZ")
+            Ln.new(along, vec.inputs["X"])
+            Ln.new(op("MULTIPLY", across, 1.7), vec.inputs["Y"])
+            col, bump_h = setts(vec.outputs["Vector"])
+            # Crowned: the setts darken a little towards the gutters.
+            col = mix(ramp(a, 0.8, 1.0, 0.0, 0.15), col, linear("#4f483d"))
+            bump_s = 0.25
+        else:
+            at, w = 0.5, 0.14
+            ruts = ramp(op("ABSOLUTE", op("SUBTRACT", a, at)), 0.0, w, 1.0, 0.0)
+            col = mix(op("MULTIPLY", ruts, 0.75), dirt("#977f5a" if cls == "secondary" else "#8a7552"), linear("#6a5639"))
+            wet = op("MULTIPLY", ruts, ramp(patch, 0.62, 0.7))
+            col = mix(wet, col, linear("#4e5b5a"))
+            rough = op("SUBTRACT", 0.94, op("MULTIPLY", wet, 0.86))
+            if cls == "track":
+                col = mix(op("MULTIPLY", ramp(a, 0.3, 0.12), ramp(grit, 0.3, 0.55)), col, grass)
+            bump_h = op("ADD", op("MULTIPLY", grit, 0.5), op("MULTIPLY", ruts, -0.6))
+    elif cls == "junction":
+        # Fills the corners where roads meet; wears out softly into them.
+        fade = ramp(edge, 0.45, 0.98, 1.0, 0.0)
+        if part == "setts":
+            col, bump_h = setts(obj)
+            col = mix(op("MULTIPLY", ramp(patch, 0.45, 0.75), 0.3), col, linear("#7d7260"))
+        else:
+            col = mix(op("MULTIPLY", ramp(patch, 0.4, 0.7), 0.5), dirt("#977f5a"), linear("#6a5639"))
+            bump_h = grit
+    else:
         # Trampled earth round a house; a garden of dug rows behind it.
         if kind == "yard":
             col = mix(ramp(patch, 0.35, 0.65), linear("#7f6c4b"), linear("#6c7040"))
@@ -336,39 +464,9 @@ def road_material(kind):
             col = mix(ramp(rows.outputs["Fac"], 0.35, 0.65), linear("#5a4630"), linear("#4f6a32"))
         col = mix(op("MULTIPLY", grit, 0.4), col, linear("#5e4d35"))
         bump_h, bump_s = grit, 0.15
-    elif kind == "chaussee":
-        vec = node("ShaderNodeCombineXYZ")
-        Ln.new(along, vec.inputs["X"])
-        Ln.new(op("MULTIPLY", across, 1.7), vec.inputs["Y"])
-        brick = node("ShaderNodeTexBrick")
-        brick.inputs["Color1"].default_value, brick.inputs["Color2"].default_value = linear("#80776a"), linear("#6c6457")
-        brick.inputs["Mortar"].default_value = linear("#4a4337")
-        brick.inputs["Scale"].default_value = 3.2
-        brick.inputs["Mortar Size"].default_value = 0.035
-        brick.inputs["Brick Width"].default_value, brick.inputs["Row Height"].default_value = 0.5, 0.42
-        Ln.new(vec.outputs["Vector"], brick.inputs["Vector"])
-        setts = mix(op("MULTIPLY", grit, 0.4), brick.outputs["Color"], linear("#8a7f6b"))
-        gravel = mix(grit, linear("#8d7f63"), linear("#72664f"))
-        col = mix(ramp(a, 0.6, 0.66), setts, gravel)
-        bump_h = op("ADD", op("MULTIPLY", brick.outputs["Fac"], 0.6), op("MULTIPLY", grit, 0.3))
-        bump_s = 0.25
-    else:
-        at, rw = (0.45, 0.1) if kind == "secondary" else (0.5, 0.13)
-        dirt = mix(grit, linear("#977f5a" if kind == "secondary" else "#8a7552"), linear("#7a6646"))
-        dirt = mix(op("MULTIPLY", streak, 0.45), dirt, linear("#7a6646"))
-        ruts = rut(at, rw)
-        col = mix(op("MULTIPLY", ruts, 0.75), dirt, linear("#6a5639"))
-        wet = op("MULTIPLY", ruts, ramp(patch, 0.62, 0.7))
-        col = mix(wet, col, linear("#4e5b5a"))
-        rough = op("SUBTRACT", 0.94, op("MULTIPLY", wet, 0.86))
-        if kind == "track":
-            mid = op("MULTIPLY", ramp(a, 0.28, 0.12), ramp(grit, 0.3, 0.55))
-            col = mix(mid, col, grass)
-        bump_h = op("ADD", op("MULTIPLY", grit, 0.5), op("MULTIPLY", ruts, -0.6))
-        bump_s = 0.2
-    # Grass creeping in towards the edge, before it fades out.
-    col = mix(ramp(edge, 0.55, 0.85, 0.0, 0.7), col, grass)
-    col = mix(op("MULTIPLY", op("SUBTRACT", streak, 0.5), 0.25), col, linear("#6d5c41"))
+        green = ramp(edge, 0.55, 0.85, 0.0, 0.7)
+    alpha = op("MULTIPLY", fade, ramp(op("ADD", attr("ends"), op("MULTIPLY", op("SUBTRACT", patch, 0.5), 0.6)), 0.05, 0.55))
+    col = mix(green, col, grass)
     Ln.new(col, bsdf.inputs["Base Color"])
     feed(bsdf.inputs["Roughness"], rough)
     bp = node("ShaderNodeBump")
@@ -545,15 +643,28 @@ def main(argv: list[str]) -> int:
     # the road below show through at junctions.
     verge = {"chaussee": 1.6, "secondary": 1.2, "track": 0.8}
     order = {"track": 0, "secondary": 1, "chaussee": 2}
-    mats = {k: road_material(k) for k in verge}
-    for ri, road in enumerate(sorted(data["roads"], key=lambda r: order.get(r["cls"], 1))):
-        cls = road["cls"] if road["cls"] in verge else "secondary"
-        width = road["width"] / PPM_GAME
-        band = width + 2 * verge[cls]
+    ordered = sorted(data["roads"], key=lambda r: order.get(r["cls"], 1))
+    cls_of = lambda r: r["cls"] if r["cls"] in verge else "secondary"
+    n = len(ordered)
+    # Pass 1: every road's worn shoulder.
+    for ri, road in enumerate(ordered):
+        cls, width = cls_of(road), road["width"] / PPM_GAME
         rp = [m(p) for p in road["points"]]
-        road_ribbon(relief, f"road{ri}", rp, band, 0.06 + ri * 0.004, mats[cls], extend=width * 0.4)
+        road_ribbon(relief, f"verge{ri}", rp, width + 2 * verge[cls], 0.05 + ri * 0.002, road_material(cls + "-verge"),
+                    extend=width * 0.4)
         for a, b in zip(rp, rp[1:]):
             mask.capsule(a, b, width / 2 + verge[cls] / 2 + 0.3)
+    # Between the passes: a patch filling the corners where roads cross or meet.
+    junctions = find_junctions([(cls_of(r), r["width"] / PPM_GAME, chaikin([m(p) for p in r["points"]])) for r in ordered])
+    squares = {True: road_material("junction-setts"), False: road_material("junction-earth")}
+    for k, (x, y, R, with_setts) in enumerate(junctions):
+        junction_square(relief, f"junction{k}", x, y, R, 0.05 + n * 0.002 + 0.006, squares[with_setts])
+    # Pass 2: every road's carriageway, over all shoulders and patches.
+    for ri, road in enumerate(ordered):
+        cls, width = cls_of(road), road["width"] / PPM_GAME
+        road_ribbon(relief, f"road{ri}", [m(p) for p in road["points"]], width + 0.3, 0.05 + n * 0.002 + 0.012 + ri * 0.003,
+                    road_material(cls + "-core"), extend=width * 0.4)
+    print(f"junctions: {len(junctions)}")
 
     # River: one continuous ribbon, laid over the roads so it runs on under every
     # bridge (the bridges stand as 3D props in the view). Muddy banks, a lighter
@@ -576,7 +687,7 @@ def main(argv: list[str]) -> int:
             right.append((x - nx, y - ny))
         return left, right
 
-    top = 0.06 + len(data["roads"]) * 0.004 + 0.03
+    top = 0.05 + len(data["roads"]) * 0.005 + 0.04
     drape_ribbon(relief, "riverbank", *sides(rw + 2.2), top, bank)
     drape_ribbon(relief, "shallows", *sides(rw), top + 0.01, shallow)
     drape_ribbon(relief, "river", *sides(rw * 0.62), top + 0.02, water)
