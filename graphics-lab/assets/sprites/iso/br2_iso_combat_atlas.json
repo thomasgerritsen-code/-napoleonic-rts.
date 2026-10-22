@@ -3546,6 +3546,10 @@
      "y": 49.1
     }
    }
+  },
+  "half": {
+   "image": "br2_iso_combat_atlas_half.webp",
+   "scale": 0.5
   }
  }
 }

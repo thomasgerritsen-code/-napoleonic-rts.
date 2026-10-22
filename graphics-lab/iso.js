@@ -96,14 +96,20 @@ function loadSheet(prefix,kind,states){
  const dir='./assets/sprites/iso/';
  return fetch(dir+prefix+'_iso_'+kind+'_atlas.json',{cache:'no-cache'})
    .then(r=>{if(!r.ok)throw new Error('ontbrekende atlas '+prefix+' '+kind);return r.json();})
-   // The JSON names the image (WebP since v330), so formats can change without code changes.
-   .then(sheet=>loadImage(dir+sheet.meta.image).then(image=>{
-     if(sheet.meta.size.w!==image.naturalWidth||sheet.meta.size.h!==image.naturalHeight)throw new Error(prefix+': atlasmaat wijkt af');
+   // The JSON names the image (WebP since v330). The lab draws sprites at about half
+   // their atlas size, so it loads the half-resolution copy unless ?hd=1: all atlases
+   // at full size decode to close to 1 GB, far too much for a phone.
+   .then(sheet=>{
+     const half=!HD&&sheet.meta.half,scale=half?half.scale:1;
+     return loadImage(dir+(half?half.image:sheet.meta.image)).then(image=>{
+     if(Math.round(sheet.meta.size.w*scale)!==image.naturalWidth||Math.round(sheet.meta.size.h*scale)!==image.naturalHeight)
+       throw new Error(prefix+': atlasmaat wijkt af');
      for(const d of DIRS)for(const s of states)if(!sheet.animations[s+'_'+d])throw new Error(prefix+': animatie ontbreekt '+s+'_'+d);
      if(!sheet.meta.cell||!sheet.meta.pivot)throw new Error(prefix+': atlas-meta onvolledig');
-     return{sheet,image};
-   }));
+     return{sheet,image,scale};
+   });});
 }
+const HD=new URLSearchParams(location.search).has('hd');
 // Looks per nation: 1-3 vary face, trousers and kit, 4 grenadiers, 5 voltigeurs
 // (British light company). Fixed per soldier so the same man keeps his look.
 const LOOKS=['','2','3'];
@@ -144,7 +150,7 @@ function resize(){
 const COLUMN={files:4,gap:1.6,spacing:1.15},LINE={spacing:0.8,gap:0.95},WALK=2.2,ARRIVE=0.06;
 // Firing realism: per-man delay before presenting, misfires (flash in the pan,
 // no shot), own reload pace, and a slow smoke bank over the firing line.
-const FIRE_JITTER=0.35,RATE_SPREAD=0.3,BANK_LIFE=28,BANK_MAX=320;
+const FIRE_JITTER=0.35,RATE_SPREAD=0.3,BANK_LIFE=28,BANK_MAX=70,BANK_MERGE=36,SMOKE_MAX=240;
 // Idle variety: every few seconds a man looks around, sets his shako or leans on his musket.
 const IDLE_EXTRAS=[['look',4,0.45],['adjust',4,0.38],['lean',2,1.4]];
 // Bayonet charge: the French line advances at the double until the front ranks
@@ -496,7 +502,7 @@ function fireGun(g,c){
      const seed=hash(state.cannonShots*7+i,g.prefix==='fr'?3:5);
      state.smoke.push({x:x+F.x*S*i*0.5,y:y-F.y*S*SQUASH*i*0.5,born:state.time,life:7+seed*3,size:1.5+seed*1.3,seed});
    }
-   state.bank.push({x,y,born:state.time,seed:hash(state.cannonShots,9)});
+   addBank(x,y,hash(state.cannonShots,9));
    if(audio)audio.cannon(...ear(x,y));
  }
  // Round shot: first graze just short of the enemy line, then ever lower bounces.
@@ -830,12 +836,11 @@ function spawnSmoke(u,kneel){
  const m=(kneel?atlas.combat.sheet:atlas.sheet).meta,px=m.muzzle.px[DIRS[u.dir]],k=S/SPRITE_PX_PER_M;
  const x=u.x+(px.x-m.pivot.x)*k,y=u.y+(px.y-m.pivot.y)*k;
  if(u.id===0)state.volleys++;
- if(state.smoke.length>600)state.smoke.splice(0,state.smoke.length-600);
+ if(state.smoke.length>SMOKE_MAX)state.smoke.splice(0,state.smoke.length-SMOKE_MAX);
  const seed=hash(u.id+state.volleys*97,u.prefix==='fr'?1:2);
  state.smoke.push({x,y,born:state.time,life:4.5+seed*2,size:.55+seed*.5,seed});
  // Every shot also feeds a slow, faint bank of smoke that hangs over the line.
- if(state.bank.length>=BANK_MAX)state.bank.shift();
- state.bank.push({x,y,born:state.time,seed});
+ addBank(x,y,seed);
 }
 
 // A musket ball may drop a random soldier of the other side a moment later.
@@ -878,6 +883,28 @@ function frontGaps(reg){
 }
 const regimentOf=u=>state.regiments[u.side==='france'?0:1];
 
+// Smoke and dust puffs are drawn from small pre-rendered gradient images (made
+// once) instead of building hundreds of radial gradients every frame.
+const PUFFS={};
+function puff(kind){
+ if(PUFFS[kind])return PUFFS[kind];
+ const c=document.createElement('canvas');c.width=c.height=64;
+ const g=c.getContext('2d'),grad=g.createRadialGradient(32,32,0,32,32,32);
+ const stops={smoke:[[0,'rgba(236,232,222,.55)'],[.55,'rgba(214,212,204,.32)'],[1,'rgba(200,200,196,0)']],
+   dust:[[0,'rgba(150,128,96,.55)'],[.55,'rgba(136,116,88,.32)'],[1,'rgba(120,104,80,0)']],
+   bank:[[0,'rgba(226,224,216,1)'],[1,'rgba(214,214,208,0)']]}[kind];
+ for(const [o,col] of stops)grad.addColorStop(o,col);
+ g.fillStyle=grad;g.fillRect(0,0,64,64);
+ return(PUFFS[kind]=c);
+}
+// Shots close together feed one bank cloud (it thickens and stays young)
+// instead of each adding its own: the same haze from far fewer, cheaper puffs.
+function addBank(x,y,seed){
+ const near=state.bank.find(p=>state.time-p.born<6&&Math.abs(p.x-x)<BANK_MERGE&&Math.abs(p.y-y)<BANK_MERGE);
+ if(near){near.weight=Math.min(4,(near.weight||1)+0.35);near.born=Math.max(near.born,state.time-2);return;}
+ if(state.bank.length>=BANK_MAX)state.bank.shift();
+ state.bank.push({x,y,born:state.time,seed,weight:1});
+}
 function drawSmokeBank(){
  const t=state.time;
  state.bank=state.bank.filter(p=>t-p.born<BANK_LIFE);
@@ -885,10 +912,9 @@ function drawSmokeBank(){
    const age=t-p.born,f=age/BANK_LIFE,r=24+age*4.2;
    const x=p.x+age*3.2+Math.sin(age*.15+p.seed*9)*6,y=p.y-14-age*1.1;
    const a=0.075*(age<1.5?age/1.5:1)*(1-f);
-   const g=ctx.createRadialGradient(x,y,0,x,y,r);
-   g.addColorStop(0,`rgba(226,224,216,${a.toFixed(3)})`);g.addColorStop(1,'rgba(214,214,208,0)');
-   ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(x,y,r,r*.62,0,0,Math.PI*2);ctx.fill();
+   ctx.globalAlpha=Math.min(0.6,a*(p.weight||1));ctx.drawImage(puff('bank'),x-r,y-r*.62,r*2,r*1.24);
  }
+ ctx.globalAlpha=1;
 }
 
 function drawSmoke(){
@@ -897,23 +923,19 @@ function drawSmoke(){
  for(const p of state.smoke){
    const age=t-p.born,f=age/p.life,r=(6+age*13)*p.size;
    const x=p.x+age*9+Math.sin(age*.9+p.seed*6)*3,y=p.y-age*7-10*f;
-   const g=ctx.createRadialGradient(x,y,0,x,y,r);
    const a=(1-f)*(age<.12?age/.12:1);
    // Earth thrown up by a grazing ball is brown; powder smoke is off-white.
-   const [c0,c1,c2]=p.dust?['150,128,96','136,116,88','120,104,80']:['236,232,222','214,212,204','200,200,196'];
-   g.addColorStop(0,`rgba(${c0},${(.55*a).toFixed(3)})`);
-   g.addColorStop(.55,`rgba(${c1},${(.32*a).toFixed(3)})`);
-   g.addColorStop(1,`rgba(${c2},0)`);
-   ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(x,y,r,r*.82,0,0,Math.PI*2);ctx.fill();
+   ctx.globalAlpha=a;ctx.drawImage(puff(p.dust?'dust':'smoke'),x-r,y-r*.82,r*2,r*1.64);
  }
+ ctx.globalAlpha=1;
 }
 
 function drawSprite(atlas,anim,f,x,y,k){
  // A missing animation or frame is counted (tests expect none) instead of drawn.
  const src=atlas.byAnim.get(anim),name=src&&src.sheet.animations[anim]?.[f];
  if(!name){state.missing=(state.missing||0)+1;return;}
- const fr=src.sheet.frames[name].frame,p=src.sheet.meta.pivot;
- ctx.drawImage(src.image,fr.x,fr.y,fr.w,fr.h,x-p.x*k,y-p.y*k,fr.w*k,fr.h*k);
+ const fr=src.sheet.frames[name].frame,p=src.sheet.meta.pivot,s=src.scale||1;
+ ctx.drawImage(src.image,fr.x*s,fr.y*s,fr.w*s,fr.h*s,x-p.x*k,y-p.y*k,fr.w*k,fr.h*k);
 }
 
 function draw(now){
@@ -1007,7 +1029,12 @@ function drawMinimap(dpr){
  state.minimapRect={x,y,w,h};
  ctx.setTransform(dpr,0,0,dpr,0,0);
  ctx.fillStyle='rgba(20,24,22,.72)';ctx.fillRect(x-4,y-4,w+8,h+8);
- ctx.drawImage(t.image,x,y,w,h);
+ // The terrain thumbnail is scaled once and cached, not every frame.
+ if(!state.miniTerrain||state.miniTerrain.width!==Math.round(w*dpr)){
+   const c=document.createElement('canvas');c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);
+   c.getContext('2d').drawImage(t.image,0,0,c.width,c.height);state.miniTerrain=c;
+ }
+ ctx.drawImage(state.miniTerrain,x,y,w,h);
  const dot=(gx,gy,size,color)=>{ctx.fillStyle=color;ctx.fillRect(x+(gx/(2*half)+0.5)*w-size/2,y+(-gy/(2*half)+0.5)*h-size/2,size,size);};
  state.regiments.forEach((reg,i)=>{for(const m of aliveMen(reg))dot(m.gx,m.gy,2,i?'#d0362e':'#2f55c8');});
  for(const g of state.batteries||[])dot(g.gx,g.gy,3.5,'#1c1c1c');

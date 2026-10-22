@@ -169,3 +169,14 @@ test('v338 larger field: stream with a bridge where the west road crosses it, a 
   assert.ok(layout.props.filter(p => p.type === 'farmhouse').length >= 2);
   for (const p of layout.props) assert.ok(Math.abs(p.x) < 64 && Math.abs(p.y) < 64, `${p.type} inside the field`);
 });
+
+test('v338c every sprite atlas has a half-resolution copy the lab loads by default', () => {
+  const sheets = fs.readdirSync(dir).filter(f => f.endsWith('_atlas.json'));
+  assert.ok(sheets.length > 70);
+  for (const file of sheets) {
+    const meta = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')).meta;
+    assert.ok(meta.half, `${file}: meta.half (run scripts/make-iso-halfres.py)`);
+    assert.equal(meta.half.scale, 0.5);
+    assert.deepEqual(imageSize(path.join(dir, meta.half.image)), {w: meta.size.w / 2, h: meta.size.h / 2, alpha: true}, file);
+  }
+});

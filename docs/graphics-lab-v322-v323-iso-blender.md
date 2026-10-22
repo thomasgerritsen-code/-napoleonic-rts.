@@ -457,3 +457,20 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
 - **🎥 Volg**: de camera glijdt mee met het Franse regiment, het Britse
   regiment of de Franse ruiters; slepen zet het volgen uit.
 - `getStats()` toont `minimap`, `follow`, `cam` en `half`.
+
+## v338c — sneller, vooral op telefoons
+
+- **Halve-resolutie-atlassen**: het lab tekent sprites op ongeveer de helft van
+  hun atlasgrootte (20 tegen 41,3 px per meter), dus de volle atlassen kostten 4×
+  zoveel geheugen zonder zichtbare winst: alle 78 samen bijna 1 GB uitgepakt,
+  te veel voor een telefoon. `scripts/make-iso-halfres.py` maakt van elke atlas
+  een `_half.webp` op 50% (geschaald met voorvermenigvuldigde alpha, dus geen
+  donkere randjes) en zet `meta.half` in de JSON; het lab laadt die tenzij `?hd=1`.
+  Geheugen ±234 MB in plaats van ±936 MB, download ±12 MB in plaats van ±21 MB.
+  Na een nieuwe `pack-iso-atlas.py` het script opnieuw draaien (een test bewaakt dat).
+- **Rook**: puffen komen uit drie vooraf getekende verloopplaatjes in plaats van
+  honderden nieuwe radiale verlopen per frame, en schoten dicht bij elkaar voeden
+  één wolk van de rookbank (die dikker wordt) in plaats van elk een eigen wolk.
+- **Minimap**: de terreinachtergrond wordt één keer verkleind en bewaard.
+- Gemeten (Chromium, telefoonformaat, tijdens een vuurgevecht): laden 1,9 → 0,9 s,
+  frame 43 → 24 ms.

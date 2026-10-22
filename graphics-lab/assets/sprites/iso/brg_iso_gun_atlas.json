@@ -1514,6 +1514,10 @@
      "y": 55.1
     }
    }
+  },
+  "half": {
+   "image": "brg_iso_gun_atlas_half.webp",
+   "scale": 0.5
   }
  }
 }

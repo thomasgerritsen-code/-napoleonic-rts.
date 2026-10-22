@@ -122,7 +122,8 @@ test('v338 French front rank kneels, some muskets misfire and smoke hangs over t
   expect(r.stats.misfires).toBeGreaterThan(0);
   // Misfiring men fire no ball: fewer shots than muskets presented.
   expect(r.stats.shooters).toBeLessThan(64);
-  expect(r.stats.bank).toBeGreaterThan(20);
+  // Nearby shots feed shared bank clouds, so a handful of clouds covers the line.
+  expect(r.stats.bank).toBeGreaterThan(2);
   expect(r.stats.missing).toBe(0);
   expect(errors).toEqual([]);
 });

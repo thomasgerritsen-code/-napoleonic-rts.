@@ -3546,6 +3546,10 @@
      "y": 35.0
     }
    }
+  },
+  "half": {
+   "image": "fr2_iso_infantry_atlas_half.webp",
+   "scale": 0.5
   }
  }
 }

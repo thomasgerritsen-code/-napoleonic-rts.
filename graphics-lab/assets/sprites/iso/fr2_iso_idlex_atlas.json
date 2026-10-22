@@ -2076,6 +2076,10 @@
    "x": 88,
    "y": 108
   },
-  "source": "scripts/render-iso-infantry.py (Blender, original procedural model)"
+  "source": "scripts/render-iso-infantry.py (Blender, original procedural model)",
+  "half": {
+   "image": "fr2_iso_idlex_atlas_half.webp",
+   "scale": 0.5
+  }
  }
 }

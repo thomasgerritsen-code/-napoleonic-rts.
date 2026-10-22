@@ -2476,6 +2476,10 @@
    "x": 88,
    "y": 108
   },
-  "source": "scripts/render-iso-infantry.py (Blender, original procedural model)"
+  "source": "scripts/render-iso-infantry.py (Blender, original procedural model)",
+  "half": {
+   "image": "fr4_iso_morale_atlas_half.webp",
+   "scale": 0.5
+  }
  }
 }

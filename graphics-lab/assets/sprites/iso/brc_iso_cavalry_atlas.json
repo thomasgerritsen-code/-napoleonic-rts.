@@ -2876,6 +2876,10 @@
    "x": 112,
    "y": 152
   },
-  "source": "scripts/render-iso-cavalry.py (Blender, original procedural model)"
+  "source": "scripts/render-iso-cavalry.py (Blender, original procedural model)",
+  "half": {
+   "image": "brc_iso_cavalry_atlas_half.webp",
+   "scale": 0.5
+  }
  }
 }

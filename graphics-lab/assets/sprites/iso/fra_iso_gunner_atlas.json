@@ -3740,6 +3740,10 @@
    "x": 88,
    "y": 108
   },
-  "source": "scripts/render-iso-artillery.py (Blender, original procedural model)"
+  "source": "scripts/render-iso-artillery.py (Blender, original procedural model)",
+  "half": {
+   "image": "fra_iso_gunner_atlas_half.webp",
+   "scale": 0.5
+  }
  }
 }

@@ -2076,6 +2076,10 @@
    "x": 88,
    "y": 140
   },
-  "source": "scripts/render-iso-roles.py (Blender, original procedural model)"
+  "source": "scripts/render-iso-roles.py (Blender, original procedural model)",
+  "half": {
+   "image": "bro_iso_officer_atlas_half.webp",
+   "scale": 0.5
+  }
  }
 }
