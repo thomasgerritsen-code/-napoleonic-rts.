@@ -177,16 +177,27 @@ def main(argv: list[str]) -> int:
         cx, cy = m((hl["x"], hl["y"]))
         dome(f"hill{i}", cx, cy, hl["rx"] / PPM_GAME, hl["ry"] / PPM_GAME, 1.6, grass)
 
-    # River: muddy bank under dark water; segments run on past their ends to close the bends.
+    # River: muddy banks under the water, each one continuous ribbon along the
+    # (y-monotone) centreline - overlapping segments leave stripes on glossy water.
     bank = material("#6f6043", 0.9, pattern="dirt", alt="#56492f")
-    water = material("#2f4d5c", 0.06, pattern="plain")
+    water = material("#365a6a", 0.14, pattern="plain")
     rw = data["river"]["width"] / PPM_GAME
     pts = [m(p) for p in data["river"]["points"]]
-    for k, (a, b) in enumerate(zip(pts, pts[1:])):
-        lift = 0.0005 * (k % 2)
-        # Thin slabs: thick ones show their sides as stripes where segments overlap.
-        strip(f"bank{k}", a, b, rw + 2.4, 0.012 + lift, bank, extend=(rw + 2.4) / 2, thick=0.002)
-        strip(f"water{k}", a, b, rw, 0.022 + lift, water, extend=rw / 2, thick=0.002)
+
+    def ribbon(width):
+        left, right = [], []
+        for i, (x, y) in enumerate(pts):
+            a, b = pts[max(0, i - 1)], pts[min(len(pts) - 1, i + 1)]
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            n = math.hypot(dx, dy) or 1
+            nx, ny = -dy / n * width / 2, dx / n * width / 2
+            left.append((x + nx, y + ny))
+            right.append((x - nx, y - ny))
+        return left + right[::-1]
+
+    slab("riverbank", ribbon(rw + 2.4), 0.010, 0.012, bank)
+    slab("river", ribbon(rw), 0.020, 0.022, water)
+    for a, b in zip(pts, pts[1:]):
         mask.capsule(a, b, rw / 2 + 1.6)
 
     # Roads by class: a worn verge, then the surface.

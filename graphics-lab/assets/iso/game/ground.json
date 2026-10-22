@@ -1,0 +1,12 @@
+{
+ "image": "ground.jpg",
+ "w": 4978,
+ "h": 1556,
+ "pxPerM": 14.0,
+ "gamePxPerM": 22.5,
+ "world": {
+  "w": 8000,
+  "h": 5000
+ },
+ "source": "scripts/render-iso-gamemap.py (Blender) from gamemap.json"
+}

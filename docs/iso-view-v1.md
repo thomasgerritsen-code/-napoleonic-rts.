@@ -65,6 +65,39 @@ weergave van dezelfde wereld.
   geen schoorsteenrook, kruitdamp nog dunner. Ver uitgezoomd (zoom < 0,55) verdwijnen
   aankleding en schoorsteenrook vanzelf.
 
+## Terrein uit Blender
+
+- `scripts/render-iso-gamemap.py` rendert het hele slagveld (356 × 222 m) in Blender uit
+  `graphics-lab/assets/iso/game/gamemap.json` (geëxporteerd uit de draaiende game: 37
+  wegen, de rivier met 5 bruggen, bossen, heuvels en de 224 dorpshuizen): gras met
+  plukjes en bloemen, wegen per klasse met bermen, de rivier als één doorlopende band
+  met modderige oevers, stenen en houten bruggen, donkere bosgrond, lage heuvels, en
+  een erf met moestuin bij elk huis. Resultaat `ground.jpg` (4978 × 1556, 14 px per
+  meter); de iso-weergave tekent alleen het deel dat in beeld is. Zonder die afbeelding
+  valt hij terug op de 2D-kaart.
+- In de **bossen** van de game staan eiken en populieren als sprites (met open plekken,
+  niet op wegen of in de rivier), en ze worden doorzichtig over soldaten erachter.
+
+## Bediening zoals in het lab
+
+- **Vlaggetjes**: elk geselecteerd regiment toont een vlag op zijn bestemming met een
+  stippellijn vanaf waar het staat, tot het er is.
+- **Kijkrichting**: slepen met rechts (de bestaande order van de game) toont een pijl.
+- **Aanvalsdoel**: rechtsklik (of tik) op een zichtbare vijand: de selectie marcheert naar
+  schootsafstand van die vijand (infanterie 85% van haar bereik, kanonnen 80%, ruiters
+  tot contact) met het front naar hem toe — de eigen loop- en frontorders van de game;
+  het vechten doet de game zelf. Rode stippelringen en een vizier boven de vijand.
+- **Schuiven**: verticaal schuiven met toetsen of één vinger gaat op iso-snelheid.
+
+## Boeren en geluid
+
+- **Boeren** (`scripts/render-iso-roles.py --role worker`): linnen kiel, strohoed,
+  bijl; staan, lopen en hakken (bij een taak) in 8 richtingen (`frw`/`brw`).
+- **Geluid uit het lab** bovenop dat van de game (schoten, kanonnen, trommels): hoeven
+  onder galopperende ruiters, een trompet als ruiters chargeren, gesproken commando's
+  ("Joue! Feu!", "Present! Fire!", "En avant! À la baïonnette!"). Volgt de geluidsknop
+  van de game.
+
 ## Schaal
 
 In linie staan de mannen in de game 18 px uit elkaar en in het lab 0,8 m: 1 m is
@@ -96,9 +129,6 @@ weergaven; terug in 2D begint de terreincache opnieuw.
 
 ## Nog niet (volgende stappen)
 
-1. Het terrein zelf (gras, akkers, bossen, rivier) in Blender renderen; nu is dat nog
-   de 2D-kaart plat op de grond. De dorpen zijn wel al Blender (zie boven).
-2. De bediening uit het lab (vlaggetjes, draaien, aanvalsdoel) koppelen aan de bevelen
-   van de game, en het pannen met slepen ook verticaal op iso-snelheid.
-3. Boeren-sprites, geluid uit het lab, en tekenen via de GPU voor 520 eenheden op
-   zwakke telefoons.
+1. De grond opnieuw renderen als de kaart van de game verandert (export + script).
+2. Tekenen via de GPU voor 520 eenheden op zwakke telefoons.
+3. Hoogte: de heuvels zijn laag gehouden omdat eenheden nog niet meeklimmen.
