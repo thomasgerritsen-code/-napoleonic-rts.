@@ -10,8 +10,8 @@
 //   - Trenches: a braced line goes on to dig a trench along its front (digSeconds,
 //     slower under fire). A finished trench stays on the field; men standing in it
 //     - of either side - take trenchDamage of the losses and trenchShock of the
-//     morale shock. A defending regiment that halts by an empty trench steps into
-//     it, front the way the trench faces.
+//     morale shock. Any regiment that halts by an empty finished trench steps
+//     into it - again each time it comes back - front the way the trench faces.
 //   - Reinforce: loose musketiers selected together with one regiment join it,
 //     up to maxInfantry men.
 // Only on the open map (NRTS_CONFIG.regimentOrders); the normal game is unchanged.
@@ -33,6 +33,7 @@
     baseRefresh(reg);
     if (!reg || reg.destroyed) return;
     if (reg.side === 'britain' && typeof AI_COMMANDER_V1 !== 'undefined') reg.defend = AI_COMMANDER_V1.state === 'DEFEND' || AI_COMMANDER_V1.state === 'REGROUP';
+    if (trenches.length) manTrenches(reg);
     if (!reg.defend) { reg.bracedAt = null; return; }
     // Once a second: has the regiment moved, and is it formed to receive?
     if (reg.stanceCheckAt != null && elapsed - reg.stanceCheckAt < 1) return;
@@ -71,18 +72,33 @@
     // Long enough for every file, deep enough for every rank, with room to stand.
     return { x: c.x + ax * mid + nx * depth, y: c.y + ay * mid + ny * depth, facing, length: Math.max(60, hi - lo + 30), width: Math.max(cfg.trenchWidth, front - back + 26) };
   }
+  // Manning, once a second for every regiment: one that has left its trench
+  // lets go of it; one that halts by an empty finished trench - any regiment,
+  // as often as it comes back - steps into it, front the way the trench faces,
+  // and stands on the defensive.
+  function manTrenches(reg) {
+    if (reg.trenchCheckAt != null && elapsed - reg.trenchCheckAt < 1) return;
+    reg.trenchCheckAt = elapsed;
+    const m = regimentMembers(reg); if (!m.length) return;
+    const c = centroid(m), last = reg.trenchLast;
+    reg.trenchLast = c;
+    reg.trenchStill = last && Math.hypot(c.x - last.x, c.y - last.y) < 8 && !m.some(u => u.routing) ? (reg.trenchStill || 0) + 1 : 0;
+    const own = reg.trenchId ? trenches.find(t => t.id === reg.trenchId) : null;
+    if (reg.trenchId && (!own || Math.hypot(own.x - c.x, own.y - c.y) > cfg.trenchSnap)) reg.trenchId = null;
+    if (reg.trenchId || reg.trenchStill < 2) return;
+    const t = trenches.filter(q => q.progress >= 1 && Math.hypot(q.x - c.x, q.y - c.y) < cfg.trenchSnap)
+      .sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
+    if (!t || regiments.some(r => r !== reg && !r.destroyed && r.trenchId === t.id)) return;
+    reg.trenchId = t.id; t.side = reg.side; stats.manned++;
+    if (reg.side === 'france') reg.defend = true;
+    reg.formation = 'line';
+    if (typeof arrangeFacingRegimentV146 === 'function') arrangeFacingRegimentV146(reg, t.x, t.y, 'line', t.facing);
+    // The trench covers them as soon as they stand in it; bracing follows when they halt.
+  }
   function trenchWork(reg, m, c) {
-    // Step into an empty finished trench close by, once.
+    // By a trench already: finish digging it, or (finished) nothing to dig here.
     const near = trenches.find(t => Math.hypot(t.x - c.x, t.y - c.y) < cfg.trenchSnap);
-    if (near && near.progress >= 1) {
-      const holder = regiments.find(r => r !== reg && !r.destroyed && r.trenchId === near.id);
-      if (!holder && reg.trenchId !== near.id) {
-        reg.trenchId = near.id; near.side = reg.side; stats.manned++;
-        if (typeof arrangeFacingRegimentV146 === 'function') arrangeFacingRegimentV146(reg, near.x, near.y, 'line', near.facing);
-        reg.bracedAt = elapsed - cfg.braceSeconds;   // men stepping into a trench are at once in cover
-      }
-      return;
-    }
+    if (near && near.progress >= 1) return;
     if (!isBraced(reg) || elapsed - reg.bracedAt < cfg.braceSeconds + cfg.digDelay) return;
     let t = near && near.progress < 1 ? near : null;
     if (!t && !near) {

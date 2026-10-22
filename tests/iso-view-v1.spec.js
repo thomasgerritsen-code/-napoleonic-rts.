@@ -404,12 +404,26 @@ test('iso view: a defending line digs a trench, men in it lose less, and a regim
     selectWholeRegiment(b); O.toggleDefend();
     for (let k = 0; k < 12; k++) window.__RTS_DEBUG__.tick(1);
     const inB = regimentMembers(b).filter(u => u.type === 'infantry' && O.trenchAt(u.x, u.y)).length;
-    return { finished: t && t.progress >= 1, lostIn: h1 - man.hp, lostOut: h2 - out.hp, manned: b.trenchId === t.id, inB, facing: b.facing, tf: t.facing };
+    const mannedB = b.trenchId === t.id, facingB = b.facing;
+    // The second regiment marches off and comes back: it steps in again, without
+    // the defensive stance switched on.
+    b.defend = false;
+    orderGroupPathV06(b, t.x + 40, t.y + 600, 'line', Math.PI / 2);
+    for (let k = 0; k < 25; k++) window.__RTS_DEBUG__.tick(1);
+    const left = b.trenchId !== t.id;
+    orderGroupPathV06(b, t.x + 50, t.y + 60, 'line', 0);
+    for (let k = 0; k < 30; k++) window.__RTS_DEBUG__.tick(1);
+    const again = regimentMembers(b).filter(u => u.type === 'infantry' && O.trenchAt(u.x, u.y)).length;
+    return { finished: t && t.progress >= 1, lostIn: h1 - man.hp, lostOut: h2 - out.hp, manned: mannedB, inB, facing: facingB, tf: t.facing,
+      left, again, mannedAgain: b.trenchId === t.id };
   });
   expect(r.finished).toBe(true);
   expect(r.lostIn).toBeLessThan(r.lostOut * 0.6);
   expect(r.manned).toBe(true);
   expect(r.inB).toBeGreaterThan(10);
   expect(r.facing).toBeCloseTo(r.tf, 2);
+  expect(r.left).toBe(true);
+  expect(r.mannedAgain).toBe(true);
+  expect(r.again).toBeGreaterThan(10);
   expect(errors).toEqual([]);
 });

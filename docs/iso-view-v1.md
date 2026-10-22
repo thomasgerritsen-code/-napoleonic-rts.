@@ -99,8 +99,10 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   loopgraaf staat - van welke kant ook - lijdt 50% minder verlies en verliest nog
   minder moraal dan alleen ingegraven. In de iso-weergave staan de mannen erin lager,
   en de wal verbergt hun benen. Een loopgraaf blijft liggen als het regiment vertrekt;
-  een regiment in verdedigende houding dat vlak bij een lege loopgraaf tot stilstand
-  komt, stelt zich erin op, front de kant op die de loopgraaf heeft. Ook de Britse
+  elk regiment dat vlak bij een lege voltooide loopgraaf tot stilstand komt, stelt
+  zich erin op - ook bij de tweede of derde keer - front de kant op die de
+  loopgraaf heeft, en gaat in verdedigende houding. Wie wegloopt, laat de loopgraaf
+  los, zodat hij vrij is voor de volgende (of voor hetzelfde regiment). Ook de Britse
   commandant graaft in waar hij verdedigt.
 - **Grotere regimenten**: 12 tot 36 musketiers. "Selecteer nabij" vult aan tot 36, een
   officier verzamelt alle vrije musketiers in zijn buurt (tot 36), en **Versterk
