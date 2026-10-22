@@ -14,3 +14,9 @@ begint; na 06:30 begint er geen nieuwe stap meer.
 | 03:00 | v338 | **Groter slagveld**: heuvel met de Britse stelling, een beek met stenen brug en een tweede boerderij; terrein opnieuw in Blender gerenderd; de camera volgt een gekozen eenheid; minimap in de hoek. |
 | 05:00 | v339 | **Eerste bediening**: regiment, batterij of eskadron selecteren (klik/tik, sleepkader), bevelen geven (lopen, linie/colonne, vuren, charge) met muis en touch; selectiecirkels en bestemmingsvlaggetjes. |
 | 07:00 | —    | Samenvatting met wat af is, wat niet en de previewlinks. |
+
+## Stand
+
+- v336, v337 en v338 zijn af (met v338b: uitleg verborgen, v338c: sneller).
+- v339 is af: selecteren met klik/tik/kader, bevelen lopen, linie/colonne, vuren en
+  charge, selectieringen en vlaggetjes; getest met muis en touch.

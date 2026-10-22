@@ -1,4 +1,4 @@
-// Graphics Lab v338 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
+// Graphics Lab v339 — isometric scene: Blender-rendered soldiers in five looks (incl. grenadiers
 // and voltigeurs; march, aim, fire, reload, three falls) led by an officer, drummer and ensign,
 // deploying from column into line, buildings, trees and terrain.
 // Isolated demo: no game simulation, no shared globals with the playable RTS.
@@ -210,6 +210,9 @@ const SQUAD={ranks:2,files:3,walk:3.2,trot:4.5,gallop:7.5,stride:2.4,trotStride:
  melee:3.2,meet:3.5,clash:3.5,clashLoss:0.2,squareHit:0.15,squareCut:0.08,cutEvery:0.45,cutChance:0.35,cutReach:1.6,fallChance:0.18,fallWithin:6,dieFrame:0.22};
 const REGIMENTS=[{side:'france',prefix:'fr',lineRanks:3,start:0},{side:'britain',prefix:'br',lineRanks:2,start:0.5}];
 const slotKey=(r,f)=>r+','+f;
+// v339 orders: an ordered regiment's centre marches at this pace (the men walk
+// faster to keep their places) and stops within this distance of the flag.
+const ORDER={speed:1.4,arrive:0.3,tapPx:8,flagLife:25};
 
 function buildRegiments(){
  state.regiments=REGIMENTS.map(def=>{
@@ -261,8 +264,27 @@ function formSquare(reg,threat){
  men.forEach((m,j)=>{m.square=slots[Math.floor(j*slots.length/men.length)];});
  reg.square={cx:c.x,cy:c.y,half};reg.formation='square';reg.readyAt=null;
 }
+// Column off the road (v339 orders): four files behind the head, around a
+// centre that the move order walks to the flag.
+function formFreeColumn(reg,face){
+ const c=centreOf(reg),l=Math.hypot(face.x-c.x,face.y-c.y)||1,nx=(face.x-c.x)/l,ny=(face.y-c.y)/l,tx=-ny,ty=nx;
+ const men=aliveMen(reg),ranks=Math.ceil(men.length/COLUMN.files);
+ men.sort((a,b)=>(b.gx*nx+b.gy*ny)-(a.gx*nx+a.gy*ny));
+ reg.slots=new Map();
+ for(let r=0;r<ranks;r++){
+   men.slice(r*COLUMN.files,(r+1)*COLUMN.files).sort((a,b)=>(a.gx*tx+a.gy*ty)-(b.gx*tx+b.gy*ty))
+     .forEach((m,f)=>{m.slot={r,f};reg.slots.set(slotKey(r,f),m);});
+ }
+ reg.col={cx:c.x,cy:c.y,nx,ny,tx,ty,ranks};reg.formation='fcolumn';reg.readyAt=null;
+}
+function freeColumnAt(reg,back,lateral){
+ const C=reg.col,v=(C.ranks-1)/2*COLUMN.gap-back;
+ return{x:C.cx+C.nx*v+C.tx*lateral,y:C.cy+C.ny*v+C.ty*lateral,dir:dirIndex(C.nx,C.ny)};
+}
+const firingOf=reg=>state.firing||!!(reg.cmd&&reg.cmd.fire);
 function slotTarget(reg,m){
  if(reg.formation==='square'&&m.square)return m.square;
+ if(reg.formation==='fcolumn')return freeColumnAt(reg,m.slot.r*COLUMN.gap,(m.slot.f-(COLUMN.files-1)/2)*COLUMN.spacing);
  return reg.formation==='line'?lineTarget(reg,m.slot.r,m.slot.f)
    :columnTarget(reg,m.slot.r*COLUMN.gap,(m.slot.f-(COLUMN.files-1)/2)*COLUMN.spacing);
 }
@@ -275,6 +297,8 @@ function staffTarget(reg,role){
    // Officer on the right flank, colour just behind the front rank, drummer at the rear.
    return role==='officer'?at(half+1.1,0.4):role==='ensign'?at(0,-LINE.gap*0.5):at(-1.0,-(L.ranks*LINE.gap+0.7));
  }
+ if(reg.formation==='fcolumn'){const R=reg.col.ranks;
+   return role==='officer'?freeColumnAt(reg,-2.2,0):role==='ensign'?freeColumnAt(reg,(R/2-0.5)*COLUMN.gap,0):freeColumnAt(reg,R*COLUMN.gap+0.4,1.2);}
  const ranks=Math.ceil(aliveMen(reg).length/COLUMN.files);
  return role==='officer'?columnTarget(reg,-2.2,0):role==='ensign'?columnTarget(reg,(ranks/2-0.5)*COLUMN.gap,0)
    :columnTarget(reg,ranks*COLUMN.gap+0.4,1.2);
@@ -336,10 +360,23 @@ function updateRegiments(){
  state.regiments.forEach((reg,i)=>{
    // The British form square while the French horse is out, and line again after.
    const square=i===1&&state.reaction&&state.cavCharge&&state.cavCharge.phase!=='rally';
+   const cmd=reg.cmd,firing=firingOf(reg);
    if(square){if(reg.formation!=='square')formSquare(reg,centreOf({men:liveRiders(state.squadrons[0])}));}
    else if(reg.formation==='square')formLine(reg,centres[1-i]);
-   else if((state.firing||state.charge)&&reg.formation!=='line')formLine(reg,centres[1-i]);
+   else if((firing||state.charge)&&reg.formation!=='line')formLine(reg,centres[1-i]);
+   else if(cmd){
+     // An ordered regiment keeps its own formation off the road.
+     if(cmd.form==='line'&&reg.formation!=='line')formLine(reg,cmd.face);
+     else if(cmd.form==='column'&&reg.formation!=='fcolumn')formFreeColumn(reg,cmd.face);
+   }
    else if(!state.halted&&reg.formation!=='column')formColumn(reg);
+   reg.marching=false;
+   if(cmd&&cmd.dest&&!state.charge&&!square&&(reg.formation==='line'||reg.formation==='fcolumn')){
+     // March the formation's centre to the flag; the men keep their places round it.
+     const A=reg.formation==='line'?reg.line:reg.col,dx=cmd.dest.x-A.cx,dy=cmd.dest.y-A.cy,dist=Math.hypot(dx,dy);
+     if(dist<=ORDER.arrive)cmd.dest=null;
+     else{const step=Math.min(dist,ORDER.speed*dt);A.cx+=dx/dist*step;A.cy+=dy/dist*step;reg.readyAt=null;reg.marching=true;}
+   }
    // A column on the march follows the road exactly; reforming men walk.
    const snap=reg.formation==='column'&&!reg.reforming;
    let spread=0,walking=0;
@@ -351,7 +388,7 @@ function updateRegiments(){
    }
    for(const st of reg.staff)walkTo(st,staffTarget(reg,st.role),dt,snap);
    if(reg.reforming&&spread<0.3)reg.reforming=false;
-   if(reg.formation==='line'&&reg.readyAt===null&&walking===0){reg.readyAt=state.time;if(state.firing)command(reg.prefix,'fire');}
+   if(reg.formation==='line'&&reg.readyAt===null&&walking===0&&!reg.marching){reg.readyAt=state.time;if(firing)command(reg.prefix,'fire');}
  });
 }
 
@@ -403,7 +440,7 @@ function beatDrums(){
  if(!audio||!audio.isOn())return;
  state.regiments.forEach((reg,i)=>{
    const ch=state.charge,charging=ch&&ch.phase==='advance'&&i===ch.attacker;
-   const moving=charging||(!state.halted&&!state.firing)||reg.reforming;
+   const moving=charging||(reg.cmd?reg.marching:!state.halted&&!state.firing)||reg.reforming;
    const drummer=reg.staff.find(s=>s.role==='drummer');
    if(!moving||!drummer||drummer.gone){reg.drumAt=null;return;}
    const every=charging?0.28:0.5;
@@ -426,7 +463,10 @@ function buildBatteries(){
 }
 // Where a gun belongs: behind the column, or on its flank of the line facing the enemy.
 function gunTarget(reg,i){
- const ranks=Math.ceil(aliveMen(reg).length/COLUMN.files);
+ const ranks=Math.ceil(aliveMen(reg).length/COLUMN.files),B=reg.batCmd;
+ // Ordered elsewhere: the two guns side by side, laid towards the enemy.
+ if(B)return{x:B.x+B.tx*(i?-1:1)*GUN.spacing/2,y:B.y+B.ty*(i?-1:1)*GUN.spacing/2,dir:B.dir};
+ if(reg.formation==='fcolumn')return freeColumnAt(reg,ranks*COLUMN.gap+GUN.trail+i*GUN.spacing,0);
  if(reg.formation==='column'||!reg.line)return columnTarget(reg,ranks*COLUMN.gap+GUN.trail+i*GUN.spacing,0);
  const L=reg.line,u=(i?-1:1)*((L.files-1)/2*LINE.spacing+GUN.flank);
  return{x:L.cx+L.tx*u,y:L.cy+L.ty*u,dir:dirIndex(L.nx,L.ny)};
@@ -452,10 +492,11 @@ function updateBatteries(dt){
      g.gx=g.home.x;g.gy=g.home.y;
      moveCrew(g,dt);continue;
    }
-   if(state.firing)g.clock+=dt;
-   const t=state.firing&&g.clock>=0?g.clock%GUN.cycle:-1,cycle=Math.floor(g.clock/GUN.cycle);
+   const firing=state.firing||!!reg.batFire;
+   if(firing)g.clock+=dt;
+   const t=firing&&g.clock>=0?g.clock%GUN.cycle:-1,cycle=Math.floor(g.clock/GUN.cycle);
    g.t=t;
-   if(t<0&&!state.firing)g.dir=goal.dir;
+   if(t<0&&!firing)g.dir=goal.dir;
    // The gun is laid on the enemy between shots.
    if(t>=0&&t<0.6&&aliveMen(enemy).length)g.dir=dirIndex(c.x-g.home.x,c.y-g.home.y);
    if(t>=GUN.fireAt&&g.fired!==cycle){g.fired=cycle;fireGun(g,c);}
@@ -592,6 +633,11 @@ function buildSquadrons(){
 }
 // A rider's place: in the column behind the guns, or on the line's left flank.
 function riderHome(reg,m){
+ const Q=state.squadrons&&state.squadrons[reg.prefix==='fr'?0:1].cmd;
+ if(Q){const u=(m.f-1)*1.5+(m.r<0?(m.role==='officer'?-0.4:0.4):0),v=m.r<0?2.2:-m.r*2.6;
+   return{x:Q.x+Q.tx*u+Q.nx*v,y:Q.y+Q.ty*u+Q.ny*v,dir:Q.dir};}
+ if(reg.formation==='fcolumn'){const ranks=Math.ceil(aliveMen(reg).length/COLUMN.files);
+   return freeColumnAt(reg,ranks*COLUMN.gap+GUN.trail+GUN.spacing+4+m.r*2.8,(m.f-1)*1.4);}
  if(reg.formation==='column'||!reg.line){
    const ranks=Math.ceil(aliveMen(reg).length/COLUMN.files);
    return columnTarget(reg,ranks*COLUMN.gap+GUN.trail+GUN.spacing+4+m.r*2.8,(m.f-1)*1.4);
@@ -605,7 +651,7 @@ function updateSquadrons(dt){
  const ch=state.cavCharge;
  updateCounter(dt);updateClash();
  state.squadrons.forEach((sq,i)=>{
-   const reg=sq.reg,charging=ch&&i===0,marching=reg.formation==='column'&&!state.halted;
+   const reg=sq.reg,charging=ch&&i===0,marching=!sq.cmd&&((reg.formation==='column'&&!state.halted)||reg.marching);
    if(i===1&&state.cavCounter)return;
    if(!charging){
      for(const m of liveRiders(sq)){
@@ -769,7 +815,7 @@ function frameFor(u){
  if(u.role){
    // Command pose while the regiment fires: sword raised, charge beaten, colour raised.
    if(u.moving)return 'march_'+d+'|'+Math.floor((u.walk%MARCH.strideM)/MARCH.strideM*MARCH.frames)%MARCH.frames;
-   if(state.firing)return 'command_'+d+'|'+(Math.floor(state.time/0.45)%2);
+   if(firingOf(regimentOf(u)))return 'command_'+d+'|'+(Math.floor(state.time/0.45)%2);
    return 'idle_'+d+'|'+(Math.floor(state.time/0.6)%2);
  }
  const ch=state.charge,step=(stride,frames)=>Math.floor((u.walk%stride)/stride*frames)%frames;
@@ -796,7 +842,7 @@ function frameFor(u){
    // Ranks open fire one after another once the whole line stands; each man
    // presents a moment later or earlier than his neighbours.
    const reg=regimentOf(u),jitter=hash(u.id+71,u.prefix==='fr'?13:17)*FIRE_JITTER;
-   const ordered=state.firing&&reg.formation==='line'&&reg.readyAt!==null&&state.time>=reg.readyAt+u.slot.r*BAND_DELAY+jitter;
+   const ordered=firingOf(reg)&&reg.formation==='line'&&reg.readyAt!==null&&state.time>=reg.readyAt+u.slot.r*BAND_DELAY+jitter;
    const rate=1-RATE_SPREAD/2+hash(u.id+29,u.prefix==='fr'?19:23)*RATE_SPREAD;
    const r=c.update(u.key,state.time*1000,{moving:u.moving,fireOrder:ordered&&!u.moving,rate});
    const mem=state.drill.get(u.key)||{last:'idle',volley:0,misfire:false};
@@ -811,7 +857,7 @@ function frameFor(u){
    if(!u.moving&&r.state!=='march'){
      if(kneel&&(r.state==='aim'||r.state==='fire'))return 'k'+r.state+'_'+d+'|'+r.frame;
      if(r.state==='fire'&&mem.misfire)return 'misfire_'+d+'|'+r.frame;
-     if(r.state==='idle'&&!state.firing){const extra=idleExtra(u);if(extra)return extra[0]+'_'+d+'|'+extra[1];}
+     if(r.state==='idle'&&!firingOf(reg)){const extra=idleExtra(u);if(extra)return extra[0]+'_'+d+'|'+extra[1];}
      return r.state+'_'+d+'|'+r.frame;
    }
  }else if(!u.moving){
@@ -958,6 +1004,7 @@ function draw(now){
  const battery=(state.batteries||[]).flatMap(g=>[g,...g.crew]).map(u=>({...u,...project(u.gx,u.gy)}));
  const horse=(state.squadrons||[]).flatMap(sq=>liveRiders(sq)).map(u=>({...u,...project(u.gx,u.gy)}))
    .concat(state.deadRiders.map(d=>({...d,deadRider:true,...project(d.gx,d.gy)})));
+ drawSelection();
  const list=alive.filter(u=>!u.dead).map(u=>({...u,...project(u.gx,u.gy)})).concat(battery,horse,fallen,state.props).sort((a,b)=>a.y-b.y);
  state.animStates={};state.crewStates={};state.cavStates={};state.ridersDrawn=0;
  state.drawn=0;state.propsDrawn=0;state.rolesDrawn=0;state.gunsDrawn=0;state.crewDrawn=0;
@@ -999,10 +1046,12 @@ function draw(now){
    state.directionsSeen.add(u.dir);state.drawn++;
  }
  drawBalls();
+ drawFlags();
  drawSmoke();
  drawSmokeBank();
  drawCompass(dpr);
  drawMinimap(dpr);
+ drawBox(dpr);
  requestAnimationFrame(draw);
 }
 
@@ -1062,36 +1111,242 @@ function followCamera(){
  state.camX+=(p.x-state.camX)*0.12;state.camY+=(p.y-state.camY)*0.12;
 }
 
-// Pan with one pointer, pinch or wheel to zoom around the gesture centre.
-const pointers=new Map();let pinch=null;
+// v339 command: regiments, batteries and squadrons can be selected and ordered.
+const GROUPS=[['fr','regiment',0,'Frans regiment'],['br','regiment',1,'Brits regiment'],['frbat','battery',0,'Franse batterij'],
+ ['brbat','battery',1,'Britse batterij'],['frcav','squadron',0,'Franse ruiters'],['brcav','squadron',1,'Britse ruiters']]
+ .map(([id,kind,side,name])=>({id,kind,side,name}));
+const GROUP=Object.fromEntries(GROUPS.map(g=>[g.id,g]));
+state.selected=new Set();state.flags=[];state.orders=0;state.box=null;state.boxMode=false;
+function groupMembers(id){
+ const g=GROUP[id];if(!state.regiments)return[];
+ const reg=state.regiments[g.side];
+ if(g.kind==='regiment')return[...aliveMen(reg),...reg.staff.filter(s=>!s.gone)];
+ if(g.kind==='battery')return(state.batteries||[]).filter(b=>b.prefix===reg.prefix).flatMap(b=>[b,...b.crew]);
+ return state.squadrons?liveRiders(state.squadrons[g.side]):[];
+}
+// Height above the feet (screen px) where a body is clicked.
+const bodyLift=m=>m.rider?26:m.gun?8:15;
+const groundAt=w=>({x:w.x/S,y:-w.y/(SQUASH*S)});
+function hitGroup(w){
+ let best=null,bestD=Math.max(12,20/state.zoom);
+ for(const g of GROUPS)for(const m of groupMembers(g.id)){
+   const p=project(m.gx,m.gy),d=Math.hypot(w.x-p.x,w.y-(p.y-bodyLift(m)));
+   if(d<bestD){best=g.id;bestD=d;}
+ }
+ return best;
+}
+function select(ids,add){
+ if(!add)state.selected.clear();
+ for(const id of ids)state.selected.add(id);
+ refreshOrders();
+}
+const enemyCentre=side=>centreOf(state.regiments[1-side]);
+// Ground frame facing from p towards q: n forward, t to the left.
+function facing(p,q,fallback){
+ let nx=q.x-p.x,ny=q.y-p.y,l=Math.hypot(nx,ny);
+ if(l<0.5&&fallback){nx=fallback.x-p.x;ny=fallback.y-p.y;l=Math.hypot(nx,ny);}
+ l=l||1;nx/=l;ny/=l;return{nx,ny,tx:-ny,ty:nx,dir:dirIndex(nx,ny)};
+}
+function moveGroup(id,P){
+ const g=GROUP[id],reg=state.regiments[g.side];
+ if(g.kind==='regiment'){
+   if(state.charge)return false;
+   const form=reg.cmd?reg.cmd.form:reg.formation==='line'?'line':'column';
+   reg.cmd={form,face:P,dest:P,fire:false};
+   if(form==='line')formLine(reg,P);else formFreeColumn(reg,P);
+ }else if(g.kind==='battery'){
+   // Unlimbered facing the enemy from the new spot.
+   reg.batCmd={x:P.x,y:P.y,...facing(P,enemyCentre(g.side))};
+ }else{
+   const sq=state.squadrons[g.side];
+   if(g.side===0&&state.cavCharge)return false;
+   if(g.side===1&&state.cavCounter)return false;
+   sq.cmd={x:P.x,y:P.y,...facing(centreOf({men:liveRiders(sq)}),P,enemyCentre(g.side))};
+ }
+ return true;
+}
+function orderMove(dest){
+ const ids=[...state.selected];if(!ids.length||!state.regiments)return;
+ const lim=GROUND*0.8;dest={x:Math.max(-lim,Math.min(lim,dest.x)),y:Math.max(-lim,Math.min(lim,dest.y))};
+ // Several groups keep their places relative to each other round the flag.
+ const cs=ids.map(id=>centreOf({men:groupMembers(id)}));
+ const mx=cs.reduce((a,c)=>a+c.x,0)/cs.length,my=cs.reduce((a,c)=>a+c.y,0)/cs.length;
+ const moved=ids.filter((id,j)=>moveGroup(id,{x:dest.x+cs[j].x-mx,y:dest.y+cs[j].y-my}));
+ if(!moved.length)return;
+ state.flags.push({x:dest.x,y:dest.y,born:state.time,ids:moved,side:GROUP[moved[0]].side});
+ state.orders++;refreshOrders();
+}
+function orderForm(form){
+ for(const id of state.selected){
+   const g=GROUP[id];if(g.kind!=='regiment'||state.charge)continue;
+   const reg=state.regiments[g.side],face=reg.cmd&&reg.cmd.dest||enemyCentre(g.side);
+   reg.cmd={form,face,dest:reg.cmd?reg.cmd.dest:null,fire:false};
+   if(form==='line')formLine(reg,face);else formFreeColumn(reg,face);
+   state.orders++;
+ }
+ refreshOrders();
+}
+function orderFire(){
+ const on=!selectedFiring();
+ for(const id of state.selected){
+   const g=GROUP[id],reg=state.regiments[g.side];
+   if(g.kind==='regiment'&&!state.charge){
+     // Halt, face the enemy in line and open fire.
+     reg.cmd={form:'line',face:enemyCentre(g.side),dest:null,fire:on};
+     if(on)formLine(reg,reg.cmd.face);
+   }else if(g.kind==='battery')reg.batFire=on;
+   else continue;
+   state.orders++;
+ }
+ refreshOrders();
+}
+function selectedFiring(){
+ return [...state.selected].some(id=>{const g=GROUP[id],reg=state.regiments&&state.regiments[g.side];
+   return reg&&(g.kind==='regiment'?!!(reg.cmd&&reg.cmd.fire):g.kind==='battery'&&!!reg.batFire);});
+}
+// Bayonets for the first selected regiment, and the French squadron goes in too if chosen.
+function orderCharge(){
+ const ids=[...state.selected],reg=ids.find(id=>GROUP[id].kind==='regiment');
+ if(reg&&!state.charge){setCharge(GROUP[reg].side);state.orders++;}
+ if(ids.includes('frcav')&&!state.cavCharge){setCavCharge();state.orders++;}
+ refreshOrders();
+}
+function clearOrders(){
+ if(!state.regiments)return;
+ state.regiments.forEach(reg=>{reg.cmd=null;reg.batCmd=null;reg.batFire=false;});
+ (state.squadrons||[]).forEach(sq=>{sq.cmd=null;});
+ state.flags=[];
+}
+// The order bar shows what the selection can do.
+const orders={bar:document.getElementById('iso-orders'),label:document.getElementById('iso-sel'),box:document.getElementById('iso-box'),
+ line:document.getElementById('iso-o-line'),column:document.getElementById('iso-o-column'),fire:document.getElementById('iso-o-fire'),
+ charge:document.getElementById('iso-o-charge'),clear:document.getElementById('iso-o-clear')};
+function refreshOrders(){
+ const ids=[...state.selected],kinds=new Set(ids.map(id=>GROUP[id].kind));
+ orders.bar.dataset.empty=String(!ids.length);
+ orders.label.textContent=ids.length?ids.map(id=>GROUP[id].name).join(' + '):'Tik een eenheid aan';
+ orders.line.disabled=orders.column.disabled=!kinds.has('regiment')||!!state.charge;
+ orders.fire.disabled=!kinds.has('regiment')&&!kinds.has('battery');
+ orders.fire.textContent=selectedFiring()?'✋ Staakt vuren':'🔥 Vuren';
+ orders.charge.disabled=!(kinds.has('regiment')&&!state.charge)&&!(ids.includes('frcav')&&!state.cavCharge);
+ for(const b of [orders.line,orders.column,orders.fire,orders.charge,orders.clear])b.hidden=!ids.length;
+}
+orders.line.addEventListener('click',()=>orderForm('line'));
+orders.column.addEventListener('click',()=>orderForm('column'));
+orders.fire.addEventListener('click',orderFire);
+orders.charge.addEventListener('click',orderCharge);
+orders.clear.addEventListener('click',()=>select([],false));
+orders.box.addEventListener('click',()=>{state.boxMode=!state.boxMode;orders.box.setAttribute('aria-pressed',String(state.boxMode));});
+addEventListener('keydown',e=>{if(e.key==='Escape'){select([],false);state.box=null;}});
+
+// Selection circles under the feet of every selected man, gun and horse.
+function drawSelection(){
+ if(!state.selected.size)return;
+ ctx.lineWidth=1.5/state.zoom;
+ for(const id of state.selected){
+   ctx.strokeStyle=GROUP[id].side?'rgba(255,190,170,.95)':'rgba(255,236,150,.95)';
+   ctx.beginPath();
+   for(const m of groupMembers(id)){
+     const p=project(m.gx,m.gy),rx=(m.rider?1.3:m.gun?1.4:0.5)*S;
+     ctx.moveTo(p.x+rx,p.y);ctx.ellipse(p.x,p.y,rx,rx*SQUASH,0,0,Math.PI*2);
+   }
+   ctx.stroke();
+ }
+}
+// A small flag marks where an order sends the selection; it goes once they are there.
+function drawFlags(){
+ state.flags=state.flags.filter(f=>{
+   if(state.time-f.born>ORDER.flagLife)return false;
+   const c=centreOf({men:f.ids.map(id=>{const k=centreOf({men:groupMembers(id)});return{gx:k.x,gy:k.y};})});
+   return Math.hypot(c.x-f.x,c.y-f.y)>2.5||state.time-f.born<0.6;
+ });
+ for(const f of state.flags){
+   const p=project(f.x,f.y),wave=Math.sin((state.time-f.born)*6)*2;
+   ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(p.x,p.y,6,3,0,0,Math.PI*2);ctx.fill();
+   ctx.strokeStyle='#2b2118';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x,p.y-30);ctx.stroke();
+   ctx.fillStyle=f.side?'#c8322a':'#2c4fb8';ctx.beginPath();ctx.moveTo(p.x,p.y-30);ctx.lineTo(p.x+15,p.y-25+wave);ctx.lineTo(p.x,p.y-19);ctx.fill();
+ }
+}
+function drawBox(dpr){
+ const b=state.box;if(!b)return;
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ const x=Math.min(b.x0,b.x1),y=Math.min(b.y0,b.y1),w=Math.abs(b.x1-b.x0),h=Math.abs(b.y1-b.y0);
+ ctx.fillStyle='rgba(255,236,150,.12)';ctx.fillRect(x,y,w,h);
+ ctx.strokeStyle='rgba(255,236,150,.9)';ctx.lineWidth=1.2;ctx.strokeRect(x,y,w,h);
+}
+function boxSelect(b,add){
+ const a=toWorld(Math.min(b.x0,b.x1),Math.min(b.y0,b.y1)),c=toWorld(Math.max(b.x0,b.x1),Math.max(b.y0,b.y1));
+ const ids=GROUPS.filter(g=>groupMembers(g.id).some(m=>{const p=project(m.gx,m.gy);return p.x>=a.x&&p.x<=c.x&&p.y>=a.y&&p.y<=c.y;})).map(g=>g.id);
+ select(ids,add);
+}
+// Screen point (client px) of a group's member nearest its centre, for tests.
+function groupScreen(id){
+ const men=groupMembers(id);if(!men.length)return null;
+ const c=centreOf({men}),m=men.reduce((b,u)=>Math.hypot(u.gx-c.x,u.gy-c.y)<Math.hypot(b.gx-c.x,b.gy-c.y)?u:b);
+ const p=project(m.gx,m.gy),r=view.getBoundingClientRect();
+ return{x:r.left+(p.x-state.camX)*state.zoom+r.width/2,y:r.top+(p.y-bodyLift(m)-state.camY)*state.zoom+r.height/2};
+}
+function screenOfGround(gx,gy){
+ const p=project(gx,gy),r=view.getBoundingClientRect();
+ return{x:r.left+(p.x-state.camX)*state.zoom+r.width/2,y:r.top+(p.y-state.camY)*state.zoom+r.height/2};
+}
+
+// One pointer: tap selects or orders, drag pans (or draws a selection box with
+// Shift or ▢ Kader); two pointers pinch; wheel zooms round the cursor.
+const pointers=new Map();let pinch=null,press=null;
 const toWorld=(x,y)=>({x:(x-view.clientWidth/2)/state.zoom+state.camX,y:(y-view.clientHeight/2)/state.zoom+state.camY});
-view.addEventListener('pointerdown',e=>{if(minimapHit(e))return;view.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+const local=e=>{const r=view.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
+view.addEventListener('contextmenu',e=>e.preventDefault());
+view.addEventListener('pointerdown',e=>{if(e.target.closest('#iso-orders')||minimapHit(e))return;view.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ press=pointers.size===1?{x:e.clientX,y:e.clientY,moved:false,box:e.shiftKey||state.boxMode,shift:e.shiftKey,right:e.button===2}:null;
+ if(!press)state.box=null;
  if(pointers.size===2){const[a,b]=[...pointers.values()],r=view.getBoundingClientRect();
    pinch={dist:Math.hypot(a.x-b.x,a.y-b.y),zoom:state.zoom,anchor:toWorld((a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top)};}});
 view.addEventListener('pointermove',e=>{const p=pointers.get(e.pointerId);if(!p)return;
  const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+ if(press&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>ORDER.tapPx)press.moved=true;
+ if(press&&press.box){if(press.moved){const r=view.getBoundingClientRect(),l=local(e);state.box={x0:press.x-r.left,y0:press.y-r.top,x1:l.x,y1:l.y};}return;}
  if(pointers.size===2&&pinch){const[a,b]=[...pointers.values()],r=view.getBoundingClientRect();
    state.zoom=Math.min(3,Math.max(.35,pinch.zoom*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(10,pinch.dist)));
    const cx=(a.x+b.x)/2-r.left,cy=(a.y+b.y)/2-r.top;
    state.camX=pinch.anchor.x-(cx-r.width/2)/state.zoom;state.camY=pinch.anchor.y-(cy-r.height/2)/state.zoom;state.customZoom=true;}
  else if(pointers.size===1&&!pinch){state.camX-=dx/state.zoom;state.camY-=dy/state.zoom;if(state.follow)setFollow(0);}});
-const up=e=>{pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;};
+function tap(e,pr){
+ const l=local(e),w=toWorld(l.x,l.y);
+ if(pr.right){orderMove(groundAt(w));return;}
+ const hit=hitGroup(w);
+ if(hit){
+   if(pr.shift&&state.selected.has(hit)){state.selected.delete(hit);refreshOrders();}
+   else select([hit],pr.shift);
+ }else if(state.selected.size)orderMove(groundAt(w));
+}
+const up=e=>{
+ const pr=pointers.size===1&&pointers.has(e.pointerId)?press:null;
+ pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;
+ if(pointers.size===0)press=null;
+ if(!pr||e.type==='pointercancel'){state.box=null;return;}
+ if(pr.box&&pr.moved&&state.box){boxSelect(state.box,pr.shift);state.box=null;
+   if(state.boxMode){state.boxMode=false;orders.box.setAttribute('aria-pressed','false');}return;}
+ if(!pr.moved)tap(e,pr);
+};
 view.addEventListener('pointerup',up);view.addEventListener('pointercancel',up);
 view.addEventListener('wheel',e=>{e.preventDefault();const r=view.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,a=toWorld(x,y);
  state.zoom=Math.min(3,Math.max(.35,state.zoom*Math.exp(-e.deltaY*.001)));
  state.camX=a.x-(x-r.width/2)/state.zoom;state.camY=a.y-(y-r.height/2)/state.zoom;state.customZoom=true;},{passive:false});
-function setHalt(h){state.halted=h;if(!h){setFire(false);state.charge=null;ui.charge.disabled=false;state.cavCharge=null;ui.cav.disabled=false;}ui.halt.textContent=h?'▶ Voorwaarts mars':'✋ Halt';}
+function setHalt(h){state.halted=h;if(!h){setFire(false);clearOrders();state.charge=null;ui.charge.disabled=false;state.cavCharge=null;ui.cav.disabled=false;}ui.halt.textContent=h?'▶ Voorwaarts mars':'✋ Halt';}
 // Offset of a wounded man who has crawled toward his own rear (his sprite direction).
 function crawled(d){
  if(!d.wounded)return{x:0,y:0};
  const m=Math.max(0,Math.min(CRAWL.time,state.time-d.t0-4*DIE_FRAME))*CRAWL.speed,v=groundVec(d.dir);
  return{x:v.x*m,y:v.y*m};
 }
-function setCharge(){
+function setCharge(attacker=0){
  if(state.charge)return;
  setFire(false);if(!state.halted)setHalt(true);
- state.charge={phase:'form',at:state.time,attacker:0,loser:null,strikes:0};
- ui.charge.disabled=true;
+ // Ordered regiments stop where they are and face each other first.
+ (state.regiments||[]).forEach((reg,i)=>{if(reg.cmd){reg.cmd.dest=null;reg.cmd.fire=false;formLine(reg,enemyCentre(i));}});
+ state.charge={phase:'form',at:state.time,attacker,loser:null,strikes:0};
+ ui.charge.disabled=true;refreshOrders();
 }
 // Cavalerie!: trumpet, "Chargez!", and the French squadron goes in.
 function setCavCharge(){
@@ -1115,12 +1370,13 @@ function resetBattle(){
  state.batteries=null;state.balls=[];state.cannonShots=0;state.ballHits=0;
  state.squadrons=null;state.cavCharge=null;state.deadRiders=[];state.riderFalls=0;state.sabreHits=0;ui.cav.disabled=false;
  state.cavCounter=null;state.squareShots=0;state.clashes=0;
+ state.selected.clear();state.flags=[];state.box=null;refreshOrders();
  if(state.controller)state.controller.reset();
 }
 ui.reset.addEventListener('click',()=>{setFire(false);resetBattle();});
 ui.halt.addEventListener('click',()=>setHalt(!state.halted));
 ui.fire.addEventListener('click',()=>setFire(!state.firing));
-ui.charge.addEventListener('click',setCharge);
+ui.charge.addEventListener('click',()=>setCharge(0));
 ui.cav.addEventListener('click',setCavCharge);
 ui.follow.addEventListener('click',()=>setFollow(((state.follow||0)+1)%FOLLOW.length));
 // The explanation stays out of the way (it covered the scene on phones); this button shows it.
@@ -1136,7 +1392,7 @@ ui.center.addEventListener('click',()=>{state.camX=state.camY=0;state.customZoom
 ui.count.addEventListener('change',()=>{state.perSide=Number(ui.count.value);resetBattle();});
 addEventListener('resize',resize);
 
-window.__GRAPHICS_LAB_ISO__={version:'338.0',state,
+window.__GRAPHICS_LAB_ISO__={version:'339.0',state,groupScreen,screenOfGround,
  getStats:()=>({missing:state.missing||0,loaded:Object.keys(state.atlases).length,looks:state.looksDrawn||0,roles:state.rolesDrawn||0,units:state.perSide*2,drawn:state.drawn,fps:state.fps,
    terrain:!!state.terrain,props:state.props.length,propsDrawn:state.propsDrawn||0,
    zoom:state.zoom,halted:state.halted,firing:state.firing,directionsSeen:state.directionsSeen.size,perimeter,
@@ -1161,6 +1417,11 @@ window.__GRAPHICS_LAB_ISO__={version:'338.0',state,
    wounded:[...state.dead.values()].filter(d=>d.wounded).length,
    frontGaps:state.regiments?state.regiments.reduce((n,r)=>n+frontGaps(r),0):0,
    fallKinds:[...new Set([...state.dead.values()].map(d=>d.fall))].sort(),
+   selected:[...state.selected],orders:state.orders,flags:state.flags.length,box:!!state.box,
+   commands:state.regiments?state.regiments.map(r=>r.cmd?{form:r.cmd.form,fire:!!r.cmd.fire,moving:!!r.cmd.dest}:null):[],
+   centres:state.regiments?state.regiments.map(centreOf):[],
+   batteryFire:state.regiments?state.regiments.map(r=>!!r.batFire):[],batteryAt:state.regiments?state.regiments.map(r=>r.batCmd?{x:r.batCmd.x,y:r.batCmd.y}:null):[],
+   squadronAt:state.squadrons?state.squadrons.map(sq=>sq.cmd?{x:sq.cmd.x,y:sq.cmd.y}:null):[],
    muzzleEvents:state.controller?state.controller.metrics().muzzleEvents:0})};
 
 paintGround();resize();

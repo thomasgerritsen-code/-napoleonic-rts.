@@ -474,3 +474,28 @@ python3 scripts/pack-iso-atlas.py --frames art/frames/iso-proof --out graphics-l
 - **Minimap**: de terreinachtergrond wordt één keer verkleind en bewaard.
 - Gemeten (Chromium, telefoonformaat, tijdens een vuurgevecht): laden 1,9 → 0,9 s,
   frame 43 → 24 ms.
+
+## v339 — eerste bediening
+
+Alleen in het Graphics Lab; de speelbare game verandert niet.
+
+- **Selecteren**: klik of tik op een regiment, batterij of eskadron (Frans of
+  Brits). Shift-klik voegt toe of haalt eraf; **▢ Kader** (of Shift+slepen)
+  trekt een kader om meerdere eenheden. Esc of **✕** heft de selectie op.
+  Geselecteerde mannen, kanonnen en paarden krijgen een ring om de voeten.
+- **Lopen**: met een selectie tik of klik je op het veld (of klik je rechts) en
+  zet je een vlaggetje neer. Een regiment verlaat de weg en marcheert in zijn
+  formatie (colonne of linie) naar de vlag; de mannen houden hun plaats rond het
+  midden. Een batterij rijdt erheen en zet de stukken naast elkaar, gericht op de
+  vijand; een eskadron rijdt erheen in twee rijen. Bij meerdere eenheden houdt
+  elk zijn plaats ten opzichte van de andere. Het vlaggetje verdwijnt als ze er zijn.
+- **Bevelen** (balk rechtsboven): ═ Linie en ‖ Colonne voor regimenten;
+  🔥 Vuren voor regimenten (stoppen, linie naar de vijand, rangvuur) en
+  batterijen; ⚔ Charge laat een regiment met de bajonet aanvallen (ook de Britten
+  nu) en de Franse ruiters chargeren. Alleen de bevolen eenheid vuurt; de knoppen
+  onderaan (Vuur!, Bajonet!, Cavalerie!) werken zoals voorheen voor allen.
+- **Voorwaarts mars** heft alle bevelen op: iedereen gaat terug in colonne op de weg.
+- Werkt met muis en touch (tikken, slepen om te schuiven, knijpen om te zoomen).
+- `getStats()` toont `selected`, `orders`, `flags`, `commands`, `centres`,
+  `batteryFire`, `batteryAt` en `squadronAt`; `groupScreen(id)` en
+  `screenOfGround(x,y)` geven schermpunten voor de tests.
