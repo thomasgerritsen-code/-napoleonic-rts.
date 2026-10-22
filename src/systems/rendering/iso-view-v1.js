@@ -787,7 +787,7 @@
   const seenLayer = document.createElement('canvas'), seenCtx = seenLayer.getContext('2d');
   const sightLayer = document.createElement('canvas'), sightCtx = sightLayer.getContext('2d');
   const FOG_SOFT = 'filter' in fogCtx2;
-  const SEEN_VEIL = 0.66;   // share of the cloud lifted over ground seen before (a thin haze stays)
+  const SEEN_VEIL = 0.76;   // share of the cloud lifted over ground seen before (a thin haze stays)
   // Cloud textures: tiling fractal noise (five octaves), lit from the upper left
   // like the props - bright tops, blue-grey undersides - and thicker where the
   // noise is high. 'base' is the deck of cloud, 'wisp' a lighter, finer layer
@@ -806,6 +806,16 @@
       const c = document.createElement('canvas'); c.width = c.height = N;
       const cx = c.getContext('2d'), img = cx.createImageData(N, N), F = new Float32Array(N * N);
       for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) F[y * N + x] = fbm(o, x, y);
+      if (dense) {
+        // A smoother field (three octaves) for the shape of the cloud edges.
+        const E = new Float32Array(N * N);
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          let n = 0, amp = 0.55, p = 4;
+          for (let k = 0; k < 3; k++) { n += amp * noise(o + 7001 + k * 997, x / N * p, y / N * p, p); amp *= 0.45; p *= 2; }
+          E[y * N + x] = n / 0.9;
+        }
+        view.cloudField = E;
+      }
       for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
         const n = F[y * N + x], up = F[((y - 3 + N) % N) * N + (x - 3 + N) % N];
         // Light: brighter where the cloud rises towards the sun (upper left).
@@ -871,13 +881,14 @@
       }
       sightCtx.fill();
       // Cut both out of the mist, blurred so the edges are soft.
-      const soft = Math.max(2, 18 * z());
+      const soft = Math.max(3, 30 * z());
       f.globalCompositeOperation = 'destination-out';
       if (FOG_SOFT) f.filter = `blur(${soft}px)`;
       f.globalAlpha = SEEN_VEIL; f.drawImage(seenLayer, 0, 0);
       if (FOG_SOFT) f.filter = `blur(${soft}px)`;
       f.globalAlpha = 1; f.drawImage(sightLayer, 0, 0);
       f.filter = 'none'; f.globalCompositeOperation = 'source-over';
+      billowEdges(f, w, h, now);
       view.stats.fogCells = cells; view.stats.fogSources = sources;
     }
     // Blend the one before into the newest (additive mix of the two at weights
@@ -895,6 +906,40 @@
       mixCtx.globalCompositeOperation = 'source-over'; mixCtx.globalAlpha = 1;
     }
     drawClouds(now, w, h);
+  }
+  // Cloud edges: the soft ramp of the mask is pushed in or out by the cloud
+  // noise (where the cloud is thick it reaches farther), then sharpened - so
+  // the rim billows like a cloud instead of fading like an airbrush. Done on each
+  // redraw of the mask (5-8 times a second); the noise is fixed to the ground
+  // and drifts with the cloud deck. Both rims are shaped: cloud to haze over
+  // ground seen before, and haze (or cloud) to clear ground in sight.
+  const EDGE_SPAN = 1300, EDGE_PUSH = 1.1;
+  function billowEdges(f, w, h, now) {
+    const F = view.cloudField; if (!F) return;
+    let img;
+    try { img = f.getImageData(0, 0, w, h); } catch (_) { return; }
+    const d = img.data, N = 256, L = 1 - SEEN_VEIL, zz = z(), drift = (now / 1000 * 9) % EDGE_SPAN;
+    // Ground position of each column and row (flat; the noise needs no relief).
+    const us = new Int32Array(w), us2 = new Int32Array(w);
+    for (let x = 0; x < w; x++) {
+      const wx = ((x - FOG_M) * 2 - innerWidth / 2) / zz + camera.x - drift, u = wx / EDGE_SPAN * N;
+      us[x] = ((Math.floor(u) % N) + N) % N; us2[x] = ((Math.floor(u * 2.1 + 91) % N) + N) % N;
+    }
+    for (let y = 0; y < h; y++) {
+      const wy = ((y - FOG_M) * 2 - innerHeight / 2) / (zz * SQ) + camera.y, v = wy / EDGE_SPAN * N;
+      const row = (((Math.floor(v) % N) + N) % N) * N, row2 = (((Math.floor(v * 2.1 + 37) % N) + N) % N) * N;
+      for (let x = 0, i = y * w * 4 + 3; x < w; x++, i += 4) {
+        const a = d[i] / 255;
+        if (a <= 0.004 || a >= 0.996 || Math.abs(a - L) < 0.004) continue;
+        const n = 0.72 * F[row + us[x]] + 0.28 * F[row2 + us2[x]] - 0.5;
+        // Which rim: between clear and haze, or between haze and cloud.
+        const lo = a < L ? 0 : L, hi = a < L ? L : 1, t = (a - lo) / (hi - lo);
+        let e = (t + n * EDGE_PUSH - 0.5) * 3.0 + 0.5;
+        e = e <= 0 ? 0 : e >= 1 ? 1 : e * e * (3 - 2 * e);
+        d[i] = (lo + (hi - lo) * e) * 255;
+      }
+    }
+    f.putImageData(img, 0, 0);
   }
   // Clouds through the cover mask: a deck and a lighter layer of wisps, each
   // drifting with the wind at its own speed, and their shadow on the ground
