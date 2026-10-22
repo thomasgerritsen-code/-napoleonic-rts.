@@ -1096,6 +1096,9 @@ ui.fire.addEventListener('click',()=>setFire(!state.firing));
 ui.charge.addEventListener('click',setCharge);
 ui.cav.addEventListener('click',setCavCharge);
 ui.follow.addEventListener('click',()=>setFollow(((state.follow||0)+1)%FOLLOW.length));
+// The explanation stays out of the way (it covered the scene on phones); this button shows it.
+const info=document.getElementById('iso-info'),infoToggle=document.getElementById('iso-info-toggle');
+infoToggle.addEventListener('click',()=>{info.hidden=!info.hidden;infoToggle.setAttribute('aria-pressed',String(!info.hidden));});
 ui.sound.addEventListener('click',()=>{
  if(!audio)return;
  const on=audio.setOn(!audio.isOn());

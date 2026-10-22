@@ -369,3 +369,12 @@ test.describe('phone',()=>{
     expect(errors).toEqual([]);
   });
 });
+test('v338 the explanation is hidden until Uitleg is pressed',async({page})=>{
+  const errors=await open(page);
+  await expect(page.locator('#iso-info')).toBeHidden();
+  await page.getByRole('button',{name:'Uitleg'}).click();
+  await expect(page.locator('#iso-info')).toBeVisible();
+  await page.getByRole('button',{name:'Uitleg'}).click();
+  await expect(page.locator('#iso-info')).toBeHidden();
+  expect(errors).toEqual([]);
+});

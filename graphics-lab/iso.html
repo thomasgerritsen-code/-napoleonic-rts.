@@ -12,6 +12,7 @@
     .iso-panel{position:absolute;left:12px;bottom:12px;max-width:min(560px,calc(100% - 24px));
       background:rgba(20,24,22,.78);color:#efe7d2;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.4;pointer-events:none}
     .iso-panel strong{color:#f0d488}
+    .iso-panel[hidden]{display:none}
     @media(max-width:720px){.iso-panel{font-size:11px;padding:7px 9px;left:8px;bottom:8px}}
   </style>
 </head>
@@ -29,7 +30,7 @@
     </header>
     <section id="iso-view" class="iso-view" aria-label="Isometrische proefscene: sleep om te schuiven, knijp of scroll om te zoomen">
       <canvas id="iso-canvas"></canvas>
-      <div class="iso-panel">
+      <div class="iso-panel" id="iso-info" hidden>
         <strong>Proef:</strong> soldaten, gebouwen, bomen en terrein zijn vooraf in Blender gerenderd
         uit eigen 3D-modellen, met dezelfde camera (30°) en zon. Druk op <strong>Vuur!</strong>: de regimenten
         ontplooien van colonne in linie (Frans 3, Brits 2 rijen diep) en vuren rang na rang; getroffen soldaten vallen achterover, voorover of opzij en blijven liggen. Grenadiers (rechterflank) en voltigeurs (linkerflank) hebben hun eigen uniform; sprites zijn 2× supersampled en als WebP geladen. Valt er iemand, dan stapt de man achter hem naar voren. De Franse voorste rij knielt om te vuren; soms ketst een musket, ieder herlaadt in zijn eigen tempo en er blijft een rookbank boven de linie hangen. Met <strong>Bajonet!</strong> stormen de Fransen naar voren: man tegen man, daarna vlucht de verliezer en juichen de winnaars. Gewonden kruipen naar achteren. Officier, tamboer en vaandeldrager leiden elk regiment. Elk regiment heeft twee kanonnen die naar de flanken van de linie worden gereden: de bediening wist, laadt, richt en vuurt, het stuk slaat terug en de kogel stuitert door de vijandelijke rijen. Elk regiment heeft ook een eskadron lichte cavalerie met een officier en een trompetter; met <strong>Cavalerie!</strong> chargeren de Franse ruiters; de Britten vormen een carré en hun eskadron rijdt de Fransen tegemoet. Het slagveld is groter, met een beek en stenen brug, een heuvel en een tweede boerderij; de minimap rechtsonder toont alles (tik erop om erheen te kijken) en <strong>Volg</strong> laat de camera een regiment of de ruiters volgen. Zet het <strong>geluid</strong> aan voor schoten, trommels en commando’s.
@@ -51,12 +52,13 @@
         <button id="iso-center" type="button">⦿ Centreren</button>
         <button id="iso-follow" type="button" aria-pressed="false">🎥 Volg: uit</button>
         <button id="iso-sound" type="button" aria-pressed="false">🔇 Geluid uit</button>
+        <button id="iso-info-toggle" type="button" aria-pressed="false" aria-controls="iso-info">ℹ Uitleg</button>
         <label>Soldaten<select id="iso-count"><option value="16">2 × 16</option><option value="32" selected>2 × 32</option><option value="64">2 × 64</option></select></label>
       </div>
     </section>
   </main>
-  <script src="./render/infantry-animation-controller.js?v=338a"></script>
-  <script src="./iso-audio.js?v=338a"></script>
-  <script src="./iso.js?v=338a"></script>
+  <script src="./render/infantry-animation-controller.js?v=338b"></script>
+  <script src="./iso-audio.js?v=338b"></script>
+  <script src="./iso.js?v=338b"></script>
 </body>
 </html>
