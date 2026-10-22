@@ -460,9 +460,10 @@ def pose_extra(rig: dict, state: str, frame: int, frames: int, direction: int = 
         if flash == 3:
             rig["pan"].hide_render = False
         elif flash:
+            # A smaller flash: the levelled musket already reaches far out of the cell.
             for obj in rig["flash"]:
                 obj.hide_render = False
-                obj.scale = (1, 1, 1) if flash == 2 else (0.55, 0.55, 0.55)
+                obj.scale = (0.5, 0.5, 0.5)
         return True
     if state in ("look", "adjust", "lean"):
         breath = math.cos(t * math.tau)
