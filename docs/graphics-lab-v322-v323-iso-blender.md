@@ -524,3 +524,18 @@ Alleen in het Graphics Lab; de speelbare game verandert niet.
   tonen hun toets als tooltip.
 - `getStats()` toont `attacks`, `turns`, `targets`, `facings`, `batteryTarget`,
   `squadronTarget`, `crewFalls`, `targetHits` en `lastKey`.
+
+## v341 — om gebouwen heen en kijkrichting op de telefoon
+
+- **Om gebouwen heen**: een regiment dat naar een vlag of doel marcheert, kiest
+  een omweg rond boerderij, schuur, huisjes en kazernes (breed genoeg voor zijn
+  formatie: een linie ruimer dan een colonne). Een colonne zwenkt onderweg mee met
+  haar weg; een linie houdt haar front. Kanonnen rijden ook om gebouwen heen.
+  Een vlag die in een gebouw valt, wordt net buiten de muren gezet.
+- **Vasthouden en slepen**: houd je vinger (of de muisknop) een halve seconde
+  stil op het veld; er verschijnt een ring. Sleep dan in de gewenste kijkrichting
+  en laat los: de selectie gaat naar de ring en kijkt die kant op. Loslaten zonder
+  slepen is een gewone verplaatsing. Op een eenheid vasthouden doet niets bijzonders.
+- Een regiment dat op een doel vuurt, rukt pas weer op als het doel duidelijk
+  verder weg is (geen heen-en-weer meer rond de grens van de schootsafstand).
+- `getStats()` toont `detours` en `arrow`; `orderMove(dest)` staat op de API voor tests.
