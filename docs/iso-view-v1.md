@@ -132,6 +132,12 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   loopgraaf heeft, en gaat in verdedigende houding. Wie wegloopt, laat de loopgraaf
   los, zodat hij vrij is voor de volgende (of voor hetzelfde regiment). Ook de Britse
   commandant graaft in waar hij verdedigt.
+- **Menu onderin**: toont alleen wat bij je selectie past, in groepen met een kopje
+  en een vaste volgorde. Boeren: *Werk* (akker, bouw hervatten) en *Bouwen*
+  (woning, graanakker, kazerne, schiettoren, stal, gieterij). Soldaten: *Bevel*
+  (halt, bajonet/charge, verdedig, loopgraaf versterken), *Formatie* (linie,
+  colonne, carré, draaien) en *Regiment* (maken, versterken, selectie). Een gebouw:
+  *Productie* (trainen, verzamelpunt). Niets geselecteerd: een korte uitleg.
 - **Schietbereik**: selecteer je soldaten (of artillerie) of een schiettoren, dan
   ligt hun bereik als een licht geel veld met een duidelijke rand op de grond (het
   bereik van alle schutters samen; rood bij een vijandelijke selectie). Vijanden

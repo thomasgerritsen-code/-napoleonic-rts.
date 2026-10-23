@@ -1,0 +1,109 @@
+'use strict';
+// Action menu (open map only, NRTS_CONFIG.actionMenu): the bottom bar shows
+// only what fits the selection, in labelled groups and a fixed order -
+// peasants get Bouwen and Werk, soldiers get Bevel, Formatie and Regiment, a
+// building gets Productie - instead of every button at once. The buttons stay
+// the game's own (same actions, same handlers); this only sorts, labels and
+// hides them, with CSS order so no other module's DOM work is disturbed.
+(function installActionMenuV1(root) {
+  if (!root.NRTS_CONFIG?.actionMenu || root.__ACTION_MENU_V1__ || typeof actionsEl === 'undefined') return;
+  const GROUPS = [
+    { id: 'bevel', label: '⚔ Bevel', show: c => c.army },
+    { id: 'formatie', label: '▦ Formatie', show: c => c.army },
+    { id: 'regiment', label: '🎖 Regiment', show: c => c.army },
+    { id: 'productie', label: '🏭 Productie', show: c => c.building },
+    { id: 'werk', label: '🌾 Werk', show: c => c.workers },
+    { id: 'bouwen', label: '🔨 Bouwen', show: c => c.workers },
+    { id: 'overig', label: '', show: () => true }
+  ];
+  const ACTION_GROUP = {
+    halt: 'bevel', bayonet: 'bevel', charge: 'bevel', 'artillery-mode': 'bevel', 'defend-stance': 'bevel', 'trench-upgrade': 'bevel',
+    'rotate-left': 'formatie', 'rotate-right': 'formatie',
+    'create-regiment': 'regiment', 'reinforce-regiment': 'regiment', 'select-nearby-infantry': 'regiment', 'add-nearest-regiment': 'regiment',
+    'toggle-regiment-tap-selection': 'regiment', 'create-cavalry-regiment': 'regiment', 'create-battery': 'regiment',
+    'farm-assign': 'werk', 'resume-construction': 'werk', 'set-rally': 'productie'
+  };
+  function groupOf(el) {
+    if (el.dataset.formation) return 'formatie';
+    const a = el.dataset.action || '';
+    if (ACTION_GROUP[a]) return ACTION_GROUP[a];
+    if (a.startsWith('build-')) return 'bouwen';
+    if (a.startsWith('train-')) return 'productie';
+    return 'overig';
+  }
+  // Order inside a group: the main choices first (formations, training,
+  // standing orders), then the finer ones.
+  const RANK = { line: 1, column: 2, square: 3, 'rotate-left': 6, 'rotate-right': 7, halt: 1, bayonet: 2, charge: 2, 'artillery-mode': 3,
+    'defend-stance': 4, 'trench-upgrade': 5, 'create-regiment': 1, 'reinforce-regiment': 2, 'set-rally': 9, 'farm-assign': 1, 'resume-construction': 2,
+    'build-house': 1, 'build-farm': 2, 'build-barracks': 3, 'build-tower': 4, 'build-stable': 5, 'build-foundry': 6 };
+  const rank = el => 10 + (RANK[el.dataset.formation || el.dataset.action] ?? (el.dataset.action?.startsWith('train-') ? 0 : 8));
+  function context() {
+    const sel = [...selectedUnits].filter(u => !u.dead && u.side === 'france');
+    const b = typeof selectedBuilding !== 'undefined' ? selectedBuilding : null;
+    return {
+      workers: sel.some(u => u.type === 'worker'),
+      army: sel.some(u => u.type !== 'worker'),
+      building: !!(b && !b.dead && b.side === 'france'),
+      any: sel.length > 0 || !!(b && !b.dead)
+    };
+  }
+  const style = document.createElement('style');
+  style.textContent = `
+    .actions .menu-hidden{display:none!important}
+    .actions .menu-label{display:flex;align-items:center;flex:0 0 auto;padding:0 6px 0 10px;margin-left:4px;border-left:1px solid rgba(245,241,232,.22);
+      color:#f4d86d;font:700 .62rem/1.1 system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;pointer-events:none}
+    .actions .menu-label:first-child,.actions .menu-label.first{border-left:0;margin-left:0;padding-left:2px}
+    .actions .menu-hint{display:flex;align-items:center;padding:0 10px;color:rgba(245,241,232,.75);font:600 .72rem/1.3 system-ui,sans-serif;white-space:normal;max-width:420px}
+  `;
+  document.head.appendChild(style);
+  let busy = false, signature = '';
+  const stats = { organized: 0 };
+  function organize() {
+    if (busy) return;
+    busy = true;
+    try {
+      const c = context(), shown = new Set(GROUPS.filter(g => g.show(c)).map(g => g.id));
+      const buttons = [...actionsEl.querySelectorAll(':scope > button')];
+      const counts = {};
+      for (const el of buttons) {
+        const g = groupOf(el), visible = shown.has(g);
+        el.classList.toggle('menu-hidden', !visible);
+        el.style.order = String(GROUPS.findIndex(q => q.id === g) * 100 + rank(el));
+        if (visible) counts[g] = (counts[g] || 0) + 1;
+      }
+      // Group headings, before the first button of each shown group.
+      const sig = GROUPS.map(g => g.id + ':' + (counts[g.id] || 0)).join('|') + (c.any ? '' : '|none');
+      if (sig !== signature) {
+        signature = sig;
+        actionsEl.querySelectorAll(':scope > .menu-label, :scope > .menu-hint').forEach(el => el.remove());
+        let first = true;
+        GROUPS.forEach((g, i) => {
+          if (!counts[g.id] || !g.label) return;
+          const lab = document.createElement('span');
+          lab.className = 'menu-label' + (first ? ' first' : ''); lab.dataset.menuGroup = g.id; lab.textContent = g.label;
+          lab.style.order = String(i * 100); first = false;
+          actionsEl.appendChild(lab);
+        });
+        if (!c.any) {
+          const hint = document.createElement('span');
+          hint.className = 'menu-hint'; hint.textContent = 'Tik boeren aan om te bouwen en te werken, soldaten om bevelen te geven, of een gebouw om te trainen.';
+          hint.style.order = '-1';
+          actionsEl.appendChild(hint);
+        }
+      }
+      stats.organized++;
+    } finally { busy = false; }
+  }
+  new MutationObserver(() => { if (!busy) organize(); }).observe(actionsEl, { childList: true });
+  if (typeof updateHud === 'function') {
+    const base = updateHud;
+    updateHud = function updateHudWithActionMenu(...args) { const r = base.apply(this, args); organize(); return r; };
+  }
+  organize();
+  root.__ACTION_MENU_V1__ = Object.freeze({
+    version: '1.0', organize, groups: GROUPS.map(g => g.id), groupOf,
+    visible: () => [...actionsEl.querySelectorAll(':scope > button')].filter(b => !b.classList.contains('menu-hidden')).map(b => b.dataset.action || 'formation:' + b.dataset.formation),
+    labels: () => [...actionsEl.querySelectorAll(':scope > .menu-label')].sort((a, b) => a.style.order - b.style.order).map(l => l.dataset.menuGroup),
+    stats: () => ({ ...stats })
+  });
+})(window);

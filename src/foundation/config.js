@@ -129,6 +129,8 @@
         Object.freeze({ label:'Veldschans' }),
         Object.freeze({ label:'Bekleed', cost:Object.freeze({ wood:120 }), seconds:10, damage:0.38, shock:0.35 }),
         Object.freeze({ label:'Versterkt', cost:Object.freeze({ wood:160, iron:40 }), seconds:14, damage:0.28, shock:0.25 })]) }) : null,
+    // Grouped, context-sensitive bottom menu (open map only).
+    actionMenu: OPEN_MAP ? Object.freeze({ version:1 }) : null,
     // Buildable musketry tower (open map only): range and vision in game px.
     towers: OPEN_MAP ? Object.freeze({ cost:Object.freeze({ wood:260 }), hp:1100, range:240, reload:2.6, shots:2, damage:18,
       vision:420, aiAfter:300, aiMax:2 }) : null,

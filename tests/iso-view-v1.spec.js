@@ -656,3 +656,28 @@ test('iso view: a trench can be upgraded for resources - the men revet it, then 
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().fascines > 0 && window.__ISO_VIEW_V1__.stats().gabions > 0);
   expect(errors).toEqual([]);
 });
+
+test('iso view: the bottom menu shows only what fits the selection, in labelled groups', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-menu&view=iso');
+  await page.waitForFunction(() => window.__ACTION_MENU_V1__ && window.__REGIMENT_ORDERS_V1__, null, { timeout: 60_000 });
+  const look = fn => page.evaluate(fn).then(() => page.waitForTimeout(150)).then(() => page.evaluate(() => ({ v: window.__ACTION_MENU_V1__.visible(), l: window.__ACTION_MENU_V1__.labels() })));
+  const none = await look(() => { selectedUnits.clear(); selectedBuilding = null; actionSignature = ''; updateHud(true); });
+  expect(none.v).toEqual([]);
+  const workers = await look(() => { selectedUnits.clear(); units.filter(u => u.side === 'france' && u.type === 'worker').slice(0, 2).forEach(u => selectedUnits.add(u)); actionSignature = ''; updateHud(true); });
+  expect(workers.l).toEqual(['werk', 'bouwen']);
+  expect(workers.v).toContain('build-tower');
+  expect(workers.v.some(a => a.startsWith('formation:'))).toBe(false);
+  const army = await look(() => {
+    const us = []; for (let i = 0; i < 12; i++) us.push(createUnit('france', 'infantry', 900 + i * 20, 1300));
+    us.push(createUnit('france', 'officer', 880, 1300), createUnit('france', 'drummer', 880, 1310));
+    const a = createRegiment('france', us); selectedUnits.clear(); selectWholeRegiment(a); actionSignature = ''; updateHud(true);
+  });
+  expect(army.l.slice(0, 2)).toEqual(['bevel', 'formatie']);
+  expect(army.v).toContain('defend-stance');
+  expect(army.v).toContain('formation:line');
+  expect(army.v.some(a => a.startsWith('build-'))).toBe(false);
+  const tc = await look(() => { selectedUnits.clear(); selectedBuilding = buildings.find(b => b.side === 'france' && b.type === 'towncenter'); actionSignature = ''; updateHud(true); });
+  expect(tc.l).toEqual(['productie']);
+  expect(tc.v).toContain('train-worker');
+  expect(errors).toEqual([]);
+});
