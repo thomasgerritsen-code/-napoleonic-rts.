@@ -138,6 +138,11 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   (halt, bajonet/charge, verdedig, loopgraaf versterken), *Formatie* (linie,
   colonne, carré, draaien) en *Regiment* (maken, versterken, selectie). Een gebouw:
   *Productie* (trainen, verzamelpunt). Niets geselecteerd: een korte uitleg.
+  De knoppen hebben een eigen stijl: donker gelakt hout met een messingrand,
+  een serif-letter, een icoon boven elk label en een gekleurde bovenrand per groep
+  (Bevel rood, Formatie blauw, Regiment goud, Productie groenblauw, Werk groen,
+  Bouwen bruin); de gekozen formatie licht goud op, wat je niet kunt betalen is
+  grijs met een gestippelde rand.
 - **Schietbereik**: selecteer je soldaten (of artillerie) of een schiettoren, dan
   ligt hun bereik als een licht geel veld met een duidelijke rand op de grond (het
   bereik van alle schutters samen; rood bij een vijandelijke selectie). Vijanden

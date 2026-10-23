@@ -54,8 +54,58 @@
       color:#f4d86d;font:700 .62rem/1.1 system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;pointer-events:none}
     .actions .menu-label:first-child,.actions .menu-label.first{border-left:0;margin-left:0;padding-left:2px}
     .actions .menu-hint{display:flex;align-items:center;padding:0 10px;color:rgba(245,241,232,.75);font:600 .72rem/1.3 system-ui,sans-serif;white-space:normal;max-width:420px}
+    /* Napoleonic look: dark lacquered wood, a brass edge, a serif face, an
+       icon over each label and a coloured cap per group. */
+    .actions.menu-v1{--brass:#c9a254;--wood1:#3b3227;--wood2:#231d16}
+    .actions.menu-v1 button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+      min-width:70px;min-height:46px;padding:3px 8px 4px;border-radius:9px;border:1px solid rgba(201,162,84,.5);border-top:3px solid var(--cap,#c9a254);
+      background:linear-gradient(180deg,var(--wood1),var(--wood2));color:#f3e9d2;font-family:Georgia,'Times New Roman',serif;font-weight:700;letter-spacing:.01em;
+      box-shadow:inset 0 1px 0 rgba(255,236,190,.14),0 2px 5px rgba(0,0,0,.45);transition:transform .08s ease,box-shadow .12s ease,background .12s ease}
+    .actions.menu-v1 button::before{display:block;font-size:.95rem;line-height:1;font-family:system-ui,'Apple Color Emoji','Segoe UI Emoji',sans-serif;margin-bottom:1px}
+    .actions.menu-v1 button small{font-family:system-ui,sans-serif;font-weight:600;font-size:.58rem;line-height:1.1;opacity:.85;color:#e7d6ac}
+    .actions.menu-v1 button:hover{background:linear-gradient(180deg,#4a3f31,#2c251c);box-shadow:inset 0 1px 0 rgba(255,236,190,.2),0 3px 8px rgba(0,0,0,.5)}
+    .actions.menu-v1 button:active{transform:translateY(1px) scale(.98)}
+    .actions.menu-v1 button.active,.actions.menu-v1 button[aria-pressed="true"]{background:linear-gradient(180deg,#6b5528,#3e3118);border-color:var(--brass);
+      box-shadow:0 0 0 2px rgba(244,216,109,.55),inset 0 1px 0 rgba(255,240,200,.3);outline:none}
+    .actions.menu-v1 button:disabled{opacity:.5;filter:grayscale(.8);border-style:dashed;border-top-style:solid;box-shadow:none;cursor:not-allowed}
+    .actions.menu-v1 button[data-menu-group="bevel"]{--cap:#b5432f}
+    .actions.menu-v1 button[data-menu-group="formatie"]{--cap:#3d63a8}
+    .actions.menu-v1 button[data-menu-group="regiment"]{--cap:#c9a254}
+    .actions.menu-v1 button[data-menu-group="productie"]{--cap:#3f8f7d}
+    .actions.menu-v1 button[data-menu-group="werk"]{--cap:#7aa34a}
+    .actions.menu-v1 button[data-menu-group="bouwen"]{--cap:#9a6b3a}
+    .actions.menu-v1 .menu-label{font-family:Georgia,'Times New Roman',serif;font-size:.66rem;color:#e9c76a;text-shadow:0 1px 0 rgba(0,0,0,.6)}
+    .actions.menu-v1 button[data-action="build-house"]::before{content:"🏠"}
+    .actions.menu-v1 button[data-action="build-farm"]::before{content:"🌾"}
+    .actions.menu-v1 button[data-action="build-barracks"]::before{content:"🏛"}
+    .actions.menu-v1 button[data-action="build-tower"]::before{content:"🗼"}
+    .actions.menu-v1 button[data-action="build-stable"]::before{content:"🐎"}
+    .actions.menu-v1 button[data-action="build-foundry"]::before{content:"🔥"}
+    .actions.menu-v1 button[data-action="farm-assign"]::before{content:"🧺"}
+    .actions.menu-v1 button[data-action="resume-construction"]::before{content:"🔨"}
+    .actions.menu-v1 button[data-action="halt"]::before{content:"✋"}
+    .actions.menu-v1 button[data-action="bayonet"]::before{content:"🗡"}
+    .actions.menu-v1 button[data-action="charge"]::before{content:"🐎"}
+    .actions.menu-v1 button[data-action="artillery-mode"]::before{content:"💥"}
+    .actions.menu-v1 button[data-action="create-regiment"]::before{content:"🎖"}
+    .actions.menu-v1 button[data-action="reinforce-regiment"]::before{content:"➕"}
+    .actions.menu-v1 button[data-action="select-nearby-infantry"]::before{content:"👥"}
+    .actions.menu-v1 button[data-action="toggle-regiment-tap-selection"]::before{content:"☝"}
+    .actions.menu-v1 button[data-action="add-nearest-regiment"]::before{content:"➕"}
+    .actions.menu-v1 button[data-action="create-cavalry-regiment"]::before{content:"🐎"}
+    .actions.menu-v1 button[data-action="create-battery"]::before{content:"💣"}
+    .actions.menu-v1 button[data-action="train-worker"]::before{content:"👨‍🌾"}
+    .actions.menu-v1 button[data-action="train-infantry"]::before{content:"💂"}
+    .actions.menu-v1 button[data-action="train-officer"]::before{content:"🎖"}
+    .actions.menu-v1 button[data-action="train-drummer"]::before{content:"🥁"}
+    .actions.menu-v1 button[data-action="train-cavalry"]::before{content:"🐎"}
+    .actions.menu-v1 button[data-action="train-artillery"]::before{content:"💣"}
+    .actions.menu-v1 button[data-formation="line"]::before{content:"▬▬▬";letter-spacing:-2px}
+    .actions.menu-v1 button[data-formation="column"]::before{content:"▮";letter-spacing:-2px}
+    .actions.menu-v1 button[data-formation="square"]::before{content:"◻";letter-spacing:-2px}
   `;
   document.head.appendChild(style);
+  actionsEl.classList.add('menu-v1');
   let busy = false, signature = '';
   const stats = { organized: 0 };
   function organize() {
@@ -68,6 +118,7 @@
       for (const el of buttons) {
         const g = groupOf(el), visible = shown.has(g);
         el.classList.toggle('menu-hidden', !visible);
+        if (el.dataset.menuGroup !== g) el.dataset.menuGroup = g;
         el.style.order = String(GROUPS.findIndex(q => q.id === g) * 100 + rank(el));
         if (visible) counts[g] = (counts[g] || 0) + 1;
       }
