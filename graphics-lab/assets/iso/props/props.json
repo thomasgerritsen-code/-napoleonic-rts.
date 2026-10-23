@@ -42,6 +42,34 @@
    },
    "w": 939
   },
+  "beech": {
+   "footprint": {
+    "d": 6.6,
+    "w": 7.08
+   },
+   "h": 439,
+   "heightM": 8.13,
+   "image": "beech.webp",
+   "pivot": {
+    "x": 171,
+    "y": 298
+   },
+   "w": 462
+  },
+  "birch": {
+   "footprint": {
+    "d": 2.82,
+    "w": 3.41
+   },
+   "h": 383,
+   "heightM": 7.79,
+   "image": "birch.webp",
+   "pivot": {
+    "x": 98,
+    "y": 285
+   },
+   "w": 306
+  },
   "bridge": {
    "footprint": {
     "d": 4.95,
@@ -147,6 +175,20 @@
    },
    "w": 325
   },
+  "fern": {
+   "footprint": {
+    "d": 1.72,
+    "w": 1.65
+   },
+   "h": 71,
+   "heightM": 0.54,
+   "image": "fern.webp",
+   "pivot": {
+    "x": 61,
+    "y": 34
+   },
+   "w": 130
+  },
   "gabion": {
    "footprint": {
     "d": 0.69,
@@ -161,6 +203,20 @@
    },
    "w": 98
   },
+  "hawthorn": {
+   "footprint": {
+    "d": 2.25,
+    "w": 2.94
+   },
+   "h": 139,
+   "heightM": 1.97,
+   "image": "hawthorn.webp",
+   "pivot": {
+    "x": 85,
+    "y": 89
+   },
+   "w": 204
+  },
   "haystack": {
    "footprint": {
     "d": 3.0,
@@ -174,6 +230,20 @@
     "y": 125
    },
    "w": 227
+  },
+  "hazel": {
+   "footprint": {
+    "d": 2.4,
+    "w": 3.02
+   },
+   "h": 182,
+   "heightM": 3.04,
+   "image": "hazel.webp",
+   "pivot": {
+    "x": 88,
+    "y": 118
+   },
+   "w": 222
   },
   "hospital_br": {
    "footprint": {
@@ -217,6 +287,20 @@
    },
    "w": 465
   },
+  "pine": {
+   "footprint": {
+    "d": 4.16,
+    "w": 4.84
+   },
+   "h": 455,
+   "heightM": 8.98,
+   "image": "pine.webp",
+   "pivot": {
+    "x": 126,
+    "y": 332
+   },
+   "w": 383
+  },
   "poplar": {
    "footprint": {
     "d": 2.41,
@@ -244,6 +328,20 @@
     "y": 20
    },
    "w": 126
+  },
+  "spruce": {
+   "footprint": {
+    "d": 4.2,
+    "w": 4.09
+   },
+   "h": 426,
+   "heightM": 8.5,
+   "image": "spruce.webp",
+   "pivot": {
+    "x": 111,
+    "y": 307
+   },
+   "w": 345
   },
   "tower_br": {
    "footprint": {
@@ -286,6 +384,20 @@
     "y": 123
    },
    "w": 218
+  },
+  "willow": {
+   "footprint": {
+    "d": 5.33,
+    "w": 5.81
+   },
+   "h": 364,
+   "heightM": 6.65,
+   "image": "willow.webp",
+   "pivot": {
+    "x": 138,
+    "y": 246
+   },
+   "w": 389
   }
  },
  "pxPerM": 41.2903,

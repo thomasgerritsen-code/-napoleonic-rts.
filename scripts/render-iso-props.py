@@ -187,6 +187,81 @@ def build_bush(root):
         blob(root, r, loc, "#506f31", "#6a873b", 0.25)
 
 
+# --- more vegetation: broadleaves, conifers, bushes ----------------------------------
+def build_beech(root):
+    """A beech: a smooth grey trunk and a broad, dense dome of dark leaves."""
+    part("cyl", (0.36, 3.0, 0.26), (0, 0, 1.5), M("#8a877d", "plain", 0.6, alt="#6f6c63"), root, name="trunk", segments=12)
+    for rot in (35, -30, 10):
+        part("cyl", (0.16, 1.7, 0.08), (0.25 * math.copysign(1, rot), 0, 3.0), M("#8a877d", "plain", 0.6), root, rot=(0, rot, 0), name="limb", segments=8)
+    for i, (loc, r) in enumerate((((0, 0, 5.0), 2.4), ((1.9, 0.5, 4.4), 1.7), ((-1.9, -0.3, 4.5), 1.7), ((0.5, 1.7, 4.6), 1.6),
+                                  ((-0.4, -1.7, 4.3), 1.6), ((0.9, -0.5, 6.2), 1.5), ((-1.0, 0.6, 6.0), 1.4), ((0, 0, 6.9), 1.2))):
+        blob(root, r, loc, "#2f4f22" if i % 2 else "#3b5c27", "#55772f")
+
+
+def build_birch(root):
+    """A birch: a slender white trunk marked black and a light, airy crown."""
+    bark = M("#e7e3d8", "bark", 0.8, scale=3, alt="#2c2a26")
+    part("cyl", (0.17, 5.2, 0.1), (0, 0, 2.6), bark, root, name="trunk", segments=10)
+    part("cyl", (0.08, 1.8, 0.04), (0.35, 0, 4.4), bark, root, rot=(0, 30, 0), name="limb", segments=6)
+    for i, (loc, r) in enumerate((((0, 0, 5.6), 1.2), ((0.8, 0.3, 4.8), 0.9), ((-0.8, -0.2, 5.0), 0.9), ((0.2, 0.7, 6.4), 0.8),
+                                  ((-0.3, -0.6, 6.6), 0.7), ((0.5, -0.4, 4.2), 0.7), ((0, 0, 7.2), 0.6))):
+        blob(root, r, loc, "#5d7d30" if i % 2 else "#6c8c38", "#8aa84a", 0.45)
+
+
+def build_pine(root):
+    """A Scots pine: a tall trunk, orange-red above, and a flat umbrella of dark needles up high."""
+    part("cyl", (0.3, 4.5, 0.2), (0, 0, 2.25), M("#5c4433", "bark", 0.95, scale=1.5), root, name="trunk", segments=10)
+    part("cyl", (0.2, 3.2, 0.12), (0.1, 0, 6.0), M("#b0603a", "bark", 0.8, scale=2), root, rot=(0, 4, 0), name="upper", segments=10)
+    for i, (loc, r) in enumerate((((0, 0, 7.6), 1.6), ((1.3, 0.3, 7.2), 1.2), ((-1.2, -0.2, 7.0), 1.2), ((0.3, 1.1, 7.4), 1.0),
+                                  ((-0.2, -1.1, 7.3), 1.0), ((0.4, 0, 8.4), 1.0))):
+        blob(root, r, loc, "#2a4626" if i % 2 else "#33522b", "#4a6b39", 0.4).scale = (1, 1, 0.6)
+
+
+def build_spruce(root):
+    """A spruce: a dark green cone of drooping tiers on a straight trunk."""
+    part("cyl", (0.22, 2.0, 0.18), (0, 0, 1.0), M("#4d3a2b", "bark", 0.95), root, name="trunk", segments=10)
+    needles = M("#213b25", "leaves", 0.9, alt="#35553a")
+    for z, r, h in ((1.6, 2.1, 2.2), (3.0, 1.75, 2.0), (4.3, 1.4, 1.8), (5.5, 1.05, 1.6), (6.6, 0.7, 1.4), (7.5, 0.35, 1.0)):
+        part("cyl", (r, h, 0.05), (0, 0, z + h / 2), needles, root, name="tier", segments=14)
+
+
+def build_willow(root):
+    """A willow: a short, thick, leaning trunk and a silvery crown hanging down."""
+    part("cyl", (0.48, 2.4, 0.36), (0.2, 0, 1.2), M("#5a4c3c", "bark", 0.95, scale=1.2), root, rot=(0, 8, 0), name="trunk", segments=12)
+    for i, (loc, r) in enumerate((((0.4, 0, 4.0), 1.9), ((1.8, 0.4, 3.4), 1.4), ((-1.3, -0.3, 3.5), 1.4), ((0.6, 1.4, 3.3), 1.3),
+                                  ((0.2, -1.4, 3.2), 1.3), ((0.5, 0, 5.1), 1.2))):
+        blob(root, r, loc, "#5d7449" if i % 2 else "#6b8256", "#8a9d72", 0.5).scale = (1, 1, 1.35)
+
+
+def build_hawthorn(root):
+    """A hawthorn bush: a tangle of small dark leaves, red haws among them."""
+    for loc, r in (((0, 0, 0.9), 1.0), ((0.8, 0.4, 0.7), 0.75), ((-0.7, -0.3, 0.7), 0.75), ((0.1, 0.6, 1.4), 0.6)):
+        blob(root, r, loc, "#3e5b29", "#577a34", 0.35)
+    berries = M("#9e1c1c", "plain", 0.5)
+    for k in range(14):
+        a = k * 2.39
+        part("ball", (0.06,), (math.cos(a) * (0.6 + (k % 3) * 0.25), math.sin(a) * (0.5 + (k % 2) * 0.3), 0.7 + (k % 4) * 0.25), berries, root, name="haw")
+
+
+def build_hazel(root):
+    """A hazel: a clump of thin upright stems and a loose, rounded leafy top."""
+    for k in range(6):
+        a = k / 6 * math.tau
+        part("cyl", (0.04, 2.0, 0.02), (math.cos(a) * 0.25, math.sin(a) * 0.25, 1.0), M("#6b5a45", "bark"), root,
+             rot=(math.sin(a) * 12, math.cos(a) * 12, 0), name="stem", segments=6)
+    for loc, r in (((0, 0, 2.0), 1.05), ((0.7, 0.3, 1.6), 0.8), ((-0.7, -0.2, 1.7), 0.8), ((0.1, -0.6, 2.3), 0.7)):
+        blob(root, r, loc, "#5a7a32", "#7a9a42", 0.4)
+
+
+def build_fern(root):
+    """A patch of bracken: low fronds fanning out from the ground."""
+    frond = M("#5f8a2e", "leaves", 0.85, alt="#86a83e")
+    for k in range(11):
+        a = k / 11 * math.tau + (k % 2) * 0.2
+        part("box", (0.12, 0.85, 0.02), (math.cos(a) * 0.45, math.sin(a) * 0.45, 0.32), frond, root,
+             rot=(30 * math.cos(a), -30 * math.sin(a), math.degrees(a) + 90), name="frond")
+
+
 def build_fence(root):
     for x in (-3, -1.5, 0, 1.5, 3):
         part("box", (0.13, 0.13, 1.25), (x, 0, 0.62), M("#6a5038", "bark", 0.95), root, name="post")
@@ -526,6 +601,8 @@ BUILDERS = {
     "barracks_br": lambda r: build_barracks(r, "br"),
     "farmhouse": build_farmhouse, "barn": build_barn, "cottage": build_cottage, "well": build_well,
     "haystack": build_haystack, "oak": build_oak, "poplar": build_poplar, "bush": build_bush, "fence": build_fence,
+    "beech": build_beech, "birch": build_birch, "pine": build_pine, "spruce": build_spruce, "willow": build_willow,
+    "hawthorn": build_hawthorn, "hazel": build_hazel, "fern": build_fern,
     "bridge": build_bridge, "bridge_stone": build_bridge_stone, "bridge_wood": build_bridge_wood,
 }
 

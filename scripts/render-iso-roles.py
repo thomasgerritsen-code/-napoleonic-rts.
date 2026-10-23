@@ -38,7 +38,8 @@ PIVOT = (88, 140)
 STATES = [("idle", 2), ("march", 6), ("command", 2)]
 ROLES = {"officer": "o", "drummer": "d", "ensign": "e", "worker": "w"}
 # The peasant (the game's worker) walks and works instead of giving commands.
-ROLE_STATES = {"worker": [("idle", 2), ("march", 6), ("work", 4)]}
+# work: felling with the axe; farm: hoeing the crop; mine: the pickaxe on ore; build: the hammer.
+ROLE_STATES = {"worker": [("idle", 2), ("march", 6), ("work", 4), ("farm", 4), ("mine", 4), ("build", 4)]}
 # Uniform pieces the peasant does not wear.
 UNIFORM = ("shako", "plate", "plume", "pompom", "cord", "chinscale", "visor", "band", "epaulette", "wing",
            "winglace", "fringe", "lace", "button", "scabbard", "turnback", "gaitertop", "tuft")
@@ -46,10 +47,10 @@ GOLD = "#d4ad45"
 STRIPPED = ("pack", "packstrap", "roll", "messtin", "cartridge", "haversack", "canteen", "belt", "beltplate")
 
 
-def hide_tree(obj) -> None:
-    obj.hide_render = True
+def hide_tree(obj, hidden=True) -> None:
+    obj.hide_render = hidden
     for child in obj.children:
-        hide_tree(child)
+        hide_tree(child, hidden)
 
 
 def flag_cloth(name, width, height, colour_at, parent, loc):
@@ -123,8 +124,27 @@ def build_role(side: str, role: str) -> dict:
         part("cyl", (0.1, 0.12, 0.085), (0, 0, 0.23), straw, head, name="crown", segments=16)
         axe = empty("axe", el_r, (0, 0.01, -0.29))
         part("cyl", (0.018, 0.85), (0, 0, -0.2), material("#7a5a36", 0.7, pattern="plain"), axe, name="haft")
-        part("box", (0.03, 0.16, 0.12), (0, 0.06, -0.6), material("#8d9296", 0.35, 0.8, pattern="plain"), axe, name="axehead")
+        steel = material("#8d9296", 0.35, 0.8, pattern="plain")
+        wood = material("#7a5a36", 0.7, pattern="plain")
+        part("box", (0.03, 0.16, 0.12), (0, 0.06, -0.6), steel, axe, name="axehead")
         props["axe"] = axe
+        # A hoe: a long haft with its blade across the end.
+        hoe = empty("hoe", el_r, (0, 0.01, -0.29))
+        # (Short enough that it strikes the soil within the frame when he faces the camera.)
+        part("cyl", (0.016, 1.05), (0, 0, -0.32), wood, hoe, name="hoehaft")
+        part("box", (0.16, 0.13, 0.02), (0, 0.07, -0.82), steel, hoe, rot=(70, 0, 0), name="hoeblade")
+        props["hoe"] = hoe
+        # A pickaxe: a shorter haft and a two-pointed iron head.
+        pick = empty("pick", el_r, (0, 0.01, -0.29))
+        part("cyl", (0.02, 0.85), (0, 0, -0.25), wood, pick, name="pickhaft")
+        part("cyl", (0.025, 0.62, 0.006), (0, 0.16, -0.66), steel, pick, rot=(90, 0, 0), name="pickpoint")
+        part("cyl", (0.025, 0.3, 0.006), (0, -0.1, -0.66), steel, pick, rot=(-90, 0, 0), name="pickback")
+        props["pick"] = pick
+        # A carpenter's hammer.
+        hammer = empty("hammer", el_r, (0, 0.01, -0.29))
+        part("cyl", (0.012, 0.32), (0, 0, -0.08), wood, hammer, name="hammerhaft")
+        part("box", (0.03, 0.11, 0.035), (0, 0.02, -0.23), steel, hammer, name="hammerhead")
+        props["hammer"] = hammer
     elif role == "officer":
         for sh in (sh_r, sh_l):
             part("cyl", (0.075, 0.05, 0.09), (0, 0, 0.0), gold, sh, name="epaulette")
@@ -192,7 +212,38 @@ def pose_role(rig: dict, role: str, state: str, frame: int, frames: int) -> None
     t = frame / max(1, frames)
     if role == "worker":
         axe = rig["props"]["axe"]
-        if state == "work":
+        # Only the tool of the task in hand; on the march and at rest, the axe on the shoulder.
+        tool = {"farm": "hoe", "mine": "pick", "build": "hammer"}.get(state, "axe")
+        for name in ("axe", "hoe", "pick", "hammer"):
+            hide_tree(rig["props"][name], name != tool)
+        torso = rig["torso"]
+        torso.rotation_euler = Euler((0, 0, 0))
+        if state == "farm":
+            # Hoeing: bent over the row, the hoe lifted and chopped into the soil.
+            # (In this rig a negative turn of the torso leans it forward.)
+            torso.rotation_euler = Euler((rad(-(22, 26, 34, 30)[frame % 4]), 0, 0))
+            lift = (100, 72, 34, 52)[frame % 4]
+            sh_r.rotation_euler = Euler((rad(lift), rad(8), 0))
+            sh_l.rotation_euler = Euler((rad(lift + 12), rad(-22), 0))
+            el_r.rotation_euler = el_l.rotation_euler = Euler((rad(25), 0, 0))
+            rig["props"]["hoe"].rotation_euler = Euler((rad((45, 35, 4, 20)[frame % 4]), 0, 0))
+        elif state == "mine":
+            # The pickaxe swung over the head and brought down on the ore.
+            torso.rotation_euler = Euler((rad(-(4, 10, 32, 20)[frame % 4]), 0, 0))
+            lift = (175, 140, 38, 95)[frame % 4]
+            sh_r.rotation_euler = Euler((rad(lift), rad(8), 0))
+            sh_l.rotation_euler = Euler((rad(lift - 8), rad(-18), 0))
+            el_r.rotation_euler = el_l.rotation_euler = Euler((rad(18), 0, 0))
+            rig["props"]["pick"].rotation_euler = Euler((rad((80, 75, 22, 50)[frame % 4]), 0, 0))
+        elif state == "build":
+            # Stooped at the work, the left hand holding a nail, the hammer striking.
+            torso.rotation_euler = Euler((rad(-34), 0, 0))
+            sh_r.rotation_euler = Euler((rad((95, 55, 80, 60)[frame % 4]), rad(14), 0))
+            el_r.rotation_euler = Euler((rad((70, 25, 55, 32)[frame % 4]), 0, 0))
+            sh_l.rotation_euler = Euler((rad(55), rad(-14), 0))
+            el_l.rotation_euler = Euler((rad(40), 0, 0))
+            rig["props"]["hammer"].rotation_euler = Euler((rad(90), 0, 0))
+        elif state == "work":
             # Chopping: both hands on the haft, raised and brought down.
             lift = [150, 110, 40, 90][frame % 4]
             sh_r.rotation_euler = Euler((rad(lift), rad(10), 0))
@@ -254,6 +305,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--out", default="art/frames/iso-proof")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--supersample", type=int, default=2)
+    ap.add_argument("--states", nargs="*", help="render only these states (review)")
+    ap.add_argument("--dirs", nargs="*", help="render only these directions (review)")
     args = ap.parse_args(argv)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     setup_render(args.samples)
@@ -266,8 +319,12 @@ def main(argv: list[str]) -> int:
     out = Path(args.out).resolve() / "roles" / f"{args.side}_{args.role}"
     out.mkdir(parents=True, exist_ok=True)
     for d, name in enumerate(infantry.DIRECTIONS):
+        if args.dirs and name not in args.dirs:
+            continue
         rig["root"].rotation_euler = Euler((0, 0, math.radians(-45 * d - 90)))
         for state, frames in ROLE_STATES.get(args.role, STATES):
+            if args.states and state not in args.states:
+                continue
             for f in range(frames):
                 pose_role(rig, args.role, state, f, frames)
                 bpy.context.view_layer.update()

@@ -495,3 +495,30 @@ Gemeten met een veldslag van ruim 330 eenheden (12 regimenten, 4 ruiterregimente
   hoeft niets voor te tekenen. Wie de gewone link opent (zonder `?view=iso`) komt
   meteen in de iso-weergave; alleen geautomatiseerde browsers (de testset) krijgen
   nog de oude 2D-pagina. De resolutie blijft altijd scherp.
+
+## Boerenwerk, bouwen in fasen, begroeiing en wild
+
+- **Boeren aan het werk** (`render-iso-roles.py`, atlas `frw`/`brw`): naast lopen en
+  hout hakken heeft de boer drie nieuwe animaties in 8 richtingen. Op de akker (of bij
+  een bessenstruik) werkt hij voorovergebogen met de schoffel tussen de gewassen; bij
+  ijzererts slaat hij met de houweel op de steen; bij een bouwplaats timmert hij met
+  een hamer. Hij kijkt daarbij naar waar hij aan werkt.
+- **Bouwen in fasen**: een gebouw dat nog gebouwd wordt, begint als uitgezet stuk kale
+  grond met paaltjes, hout en steen ernaast. Daarna rijst het van onder naar boven op
+  (de lijn volgt het gebouw zelf, niet de lege rand van het plaatje), met een steiger
+  van palen en een plankier op de hoogte waar gewerkt wordt; erboven een vage omtrek
+  van wat het wordt. De voorraad hout en steen raakt op naarmate het gebouw groeit.
+- **Begroeiing** (`render-iso-props.py`): beuk, berk, grove den, spar, wilg, meidoorn,
+  hazelaar en varens naast eik, populier en struik. Elk bos heeft een eigen menging
+  (loofbos, naaldbos of gemengd) met ondergroei van varens, hazelaar en meidoorn;
+  langs de rivier staan wilgen en een enkele berk; in het open veld her en der een
+  struik, een boom of een varenpol. Houtbronnen hebben verschillende boomsoorten en
+  de helft van de bessenstruiken is een meidoorn.
+- **Wild** (`wildlife-v1.js`, `render-iso-wildlife.py`, instelling `wildlife`): kleine
+  roedels edelherten (een bok met gewei en hindes) aan de bosranden en konijnen in de
+  weiden. Ze grazen, kijken rond en zwerven over hun eigen stuk grond. Komen er
+  mannen te dichtbij, of vallen er schoten of granaten in de buurt, dan slaat het
+  hele roedel op de vlucht (herten in sprongen, konijnen huppelend), weg van het
+  gevaar en nooit door de rivier, en komt verderop weer tot rust. Het wild is
+  alleen decor: er wordt niet op geschoten en het houdt niemand tegen. Je ziet het
+  alleen waar Frankrijk zicht heeft.

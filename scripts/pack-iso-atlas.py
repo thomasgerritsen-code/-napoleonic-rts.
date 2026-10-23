@@ -73,7 +73,7 @@ def frame_names(prefix: str, states) -> list[tuple[str, str, int, int]]:
 ROLES = {"officer": "o", "drummer": "d", "ensign": "e", "worker": "w"}
 ROLE_STATES = [("idle", 2), ("march", 6), ("command", 2)]
 # The peasant (iso view of the game) walks and works instead of giving commands.
-ROLE_STATES_BY = {"worker": [("idle", 2), ("march", 6), ("work", 4)]}
+ROLE_STATES_BY = {"worker": [("idle", 2), ("march", 6), ("work", 4), ("farm", 4), ("mine", 4), ("build", 4)]}
 ROLE_CELL = (176, 160)
 ROLE_PIVOT = {"x": 88, "y": 140}
 CAV_CELL, CAV_PIVOT = (224, 192), {"x": 112, "y": 152}
@@ -95,6 +95,11 @@ ARTILLERY = {
                                ("haul", 4)], (CELL_W, CELL_H), PIVOT),
     "gunner2": ("gunner", "a", [("march", 6), ("die", 4), ("diefwd", 4), ("dieside", 4)], (CELL_W, CELL_H), PIVOT),
 }
+# Wildlife (render-iso-wildlife.py): kind -> (folder, sprite prefix, states, cell, pivot).
+DEER_STATES = [("idle", 2), ("graze", 2), ("walk", 6), ("run", 6)]
+WILDLIFE = {"stag": ("stag", "wds", DEER_STATES, (176, 176), ROLE_PIVOT),
+            "hind": ("hind", "wdh", DEER_STATES, (176, 176), ROLE_PIVOT),
+            "rabbit": ("rabbit", "wrb", [("idle", 2), ("graze", 2), ("hop", 4)], (64, 48), {"x": 32, "y": 40})}
 
 
 def downsample(rgba: bytes, w: int, h: int, n: int) -> bytes:
@@ -136,6 +141,9 @@ def clean(rgba: bytes, name: str, cell=(CELL_W, CELL_H)) -> bytes:
 
 
 def pack(frames_dir: Path, side: str, kind: str) -> tuple[bytes, dict, int]:
+    if kind in WILDLIFE:
+        piece, prefix, states, cell, pivot = WILDLIFE[kind]
+        return pack_cells(frames_dir / "wildlife" / piece, prefix, kind, states, cell, pivot)
     if kind in ROLES:
         return pack_cells(frames_dir / "roles" / f"{side}_{kind}", SIDES[side] + ROLES[kind], kind,
                           ROLE_STATES_BY.get(kind, ROLE_STATES), ROLE_CELL, ROLE_PIVOT)
@@ -188,7 +196,7 @@ def pack_cells(folder: Path, prefix: str, kind: str, states, cell, pivot) -> tup
         animations.setdefault(f"{state}_{d}", []).append(name)
     if len(digests) != len(frames):
         raise PngError(f"{prefix} {kind}: pixel-identical frames found")
-    source = ("render-iso-roles.py" if kind in ROLES else "render-iso-artillery.py" if kind in ARTILLERY
+    source = ("render-iso-wildlife.py" if kind in WILDLIFE else "render-iso-roles.py" if kind in ROLES else "render-iso-artillery.py" if kind in ARTILLERY
               else "render-iso-cavalry.py" if kind in CAVALRY else "render-iso-infantry.py")
     meta = {"image": f"{prefix}_iso_{kind}_atlas.png", "size": {"w": w, "h": h},
             "scale": "1", "cell": {"w": cw, "h": ch}, "directions": DIRECTIONS, "pivot": pivot,
@@ -225,9 +233,11 @@ def main(argv: list[str]) -> int:
         jobs += [(side, role) for side in ("france", "britain") for role in ROLES]
         jobs += [(side, kind) for side in ("france", "britain") for kind in ARTILLERY]
         jobs += [(side, kind) for side in CAV_SIDES for kind in CAVALRY]
+        jobs += [("wild", kind) for kind in WILDLIFE]
         if args.only:
             special = {**dict.fromkeys(ROLES, "roles"), **dict.fromkeys(ARTILLERY, "artillery"),
-                       **dict.fromkeys(CAVALRY, "cavalry"), "worker": "workers"}
+                       **dict.fromkeys(CAVALRY, "cavalry"), **dict.fromkeys(WILDLIFE, "wildlife"),
+                       "worker": "workers"}
             jobs = [(s, k) for s, k in jobs if (k in special and special[k] in args.only)
                     or (k not in special and s in args.only) or (k in CAVALRY and s in args.only)]
         if args.kinds:

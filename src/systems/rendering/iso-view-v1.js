@@ -131,6 +131,8 @@
         load(p + 'g', ['gun']), load(p + 'a', ['gunner', 'gunner2']));
     }
     first.push(loadProps(), loadVillage(), loadGround(), load('frw', ['worker']), load('brw', ['worker']));
+    // Wildlife (wildlife-v1): red deer stag and hind, rabbit.
+    if (global.NRTS_CONFIG?.wildlife) first.push(load('wds', ['stag']), load('wdh', ['hind']), load('wrb', ['rabbit']));
     // Extra looks stream in afterwards; until then everyone uses the base look.
     // Period troops (troops-v1): Old Guard (fr6), sappers (fr7), 95th Rifles (br6);
     // cuirassiers (frck), Polish lancers (frcl), Scots Greys (brcg).
@@ -282,15 +284,30 @@
   }
 
   // ---- the game's woods: stands of oak and poplar (they slow movement in the game) ----
+  // The kinds of tree a wood is made of: broadleaf, conifer, or the two mixed.
+  const WOOD_MIX = {
+    leaf: [['oak', 0.38], ['beech', 0.3], ['birch', 0.2], ['poplar', 0.12]],
+    conifer: [['spruce', 0.55], ['pine', 0.38], ['birch', 0.07]],
+    mixed: [['oak', 0.22], ['beech', 0.18], ['spruce', 0.22], ['pine', 0.18], ['birch', 0.2]]
+  };
+  const UNDERGROWTH = [['fern', 0.45], ['hazel', 0.3], ['hawthorn', 0.25]];
+  function pickKind(table, r) { for (const [k, w] of table) { if ((r -= w) < 0) return k; } return table[table.length - 1][0]; }
+  // The props this browser has: a kind not yet loaded falls back to the oak.
+  const tree = k => view.props[k] ? k : 'oak';
   function buildWoodTrees() {
     const woods = typeof TERRAIN_WOODS !== 'undefined' ? TERRAIN_WOODS : [], trees = [];
+    const blocked = (x, y, river = 110) => (typeof roadNetworkAtV066 === 'function' && roadNetworkAtV066(x, y)) ||
+      (typeof riverHitV067 === 'function' && (h => h && h.distance < river)(riverHitV067(x, y)));
     woods.forEach((w, i) => {
+      const mix = ['leaf', 'mixed', 'conifer'][Math.floor(hash(i * 31 + 7, 11) * 3)];
       for (let y = w.y + 30; y < w.y + w.h - 10; y += 62) for (let x = w.x + 30; x < w.x + w.w - 10; x += 70) {
         const r = hash(Math.round(x), Math.round(y) + i), tx = x + (r - 0.5) * 50, ty = y + (hash(Math.round(y), Math.round(x)) - 0.5) * 40;
+        // Undergrowth between the trees: bracken, hazel and hawthorn.
+        const u = hash(Math.round(x) + 17, Math.round(y) + i), ux = x + 35 + (u - 0.5) * 20, uy = y + 20;
+        if (u < 0.45 && !blocked(ux, uy)) trees.push({ x: ux, y: uy, kind: tree(pickKind(UNDERGROWTH, u / 0.45)), scale: 0.55 + u * 0.3 });
         if (r < 0.12) continue;   // clearings
-        if (typeof roadNetworkAtV066 === 'function' && roadNetworkAtV066(tx, ty)) continue;
-        if (typeof riverHitV067 === 'function') { const h = riverHitV067(tx, ty); if (h && h.distance < 110) continue; }
-        trees.push({ x: tx, y: ty, kind: r > 0.8 ? 'poplar' : 'oak', scale: 0.5 + r * 0.25 });
+        if (blocked(tx, ty)) continue;
+        trees.push({ x: tx, y: ty, kind: tree(pickKind(WOOD_MIX[mix], hash(Math.round(tx), Math.round(ty)))), scale: 0.5 + r * 0.25 });
       }
     });
     // Avenues: poplars line both sides of the chaussees, as along Napoleon's
@@ -322,6 +339,28 @@
       }
     });
     view.stats.avenueTrees = avenue;
+    // Willows along the river banks, a little way out from the water.
+    let willows = 0, field = 0;
+    if (typeof riverCenterXAtYV067 === 'function') {
+      for (let y = 80; y < WORLD.height - 80; y += 150) for (const side of [-1, 1]) {
+        const r = hash(Math.round(y), side + 31); if (r < 0.45) continue;
+        const x = riverCenterXAtYV067(y) + side * (150 + r * 60);
+        if (bridges.some(c => Math.hypot(x - c.x, y - c.y) < 260) || houses.some(h => Math.hypot(x - h.x, y - h.y) < 120) || inWood(x, y)) continue;
+        if (typeof roadNetworkAtV066 === 'function' && roadNetworkAtV066(x, y)) continue;
+        trees.push({ x, y, kind: tree(r > 0.8 ? 'birch' : 'willow'), scale: 0.5 + r * 0.15 }); willows++;
+      }
+    }
+    // The open field: here and there a bush, a hazel or hawthorn, a fern patch, a lone tree -
+    // never on a road, by the river, in a village or a wood, or near either side's base.
+    const bases = buildings.filter(b => b.type === 'towncenter');
+    for (let y = 120; y < WORLD.height - 120; y += 170) for (let x = 120; x < WORLD.width - 120; x += 170) {
+      const r = hash(Math.round(x) + 5, Math.round(y) + 9); if (r > 0.13) continue;
+      const px = x + (hash(Math.round(y), Math.round(x) + 3) - 0.5) * 120, py = y + (hash(Math.round(x), Math.round(y) + 4) - 0.5) * 120;
+      if (blocked(px, py, 200) || inWood(px, py) || houses.some(h => Math.hypot(px - h.x, py - h.y) < 140) || bases.some(b => Math.hypot(px - b.x, py - b.y) < 420)) continue;
+      const q = r / 0.13, kind = q < 0.3 ? 'bush' : q < 0.5 ? 'hazel' : q < 0.65 ? 'hawthorn' : q < 0.8 ? 'fern' : q < 0.9 ? 'birch' : 'beech';
+      trees.push({ x: px, y: py, kind: tree(kind), scale: q >= 0.8 ? 0.45 + q * 0.1 : 0.6 + q * 0.3 }); field++;
+    }
+    view.stats.willows = willows; view.stats.fieldPlants = field;
     return trees;
   }
   function woodTreeDrawable(tr) {
@@ -738,8 +777,16 @@
     if (u.type === 'worker') {
       const key = p + 'w';
       if (m.moving) return [key, 'march_' + d, step(MARCH_STRIDE, 6)];
-      // At work: chopping, harvesting or building where his task has taken him.
-      if (u.task && u.task !== 'idle') return [key, 'work_' + d, Math.floor(now / 0.3 + hash(u.id, 3) * 4) % 4];
+      // At work, facing what he works on, with the tool of the task: the axe on a
+      // tree, the pickaxe on iron ore, the hoe on a field or a berry patch, the
+      // hammer on a building going up.
+      if (u.task && u.task !== 'idle' && u.task !== 'return') {
+        const r = u.task === 'gather' ? u.resourceTarget : null, b = u.task === 'build' ? u.buildingTarget : null;
+        const job = b ? 'build' : u.task === 'farm' ? 'farm' : r?.type === 'iron' ? 'mine' : r?.type === 'food' ? 'farm' : 'work';
+        const at = r || b, wd = at ? DIRS[dirOf(Math.atan2(at.y - u.y, at.x - u.x))] : d;
+        const anim = view.atlases[key]?.byAnim.has(job + '_e') ? job : 'work';
+        return [key, anim + '_' + wd, Math.floor(now / (anim === 'build' ? 0.22 : 0.3) + hash(u.id, 3) * 4) % 4];
+      }
       return [key, 'idle_' + d, Math.floor(now / 0.7 + hash(u.id, 2) * 2) % 2];
     }
     if (u.type === 'artillery') {
@@ -849,6 +896,26 @@
     }
     st().wounded = lying; st().stretcherTeams = teams;
   }
+  // ---- wildlife (wildlife-v1): deer and rabbits, seen only where France can see ----
+  const WILD_KEY = { stag: 'wds', hind: 'wdh', rabbit: 'wrb' };
+  function wildlifeDrawables(list, t, k) {
+    const W = global.__WILDLIFE_V1__; if (!W) return;
+    let n = 0;
+    for (const a of W.animals()) {
+      const X = sx(a.x), Y = gy(a.x, a.y);
+      if (X < -60 || X > innerWidth + 60 || Y < -40 || Y > innerHeight + 60) continue;
+      if (typeof isVisibleToFrance === 'function' && !isVisibleToFrance({ side: 'wild', x: a.x, y: a.y })) continue;
+      const atlas = view.atlases[WILD_KEY[a.kind]]; if (!atlas) continue;
+      const rabbit = a.kind === 'rabbit', d = DIRS[dirOf(a.facing)], ph = hash(a.id, 5) * 8;
+      const anim = a.state === 'run' ? (rabbit ? 'hop' : 'run') : a.state === 'walk' ? (rabbit ? 'hop' : 'walk') : a.state;
+      const frames = anim === 'walk' || anim === 'run' ? 6 : anim === 'hop' ? 4 : 2;
+      const rate = anim === 'run' ? 0.09 : anim === 'hop' ? (a.state === 'run' ? 0.08 : 0.13) : anim === 'walk' ? 0.16 : 0.9;
+      const f = Math.floor(t / rate + ph) % frames;
+      list.push({ y: a.y, draw: () => drawSprite(atlas, anim + '_' + d, f, X, Y, k) });
+      n++;
+    }
+    st().wildlife = n;
+  }
   const seenTeam = tm => tm.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance({ side: tm.side, x: tm.x, y: tm.y });
   const st = () => view.stats;
   // ---- hand grenades (grenades-v1): the lit grenade in its arc, the burst, the scorch ----
@@ -912,10 +979,69 @@
     const k = b.type === 'tower' ? spriteK() * 0.55 : b.type === 'hospital' ? spriteK() * 0.7 : b.w * z() * 1.45 / prop.w;
     if (b.type === 'tower') towerSmoke(b, prop, k);
     return { y: b.y + b.h * 0.3, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
-      ctx.globalAlpha *= b.complete === false ? 0.45 + 0.5 * (b.construction || 0) : 1;
+      if (b.complete === false) { drawConstruction(b, prop, k); view.stats.props++; return; }
       ctx.drawImage(prop.image, sx(b.x) - prop.pivot.x * k, gy(b.x, b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
-      ctx.globalAlpha = 1; view.stats.props++;
+      view.stats.props++;
     } };
+  }
+  // A building going up, in stages: first the plot pegged out with timber and
+  // stone stacked by it; then the building rises from the ground, course by
+  // course, a scaffold of poles and planks along the line being built and the
+  // rest of it a faint outline still to come.
+  // The first and last rows (0..1) of a prop's picture with anything solid in them.
+  function propRows(prop) {
+    if (prop.rows) return prop.rows;
+    try {
+      const c = document.createElement('canvas'), W = 64, H = 128; c.width = W; c.height = H;
+      const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(prop.image, 0, 0, W, H);
+      const a = g.getImageData(0, 0, W, H).data, solid = y => { for (let x = 0; x < W; x++) if (a[(y * W + x) * 4 + 3] > 200) return true; return false; };
+      let t = 0, b = H - 1; while (t < H - 1 && !solid(t)) t++; while (b > t && !solid(b)) b--;
+      prop.rows = [t / H, (b + 1) / H];
+    } catch (_) { prop.rows = [0, 1]; }
+    return prop.rows;
+  }
+  function drawConstruction(b, prop, k) {
+    const p = Math.max(0, Math.min(1, b.construction || 0)), X = sx(b.x), Y = gy(b.x, b.y);
+    view.stats.underConstruction = (view.stats.underConstruction || 0) + 1;
+    const left = X - prop.pivot.x * k, top = Y - prop.pivot.y * k, w = prop.w * k, h = prop.h * k;
+    // The footprint on the ground: a pegged-out plot of bare earth.
+    const fw = b.w * z() * 0.62, fh = fw * SQ;
+    ctx.fillStyle = 'rgba(105,82,55,.55)'; ctx.beginPath(); ctx.moveTo(X - fw, Y); ctx.lineTo(X, Y - fh); ctx.lineTo(X + fw, Y); ctx.lineTo(X, Y + fh); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(70,52,32,.8)'; ctx.lineWidth = Math.max(1, z()); ctx.stroke();
+    // Building materials beside it, used up as it rises: timber and stone.
+    const left2 = Math.max(0, 1 - p * 1.2);
+    if (left2 > 0) {
+      for (let i = 0; i < 4; i++) {
+        const mx = X + fw * 0.85 + i * 3 * z(), my = Y + fh * 0.45 - i * 2 * z(), len = 14 * z() * left2;
+        ctx.fillStyle = i % 2 ? '#8a6a42' : '#9c7a4c'; ctx.fillRect(mx - len / 2, my - 2 * z() - i * 2.2 * z(), len, 2.4 * z());
+      }
+      ctx.fillStyle = '#a49c8c';
+      for (let i = 0; i < Math.ceil(5 * left2); i++) ctx.fillRect(X - fw * 0.95 + (i % 3) * 4 * z(), Y + fh * 0.3 - Math.floor(i / 3) * 3 * z(), 3.5 * z(), 2.8 * z());
+    }
+    // Stage 1 (to 15%): only the plot, its corner stakes and a string line.
+    if (p < 0.15) {
+      ctx.strokeStyle = '#6b4e2e'; ctx.lineWidth = Math.max(1, 1.4 * z());
+      for (const [cx, cy] of [[X - fw, Y], [X, Y - fh], [X + fw, Y], [X, Y + fh]]) { ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 6 * z()); ctx.stroke(); }
+      return;
+    }
+    // Stage 2: the building rises from the bottom up; above the line, a faint outline.
+    // The line climbs over the building itself (its opaque rows), not the empty margin of its picture.
+    const rows = propRows(prop), rise = (p - 0.15) / 0.85, cut = top + h * (rows[0] + (rows[1] - rows[0]) * (1 - rise));
+    ctx.save(); ctx.globalAlpha *= 0.16; ctx.drawImage(prop.image, left, top, w, h); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(left - 2, cut, w + 4, top + h - cut + 2); ctx.clip();
+    ctx.drawImage(prop.image, left, top, w, h); ctx.restore();
+    if (rise < 0.98) {
+      // The scaffold: poles from the ground to just above the line, a plank walk along it.
+      const pole = '#6b4e2e', poles = 5, x0 = X - fw * 0.95, x1 = X + fw * 0.95, ground = Y + fh * 0.2;
+      ctx.strokeStyle = pole; ctx.lineWidth = Math.max(1, 1.5 * z());
+      for (let i = 0; i < poles; i++) {
+        const px = x0 + (x1 - x0) * i / (poles - 1);
+        ctx.beginPath(); ctx.moveTo(px, ground - Math.abs(i - 2) * fh * 0.4); ctx.lineTo(px, Math.min(ground, cut - 5 * z())); ctx.stroke();
+      }
+      ctx.fillStyle = '#9a7a50'; ctx.fillRect(x0 - 2 * z(), cut - 2 * z(), x1 - x0 + 4 * z(), 2.6 * z());
+      ctx.strokeStyle = 'rgba(80,60,36,.9)'; ctx.lineWidth = Math.max(1, z());
+      ctx.beginPath(); ctx.moveTo(x0, cut + 8 * z()); ctx.lineTo(x1, cut - 2 * z()); ctx.moveTo(x0, cut - 2 * z()); ctx.lineTo(x1, cut + 8 * z()); ctx.stroke();
+    }
   }
   // Powder smoke from the tower's firing slits when its garrison fires (watchtower-v1).
   function towerSmoke(b, prop, k) {
@@ -941,13 +1067,14 @@
   function resourceDrawable(r) {
     if (r.dead || r.amount <= 0) return null;
     if (r.type === 'wood') {
-      const prop = view.props[hash(r.id, 3) < 0.65 ? 'oak' : 'poplar']; if (!prop) return null;
+      const prop = view.props[tree(['oak', 'beech', 'birch', 'pine', 'spruce', 'oak', 'poplar'][Math.floor(hash(r.id, 3) * 7)])]; if (!prop) return null;
       const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25);
       return { y: r.y, box: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
         ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
     }
     if (r.type === 'iron') return { y: r.y, draw: () => drawRock(r) };
-    const prop = view.props.bush; if (!prop) return null;
+    // Berry bushes: some hawthorns with their red haws among the bushes.
+    const prop = view.props[hash(r.id, 9) < 0.5 && view.props.hawthorn ? 'hawthorn' : 'bush']; if (!prop) return null;
     return { y: r.y, draw: () => { const k = spriteK() * 0.75;
       ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       ctx.fillStyle = '#8c1f2a'; for (let i = 0; i < 5; i++) { ctx.beginPath();
@@ -1319,7 +1446,7 @@
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
-    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = st.stances = st.digging = st.leaning = st.gabions = st.fascines = 0;
+    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = st.stances = st.digging = st.leaning = st.gabions = st.fascines = st.underConstruction = 0;
     panFix();
     ensureAttackHook();
     drawTerrain();
@@ -1411,6 +1538,7 @@
     }
     st.corpses = view.corpses.length;
     medicsDrawables(list, t, k);
+    wildlifeDrawables(list, t, k);
     for (const b of buildings) { const d = buildingDrawable(b); if (d) list.push(d); }
     for (const h of villageHouses()) { const d = houseDrawable(h); if (d) list.push(d); }
     for (const b of crossings()) { const d = bridgeDrawable(b); if (d) list.push(d); }
@@ -1924,6 +2052,10 @@
   global.__ISO_VIEW_V1__ = Object.freeze({
     version: 'iso-view-v1', optIn: 'view=iso',
     isOn: () => view.on, setOn, setOverview, atlasKeys: () => Object.keys(view.atlases), lookOf,
+    animsOf: key => [...(view.atlases[key]?.byAnim.keys() || [])],
+    // The sprite a unit is drawn with now ([atlas, anim, frame]), and the kinds of tree and bush on the map.
+    frameOf: id => { const u = units.find(q => q.id === id), m = view.info.get(id); return u && m ? frameFor(u, m, performance.now() / 1000) : null; },
+    plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,

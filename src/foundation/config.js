@@ -152,6 +152,9 @@
     medics: OPEN_MAP ? Object.freeze({ types:Object.freeze(['infantry', 'officer', 'drummer']), woundedShare:0.45, bleedOutSeconds:90, healSeconds:45,
       teams:2, teamSpeed:44, reach:1600, aiAfter:240,
       hospital:Object.freeze({ w:64, h:52, hp:520, cost:Object.freeze({ wood:180, food:60 }) }) }) : null,
+    // Wildlife roaming the open map (visual only): red deer herds by the woods, rabbits in the meadows.
+    wildlife: OPEN_MAP ? Object.freeze({ herds:6, herdMin:3, herdMax:6, stagShare:0.25, rabbits:22, homeRange:260, rabbitRange:120,
+      deerWalk:16, deerRun:95, rabbitHop:34, rabbitRun:80, deerShy:170, rabbitShy:80, gunfireShy:320, calmAfter:6 }) : null,
     gunCrew: OPEN_MAP ? Object.freeze({ reach:600, keepInRegiment:6, clickRadius:26 }) : null,
     // Troop kinds, each with a strength and a weakness (open map only). Multipliers on the base type.
     // Period troops (open map only): each with a strength and a weakness.

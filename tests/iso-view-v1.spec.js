@@ -1336,3 +1336,69 @@ test('iso view: the fallen bleed, the wounded show among them and the hospital t
   expect(s.stretcherTeams).toBeGreaterThanOrEqual(1);
   expect(errors).toEqual([]);
 });
+
+test('iso view: peasants hoe the field, swing a pick at the ore and hammer at a building that rises in stages', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-peasants&view=iso');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 0 && window.__ISO_VIEW_V1__.atlasKeys().includes('frw') && window.__ISO_VIEW_V1__.stats().ground, null, { timeout: 60_000 });
+  const anims = await page.evaluate(() => window.__ISO_VIEW_V1__.animsOf('frw'));
+  for (const a of ['farm_e', 'mine_e', 'build_e', 'work_e']) expect(anims).toContain(a);
+  await page.evaluate(() => {
+    const tc = buildings.find(b => b.side === 'france' && b.type === 'towncenter'), x0 = tc.x + 650, y0 = tc.y - 420;
+    const mk = (x, y) => createUnit('france', 'worker', x, y);
+    window.__jobs = {};
+    window.__sites = [0.08, 0.5].map((c, i) => { const b = createBuilding('france', 'barracks', x0 + i * 130, y0, false); b.construction = c; b.complete = false; return b; });
+    const builder = mk(x0 - 50, y0 + 10); builder.task = 'build'; builder.buildingTarget = window.__sites[1]; window.__jobs.build = builder.id;
+    const farm = createBuilding('france', 'farm', x0 + 60, y0 + 150, true);
+    const farmer = mk(farm.x, farm.y); farmer.task = 'farm'; farmer.farmId = farm.id; window.__jobs.farm = farmer.id;
+    const miner = mk(x0 + 280, y0 + 160); miner.task = 'gather'; miner.resourceTarget = { type: 'iron', x: x0 + 300, y: y0 + 150 }; window.__jobs.mine = miner.id;
+    window.__C = [x0 + 90, y0 + 60];
+  });
+  await page.waitForFunction(() => { camera.x = __C[0]; camera.y = __C[1]; camera.zoom = 2; return Object.values(__jobs).every(id => window.__ISO_VIEW_V1__.frameOf(id)); }, null, { timeout: 30_000 });
+  const frames = await page.evaluate(() => Object.fromEntries(Object.entries(__jobs).map(([job, id]) => [job, window.__ISO_VIEW_V1__.frameOf(id)[1].split('_')[0]])));
+  expect(frames).toEqual({ build: 'build', farm: 'farm', mine: 'mine' });
+  await page.waitForFunction(() => { camera.x = __C[0]; camera.y = __C[1]; camera.zoom = 2; return window.__ISO_VIEW_V1__.stats().underConstruction >= 2; }, null, { timeout: 30_000 });
+  expect(errors).toEqual([]);
+});
+
+test('iso view: broadleaf and conifer woods with undergrowth, willows by the river, bushes in the fields', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-plants&view=iso');
+  await page.waitForFunction(() => Object.keys(window.__ISO_VIEW_V1__?.plantKinds() || {}).length >= 6, null, { timeout: 60_000 });
+  const kinds = await page.evaluate(() => window.__ISO_VIEW_V1__.plantKinds());
+  for (const k of ['oak', 'beech', 'birch', 'pine', 'spruce', 'willow', 'fern', 'hazel', 'hawthorn']) expect(kinds[k] || 0).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: deer and rabbits graze and wander, and bolt from men and gunfire', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-wildlife&view=iso');
+  await page.waitForFunction(() => window.__WILDLIFE_V1__ && window.__ISO_VIEW_V1__?.stats().ground, null, { timeout: 60_000 });
+  await page.evaluate(() => { window.__WILDLIFE_V1__.populate(); });
+  const s0 = await page.evaluate(() => window.__WILDLIFE_V1__.stats());
+  expect(s0.deer).toBeGreaterThanOrEqual(12);
+  expect(s0.rabbits).toBeGreaterThanOrEqual(10);
+  // A man walks up to a herd: the whole herd runs off, away from him.
+  const fled = await page.evaluate(() => {
+    window.__WILDLIFE_V1__.populate();
+    const W = window.__WILDLIFE_V1__, quiet = q => !units.some(u => !u.dead && Math.hypot(u.x - q.x, u.y - q.y) < 500);
+    const a = W.animals().find(q => q.kind !== 'rabbit' && q.state !== 'run' && W.animals().filter(m => m.herd === q.herd).every(quiet));
+    const ux = a.x + 60, uy = a.y, mates = W.animals().filter(q => q.herd === a.herd), d0 = mates.map(m => Math.hypot(m.x - ux, m.y - uy));
+    createUnit('britain', 'infantry', ux, uy);
+    for (let i = 0; i < 20; i++) window.__RTS_DEBUG__.tick(0.1);
+    return { running: mates.every(m => m.state === 'run' || Math.hypot(m.x - ux, m.y - uy) > 150), further: mates.every((m, i) => Math.hypot(m.x - ux, m.y - uy) > d0[i]), bolts: W.stats().bolts };
+  });
+  expect(fled.bolts).toBeGreaterThanOrEqual(1);
+  expect(fled.running).toBe(true);
+  expect(fled.further).toBe(true);
+  // Seen where France can see: the iso view draws them.
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.atlasKeys().includes('wds') && window.__ISO_VIEW_V1__.atlasKeys().includes('wrb'), null, { timeout: 60_000 });
+  await page.evaluate(() => {
+    const a = window.__WILDLIFE_V1__.animals().find(q => q.kind === 'rabbit' && q.state !== 'run');
+    for (const q of window.__WILDLIFE_V1__.animals()) if (q.kind === 'rabbit') { q.state = 'graze'; q.until = elapsed + 999; }
+    createUnit('france', 'officer', a.x + 200, a.y + 200);
+    window.__C = [a.x, a.y];
+  });
+  await page.waitForFunction(() => { camera.x = __C[0]; camera.y = __C[1]; camera.zoom = 2; return window.__ISO_VIEW_V1__.stats().wildlife >= 1; }, null, { timeout: 30_000 });
+  expect(errors).toEqual([]);
+});
