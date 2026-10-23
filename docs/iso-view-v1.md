@@ -132,6 +132,13 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   loopgraaf heeft, en gaat in verdedigende houding. Wie wegloopt, laat de loopgraaf
   los, zodat hij vrij is voor de volgende (of voor hetzelfde regiment). Ook de Britse
   commandant graaft in waar hij verdedigt.
+- **Loopgraaf bezetten met een klik**: met een regiment geselecteerd klik (of tik)
+  je op een bestaande loopgraaf. Het regiment marcheert erheen, stelt zich in linie
+  langs de loopgraaf op met het front de kant van de loopgraaf op, bezet hem en gaat
+  in verdedigende houding. Selecteer je meer regimenten, dan bezet het eerste de
+  loopgraaf en vormen de andere een tweede linie er vlak achter. Zit er al een eigen
+  regiment in, dan gaan de nieuwe in tweede linie; een vijandelijke loopgraaf
+  aanklikken is gewoon een aanval. Een gewoon verplaatsbevel laat de loopgraaf weer los.
 - **Moraal**: boven elk regiment in zicht een balkje van groen naar rood; een
   knipperend rood "!" als het wankelt (onder 45), een witte vlag als het merendeel
   vlucht; een zwaardje en trommel tonen dat officier en tamboer er nog zijn (die

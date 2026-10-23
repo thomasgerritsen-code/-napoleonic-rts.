@@ -913,3 +913,44 @@ test('iso view: period troops - Old Guard, sapeurs, Polish lancers; 95th Rifles 
   if (r.looks) expect(r.looks).toEqual(['fr6', 'fr7', 'br6']);
   expect(errors).toEqual([]);
 });
+
+test('iso view: a click on a trench with a regiment selected sends it there to man it', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-trench-order&view=iso');
+  await page.waitForFunction(() => window.__REGIMENT_ORDERS_V1__ && window.__RTS_DEBUG__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const O = window.__REGIMENT_ORDERS_V1__, out = {};
+    const t = { id: 9001, side: 'france', x: 1500, y: 1400, facing: 0, length: 220, width: 70, progress: 1, startedAt: 0, level: 1 };
+    O.trenches().push(t);
+    const mk = (n, x, y) => { const m = []; for (let i = 0; i < n; i++) m.push(createUnit('france', 'infantry', x + (i % 6) * 18, y + Math.floor(i / 6) * 18)); m.push(createUnit('france', 'officer', x - 20, y), createUnit('france', 'drummer', x - 20, y + 14)); return createRegiment('france', m); };
+    const a = mk(12, 1150, 1650), b = mk(12, 1150, 1800);
+    selectedUnits.clear(); for (const u of regimentMembers(a)) selectedUnits.add(u); for (const u of regimentMembers(b)) selectedUnits.add(u);
+    out.under = O.trenchUnder(t.x + 30, t.y + 10)?.id;
+    issueMove(t.x + 30, t.y + 10);
+    out.status = statusEl.textContent;
+    for (let k = 0; k < 90 && a.trenchId !== t.id; k++) window.__RTS_DEBUG__.tick(1);
+    for (let k = 0; k < 30; k++) window.__RTS_DEBUG__.tick(1);
+    out.manned = a.trenchId === t.id;
+    const inf = regimentMembers(a).filter(u => u.type === 'infantry');
+    out.inside = inf.filter(u => O.trenchAt(u.x, u.y) === t).length; out.men = inf.length;
+    out.defend = a.defend;
+    // The second regiment forms up behind, not in the trench.
+    out.behind = regimentMembers(b).filter(u => u.type === 'infantry' && u.x < t.x - t.width / 2).length;
+    out.bInTrench = b.trenchId === t.id;
+    // An ordinary move order lets the regiment go again.
+    selectedUnits.clear(); for (const u of regimentMembers(a)) selectedUnits.add(u);
+    issueMove(t.x - 400, t.y + 300);
+    for (let k = 0; k < 30; k++) window.__RTS_DEBUG__.tick(1);
+    out.left = a.trenchId !== t.id;
+    return out;
+  });
+  expect(r.under).toBe(9001);
+  expect(r.status).toContain('bezet de loopgraaf');
+  expect(r.manned).toBe(true);
+  expect(r.inside).toBeGreaterThanOrEqual(r.men - 1);
+  expect(r.defend).toBe(true);
+  expect(r.bInTrench).toBe(false);
+  expect(r.behind).toBeGreaterThan(8);
+  expect(r.left).toBe(true);
+  expect(errors).toEqual([]);
+});

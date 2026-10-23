@@ -93,16 +93,71 @@
     if (reg.trenchId && (!own || Math.hypot(own.x - c.x, own.y - c.y) > cfg.trenchSnap)) reg.trenchId = null;
     if (reg.trenchId && own && reg.trenchStill >= 1) staffIntoTrench(reg, m, own);
     if (reg.trenchId && own && own.progress >= 1) upgradeWork(reg, own);
+    // Ordered into a trench (clicked on it): man it as soon as the regiment arrives.
+    const claim = reg.trenchClaim ? trenches.find(q => q.id === reg.trenchClaim.id) : null;
+    if (claim && (elapsed - reg.trenchClaim.at > 120 || heldBy(claim, reg))) reg.trenchClaim = null;
+    else if (claim && reg.trenchStill >= 1 && Math.hypot(claim.x - c.x, claim.y - c.y) < cfg.trenchSnap && reg.trenchId !== claim.id) {
+      reg.trenchClaim = null; occupy(reg, claim); return;
+    } else if (claim) return;
     if (reg.trenchId || reg.trenchStill < 2) return;
     const t = trenches.filter(q => q.progress >= 1 && Math.hypot(q.x - c.x, q.y - c.y) < cfg.trenchSnap)
       .sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
-    if (!t || regiments.some(r => r !== reg && !r.destroyed && r.trenchId === t.id)) return;
+    if (!t || heldBy(t, reg) || regiments.some(r => r !== reg && !r.destroyed && r.trenchClaim?.id === t.id)) return;
+    occupy(reg, t);
+  }
+  const heldBy = (t, reg) => regiments.find(r => r !== reg && !r.destroyed && r.trenchId === t.id) || null;
+  function occupy(reg, t) {
     reg.trenchId = t.id; t.side = reg.side; stats.manned++;
     if (reg.side === 'france') reg.defend = true;
     reg.formation = 'line';
     if (typeof arrangeFacingRegimentV146 === 'function') arrangeFacingRegimentV146(reg, t.x, t.y, 'line', t.facing);
     // The trench covers them as soon as they stand in it; bracing follows when they halt.
   }
+  // ---- ordering a regiment into a trench: with a regiment selected, a click
+  // (right click, or a tap) on a trench sends it there; it marches up in line,
+  // front the way the trench faces, and mans it on arrival. Other regiments
+  // selected with it form up in a second line just behind. ----
+  const trenchUnder = (x, y) => trenches.filter(t => t.progress >= 1 && inTrenchNear(t, x, y, 14))
+    .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0] || null;
+  const inTrenchNear = (t, x, y, pad) => inTrench({ ...t, length: t.length + pad * 2, width: t.width + pad * 2 }, x, y);
+  function orderIntoTrench(x, y) {
+    const regs = selectedRegs().filter(r => regimentMembers(r).some(u => u.type === 'infantry'));
+    const t = regs.length ? trenchUnder(x, y) : null;
+    if (!t) return false;
+    const holder = heldBy(t, null);
+    if (holder && holder.side !== 'france') return false;           // an enemy's trench: an attack, not a posting
+    const [first, ...rest] = holder && !regs.includes(holder) ? [null, ...regs] : [regs.find(r => r === holder) || regs[0], ...regs.filter(r => r !== (holder || regs[0]))];
+    const back = t.width / 2 + 46;
+    const go = (reg, cx, cy) => {
+      reg.formation = 'line'; reg.defend = true;
+      if (typeof issueMoveWithFacingV06 === 'function' && typeof selectedUnits !== 'undefined') {
+        // Move just this regiment: the game's own route planner with the trench's facing.
+        const keep = [...selectedUnits]; selectedUnits.clear();
+        for (const u of regimentMembers(reg)) selectedUnits.add(u);
+        try { issueMoveWithFacingV06(cx, cy, t.facing); } finally { selectedUnits.clear(); for (const u of keep) selectedUnits.add(u); }
+      } else if (typeof arrangeFacingRegimentV146 === 'function') arrangeFacingRegimentV146(reg, cx, cy, 'line', t.facing);
+    };
+    if (first) { if (first.trenchId !== t.id) first.trenchClaim = { id: t.id, at: elapsed }; go(first, t.x, t.y); }
+    rest.forEach((reg, i) => { reg.trenchClaim = null; go(reg, t.x - Math.cos(t.facing) * back * (i + 1), t.y - Math.sin(t.facing) * back * (i + 1)); });
+    stats.ordered = (stats.ordered || 0) + 1;
+    statusEl.textContent = first ? `${first.name} bezet de loopgraaf${rest.length ? `; ${rest.length === 1 ? rest[0].name : rest.length + ' regimenten'} in tweede linie erachter` : ''}.`
+      : `Loopgraaf al bezet door ${holder.name}; ${regs.length === 1 ? regs[0].name : 'de regimenten'} in tweede linie erachter.`;
+    return true;
+  }
+  // Later scripts replace issueMove: the hook is laid on top of whatever is current, every second.
+  function ensureTrenchHook() {
+    if (typeof issueMove !== 'function' || issueMove.trenchOrderV1) return;
+    const base = issueMove;
+    const hooked = function issueMoveIntoTrench(x, y) {
+      if (orderIntoTrench(x, y)) return;
+      for (const reg of selectedRegs()) reg.trenchClaim = null;
+      return base(x, y);
+    };
+    hooked.trenchOrderV1 = true;
+    issueMove = hooked;
+  }
+  ensureTrenchHook();
+  setInterval(ensureTrenchHook, 1000);
   // ---- upgrading a trench for resources: level 2 revets the walls with
   // fascines, level 3 adds gabions and sandbags; each covers better. The
   // regiment in it does the work (shown digging) while it stands there. ----
@@ -341,7 +396,7 @@
 
   global.__REGIMENT_ORDERS_V1__ = Object.freeze({
     version: 'regiment-orders-v1', config: cfg, isBraced, toggleDefend, reinforce, upgradeTrench, levelOf,
-    trenches: () => trenches, trenchAt, diggingAt, obstacleAt,
+    trenches: () => trenches, trenchAt, diggingAt, obstacleAt, orderIntoTrench, trenchUnder,
     stats: () => ({ ...stats, trenches: trenches.length, finished: trenches.filter(t => t.progress >= 1).length, braced: regiments.filter(isBraced).length, defending: regiments.filter(r => !r.destroyed && r.defend).length })
   });
 })(window);
