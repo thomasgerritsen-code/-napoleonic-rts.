@@ -1228,3 +1228,24 @@ test('iso view: visibility cache - the same answers as the full search, far fewe
   expect(r.visible).toBeGreaterThan(5);
   expect(errors).toEqual([]);
 });
+
+test('iso view: sharp sprites - sheets drawn magnified load at full size, unseen ones go back to half', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-sharp&view=iso');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 0 && window.__ISO_VIEW_V1__.atlasKeys().includes('fr2'), null, { timeout: 60_000 });
+  // Men close up, zoomed in: their sheets are drawn larger than the half-size images.
+  await page.evaluate(() => {
+    for (let i = 0; i < 6; i++) createUnit('france', 'infantry', 2300 + i * 20, 1700);
+    camera.x = 2350; camera.y = 1700; camera.zoom = 2.2;
+  });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sharpSheets > 0, null, { timeout: 30_000 });
+  const close = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
+  // Far away (and out of sight) for a while: back to half size.
+  await page.evaluate(() => { camera.x = 400; camera.y = 400; camera.zoom = 0.5; });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sharpSheets === 0, null, { timeout: 40_000 });
+  const far = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
+  expect(close.sharpMB).toBeGreaterThan(0);
+  expect(close.sharpMB).toBeLessThanOrEqual(close.sharpBudgetMB);
+  expect(far.sharpMB).toBe(0);
+  expect(errors).toEqual([]);
+});

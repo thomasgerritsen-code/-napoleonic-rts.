@@ -143,6 +143,8 @@
     facingArrow: OPEN_MAP ? Object.freeze({ dragPx:12, filePitch:18, minFront:40, maxFront:420, fadeMs:1400, colour:'#f2d27a' }) : null,
     // Visibility answered from a per-moment grid of French watchers (open map only): smallest cell in px; sight lines sample woods per losCell px.
     visibilityCache: OPEN_MAP ? Object.freeze({ minCell:200, losCell:12 }) : null,
+    // Sharper drawing for the iso view (open map only): pixel density caps and the desktop pixel budget.
+    render: OPEN_MAP ? Object.freeze({ mobileDprCap:2, desktopDprCap:2, desktopMaxBackingPixels:4200000 }) : null,
     gunCrew: OPEN_MAP ? Object.freeze({ reach:600, keepInRegiment:6, clickRadius:26 }) : null,
     // Troop kinds, each with a strength and a weakness (open map only). Multipliers on the base type.
     // Period troops (open map only): each with a strength and a weakness.

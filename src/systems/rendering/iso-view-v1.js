@@ -77,7 +77,42 @@
     const dir = ASSETS + 'sprites/iso/';
     return fetch(dir + prefix + '_iso_' + kind + '_atlas.json').then(r => { if (!r.ok) throw new Error('iso: atlas ' + prefix + ' ' + kind); return r.json(); })
       .then(sheet => { const half = !HD && sheet.meta.half;
-        return loadImage(dir + (half ? half.image : sheet.meta.image)).then(image => ({ sheet, image, scale: half ? half.scale : 1 })); });
+        return loadImage(dir + (half ? half.image : sheet.meta.image)).then(image => ({ sheet, image, scale: half ? half.scale : 1,
+          fullSrc: half ? dir + sheet.meta.image : null, halfImage: image, halfScale: half ? half.scale : 1 })); });
+  }
+  // Sharp sprites where they are seen: the half-size sheets are light enough for a
+  // phone, but drawn larger than they are (most of all zoomed in) they look soft.
+  // A sheet that is drawn magnified gets its full-size image in the background; one
+  // not drawn magnified for a while (unseen, or seen from far) goes back to half size. All full sheets together would take
+  // well over a gigabyte, so a budget keeps the sharp ones to those on screen.
+  const SHARP_AT = 1.12, SHARP_IDLE_MS = 20000;
+  const SHARP_BUDGET = (matchMedia?.('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) <= 700 ? 240 : 640) * 2 ** 20;
+  const sharp = { parts: new Set(), bytes: 0, loading: 0, loaded: 0, dropped: 0, sweptAt: 0, now: 0 };
+  const bytesOf = part => part.sheet.meta.size.w * part.sheet.meta.size.h * 4;
+  function sharpen(part, now) {
+    part.sharpening = true;
+    const need = bytesOf(part);
+    // Make room: the sheets least recently drawn (not in the last two seconds) go back to half size.
+    if (sharp.bytes + need > SHARP_BUDGET) {
+      for (const q of [...sharp.parts].sort((a, b) => a.used - b.used)) {
+        if (sharp.bytes + need <= SHARP_BUDGET || now - q.used < 2000) break;
+        soften(q);
+      }
+      if (sharp.bytes + need > SHARP_BUDGET) { part.sharpening = false; return; }
+    }
+    sharp.bytes += need; sharp.loading++;
+    loadImage(part.fullSrc).then(image => { part.image = image; part.scale = 1; sharp.parts.add(part); sharp.loaded++; })
+      .catch(() => { sharp.bytes -= need; })
+      .finally(() => { sharp.loading--; part.sharpening = false; });
+  }
+  function soften(part) {
+    if (!sharp.parts.delete(part)) return;
+    part.image = part.halfImage; part.scale = part.halfScale; sharp.bytes -= bytesOf(part); sharp.dropped++;
+  }
+  function sweepSharp(now) {
+    if (now - sharp.sweptAt < 5000) return;
+    sharp.sweptAt = now;
+    for (const q of [...sharp.parts]) if (now - q.used > SHARP_IDLE_MS) soften(q);
   }
   function indexAtlas(parts) {
     const byAnim = new Map();
@@ -534,6 +569,11 @@
     const src = atlas && atlas.byAnim.get(anim), name = src && src.sheet.animations[anim] && src.sheet.animations[anim][f];
     if (!name) { view.stats.missing++; if (view.missingNames.size < 20) view.missingNames.add((atlas ? '' : 'noatlas:') + anim); return false; }
     const fr = src.sheet.frames[name].frame, p = src.sheet.meta.pivot, s = src.scale || 1;
+    if (src.fullSrc) {
+      // 'used': last drawn magnified (larger than its half-size image would be sharp).
+      const now = sharp.now, magnified = k * (canvas.width / innerWidth) / src.halfScale > SHARP_AT;
+      if (magnified) { src.used = now; if (s < 1 && !src.sharpening) sharpen(src, now); }
+    }
     ctx.drawImage(src.image, fr.x * s, fr.y * s, fr.w * s, fr.h * s, x - p.x * k, y - p.y * k, fr.w * k, fr.h * k);
     return true;
   }
@@ -1173,6 +1213,7 @@
 
   // ---- the frame ----
   function render(now) {
+    sharp.now = performance.now(); sweepSharp(sharp.now);
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
@@ -1781,6 +1822,7 @@
     isOn: () => view.on, setOn, setOverview, atlasKeys: () => Object.keys(view.atlases), lookOf,
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
+      sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
       relief: view.relief ? view.relief.maxM : 0, heightSight: !!view.heightSight, villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
     screenOf: (wx, wy) => ({ x: sx(wx), y: gy(wx, wy) }),
