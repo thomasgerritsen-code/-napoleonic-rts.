@@ -1042,6 +1042,46 @@
     };
     view.heightSight = true;
   }
+  // Firing reach of what is selected, on the ground: one soft field with a
+  // clear edge round the whole selection (each shooter's reach merged), and
+  // the reach of a selected schiettoren. Enemies inside it get shot at.
+  function rangeOf(u) {
+    if (u.dead || u.routing) return 0;
+    if (u.type === 'artillery') return u.artilleryMode === 'grape' ? 145 : TYPES.artillery?.range || 0;
+    return u.type === 'infantry' ? TYPES.infantry?.range || 0 : 0;
+  }
+  function drawRanges() {
+    const circles = [];
+    for (const u of selectedUnits) { const r = rangeOf(u); if (r) circles.push([u.x, u.y, r]); }
+    const b = typeof selectedBuilding !== 'undefined' ? selectedBuilding : null;
+    const tower = b && !b.dead && b.type === 'tower' && b.complete !== false ? global.__WATCHTOWER_V1__?.config?.range : 0;
+    if (tower) circles.push([b.x, b.y, tower]);
+    view.stats.rangeRings = circles.length;
+    if (!circles.length) { view.stats.inReach = 0; return; }
+    const W = innerWidth, H = innerHeight;
+    let oc = view.rangeLayer;
+    if (!oc || oc.width !== W || oc.height !== H) { oc = view.rangeLayer = document.createElement('canvas'); oc.width = W; oc.height = H; }
+    const g = oc.getContext('2d'), edge = Math.max(2, 1.6 * z());
+    const shape = grow => { g.beginPath(); for (const [x, y, r] of circles) { const rx = Math.max(1, r * z() + grow); g.moveTo(sx(x) + rx, gy(x, y)); g.ellipse(sx(x), gy(x, y), rx, rx * SQ, 0, 0, 7); } };
+    const foe = b && tower && b.side !== 'france' || [...selectedUnits].some(u => u.side !== 'france');
+    g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, W, H);
+    g.fillStyle = foe ? '#ff8a7a' : '#ffe08a'; shape(0); g.fill();
+    ctx.globalAlpha = 0.24; ctx.drawImage(oc, 0, 0); ctx.globalAlpha = 1;
+    // The edge: what is left of the merged field once every circle, a little smaller, is cut out.
+    g.globalCompositeOperation = 'destination-out'; shape(-edge); g.fill(); g.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.9; ctx.drawImage(oc, 0, 0); ctx.globalAlpha = 1;
+    // Enemies within reach: a red mark at their feet.
+    const side = b && tower ? b.side : [...selectedUnits][0]?.side;
+    ctx.strokeStyle = 'rgba(235,60,45,.95)'; ctx.lineWidth = Math.max(1.5, 1.4 * z()); ctx.beginPath();
+    let marked = 0;
+    for (const e of units) {
+      if (e.dead || e.side === side || (side === 'france' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(e))) continue;
+      if (!circles.some(([x, y, r]) => (e.x - x) ** 2 + (e.y - y) ** 2 <= r * r)) continue;
+      const rr = (e.type === 'cavalry' ? 1.1 : 0.55) * PPM * z();
+      ctx.moveTo(sx(e.x) + rr, gy(e.x, e.y)); ctx.ellipse(sx(e.x), gy(e.x, e.y), rr, rr * SQ, 0, 0, 7); marked++;
+    }
+    ctx.stroke(); view.stats.inReach = marked;
+  }
   function drawSelection() {
     ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(245,220,112,.95)'; ctx.beginPath();
     for (const u of selectedUnits) {
@@ -1163,6 +1203,7 @@
       if (X < -120 || X > innerWidth + 120 || Y < -30 || Y > innerHeight + 260) continue;
       const d = resourceDrawable(r); if (d) list.push(d);
     }
+    drawRanges();
     drawSelection();
     drawOrders(t);
     list.sort((p, q) => p.y - q.y);

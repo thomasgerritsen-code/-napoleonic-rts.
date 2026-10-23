@@ -116,6 +116,12 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   loopgraaf heeft, en gaat in verdedigende houding. Wie wegloopt, laat de loopgraaf
   los, zodat hij vrij is voor de volgende (of voor hetzelfde regiment). Ook de Britse
   commandant graaft in waar hij verdedigt.
+- **Schietbereik**: selecteer je soldaten (of artillerie) of een schiettoren, dan
+  ligt hun bereik als een licht geel veld met een duidelijke rand op de grond (het
+  bereik van alle schutters samen; rood bij een vijandelijke selectie). Vijanden
+  binnen dat veld krijgen een rode ring aan hun voeten. Musketiers vuren op de open
+  kaart tot 200 px (het standaardspel houdt 122): wat je in het veld ziet, wordt
+  beschoten, en een marcherende lijn houdt halt zodra er een vijand binnen komt.
 - **Schiettoren**: boeren bouwen hem met de knop **Schiettoren** (260 hout). Een
   vierkante toren (Blender-model): stenen voet met schietgaten, een uitkragende
   houten schutterskamer met schietsleuven en musketlopen, een piramidedak en de

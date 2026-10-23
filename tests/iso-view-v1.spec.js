@@ -236,9 +236,10 @@ test('iso view: a right-click on an enemy sends the selection to musket reach fa
   const gap = await page.evaluate(([id, enemy]) => {
     const own = regimentMembers(getRegiment(id)).filter(u => !u.dead), foe = units.filter(u => enemy.includes(u.id) && !u.dead);
     const a = centroid(own), b = centroid(foe);
-    return Math.hypot(a.x - b.x, a.y - b.y);
+    return { gap: Math.hypot(a.x - b.x, a.y - b.y), range: TYPES.infantry.range };
   }, [ids.id, ids.enemy]);
-  expect(gap).toBeLessThan(160);
+  // Musket reach is 200 px on the open map: they halt as soon as the enemy is inside it.
+  expect(gap.gap).toBeLessThan(gap.range + 30);
   expect(errors).toEqual([]);
 });
 
@@ -493,5 +494,34 @@ test('iso view: peasants build a schiettoren that fires at enemies in reach and 
   expect(r.stats.volleys).toBeGreaterThan(2);
   // The Blender tower stands on the map, smoke at its slits when it fires.
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().towerVolleys > 0 || (window.__RTS_DEBUG__.tick(1), false), null, { timeout: 20_000 });
+  expect(errors).toEqual([]);
+});
+
+test('iso view: a selected line or tower shows its firing reach, and men fire at an enemy inside it', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await openGame(page, 'test=iso-range&view=iso');
+  await page.waitForFunction(() => window.__REGIMENT_ORDERS_V1__ && window.__WATCHTOWER_V1__ && window.__ISO_VIEW_V1__?.stats().props >= 16, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const us = [];
+    for (let i = 0; i < 12; i++) us.push(createUnit('france', 'infantry', 900 + (i % 6) * 20, 1300 + (i < 6 ? 0 : 18)));
+    us.push(createUnit('france', 'officer', 880, 1300), createUnit('france', 'drummer', 880, 1310));
+    const a = createRegiment('france', us);
+    arrangeFacingRegimentV146(a, 960, 1300, 'line', 0);
+    for (let k = 0; k < 8; k++) window.__RTS_DEBUG__.tick(1);
+    // A horseman standing well past the old 122 px reach, inside the new one.
+    const c = createUnit('britain', 'cavalry', 960 + 185, 1300);
+    c.targetX = c.x; c.targetY = c.y;
+    const hp0 = c.hp;
+    for (let k = 0; k < 6; k++) window.__RTS_DEBUG__.tick(1);
+    selectWholeRegiment(a);
+    camera.x = 1000; camera.y = 1350; camera.zoom = 1.3;
+    window.__rangeTower = createBuilding('france', 'tower', 900, 1560, true);
+    return { range: TYPES.infantry.range, lost: hp0 - c.hp };
+  });
+  expect(r.range).toBe(200);
+  expect(r.lost).toBeGreaterThan(40);
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().rangeRings >= 12);
+  await page.evaluate(() => { selectedUnits.clear(); selectedBuilding = window.__rangeTower; });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().rangeRings === 1);
   expect(errors).toEqual([]);
 });

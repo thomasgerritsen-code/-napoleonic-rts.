@@ -119,7 +119,9 @@
     // Open map: regiment orders (src/systems/combat/regiment-orders-v1.js) - a defensive
     // stance that braces a standing line or square, and regiments up to maxInfantry men.
     regimentOrders: OPEN_MAP ? Object.freeze({ maxInfantry:36, braceSeconds:4, defendDamage:0.7, defendShock:0.55, defendReload:0.85,
-      digDelay:3, digSeconds:25, trenchWidth:40, trenchDamage:0.5, trenchShock:0.45, trenchSnap:110, maxTrenches:40 }) : null,
+      digDelay:3, digSeconds:25, trenchWidth:40, trenchDamage:0.5, trenchShock:0.45, trenchSnap:110, maxTrenches:40,
+      // Musket reach on the open map (game px; the default game keeps 122), shown as a ring when selected.
+      infantryRange:200 }) : null,
     // Buildable musketry tower (open map only): range and vision in game px.
     towers: OPEN_MAP ? Object.freeze({ cost:Object.freeze({ wood:260 }), hp:1100, range:240, reload:2.6, shots:2, damage:18,
       vision:420, aiAfter:300, aiMax:2 }) : null,

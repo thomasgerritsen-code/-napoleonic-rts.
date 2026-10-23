@@ -23,6 +23,8 @@
   if (document.readyState !== 'complete') { addEventListener('load', () => installRegimentOrdersV1(global), { once: true }); return; }
   if (global.__REGIMENT_ORDERS_V1__ || typeof applyDamage !== 'function' || typeof refreshRegiment !== 'function') return;
   const stats = { braced: 0, reduced: 0, inTrench: 0, reinforced: 0, toggles: 0, dug: 0, manned: 0 };
+  // Longer musket reach on the open map: men open fire at the distance the range ring shows.
+  if (cfg.infantryRange && TYPES.infantry) TYPES.infantry.range = cfg.infantryRange;
   const trenches = [];
   const isBraced = reg => !!(reg && !reg.destroyed && reg.defend && reg.bracedAt != null && elapsed - reg.bracedAt >= cfg.braceSeconds);
   const regOf = u => (u && u.kind === 'unit' && u.regimentId && typeof getRegiment === 'function') ? getRegiment(u.regimentId) : null;
