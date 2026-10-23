@@ -153,6 +153,8 @@
       for (const reg of selectedRegs()) reg.trenchClaim = null;
       return base(x, y);
     };
+    // Carry the marks of the hooks below, so no hook wraps the chain twice.
+    Object.assign(hooked, base);
     hooked.trenchOrderV1 = true;
     issueMove = hooked;
   }

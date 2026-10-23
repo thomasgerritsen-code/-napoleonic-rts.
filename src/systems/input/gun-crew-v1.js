@@ -90,6 +90,8 @@
     if (typeof issueMove !== 'function' || issueMove.gunCrewV1) return;
     const base = issueMove;
     const hooked = function issueMoveToGun(x, y) { if (crewByClick(x, y)) return; return base(x, y); };
+    // Carry the marks of the hooks below, so no hook wraps the chain twice.
+    Object.assign(hooked, base);
     hooked.gunCrewV1 = true;
     issueMove = hooked;
   }

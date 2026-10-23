@@ -405,6 +405,8 @@
       if (view.on) { const e = enemyAt(x, y); if (e && attackOrder(e)) return; }
       return baseIssueMove(x, y);
     };
+    // Carry the marks of the hooks below, so no hook wraps the chain twice.
+    Object.assign(hooked, baseIssueMove);
     hooked.isoAttackV1 = true;
     issueMove = hooked;
   }
