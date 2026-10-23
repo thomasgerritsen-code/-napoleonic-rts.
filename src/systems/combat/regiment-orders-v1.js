@@ -153,6 +153,22 @@
     };
   }
 
+  // Fire at will from a trench or a braced line: a man there shoots as soon as
+  // he is loaded and an enemy is inside his reach, instead of waiting for the
+  // army-wide volley beat (up to 3 s), so an enemy entering the shown range is
+  // met at once.
+  if (typeof updateUnit === 'function') {
+    const baseUpdateUnit = updateUnit;
+    updateUnit = function updateUnitFiringAtWill(u, dt) {
+      if (u && !u.dead && !u.routing && u.type === 'infantry' && u.attackMode !== 'bayonet' && u.reload - dt <= 0 &&
+          ((trenches.length && trenchAt(u.x, u.y)) || isBraced(regOf(u)))) {
+        const enemy = nearestEnemyEntity(u, TYPES.infantry.range);
+        if (enemy) { fire(u, enemy); stats.atWill = (stats.atWill || 0) + 1; }
+      }
+      return baseUpdateUnit(u, dt);
+    };
+  }
+
   // ---- orders ----
   const selectedRegs = () => (typeof selectedRegiments === 'function' ? selectedRegiments() : []).filter(r => r.side === 'france' && !r.destroyed);
   function toggleDefend(regs = selectedRegs()) {

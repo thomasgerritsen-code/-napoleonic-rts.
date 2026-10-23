@@ -405,6 +405,15 @@ test('iso view: a defending line digs a trench, men in it lose less, and a regim
     selectWholeRegiment(b); O.toggleDefend();
     for (let k = 0; k < 12; k++) window.__RTS_DEBUG__.tick(1);
     const inB = regimentMembers(b).filter(u => u.type === 'infantry' && O.trenchAt(u.x, u.y)).length;
+    // Men in a trench fire at will: an enemy stepping into reach is shot at within a moment,
+    // not at the next army-wide volley beat.
+    for (let k = 0; k < 3; k++) window.__RTS_DEBUG__.tick(1);
+    const atWill0 = O.stats().atWill || 0;
+    const intruder = createUnit('britain', 'infantry', t.x + Math.cos(t.facing) * 150, t.y + Math.sin(t.facing) * 150);
+    intruder.targetX = intruder.x; intruder.targetY = intruder.y;
+    for (let k = 0; k < 6; k++) window.__RTS_DEBUG__.tick(1 / 20);
+    const firedAtWill = (O.stats().atWill || 0) - atWill0;
+    intruder.dead = true;
     const drummerIn = regimentMembers(b).some(u => u.type === 'drummer' && O.trenchAt(u.x, u.y));
     const mannedB = b.trenchId === t.id, facingB = b.facing;
     // The second regiment marches off and comes back: it steps in again, without
@@ -416,7 +425,7 @@ test('iso view: a defending line digs a trench, men in it lose less, and a regim
     orderGroupPathV06(b, t.x + 50, t.y + 60, 'line', 0);
     for (let k = 0; k < 30; k++) window.__RTS_DEBUG__.tick(1);
     const again = regimentMembers(b).filter(u => u.type === 'infantry' && O.trenchAt(u.x, u.y)).length;
-    return { finished: t && t.progress >= 1, lostIn: h1 - man.hp, lostOut: h2 - out.hp, manned: mannedB, inB, drummerIn, facing: facingB, tf: t.facing,
+    return { finished: t && t.progress >= 1, lostIn: h1 - man.hp, lostOut: h2 - out.hp, manned: mannedB, inB, drummerIn, firedAtWill, facing: facingB, tf: t.facing,
       left, again, mannedAgain: b.trenchId === t.id };
   });
   expect(r.finished).toBe(true);
@@ -425,6 +434,7 @@ test('iso view: a defending line digs a trench, men in it lose less, and a regim
   expect(r.inB).toBeGreaterThan(10);
   // The drummer goes down into the trench with them.
   expect(r.drummerIn).toBe(true);
+  expect(r.firedAtWill).toBeGreaterThan(0);
   expect(r.facing).toBeCloseTo(r.tf, 2);
   expect(r.left).toBe(true);
   expect(r.mannedAgain).toBe(true);

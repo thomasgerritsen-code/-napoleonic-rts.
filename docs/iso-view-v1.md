@@ -122,6 +122,9 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   binnen dat veld krijgen een rode ring aan hun voeten. Musketiers vuren op de open
   kaart tot 200 px (het standaardspel houdt 122): wat je in het veld ziet, wordt
   beschoten, en een marcherende lijn houdt halt zodra er een vijand binnen komt.
+  Mannen in een loopgraaf of een ingegraven linie (verdedigend) vuren naar
+  believen: geladen en een vijand binnen bereik, dan schieten ze meteen, zonder op
+  de gezamenlijke salvo-maat (tot 3 s) te wachten.
 - **Schiettoren**: boeren bouwen hem met de knop **Schiettoren** (260 hout). Een
   vierkante toren (Blender-model): stenen voet met schietgaten, een uitkragende
   houten schutterskamer met schietsleuven en musketlopen, een piramidedak en de
