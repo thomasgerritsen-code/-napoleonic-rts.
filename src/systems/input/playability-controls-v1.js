@@ -241,6 +241,10 @@
     camera.zoom = nextZoom;
     camera.x = base.anchor.x - (m.center.x - innerWidth / 2) / nextZoom;
     camera.y = base.anchor.y - (m.center.y - innerHeight / 2) / nextZoom;
+    // Keep the spot between the fingers under the fingers in any projection
+    // (the iso view squeezes the ground vertically): shift by what is off.
+    const s = worldToScreen(base.anchor.x, base.anchor.y), now = screenToWorld(s.x, s.y), want = screenToWorld(m.center.x, m.center.y);
+    if (Number.isFinite(now.x + now.y + want.x + want.y)) { camera.x += now.x - want.x; camera.y += now.y - want.y; }
     clampCamera();
     mobile.cameraGestures++;
   }
@@ -252,10 +256,19 @@
     canvas.addEventListener(type, suppressLegacyTouch, { capture: true, passive: false });
   });
 
+  // Forget every finger: a gesture the browser took over (or a lift that never
+  // reached the canvas) must not leave a stale finger that turns every later
+  // tap into half of a pinch.
+  function clearTouches() {
+    mobile.pointers.clear(); mobile.pinch = null; mobile.suppressSingleUntilClear = false;
+    mobile.staleResets = (mobile.staleResets || 0) + 1;
+  }
   function onTouchPointerDown(e) {
     if (e.pointerType !== 'touch') return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    // The first finger of a new gesture: whatever is still held is stale.
+    if (e.isPrimary && mobile.pointers.size) clearTouches();
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     const w = screenToWorld(e.clientX, e.clientY);
     mobile.pointers.set(e.pointerId, {
@@ -390,6 +403,15 @@
     if (mobile.pointers.size < 2) mobile.pinch = null;
     if (!mobile.pointers.size) mobile.suppressSingleUntilClear = false;
   }
+  // A finger whose lift lands elsewhere (or whose capture is lost) still ends.
+  canvas.addEventListener('lostpointercapture', e => { if (e.pointerType === 'touch' && mobile.pointers.has(e.pointerId)) onTouchPointerCancel(e); });
+  // When no finger is on the screen any more, nothing can still be held.
+  document.addEventListener('touchend', e => { if (!e.touches.length && mobile.pointers.size) clearTouches(); }, { capture: true, passive: true });
+  document.addEventListener('touchcancel', e => { if (!e.touches.length && mobile.pointers.size) clearTouches(); }, { capture: true, passive: true });
+  // iOS ignores user-scalable=no: a pinch that starts on a button or panel would
+  // zoom the whole page (and snap back), shifting every tap off its target.
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, e => e.preventDefault(), { passive: false });
+  document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
   canvas.addEventListener('pointerdown', onTouchPointerDown, true);
   canvas.addEventListener('pointermove', onTouchPointerMove, true);
   canvas.addEventListener('pointerup', onTouchPointerUp, true);
@@ -406,6 +428,7 @@
       primaryOrientation: 'landscape',
       state: () => ({
         activePointers: mobile.pointers.size,
+        staleResets: mobile.staleResets || 0,
         taps: mobile.taps,
         boxSelections: mobile.boxSelections,
         moveOrders: mobile.moveOrders,

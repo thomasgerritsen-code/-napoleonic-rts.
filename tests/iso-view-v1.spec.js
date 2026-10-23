@@ -535,3 +535,32 @@ test('iso view: a selected line or tower shows its firing reach, and men fire at
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().rangeRings === 1);
   expect(errors).toEqual([]);
 });
+
+test('iso view on a phone: a two-finger pinch zooms and stays, the spot between the fingers stays put, and a tap selects afterwards', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const ctx = await browser.newContext({ baseURL: test.info().project.use.baseURL, viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  const errors = await openGame(page, 'test=iso-pinch&view=iso');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().ground, null, { timeout: 60_000 });
+  const cdp = await ctx.newCDPSession(page);
+  const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((q, i) => ({ x: q[0], y: q[1], id: i })) });
+  const cx = 195, cy = 420;
+  const before = await page.evaluate(([x, y]) => ({ zoom: camera.zoom, w: screenToWorld(x, y) }), [cx, cy]);
+  await touch('touchStart', [[cx - 30, cy], [cx + 30, cy]]);
+  for (let i = 1; i <= 6; i++) { await touch('touchMove', [[cx - 30 - i * 6, cy], [cx + 30 + i * 6, cy]]); await page.waitForTimeout(16); }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x: cx + 66, y: cy, id: 1 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForTimeout(500);
+  const after = await page.evaluate(([x, y]) => ({ zoom: camera.zoom, w: screenToWorld(x, y), held: window.__PLAYABILITY_CONTROLS_V1__.mobile.state().activePointers }), [cx, cy]);
+  expect(after.zoom).toBeGreaterThan(before.zoom * 1.3);
+  expect(Math.hypot(after.w.x - before.w.x, after.w.y - before.w.y)).toBeLessThan(40);
+  expect(after.held).toBe(0);
+  // A tap on a man still selects him.
+  const s = await page.evaluate(() => { const w = screenToWorld(innerWidth / 2, innerHeight / 2 - 60); const u = createUnit('france', 'infantry', w.x, w.y); selectedUnits.clear(); return window.__ISO_VIEW_V1__.bodyOf(u); });
+  await page.waitForTimeout(300);
+  await touch('touchStart', [[s.x, s.y]]); await page.waitForTimeout(50); await touch('touchEnd', []);
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => selectedUnits.size)).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+  await ctx.close();
+});
