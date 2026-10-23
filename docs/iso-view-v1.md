@@ -149,6 +149,15 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   twee keer zo ver uit elkaar), vuurt naar believen en 15% verder, is moeilijk te
   raken (28% minder, tussen bomen 45% minder), maar ruiterij doet er 70% meer schade.
   Nog eens drukken (of carré) sluit de gelederen.
+- **Weer** (rechts naast de wind in de bovenbalk): helder, bewolkt, regen en mist
+  wisselen elkaar af (elke 2,5 tot 5 minuten, met een overgang van ~25 s; regen
+  komt uit bewolking). Regen valt schuin met de wind, maakt het beeld donkerder en
+  doorweekt de bodem (in een minuut; drogen duurt vier minuten): natte grond is
+  donkerder met plassen, en wie erover loopt laat sporen achter - voetafdrukken,
+  hoefafdrukken, wielsporen van kanonnen - die vervagen naarmate het opdroogt.
+  In de regen ketsen musketten (tot 30% van de schoten), modder vertraagt (18%,
+  kanonnen 30%) en het zicht is 20% korter; mist legt een waas over het veld en
+  halveert ongeveer het zicht.
 - **Menu onderin**: toont alleen wat bij je selectie past, in groepen met een kopje
   en een vaste volgorde. Boeren: *Werk* (akker, bouw hervatten) en *Bouwen*
   (woning, graanakker, kazerne, schiettoren, stal, gieterij). Soldaten: *Bevel*

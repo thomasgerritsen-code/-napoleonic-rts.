@@ -1151,6 +1151,7 @@
     ensureAttackHook();
     drawTerrain();
     view.stats.trenches = 0;
+    drawWetGround(t);
     drawTrenchBeds(t);
     drawCraters();
     const k = spriteK(), seen = new Set(), list = [];
@@ -1176,6 +1177,7 @@
       // ...also while they revet or fortify a finished one (an upgrade bought for resources).
       m.digging = sunk && (sunk.progress < 1 || sunk.upgrade) && musketeer && orders?.diggingAt?.(u.x, u.y) ? sunk : null;
       if (m.digging) st.digging++;
+      if (m.moving) leaveTrack(u, m);
       // The front rank of a finished trench steps up to the parapet and leans on it.
       let wx = u.x, wy = u.y;
       m.parapet = null;
@@ -1266,6 +1268,7 @@
     if (detailed()) drawChimneySmoke(t);
     drawSmoke(t);
     drawFog();
+    drawWeather(t);
     drawDragBox();
     drawFacingArrow();
     soundTick(t);
@@ -1356,6 +1359,95 @@
       const p = isoWorldToScreen(wx, wy);
       return pickDrawn(buildings.filter(b => !side || b.side === side), buildingDrawable, p.x, p.y) || baseBuildingAt(wx, wy, side);
     };
+  }
+  // ---- weather (weather-v1): wet ground darkens and gathers puddles, and
+  // whatever crosses it leaves tracks - boots, hooves, wheel ruts - that fade
+  // as it dries; rain falls slanting with the wind, fog and cloud veil the
+  // field. ----
+  const TRACK_MAX = 2600;
+  view.tracks = [];
+  const weather = () => global.__WEATHER_V1__?.state?.();
+  function leaveTrack(u, m) {
+    const w = weather(); if (!w || w.wetness < 0.2) return;
+    const kind = u.type === 'cavalry' ? 'hoof' : u.type === 'artillery' ? 'wheel' : 'boot';
+    const gap = (kind === 'hoof' ? 1.3 : kind === 'wheel' ? 0.7 : 0.8) * PPM;
+    if (m.trackX != null && Math.hypot(u.x - m.trackX, u.y - m.trackY) < gap) return;
+    const a = m.trackX != null ? Math.atan2(u.y - m.trackY, u.x - m.trackX) : (u.facing || 0);
+    m.trackX = u.x; m.trackY = u.y; m.trackStep = (m.trackStep || 0) + 1;
+    view.tracks.push({ x: u.x, y: u.y, a, kind, t: elapsed, s: m.trackStep & 1 });
+    if (view.tracks.length > TRACK_MAX) view.tracks.splice(0, view.tracks.length - TRACK_MAX);
+  }
+  function drawWetGround(now) {
+    const w = weather(); if (!w) return;
+    const wet = w.wetness;
+    if (wet > 0.02) {
+      // Soaked earth and grass: darker, a little cooler.
+      ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(150,158,170,${0.55 * wet})`; ctx.fillRect(0, 0, innerWidth, innerHeight);
+      ctx.globalCompositeOperation = 'source-over';
+      // Puddles in low spots (a fixed scatter over the map), reflecting the sky.
+      if (wet > 0.35) {
+        const cell = 150, x0 = flatScreenToWorld(-60, -60), x1 = flatScreenToWorld(innerWidth + 60, innerHeight + 60);
+        for (let gx = Math.floor(x0.x / cell); gx <= Math.ceil(x1.x / cell); gx++) for (let gyy = Math.floor(x0.y / cell); gyy <= Math.ceil(x1.y / cell); gyy++) {
+          if (hash(gx * 92821 + gyy, 7) > 0.22) continue;
+          const wx = (gx + hash(gx, gyy)) * cell, wy = (gyy + hash(gyy, gx + 3)) * cell, r = (8 + hash(gx + 5, gyy) * 16) * z() * Math.min(1, (wet - 0.35) * 2.5);
+          const X = sx(wx), Y = gy(wx, wy);
+          const g = ctx.createRadialGradient(X, Y, 0, X, Y, r);
+          g.addColorStop(0, 'rgba(112,126,138,.42)'); g.addColorStop(0.6, 'rgba(84,92,98,.34)'); g.addColorStop(0.85, 'rgba(58,50,40,.25)'); g.addColorStop(1, 'rgba(58,50,40,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(X, Y, r * 1.4, r * SQ, hash(gx, gyy + 9) * 0.6, 0, 7); ctx.fill();
+        }
+      }
+    }
+    // Tracks: they fade over a few minutes, faster as the ground dries.
+    if (!view.tracks.length) return;
+    const life = 90 + 150 * wet;
+    let n = 0;
+    ctx.fillStyle = 'rgba(48,38,27,.55)'; ctx.strokeStyle = 'rgba(48,38,27,.5)';
+    for (const tr of view.tracks) {
+      const age = elapsed - tr.t; if (age > life || age < 0) continue;
+      const X = sx(tr.x), Y = gy(tr.x, tr.y);
+      if (X < -20 || X > innerWidth + 20 || Y < -20 || Y > innerHeight + 20) continue;
+      ctx.globalAlpha = Math.min(1, (1 - age / life) * 1.4) * (0.4 + 0.6 * Math.max(wet, 0.3));
+      const ca = Math.cos(tr.a), sa = Math.sin(tr.a), k = PPM * z();
+      // Across the way of travel, on the ground (squeezed vertically like the ground).
+      const off = (d, e) => [X + (ca * d - sa * e) * k, Y + (sa * d + ca * e) * k * SQ];
+      if (tr.kind === 'boot') {
+        const [px, py] = off(0, tr.s ? 0.1 : -0.1);
+        ctx.beginPath(); ctx.ellipse(px, py, 0.13 * k, 0.05 * k, Math.atan2(sa * SQ, ca), 0, 7); ctx.fill();
+      } else if (tr.kind === 'hoof') {
+        for (const [d, e] of [[0.25, 0.18], [0.25, -0.18], [-0.35, 0.16], [-0.35, -0.16]]) {
+          const [px, py] = off(d, e); ctx.beginPath(); ctx.arc(px, py, 0.07 * k, 0.3, 5.9); ctx.fill();
+        }
+      } else {
+        ctx.lineWidth = Math.max(1, 0.1 * k);
+        for (const e of [0.75, -0.75]) { const [ax, ay] = off(-0.4, e), [bx, by] = off(0.4, e); ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); }
+      }
+      n++;
+    }
+    ctx.globalAlpha = 1; view.stats.tracks = n;
+  }
+  function drawWeather(now) {
+    const w = weather(); if (!w) return;
+    const W = innerWidth, H = innerHeight;
+    if (w.dark > 0.01) { ctx.fillStyle = `rgba(28,34,46,${0.5 * w.dark})`; ctx.fillRect(0, 0, W, H); }
+    if (w.fog > 0.01) {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, `rgba(214,219,224,${0.6 * w.fog})`); g.addColorStop(0.55, `rgba(214,219,224,${0.4 * w.fog})`); g.addColorStop(1, `rgba(214,219,224,${0.28 * w.fog})`);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    if (w.rain > 0.02) {
+      // Streaks slanting with the wind, a fixed set wrapped over the screen.
+      const wind = global.__MAP_AMBIENT_MOTION_V1__?.currentWind?.() || { x: 0.4, y: 0 };
+      const vx = Math.max(-1, Math.min(1, wind.x)) * 160, vy = 620, len = 16, nx = vx / Math.hypot(vx, vy), ny = vy / Math.hypot(vx, vy);
+      const n = Math.round((W * H / 3600) * w.rain);
+      ctx.strokeStyle = 'rgba(205,214,228,.38)'; ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const x = ((hash(i, 1) * (W + 200) + now * vx * (0.8 + hash(i, 2) * 0.4)) % (W + 200) + (W + 200)) % (W + 200) - 100;
+        const y = ((hash(i, 3) * (H + 100) + now * vy * (0.8 + hash(i, 4) * 0.4)) % (H + 100)) - 50;
+        ctx.moveTo(x, y); ctx.lineTo(x - nx * len, y - ny * len);
+      }
+      ctx.stroke();
+      view.stats.rainDrops = n;
+    } else view.stats.rainDrops = 0;
   }
   // ---- trenches (regiment-orders-v1): a rounded cut in the ground whose far
   // wall shows its depth, the parapet of thrown-up earth towards the enemy,

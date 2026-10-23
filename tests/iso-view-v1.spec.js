@@ -729,3 +729,35 @@ test('iso view: flank and rear blows hurt more, tirailleurs spread out, round sh
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().moraleBars > 0);
   expect(errors).toEqual([]);
 });
+
+test('iso view: the weather changes - rain soaks the ground, powder misfires, mud slows, fog shortens sight, wet ground keeps tracks', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await openGame(page, 'test=iso-weather&view=iso');
+  await page.waitForFunction(() => window.__WEATHER_V1__ && window.__ISO_VIEW_V1__?.stats().ground, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const W = window.__WEATHER_V1__, probe = { kind: 'unit', type: 'infantry', side: 'france', x: 1000, y: 1300 };
+    W.set('clear', 999); for (let k = 0; k < 30; k++) window.__RTS_DEBUG__.tick(1);
+    const clearSight = visionRadius(probe);
+    const walk = () => { const u = createUnit('france', 'infantry', 1000, 1500); u.targetX = 1400; u.targetY = 1500; const x = u.x; for (let k = 0; k < 20; k++) moveToward(u, 1400, 1500, 0.1); u.dead = true; return u.x - x; };
+    const dry = walk();
+    W.set('rain', 999); for (let k = 0; k < 90; k++) window.__RTS_DEBUG__.tick(1);
+    const s = W.state(), muddy = walk();
+    const shooter = createUnit('france', 'infantry', 1000, 1300), foe = createUnit('britain', 'infantry', 1100, 1300);
+    const m0 = W.stats().misfires; for (let i = 0; i < 60; i++) fire(shooter, foe); const misfires = W.stats().misfires - m0;
+    shooter.dead = foe.dead = true;
+    W.set('fog', 999); for (let k = 0; k < 30; k++) window.__RTS_DEBUG__.tick(1);
+    const us = []; for (let i = 0; i < 6; i++) us.push(createUnit('france', 'infantry', 900 + i * 20, 1300));
+    for (const u of us) { u.targetX = u.x + 400; u.targetY = u.y; }
+    camera.x = 1100; camera.y = 1300; camera.zoom = 1.4;
+    return { wet: s.wetness, raining: s.rain, dry, muddy, misfires, clearSight, fogSight: visionRadius(probe), label: document.getElementById('weather-indicator')?.textContent };
+  });
+  expect(r.raining).toBeGreaterThan(0.9);
+  expect(r.wet).toBeGreaterThan(0.9);
+  expect(r.muddy).toBeLessThan(r.dry * 0.9);
+  expect(r.misfires).toBeGreaterThan(5);
+  expect(r.fogSight).toBeLessThan(r.clearSight * 0.7);
+  expect(r.label).toContain('Mist');
+  // The ground is still wet after the rain: men crossing it leave tracks.
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().tracks > 10 || (window.__RTS_DEBUG__.tick(0.1), false), null, { timeout: 30_000, polling: 100 });
+  expect(errors).toEqual([]);
+});
