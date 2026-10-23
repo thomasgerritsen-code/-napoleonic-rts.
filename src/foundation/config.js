@@ -139,6 +139,8 @@
     // One-button regiments: fill up from the nearest free men; auto-regiment at the barracks (open map only).
     quickRegiment: OPEN_MAP ? Object.freeze({ reach:700, barracksReach:520 }) : null,
     // Gun crews (open map only): crew a cannon from loose men or a regiment, by button or by clicking the gun.
+    // Drag-to-face arrow (open map only): screen px before a drag shows; world px per file and front bar limits.
+    facingArrow: OPEN_MAP ? Object.freeze({ dragPx:12, filePitch:18, minFront:40, maxFront:420, fadeMs:1400, colour:'#f2d27a' }) : null,
     gunCrew: OPEN_MAP ? Object.freeze({ reach:600, keepInRegiment:6, clickRadius:26 }) : null,
     // Troop kinds, each with a strength and a weakness (open map only). Multipliers on the base type.
     // Period troops (open map only): each with a strength and a weakness.

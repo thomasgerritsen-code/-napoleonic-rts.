@@ -132,6 +132,12 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   loopgraaf heeft, en gaat in verdedigende houding. Wie wegloopt, laat de loopgraaf
   los, zodat hij vrij is voor de volgende (of voor hetzelfde regiment). Ook de Britse
   commandant graaft in waar hij verdedigt.
+- **Richting slepen met een pijl**: met troepen geselecteerd druk je op de plek waar
+  ze heen moeten en sleep je in de richting waar het front naar moet wijzen (één
+  vinger op de telefoon, de rechterknop op de computer). Een gouden pijl toont de
+  frontrichting, met een balk dwars erop waar de linie komt te staan (zo breed als het
+  regiment). Loslaten geeft de order: het regiment marcheert erheen en draait zijn
+  front die kant op; de pijl blijft even staan en vervaagt.
 - **Kanon bemannen** (een kanon heeft 2 musketiers nodig): selecteer een kanon en
   druk op *Kanon bemannen* (💣) - het haalt zelf 2 man, eerst losse soldaten, anders
   uit het dichtstbijzijnde regiment (dat houdt altijd minstens 6 musketiers). Of

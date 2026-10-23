@@ -1737,7 +1737,8 @@
   }
 
   // ---- switching ----
-  const otherLayers = () => [...document.querySelectorAll('canvas')].filter(c => c !== canvas && c.id !== 'minimap');
+  // The 2D game's own layers; overlays drawn on top of any view (data-overlay) stay.
+  const otherLayers = () => [...document.querySelectorAll('canvas')].filter(c => c !== canvas && c.id !== 'minimap' && !c.dataset.overlay);
   function setOn(on) {
     view.on = on;
     screenToWorld = on ? isoScreenToWorld : topDown.s2w;

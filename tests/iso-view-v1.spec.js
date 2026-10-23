@@ -1079,3 +1079,54 @@ test('iso view: one kind to a regiment - kinds are never mixed, short lists fill
   expect(r.anyMixed).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test('iso view: press a place and drag - an arrow shows the front, the regiment marches there and faces that way', async ({ page }) => {
+  test.setTimeout(150_000);
+  await page.setViewportSize({ width: 1100, height: 700 });
+  const errors = await openGame(page, 'test=iso-facing-arrow&view=iso');
+  await page.waitForFunction(() => window.__FACING_ARROW_V1__ && window.__ISO_VIEW_V1__?.stats().ground && window.__RTS_DEBUG__, null, { timeout: 60_000 });
+  const regId = await page.evaluate(() => {
+    const m = []; for (let i = 0; i < 12; i++) m.push(createUnit('france', 'infantry', 2300 + (i % 6) * 18, 1700 + Math.floor(i / 6) * 18));
+    m.push(createUnit('france', 'officer', 2280, 1700), createUnit('france', 'drummer', 2280, 1715));
+    const reg = createRegiment('france', m); selectWholeRegiment(reg);
+    camera.x = 2400; camera.y = 1650; camera.zoom = 1.2;
+    return reg.id;
+  });
+  await page.waitForTimeout(300);
+  const painted = () => page.evaluate(() => { const l = document.getElementById('facing-arrow-layer'); const d = l.getContext('2d').getImageData(0, 0, l.width, l.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return { n, hidden: getComputedStyle(l).visibility === 'hidden' }; });
+  const facingAfter = (sx, sy, ex, ey) => page.evaluate(([id, sx, sy, ex, ey]) => {
+    const a = screenToWorld(sx, sy), b = screenToWorld(ex, ey), want = Math.atan2(b.y - a.y, b.x - a.x);
+    for (let k = 0; k < 40; k++) window.__RTS_DEBUG__.tick(1);
+    const reg = getRegiment(id), c = centroid(regimentMembers(reg));
+    const diff = Math.abs(Math.atan2(Math.sin(reg.facing - want), Math.cos(reg.facing - want)));
+    return { diff, dist: Math.hypot(c.x - a.x, c.y - a.y) };
+  }, [regId, sx, sy, ex, ey]);
+  // 1. Computer: right button down on the place, drag the way to face.
+  await page.mouse.move(650, 330); await page.mouse.down({ button: 'right' });
+  for (let i = 1; i <= 8; i++) await page.mouse.move(650 + i * 12, 330 - i * 9);
+  const during = await page.evaluate(() => window.__FACING_ARROW_V1__.state());
+  const ink = await painted();
+  await page.mouse.up({ button: 'right' });
+  const fading = await page.evaluate(() => window.__FACING_ARROW_V1__.state().fading);
+  const mouse = await facingAfter(650, 330, 746, 258);
+  // 2. Phone: one finger down on open ground, drag, lift.
+  const touch = await page.evaluate(() => {
+    const fire = (type, x, y) => canvas.dispatchEvent(new PointerEvent(type, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    fire('pointerdown', 500, 420);
+    for (let i = 1; i <= 8; i++) fire('pointermove', 500 - i * 10, 420 + i * 6);
+    const live = window.__FACING_ARROW_V1__.state().dragging;
+    fire('pointerup', 420, 468);
+    return { live };
+  });
+  const phone = await facingAfter(500, 420, 420, 468);
+  expect(during.dragging).toBe(true);
+  expect(ink.hidden).toBe(false);
+  expect(ink.n).toBeGreaterThan(500);
+  expect(fading).toBe(true);
+  expect(mouse.diff).toBeLessThan(0.2);
+  expect(mouse.dist).toBeLessThan(40);
+  expect(touch.live).toBe(true);
+  expect(phone.diff).toBeLessThan(0.2);
+  expect(phone.dist).toBeLessThan(40);
+  expect(errors).toEqual([]);
+});
