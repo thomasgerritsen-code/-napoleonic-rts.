@@ -23,12 +23,64 @@
   const nameOf = (key, side = 'france') => T[key].names?.[side] || [T[key].label, T[key].plural];
   const fields = (key, side) => (T[key].sides || ['france', 'britain']).includes(side);
   const regOf = u => (u && u.regimentId && typeof getRegiment === 'function') ? getRegiment(u.regimentId) : null;
-  const stats = { trained: 0, british: 0, armour: 0, lance: 0 };
+  const stats = { trained: 0, british: 0, armour: 0, lance: 0, leftOut: 0 };
 
   function applyTroop(u, key) {
     const t = T[key]; if (!t || u.troop) return;
     u.troop = key;
     u.maxHp = Math.round((u.maxHp || TYPES[u.type].hp) * (t.hp || 1)); u.hp = u.maxHp;
+  }
+  // Change a man's kind (or make him line, key ''), keeping his share of health.
+  function setTroop(u, key) {
+    if ((u.troop || '') === (key || '')) return;
+    const share = u.maxHp ? u.hp / u.maxHp : 1, old = T[u.troop];
+    u.maxHp = Math.round((u.maxHp || TYPES[u.type].hp) / (old?.hp || 1));
+    u.troop = null; if (key) applyTroop(u, key);
+    u.hp = Math.max(1, Math.round(u.maxHp * share));
+  }
+
+  // ---- one kind to a regiment: grenadiers stand with grenadiers, the line with the line ----
+  const kindOf = u => (u && u.troop) || '';
+  // The kind most of these men are (ties: the first one's).
+  function mainKind(list) {
+    const count = new Map();
+    for (const u of list) count.set(kindOf(u), (count.get(kindOf(u)) || 0) + 1);
+    let best = null; for (const [k, n] of count) if (best === null || n > count.get(best)) best = k;
+    return best ?? '';
+  }
+  // Candidates for a regiment, of one kind for the soldiers of 'type'; France tops a
+  // short list up with free men of that kind nearby.
+  function oneKind(side, list, type, min) {
+    const men = list.filter(u => u && u.type === type && !u.dead && !u.regimentId);
+    if (!men.length) return { list, kind: null };
+    const kind = mainKind(men);
+    const keep = list.filter(u => u && (u.type !== type || kindOf(u) === kind));
+    let n = keep.filter(u => u.type === type && !u.dead && !u.regimentId).length;
+    stats.leftOut += men.length - n;
+    if (side === 'france' && n < min) {
+      const c = centroid(men);
+      const more = units.filter(u => !u.dead && !u.routing && !u.regimentId && u.side === side && u.type === type && kindOf(u) === kind && !keep.includes(u) && Math.hypot(u.x - c.x, u.y - c.y) <= cfg.fillReach)
+        .sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y)).slice(0, min - n);
+      keep.push(...more);
+    }
+    return { list: keep, kind };
+  }
+  // The British AI raises whole regiments of a kind: one roll per regiment.
+  function rollBritish(type) {
+    let roll = Math.random();
+    for (const [key, share] of Object.entries(cfg.britishShare)) {
+      if (T[key]?.base !== type || !fields(key, 'britain')) continue;
+      if ((roll -= share) < 0) return key;
+    }
+    return '';
+  }
+  function settle(reg, type, kind) {
+    if (!reg) return reg;
+    const m = regimentMembers(reg).filter(u => u.type === type);
+    if (reg.side === 'britain') { kind = rollBritish(type); for (const u of m) setTroop(u, kind); if (kind) stats.british++; }
+    reg.troop = kind || null;
+    if (kind && !reg.customName) reg.name = `${reg.side === 'france' ? 'Franse' : 'Britse'} ${nameOf(kind, reg.side)[1]} ${reg.id}`;
+    return reg;
   }
 
   // ---- training: barracks and stable get a button per kind ----
@@ -70,16 +122,6 @@
         const u = fresh.filter(q => q.type === head.type && q.side === b.side && !q.troop)
           .sort((p, q) => Math.hypot(p.x - b.x, p.y - b.y) - Math.hypot(q.x - b.x, q.y - b.y))[0];
         if (u) { applyTroop(u, head.troop); stats.trained++; }
-      }
-      // The British field the kinds as well: a share of their new men.
-      for (const u of fresh) {
-        if (u.side !== 'britain' || u.troop) continue;
-        let roll = Math.random();
-        for (const [key, share] of Object.entries(cfg.britishShare)) {
-          if (T[key]?.base !== u.type || !fields(key, 'britain')) continue;
-          if ((roll -= share) < 0) { applyTroop(u, key); break; }
-        }
-        if (u.troop) stats.british++;
       }
     }
     return r;
@@ -145,18 +187,23 @@
       return base(u, dt);
     };
   }
-  // A regiment mostly of one kind carries its name.
+  // Every regiment is of one kind, and carries its name.
   const baseCreate = createRegiment;
-  createRegiment = function createRegimentByTroop(side, candidateUnits, name = null) {
-    const reg = baseCreate(side, candidateUnits, name);
-    if (reg && !name) {
-      const m = regimentMembers(reg).filter(u => u.type === 'infantry' || u.type === 'cavalry'), count = {};
-      for (const u of m) if (u.troop) count[u.troop] = (count[u.troop] || 0) + 1;
-      const [key, n] = Object.entries(count).sort((a, b) => b[1] - a[1])[0] || [];
-      if (key && n >= m.length / 2) { reg.troop = key; reg.name = `${side === 'france' ? 'Franse' : 'Britse'} ${nameOf(key, side)[1]} ${reg.id}`; }
-    }
-    return reg;
+  createRegiment = function createRegimentOfOneKind(side, candidateUnits, name = null) {
+    const { list, kind } = side === 'france' ? oneKind(side, candidateUnits || [], 'infantry', 12) : { list: candidateUnits, kind: null };
+    const reg = baseCreate(side, list, name);
+    if (reg && name) reg.customName = true;
+    return settle(reg, 'infantry', kind);
   };
+  if (typeof createCavalryRegimentV06 === 'function') {
+    const baseCav = createCavalryRegimentV06;
+    createCavalryRegimentV06 = function createCavalryRegimentOfOneKind(side, candidateUnits, name = null) {
+      const { list, kind } = side === 'france' ? oneKind(side, candidateUnits || [], 'cavalry', 4) : { list: candidateUnits, kind: null };
+      const reg = baseCav(side, list, name);
+      if (reg && name) reg.customName = true;
+      return settle(reg, 'cavalry', kind);
+    };
+  }
 
   // ---- buttons ----
   if (typeof renderDynamicActions === 'function' && typeof makeDynamicButton === 'function') {
@@ -200,6 +247,6 @@
     return m.length ? 1 + k.work * m.filter(u => u.troop === 'sapper').length / m.length : 1;
   }
 
-  root.__TROOPS_V1__ = Object.freeze({ version: '1.1', kinds: T, applyTroop, trainTroop, costOf, troopOf, nameOf, workFactor, strength, stats: () => ({ ...stats,
+  root.__TROOPS_V1__ = Object.freeze({ version: '1.2', kinds: T, applyTroop, setTroop, trainTroop, costOf, troopOf, nameOf, workFactor, strength, kindOf, mainKind, stats: () => ({ ...stats,
     french: Object.fromEntries(Object.keys(T).map(k => [k, units.filter(u => !u.dead && u.side === 'france' && u.troop === k).length])) }) });
 })(window);

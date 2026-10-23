@@ -190,8 +190,7 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
     wijken bijna nooit — maar heel duur (+150 🍞 +80 🪵 +30 ⛏️), traag op te leiden
     en hooguit 24 man.
   - *Sapeur* (🪓, genie met berenmuts, baard, leren schort en bijl): een regiment
-    met sapeurs graaft, versterkt en herstelt loopgraven sneller (half sapeurs = 2x,
-    allemaal = 3x) — maar 20% zwakker vuur.
+    sapeurs graaft, versterkt en herstelt loopgraven 3x zo snel — maar 20% zwakker vuur.
   - *Kurassier* (🛡, stalen kuras en helm met paardenstaart, zwarte paarden): 50% meer
     leven, het kuras houdt 30% van het musketvuur tegen, 30% zwaardere charge — maar
     15% trager en kost ijzer.
@@ -205,8 +204,15 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   25% treffender, schiet naar believen, scherpe ogen — maar laadt 60% trager),
   *Light Dragoons* (huzaren) en de *Scots Greys* (zware dragonders met berenmuts op
   grijze paarden: 35% meer leven, 40% zwaardere charge — maar 10% trager).
-  Een regiment dat vooral uit één soort bestaat heet ernaar (bv. "Franse Grenadiers 4",
-  "Britse 95th Rifles 7").
+  **Eén soort per regiment**: soldaten van verschillende soorten staan nooit samen in
+  een regiment. Kies je een gemengde groep, dan vormt de soort waar de meeste mannen van
+  zijn het regiment; de anderen blijven los, en wat er tot 12 ontbreekt wordt aangevuld
+  met vrije mannen van dezelfde soort in de buurt. *Regiment maken* en *Auto-regiment*
+  werken per soort, *Train ontbrekende* traint de soort van het regiment, en
+  *Versterk regiment* neemt alleen soldaten van de eigen soort op. Ook ruiters
+  (kurassiers, lansiers, huzaren) rijden alleen met hun eigen soort, en de Britten
+  heffen elk regiment als één soort. Een regiment heet naar zijn soort (bv. "Franse
+  Grenadiers 4", "Britse 95th Rifles 7").
 - **Menu onderin**: toont alleen wat bij je selectie past, in groepen met een kopje
   en een vaste volgorde. Boeren: *Werk* (akker, bouw hervatten) en *Bouwen*
   (woning, graanakker, kazerne, schiettoren, stal, gieterij). Soldaten: *Bevel*

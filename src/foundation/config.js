@@ -144,7 +144,7 @@
     // Period troops (open map only): each with a strength and a weakness.
     // sides: who fields it (France trains, Britain's AI recruits by britishShare);
     // names: the British name for a kind both armies field.
-    troops: OPEN_MAP ? Object.freeze({ britishShare:Object.freeze({ grenadier:0.15, voltigeur:0.15, rifle:0.15, greys:0.45, hussar:0.55 }), kinds:Object.freeze({
+    troops: OPEN_MAP ? Object.freeze({ fillReach:700, britishShare:Object.freeze({ grenadier:0.15, voltigeur:0.15, rifle:0.15, greys:0.45, hussar:0.55 }), kinds:Object.freeze({
       grenadier: Object.freeze({ base:'infantry', label:'Grenadier', plural:'Grenadiers', sides:['france', 'britain'], extra:Object.freeze({ food:60, wood:30 }), time:1.4,
         hp:1.4, melee:1.3, shock:0.7, speed:0.85, pro:'40% meer leven, 30% sterker met de bajonet, 30% minder moraalverlies', con:'15% trager en duurder' }),
       voltigeur: Object.freeze({ base:'infantry', label:'Voltigeur', plural:'Voltigeurs', sides:['france', 'britain'], names:Object.freeze({ britain:['Light Company', 'Light Companies'] }),
@@ -153,7 +153,7 @@
       guard: Object.freeze({ base:'infantry', label:'Oude Garde', plural:'Oude Garde', sides:['france'], extra:Object.freeze({ food:150, wood:80, iron:30 }), time:1.8, max:24,
         hp:1.6, melee:1.5, ranged:1.15, shock:0.35, speed:0.9, pro:'keizerlijke veteranen: 60% meer leven, 50% sterker met de bajonet, wijken bijna nooit', con:'heel duur, traag op te leiden, hooguit 24 man' }),
       sapper: Object.freeze({ base:'infantry', label:'Sapeur', plural:'Sapeurs', sides:['france'], extra:Object.freeze({ food:40, wood:40 }), time:1.2,
-        hp:1.1, melee:1.25, ranged:0.8, work:2, pro:'genie met bijl en schop: een regiment met sapeurs graaft, versterkt en herstelt tot 3x zo snel', con:'20% zwakker vuur' }),
+        hp:1.1, melee:1.25, ranged:0.8, work:2, pro:'genie met bijl en schop: een regiment sapeurs graaft, versterkt en herstelt 3x zo snel', con:'20% zwakker vuur' }),
       rifle: Object.freeze({ base:'infantry', label:'95th Rifleman', plural:'95th Rifles', sides:['britain'], extra:Object.freeze({ food:60, wood:30 }), time:1.3,
         hp:0.9, range:1.6, ranged:1.25, reload:1.6, vision:1.25, pro:'Baker-geweer: 60% verder en 25% treffender, schiet naar believen, scherpe ogen', con:'laadt 60% trager, 10% minder leven' }),
       cuirassier: Object.freeze({ base:'cavalry', label:'Kurassier', plural:'Kurassiers', sides:['france'], extra:Object.freeze({ food:100, wood:50, iron:40 }), time:1.4,

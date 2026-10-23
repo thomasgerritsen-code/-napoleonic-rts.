@@ -867,7 +867,7 @@ test('iso view: period troops - Old Guard, sapeurs, Polish lancers; 95th Rifles 
     out.sapperOk = X.trainTroop('sapper', bk);
     // Sappers speed up their regiment's spade work.
     const mk = (side, type, troop, x, y) => { const u = createUnit(side, type, x, y); if (troop) X.applyTroop(u, troop); return u; };
-    const line = []; for (let i = 0; i < 12; i++) line.push(mk('france', 'infantry', i < 6 ? 'sapper' : null, 1600 + i * 18, 1300));
+    const line = []; for (let i = 0; i < 12; i++) line.push(mk('france', 'infantry', 'sapper', 1600 + i * 18, 1300));
     line.push(createUnit('france', 'officer', 1580, 1300), createUnit('france', 'drummer', 1580, 1310));
     out.work = X.workFactor(createRegiment('france', line));
     // The lance: against foot out of square, and against horse.
@@ -903,7 +903,7 @@ test('iso view: period troops - Old Guard, sapeurs, Polish lancers; 95th Rifles 
   expect(r.stable).not.toContain('train-greys');
   expect(r.guardOverCap).toBe(false);
   expect(r.sapperOk).toBe(true);
-  expect(r.work).toBeCloseTo(2, 1);
+  expect(r.work).toBeCloseTo(3, 1);   // a regiment of sapeurs
   expect(r.lance.line[1]).toBeGreaterThan(r.lance.line[0] * 1.4);
   expect(r.lance.horse[1]).toBeLessThan(r.lance.horse[0] * 1.1);
   expect(r.lanceHits).toBeGreaterThan(0);
@@ -1010,5 +1010,70 @@ test('iso view: gun crews - a cannon is crewed by button, by a click on it, and 
   expect(r.regFloor).toBe(7);
   expect(r.atGun).toBe(true);
   expect(r.fires).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: one kind to a regiment - kinds are never mixed, short lists fill up with the same kind', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-one-kind&view=iso');
+  await page.waitForFunction(() => window.__TROOPS_V1__ && window.__QUICK_REGIMENT_V1__ && window.__REGIMENT_ORDERS_V1__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const X = window.__TROOPS_V1__, out = {};
+    const mk = (side, type, troop, x, y) => { const u = createUnit(side, type, x, y); if (troop) X.applyTroop(u, troop); return u; };
+    const kinds = reg => [...new Set(regimentMembers(reg).filter(u => u.type === 'infantry' || u.type === 'cavalry').map(u => u.troop || ''))];
+    // 10 grenadiers and 6 line men offered; 4 more grenadiers stand nearby.
+    const gren = [], line = [];
+    for (let i = 0; i < 10; i++) gren.push(mk('france', 'infantry', 'grenadier', 2300 + i * 16, 1500));
+    for (let i = 0; i < 6; i++) line.push(mk('france', 'infantry', null, 2300 + i * 16, 1530));
+    const extra = [0, 1, 2, 3].map(i => mk('france', 'infantry', 'grenadier', 2300 + i * 16, 1570));
+    const reg = createRegiment('france', [...gren, ...line, mk('france', 'officer', null, 2280, 1500), mk('france', 'drummer', null, 2280, 1515)]);
+    out.kinds = reg && kinds(reg); out.size = reg && regimentMembers(reg).filter(u => u.type === 'infantry').length;
+    out.lineLoose = line.every(u => !u.regimentId); out.extraIn = extra.filter(u => u.regimentId === reg?.id).length;
+    out.name = reg?.name;
+    // Reinforcing: the line men may not join the grenadiers.
+    selectedUnits.clear(); for (const u of regimentMembers(reg)) selectedUnits.add(u); line.forEach(u => selectedUnits.add(u));
+    actionSignature = ''; updateHud(true);
+    const rb = actionsEl.querySelector('[data-action="reinforce-regiment"]');
+    out.reinforceOff = !!rb && rb.disabled;
+    out.reinforced = window.__REGIMENT_ORDERS_V1__.reinforce();
+    out.lineStillLoose = line.every(u => !u.regimentId);
+    // Quick regiment from a mixed selection: the majority kind, filled with free men of that kind.
+    const sel = [];
+    for (let i = 0; i < 8; i++) sel.push(mk('france', 'infantry', 'voltigeur', 1950 + i * 16, 1750));
+    for (let i = 0; i < 3; i++) sel.push(mk('france', 'infantry', null, 1950 + i * 16, 1780));
+    for (let i = 0; i < 4; i++) mk('france', 'infantry', 'voltigeur', 1950 + i * 16, 1810);
+    sel.push(mk('france', 'officer', null, 1930, 1750), mk('france', 'drummer', null, 1930, 1765));
+    const p = window.__QUICK_REGIMENT_V1__.plan('france', centroid(sel), sel, 300);
+    out.planKind = p.kind; out.planAll = p.inf.every(u => u.troop === 'voltigeur'); out.planN = p.inf.length;
+    // Cavalry: cuirassiers and hussars do not ride together.
+    const cav = [0, 1, 2, 3].map(i => mk('france', 'cavalry', 'cuirassier', 2300 + i * 30, 1300)).concat([0, 1].map(i => mk('france', 'cavalry', 'hussar', 2300 + i * 30, 1340)));
+    const creg = createCavalryRegimentV06('france', [...cav, mk('france', 'officer', null, 2280, 1300)]);
+    out.cavKinds = creg && kinds(creg);
+    // The British raise whole regiments of one kind.
+    let mixed = 0;
+    for (let n = 0; n < 6; n++) {
+      const men = []; for (let i = 0; i < 12; i++) men.push(mk('britain', 'infantry', i % 3 === 0 ? 'rifle' : null, 3000 + i * 16, 900 + n * 60));
+      const b = createRegiment('britain', [...men, mk('britain', 'officer', null, 2980, 900 + n * 60), mk('britain', 'drummer', null, 2980, 915 + n * 60)]);
+      if (b && kinds(b).length !== 1) mixed++;
+    }
+    out.britishMixed = mixed;
+    // No regiment on the field mixes kinds.
+    out.anyMixed = regiments.filter(g => !g.destroyed && kinds(g).length > 1).map(g => g.name);
+    return out;
+  });
+  expect(r.kinds).toEqual(['grenadier']);
+  expect(r.size).toBe(12);   // made up to the minimum with grenadiers standing nearby
+  expect(r.lineLoose).toBe(true);
+  expect(r.extraIn).toBe(2);
+  expect(r.name).toContain('Grenadiers');
+  expect(r.reinforceOff).toBe(true);
+  expect(r.reinforced).toBe(0);
+  expect(r.lineStillLoose).toBe(true);
+  expect(r.planKind).toBe('voltigeur');
+  expect(r.planAll).toBe(true);
+  expect(r.planN).toBe(12);
+  expect(r.cavKinds).toEqual(['cuirassier']);
+  expect(r.britishMixed).toBe(0);
+  expect(r.anyMixed).toEqual([]);
   expect(errors).toEqual([]);
 });

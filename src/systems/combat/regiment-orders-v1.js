@@ -331,13 +331,16 @@
     actionSignature = ''; updateHud(true);
     return on;
   }
-  const looseInfantry = () => [...selectedUnits].filter(u => !u.dead && !u.routing && !u.regimentId && u.side === 'france' && u.type === 'infantry');
+  // Loose men selected that may join this regiment: of its own kind only (troops-v1).
+  const kindOf = u => (u && u.troop) || '';
+  const regKind = reg => kindOf(regimentMembers(reg).find(u => u.type === 'infantry'));
+  const looseInfantry = reg => [...selectedUnits].filter(u => !u.dead && !u.routing && !u.regimentId && u.side === 'france' && u.type === 'infantry' && (!reg || kindOf(u) === regKind(reg)));
   function reinforce() {
     const regs = selectedRegs(); if (regs.length !== 1) return 0;
     const reg = regs[0], members = regimentMembers(reg);
     const room = cfg.maxInfantry - members.filter(u => u.type === 'infantry').length;
-    const joining = looseInfantry().slice(0, Math.max(0, room));
-    if (!joining.length) { statusEl.textContent = `${reg.name} is al op volle sterkte (${cfg.maxInfantry} musketiers).`; return 0; }
+    const joining = looseInfantry(reg).slice(0, Math.max(0, room));
+    if (!joining.length) { statusEl.textContent = looseInfantry().length && room > 0 ? `${reg.name} neemt alleen soldaten van zijn eigen soort op.` : `${reg.name} is al op volle sterkte (${cfg.maxInfantry} musketiers).`; return 0; }
     for (const u of joining) { reg.memberIds.push(u.id); u.regimentId = reg.id; u.morale = Math.max(u.morale || 0, reg.morale || 80); }
     reg.formedInfantryCount = (reg.formedInfantryCount || 0) + joining.length;
     const c = centroid(regimentMembers(reg));
@@ -372,11 +375,11 @@
         b.title = next ? `Niveau ${level + 1}: ${next.label} - neemt ${Math.round((1 - next.damage) * 100)}% van het vuur van voren op (nu ${Math.round((1 - (levels[level].damage ?? cfg.trenchDamage)) * 100)}%).` : 'Hoogste niveau bereikt.';
         actionsEl.appendChild(b);
       }
-      const loose = looseInfantry().length;
-      if (regs.length === 1 && loose && !actionsEl.querySelector('[data-action="reinforce-regiment"]')) {
+      const loose = regs.length === 1 ? looseInfantry(regs[0]).length : 0, other = looseInfantry().length - loose;
+      if (regs.length === 1 && (loose || other) && !actionsEl.querySelector('[data-action="reinforce-regiment"]')) {
         const have = regimentMembers(regs[0]).filter(u => u.type === 'infantry').length;
-        const b = makeDynamicButton('reinforce-regiment', `Versterk regiment<br><small>+${Math.min(loose, Math.max(0, cfg.maxInfantry - have))} · ${have}/${cfg.maxInfantry}</small>`, have >= cfg.maxInfantry);
-        b.title = `Voeg de geselecteerde losse musketiers toe aan het regiment (tot ${cfg.maxInfantry}).`;
+        const b = makeDynamicButton('reinforce-regiment', `Versterk regiment<br><small>+${Math.min(loose, Math.max(0, cfg.maxInfantry - have))} · ${have}/${cfg.maxInfantry}</small>`, have >= cfg.maxInfantry || !loose);
+        b.title = `Voeg de geselecteerde losse soldaten van dezelfde soort toe aan het regiment (tot ${cfg.maxInfantry})${other ? `; ${other} van een andere soort blijven los` : ''}.`;
         actionsEl.prepend(b);
       }
     };

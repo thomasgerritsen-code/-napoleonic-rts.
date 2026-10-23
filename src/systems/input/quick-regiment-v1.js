@@ -17,16 +17,23 @@
   const byDistance = (list, p) => list.slice().sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
   const barracksSelected = () => (typeof selectedBuilding !== 'undefined' && selectedBuilding && !selectedBuilding.dead &&
     selectedBuilding.side === 'france' && selectedBuilding.type === 'barracks' && selectedBuilding.complete) ? selectedBuilding : null;
+  // One kind to a regiment (troops-v1): the chosen men's kind, else the kind most
+  // free men around are; '' is the line.
+  const kindOf = u => root.__TROOPS_V1__?.kindOf(u) ?? '';
+  const kindName = (kind, n) => !kind ? `musketier${n === 1 ? '' : 's'}` : (n === 1 ? root.__TROOPS_V1__.kinds[kind].label : root.__TROOPS_V1__.kinds[kind].plural).toLowerCase();
   // Who would make up the regiment now, around a point (and with the given men first).
   function plan(side, anchor, chosen = [], reach = cfg.reach) {
     const near = list => byDistance(list, anchor).filter(u => Math.hypot(u.x - anchor.x, u.y - anchor.y) <= reach);
-    const pickInf = chosen.filter(u => u.type === 'infantry' && !u.regimentId && !u.dead && !u.routing);
+    const chosenInf = chosen.filter(u => u.type === 'infantry' && !u.regimentId && !u.dead && !u.routing);
+    const around = near(free(side, 'infantry'));
+    const kind = root.__TROOPS_V1__ ? root.__TROOPS_V1__.mainKind(chosenInf.length ? chosenInf : around) : '';
+    const pickInf = chosenInf.filter(u => kindOf(u) === kind);
     const want = Math.max(12, Math.min(MAX, pickInf.length));
-    const inf = [...pickInf, ...near(free(side, 'infantry')).filter(u => !pickInf.includes(u))].slice(0, want);
+    const inf = [...pickInf, ...around.filter(u => kindOf(u) === kind && !pickInf.includes(u))].slice(0, want);
     const officer = chosen.find(u => u.type === 'officer' && !u.regimentId) || near(free(side, 'officer'))[0] || null;
     const drummer = chosen.find(u => u.type === 'drummer' && !u.regimentId) || near(free(side, 'drummer'))[0] || null;
     const missing = { infantry: Math.max(0, 12 - inf.length), officer: officer ? 0 : 1, drummer: drummer ? 0 : 1 };
-    return { inf, officer, drummer, missing, ok: !missing.infantry && !missing.officer && !missing.drummer };
+    return { inf, officer, drummer, missing, kind, ok: !missing.infantry && !missing.officer && !missing.drummer };
   }
   const enemyFacing = (side, p) => {
     const foe = buildings.find(b => !b.dead && b.side !== side && b.type === 'towncenter');
@@ -40,8 +47,8 @@
     stats.formed++;
     return reg;
   }
-  function missingText(m) {
-    return [m.infantry ? `${m.infantry} musketier${m.infantry === 1 ? '' : 's'}` : '', m.officer ? 'een officier' : '', m.drummer ? 'een tamboer' : ''].filter(Boolean).join(', ');
+  function missingText(m, kind = '') {
+    return [m.infantry ? `${m.infantry} ${kindName(kind, m.infantry)}` : '', m.officer ? 'een officier' : '', m.drummer ? 'een tamboer' : ''].filter(Boolean).join(', ');
   }
   function context() {
     const b = barracksSelected();
@@ -54,14 +61,14 @@
     const c = context(); if (!c) return null;
     const p = plan('france', c.anchor, c.chosen, c.reach);
     if (!p.ok) {
-      statusEl.textContent = `Nog nodig voor een regiment: ${missingText(p.missing)}. ${c.barracks ? 'Tik "Train ontbrekende".' : 'Train ze in de kazerne.'}`;
+      statusEl.textContent = `Nog nodig voor een regiment: ${missingText(p.missing, p.kind)}. ${c.barracks ? 'Tik "Train ontbrekende".' : 'Train ze in de kazerne.'}`;
       return null;
     }
     const reg = form('france', p, c.barracks ? c.anchor : null);
     if (reg) {
       selectedUnits.clear(); if (typeof selectedBuilding !== 'undefined') selectedBuilding = null;
       selectWholeRegiment(reg);
-      statusEl.textContent = `${reg.name} gevormd: ${p.inf.length} musketiers, officier en tamboer.`;
+      statusEl.textContent = `${reg.name} gevormd: ${p.inf.length} ${kindName(p.kind, p.inf.length)}, officier en tamboer.`;
       actionSignature = ''; updateHud(true);
     }
     return reg;
@@ -70,10 +77,12 @@
     const b = barracksSelected(); if (!b) return 0;
     const p = plan('france', { x: b.rallyX ?? b.x, y: b.rallyY ?? b.y }, [], cfg.barracksReach);
     // Men already queued count too.
-    const queued = t => b.queue.filter(q => q.type === t).length;
+    const queued = t => b.queue.filter(q => q.type === t && (t !== 'infantry' || (q.troop || '') === p.kind)).length;
     let n = 0;
     const order = [['officer', p.missing.officer - queued('officer')], ['drummer', p.missing.drummer - queued('drummer')], ['infantry', p.missing.infantry - queued('infantry')]];
-    for (const [type, count] of order) for (let i = 0; i < count; i++) if (queueUnitForBuilding('france', b, type)) n++;
+    // Men of the regiment's own kind: grenadiers are made up with grenadiers.
+    const train = type => type === 'infantry' && p.kind ? root.__TROOPS_V1__.trainTroop(p.kind, b) : queueUnitForBuilding('france', b, type);
+    for (const [type, count] of order) for (let i = 0; i < count; i++) if (train(type)) n++;
     stats.trained += n;
     b.autoRegiment = true;
     statusEl.textContent = n ? `${n} man in opleiding; de kazerne vormt het regiment zodra ze klaar zijn (Auto-regiment aan).` : 'Niets te trainen (of niet genoeg grondstoffen / bevolkingsruimte).';
@@ -108,12 +117,12 @@
       const id = c.barracks ? 'quick-regiment-barracks' : 'quick-regiment';
       if (!actionsEl.querySelector(`[data-action="${id}"]`)) {
         const b = makeDynamicButton(id, `Regiment maken<br><small>${small}</small>`, !p.ok);
-        b.title = p.ok ? 'Vormt een regiment: de gekozen mannen plus de dichtstbijzijnde vrije musketiers, een officier en een tamboer.' : `Nog nodig: ${missingText(p.missing)}.`;
+        b.title = p.ok ? 'Vormt een regiment: de gekozen mannen plus de dichtstbijzijnde vrije musketiers, een officier en een tamboer.' : `Nog nodig: ${missingText(p.missing, p.kind)}.`;
         actionsEl.appendChild(b);
       }
       if (c.barracks) {
         if (!p.ok && !actionsEl.querySelector('[data-action="train-missing"]')) {
-          const b = makeDynamicButton('train-missing', `Train ontbrekende<br><small>${missingText(p.missing)}</small>`);
+          const b = makeDynamicButton('train-missing', `Train ontbrekende<br><small>${missingText(p.missing, p.kind)}</small>`);
           b.title = 'Zet wat ontbreekt in de wachtrij; het regiment vormt zich vanzelf zodra ze klaar zijn.';
           actionsEl.appendChild(b);
         }
