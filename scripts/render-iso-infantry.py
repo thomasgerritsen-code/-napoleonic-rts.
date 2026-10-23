@@ -71,12 +71,12 @@ VARIANTS = {
     # Nation-specific troops: the French Imperial Guard grenadier (bearskin with
     # the red top patch, red epaulettes) and the British 95th Rifles (rifle-green
     # jacket, black facings and belts, green tuft).
-    6: {"france": {"company": "guard", "moustache": True, "skin": "#c4906c", "height": 1.03},
+    6: {"france": {"company": "guard", "moustache": True, "skin": "#c4906c"},
         "britain": {"coat": "#24341f", "lapel": "#24341f", "collar": "#151515", "cuff": "#151515", "turnback": "#151515",
                     "strap": "#24341f", "belt": "#1a1a1a", "pompom": "#2f5a33", "button": "#1c1c1c", "plate": "#3a3a3a",
                     "breeches": "#24341f", "pack": "#1d1d1d", "sideburns": True}},
     # The sapper of the Guard: bearskin, full beard, white leather apron and an axe.
-    7: {"france": {"company": "sapper", "beard": True, "hair": "#2a1d14", "skin": "#c99470", "height": 1.04}},
+    7: {"france": {"company": "sapper", "beard": True, "hair": "#2a1d14", "skin": "#c99470"}},
 }
 
 
@@ -182,9 +182,9 @@ def build_soldier(side: str, variant: int = 1) -> dict:
         # White buff leather apron to the knees, and the felling axe on the back.
         leather = material("#e9e2cf", 0.7, pattern="cloth")
         part("box", (0.3, 0.02, 0.62), (0, 0.13, 0.02), leather, torso, name="apron")
-        axe = empty("sapperaxe", torso, (0.05, -0.27, 0.3), (0, 28, 0))
-        part("cyl", (0.02, 0.95), (0, 0, 0), M["wood"], axe, name="haft")
-        part("box", (0.03, 0.2, 0.14), (0, 0.06, 0.42), M["steel"], axe, name="axehead")
+        axe = empty("sapperaxe", torso, (0.05, -0.25, 0.22), (0, 20, 0))
+        part("cyl", (0.02, 0.7), (0, 0, 0), M["wood"], axe, name="haft")
+        part("box", (0.03, 0.17, 0.12), (0, 0.05, 0.31), M["steel"], axe, name="axehead")
         for x in (-0.04, 0.04):
             part("box", (0.012, 0.012, 0.09), (x, 0.142, 0.48), M["plate"], torso, rot=(0, 40 if x > 0 else -40, 0), name="badge")
     if company in ("guard", "sapper"):
