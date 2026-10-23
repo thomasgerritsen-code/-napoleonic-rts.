@@ -564,3 +564,47 @@ test('iso view on a phone: a two-finger pinch zooms and stays, the spot between 
   expect(errors).toEqual([]);
   await ctx.close();
 });
+
+test('iso view: a trench covers only against fire from its front, horses cross it at a walk, and its walls are revetted', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await openGame(page, 'test=iso-cover&view=iso');
+  await page.waitForFunction(() => window.__REGIMENT_ORDERS_V1__ && window.__ISO_VIEW_V1__?.stats().props >= 19, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const O = window.__REGIMENT_ORDERS_V1__, us = [];
+    for (let i = 0; i < 14; i++) us.push(createUnit('france', 'infantry', 900 + (i % 7) * 20, 1300 + (i < 7 ? 0 : 18)));
+    us.push(createUnit('france', 'officer', 880, 1300), createUnit('france', 'drummer', 880, 1310));
+    const a = createRegiment('france', us);
+    arrangeFacingRegimentV146(a, 960, 1300, 'line', Math.PI / 2);
+    O.toggleDefend([a]);
+    for (let k = 0; k < 45; k++) window.__RTS_DEBUG__.tick(1);
+    const t = O.trenches()[0];
+    const man = regimentMembers(a).find(u => u.type === 'infantry' && O.trenchAt(u.x, u.y));
+    const hit = ang => {
+      const s = createUnit('britain', 'infantry', man.x + Math.cos(ang) * 150, man.y + Math.sin(ang) * 150), h = man.hp;
+      fire(s, man); for (let k = 0; k < 40; k++) updateProjectiles(0.02);
+      s.dead = true; const lost = h - man.hp; man.hp = 100; return lost;
+    };
+    let front = 0, flank = 0;
+    for (let i = 0; i < 10; i++) { front += hit(t.facing); flank += hit(t.facing + Math.PI / 2); }
+    camera.x = t.x; camera.y = t.y; camera.zoom = 1.6;
+    // The regiment leaves; a horseman rides across the empty trench.
+    orderGroupPathV06(a, 900, 1900, 'line', Math.PI / 2);
+    for (let k = 0; k < 25; k++) window.__RTS_DEBUG__.tick(1);
+    const c = createUnit('britain', 'cavalry', t.x + Math.cos(t.facing) * 140, t.y + Math.sin(t.facing) * 140);
+    c.targetX = t.x - Math.cos(t.facing) * 120; c.targetY = t.y - Math.sin(t.facing) * 120; c.chargeTimer = 3;
+    let open = 0, ditch = 0;
+    for (let k = 0; k < 16; k++) {
+      const x = c.x, y = c.y; window.__RTS_DEBUG__.tick(0.25);
+      const v = Math.hypot(c.x - x, c.y - y) / 0.25;
+      if (O.obstacleAt(c.x, c.y)) ditch = Math.max(ditch, v); else if (!open) open = v;
+    }
+    return { front, flank, open, ditch, charge: c.chargeTimer };
+  });
+  expect(r.front).toBeLessThan(r.flank * 0.85);
+  expect(r.open).toBeGreaterThan(60);
+  expect(r.ditch).toBeLessThan(r.open * 0.5);
+  expect(r.charge).toBe(0);
+  // Fascines line the walls, gabions stand along the parapet.
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().fascines > 0 && window.__ISO_VIEW_V1__.stats().gabions > 0);
+  expect(errors).toEqual([]);
+});

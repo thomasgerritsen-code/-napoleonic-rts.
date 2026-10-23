@@ -135,10 +135,47 @@
   }
 
   // ---- the advantage ----
+  // Where a hit comes from: the shooter or horseman striking right now (set
+  // while fire runs), else the ball arriving (it lies between its shooter and
+  // the man it hits), else unknown.
+  let striker = null;
+  function hitSource(victim) {
+    if (striker && !striker.dead) return striker;
+    let best = null, bd = 50 * 50;
+    if (typeof projectiles !== 'undefined') for (const p of projectiles) {
+      if (p.dead) continue;
+      const d = (p.x - victim.x) ** 2 + (p.y - victim.y) ** 2;
+      if (d < bd && (d > 0.01 || p.target === victim)) { bd = d; best = p; }
+    }
+    return best;
+  }
+  // The parapet only covers against fire from its own side (within ~80
+  // degrees of the way the trench faces); from the flank or the rear the men
+  // stand in the open.
+  function fromFront(t, victim) {
+    const src = hitSource(victim); if (!src) return true;
+    const dx = src.x - victim.x, dy = src.y - victim.y, d = Math.hypot(dx, dy);
+    if (d < 0.5) return true;
+    return (dx * Math.cos(t.facing) + dy * Math.sin(t.facing)) / d > 0.17;
+  }
+  // Horses at a trench: the cut, its bank and the ditch in front of it.
+  const ditchReach = t => t.width / 2 + 46;
+  const obstacleAt = (x, y) => trenches.find(t => t.progress >= 0.5 && (() => {
+    const dx = x - t.x, dy = y - t.y, ax = Math.cos(t.facing + Math.PI / 2), ay = Math.sin(t.facing + Math.PI / 2);
+    const along = Math.abs(dx * ax + dy * ay), across = dx * Math.cos(t.facing) + dy * Math.sin(t.facing);
+    return along <= t.length / 2 + 10 && across >= -t.width / 2 - 6 && across <= ditchReach(t);
+  })()) || null;
+
   const baseDamage = applyDamage;
   applyDamage = function applyDamageWithStance(victim, damage, shock = 8) {
-    if (victim && victim.kind === 'unit' && trenches.length && trenchAt(victim.x, victim.y)) {
-      stats.inTrench++; return baseDamage(victim, damage * cfg.trenchDamage, shock * cfg.trenchShock);
+    if (victim && victim.kind === 'unit' && victim.type === 'cavalry' && trenches.length && obstacleAt(victim.x, victim.y)) {
+      // Horses floundering over a ditch and bank are easy targets.
+      stats.cavalryCaught = (stats.cavalryCaught || 0) + 1; damage *= cfg.cavalryExposed || 1.4;
+    }
+    const t = victim && victim.kind === 'unit' && trenches.length ? trenchAt(victim.x, victim.y) : null;
+    if (t) {
+      if (fromFront(t, victim)) { stats.inTrench++; return baseDamage(victim, damage * cfg.trenchDamage, shock * cfg.trenchShock); }
+      stats.flanked = (stats.flanked || 0) + 1;
     }
     const reg = regOf(victim);
     if (isBraced(reg)) { stats.reduced++; return baseDamage(victim, damage * cfg.defendDamage, shock * cfg.defendShock); }
@@ -147,7 +184,8 @@
   if (typeof fire === 'function') {
     const baseFire = fire;
     fire = function fireWithStance(unit, enemy) {
-      const r = baseFire(unit, enemy);
+      const before = striker; striker = unit;
+      let r; try { r = baseFire(unit, enemy); } finally { striker = before; }
       if (isBraced(regOf(unit)) && Number.isFinite(unit.reload)) unit.reload *= cfg.defendReload;
       return r;
     };
@@ -164,6 +202,18 @@
           ((trenches.length && trenchAt(u.x, u.y)) || isBraced(regOf(u)))) {
         const enemy = nearestEnemyEntity(u, TYPES.infantry.range);
         if (enemy) { fire(u, enemy); stats.atWill = (stats.atWill || 0) + 1; }
+      }
+      if (u && u.type === 'cavalry' && !u.dead && trenches.length) {
+        // A horseman cannot charge across a trench: in the ditch, over the bank
+        // and through the cut he goes at a walk, and his charge is broken.
+        const px = u.x, py = u.y, r = baseUpdateUnit(u, dt);
+        if (!u.dead && obstacleAt(u.x, u.y)) {
+          const slow = cfg.cavalryTrenchSpeed || 0.3;
+          u.x = px + (u.x - px) * slow; u.y = py + (u.y - py) * slow;
+          if (u.chargeTimer > 0 || u.chargeMomentumV1) stats.chargesBroken = (stats.chargesBroken || 0) + 1;
+          u.chargeTimer = 0; u.chargeMomentumV1 = 0;
+        }
+        return r;
       }
       return baseUpdateUnit(u, dt);
     };
@@ -237,7 +287,7 @@
 
   global.__REGIMENT_ORDERS_V1__ = Object.freeze({
     version: 'regiment-orders-v1', config: cfg, isBraced, toggleDefend, reinforce,
-    trenches: () => trenches, trenchAt, diggingAt,
+    trenches: () => trenches, trenchAt, diggingAt, obstacleAt,
     stats: () => ({ ...stats, trenches: trenches.length, finished: trenches.filter(t => t.progress >= 1).length, braced: regiments.filter(isBraced).length, defending: regiments.filter(r => !r.destroyed && r.defend).length })
   });
 })(window);

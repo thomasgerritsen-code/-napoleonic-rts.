@@ -106,7 +106,15 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   aarden rug die aan de uiteinden afloopt. In een voltooide loopgraaf stapt de
   voorste rij op de vuurtrede langs de wal (een richel halverwege de diepte) en
   leunt erop, het geweer over de rug gelegd (en vuurt er ook overheen); de rijen
-  erachter staan dieper, op de bodem. De tamboer gaat mee de loopgraaf in en staat
+  erachter staan dieper, op de bodem. De wanden zijn bekleed met takkenbossen (fascines, Blender-
+  textuur), langs de binnenkant van de wal staan schanskorven (gevlochten manden
+  met aarde) met gaten ertussen voor de musketten, en op een wal die dwars over
+  het scherm loopt ligt een rij zandzakken. Vóór de wal ligt een ondiepe gracht.
+  Dekking geldt alleen tegen vuur van de walkant (binnen ~80° van de richting van
+  de loopgraaf); van opzij of van achteren staan de mannen in het open (alleen de
+  ingegraven-bonus blijft). Ruiterij kan er niet overheen stormen: in de gracht,
+  over de wal en door de loopgraaf gaat een ruiter stapvoets (30% snelheid), zijn
+  charge breekt en hij krijgt 40% meer schade. De tamboer gaat mee de loopgraaf in en staat
   aan het uiteinde achter de rijen (al tijdens het graven); de officier blijft erbuiten. Wie in een voltooide
   loopgraaf staat - van welke kant ook - lijdt 50% minder verlies en verliest nog
   minder moraal dan alleen ingegraven. In de iso-weergave staan de mannen erin lager,

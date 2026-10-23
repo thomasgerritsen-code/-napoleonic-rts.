@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import random
 import sys
 from pathlib import Path
 
@@ -391,7 +392,60 @@ def build_tower(root, side):
         part("box", (0.17, 0.08, fh), (fw / 2, 0, fz), M("#c0282d", "cloth"), root, name="cross")
 
 
+# --- field-work kit (trenches) ---------------------------------------------------
+def build_gabion(root):
+    """A gabion: a wicker basket of upright stakes and woven withies, filled
+    with earth, as set along the inside of a parapet."""
+    r, h = 0.33, 0.9
+    withy = (M("#7d6440", "bark", 0.9, scale=4), M("#94784c", "bark", 0.9, scale=4))
+    for i in range(9):
+        part("cyl", (r, 0.075, r), (0, 0, 0.06 + i * 0.1), withy[i % 2], root, name="weave", segments=18)
+    for i in range(10):
+        a = i / 10 * math.tau
+        part("cyl", (0.018, h + 0.12), (math.cos(a) * (r + 0.012), math.sin(a) * (r + 0.012), (h + 0.12) / 2), M("#5b4429", "bark", 0.9), root,
+             name="stake", segments=6)
+    part("cyl", (r * 0.97, 0.12, r * 0.6), (0, 0, h + 0.04), M("#5f4a31", "dirt", 0.95), root, name="earth", segments=18)
+
+
+def build_sandbags(root):
+    """A short course of sandbags: three below, two on top."""
+    bag = (M("#93805a", "cloth", 0.95, scale=3), M("#857250", "cloth", 0.95, scale=3))
+    for i, x in enumerate((-0.52, 0.0, 0.52)):
+        part("ball", (0.27, 1.0, 0.62, 0.42), (x, 0, 0.12), bag[i % 2], root, rot=(0, 0, (i - 1) * 6), name="bag")
+    for i, x in enumerate((-0.26, 0.26)):
+        part("ball", (0.27, 1.0, 0.62, 0.42), (x, 0.03, 0.33), bag[(i + 1) % 2], root, rot=(0, 0, (i - 0.5) * 8), name="bag")
+
+
+def build_fascine_wall(root, length=8.0, height=1.2):
+    """The revetment of a trench wall: fascines (bundles of brushwood) laid on
+    top of each other, held by stakes and ties at 1 m spacing, so a 4 m strip
+    repeats seamlessly."""
+    twig = (M("#6e5535", "bark", 0.9, scale=6), M("#836644", "bark", 0.9, scale=6), M("#5a4529", "bark", 0.9, scale=6))
+    rows = int(height / 0.24)
+    rng = random.Random(7)
+    # Earth behind, so no light shows between the bundles.
+    part("box", (length, 0.1, height + 0.1), (0, 0.16, height / 2), M("#3a2d1e", "dirt", 0.95), root, name="earth")
+    for row in range(rows):
+        z = 0.12 + row * 0.24
+        part("cyl", (0.09, length), (0, 0.03, z), M("#33281a", "bark", 0.9, scale=6), root, rot=(0, 90, 0), name="core", segments=8)
+        # Brushwood: thin crooked sticks of mixed length and tone, repeated
+        # every 4 m so the strip tiles without a seam.
+        for k in range(34):
+            a, d = rng.uniform(0, math.tau), rng.uniform(0.04, 0.11)
+            ln, cx = rng.uniform(0.9, 2.6), rng.uniform(-2, 2)
+            mat = M(rng.choice(("#6e5535", "#836644", "#5a4529", "#9a7b51", "#4d3b24")), "bark", 0.9, scale=7)
+            rot = (0, 90 + rng.uniform(-3, 3), rng.uniform(-4, 4))
+            r = rng.uniform(0.01, 0.022)
+            for shift in (-4, 0, 4):
+                part("cyl", (r, ln), (cx + shift, math.cos(a) * d - 0.02, z + math.sin(a) * d), mat, root, rot=rot, name="twig", segments=5)
+        for x in range(-int(length / 2), int(length / 2) + 1):
+            part("cyl", (0.122, 0.05), (x + 0.5 * (row % 2), 0, z), M("#2f2416", "plain", 0.9), root, rot=(0, 90, 0), name="tie", segments=10)
+    for x in range(-int(length / 2), int(length / 2) + 1):
+        part("cyl", (0.04, height + 0.25), (x, -0.13, (height + 0.25) / 2), M("#4f3b24", "bark", 0.9), root, name="stake", segments=6)
+
+
 BUILDERS = {
+    "gabion": build_gabion, "sandbags": build_sandbags,
     "tower_fr": lambda r: build_tower(r, "fr"),
     "tower_br": lambda r: build_tower(r, "br"),
     "barracks_fr": lambda r: build_barracks(r, "fr"),
@@ -463,6 +517,25 @@ def render_prop(kind: str, out: Path, samples: int) -> dict:
             "heightM": round(height, 2)}
 
 
+def render_tile(kind: str, out: Path, samples: int) -> dict:
+    """A seamless horizontal strip of a wall as the iso camera sees it (the
+    trench's far wall): 4 m wide, its top at the image top."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    setup_render(samples)
+    root = empty("root")
+    build_fascine_wall(root)
+    ppm, width_m, height_m = SPRITE_PX_PER_M * 3, 4.0, 1.25
+    w, h = round(width_m * ppm), math.ceil(height_m * math.cos(math.radians(30)) * ppm + 0.25 * ppm)
+    camera(w, h, ppm, (0, h), origin=(-2.0, 0.0, 0.0))
+    path = out / f"{kind}.png"
+    bpy.context.scene.render.filepath = str(path)
+    bpy.ops.render.render(write_still=True)
+    return {"image": path.name, "w": w, "h": h, "tileM": width_m, "pxPerM": round(ppm, 3)}
+
+
+TILES = {"fascine_wall": render_tile}
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="graphics-lab/assets/iso/props")
@@ -476,8 +549,8 @@ def main(argv: list[str]) -> int:
     manifest.setdefault("pxPerM", round(SPRITE_PX_PER_M, 4))
     manifest.setdefault("source", "scripts/render-iso-props.py (Blender, original procedural models)")
     manifest.setdefault("props", {})
-    for kind in args.only or BUILDERS:
-        manifest["props"][kind] = render_prop(kind, out, args.samples)
+    for kind in args.only or [*BUILDERS, *TILES]:
+        manifest["props"][kind] = TILES[kind](kind, out, args.samples) if kind in TILES else render_prop(kind, out, args.samples)
         print(kind, manifest["props"][kind])
     manifest_path.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n")
     return 0

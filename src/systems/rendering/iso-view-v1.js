@@ -1104,7 +1104,7 @@
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
-    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = st.stances = st.digging = st.leaning = 0;
+    const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = st.stances = st.digging = st.leaning = st.gabions = st.fascines = 0;
     panFix();
     ensureAttackHook();
     drawTerrain();
@@ -1193,7 +1193,7 @@
     for (const b of buildings) { const d = buildingDrawable(b); if (d) list.push(d); }
     for (const h of villageHouses()) { const d = houseDrawable(h); if (d) list.push(d); }
     for (const b of crossings()) { const d = bridgeDrawable(b); if (d) list.push(d); }
-    for (const tr of trenchList()) { const d = parapetDrawable(tr); if (d) list.push(d); }
+    for (const tr of trenchList()) { const d = parapetDrawable(tr); if (d) list.push(d); list.push(...revetmentDrawables(tr)); }
     if (view.village && view.props.well && !view.dressing) view.dressing = buildDressing();
     for (const it of view.dressing || []) { const d = dressingDrawable(it); if (d) list.push(d); }
     if (view.props.oak && !view.woodTrees) view.woodTrees = buildWoodTrees();
@@ -1319,6 +1319,7 @@
   // wall hides them below the lip); the front rank leans on the parapet ----
   // CREST_OVERHANG: how far (m, on screen) below the crest a man leaning over it still
   // shows: his forearms and musket lie on the far side of the bank.
+  const DITCH_FROM = 34, DITCH_TO = 50, GABION_GAP = 1.25;
   const TRENCH_SINK = 1.1, FIRE_STEP = 0.5, FIRE_STEP_NEAR = 0.9, PARAPET_H = 0.5, TRENCH_LEAN_GAP = 3, CREST_OVERHANG = 0.12;
   const trenchList = () => global.__REGIMENT_ORDERS_V1__?.trenches?.() || [];
   function trenchFrame(t) {
@@ -1386,6 +1387,16 @@
       view.trenchLips.set(t.id, lip);
       const ps = parapetShape(t, f);
       view.trenchCrests.set(t.id, ps.us.map(u => at(u, ps.lipV(u) + 7, ps.lift(u))).sort((a, b) => a[0] - b[0]));
+      // The ditch dug in front of the parapet (enemy side): a shallow trough,
+      // its far bank catching the light.
+      if (p >= 0.5) {
+        const dn = ps.us.map(u => u * 1.04), inner = dn.map(u => at(u, ps.lipV(u / 1.04) + DITCH_FROM)), outer = dn.map(u => at(u, ps.lipV(u / 1.04) + DITCH_TO));
+        const [gx0, gy0] = at(0, w + DITCH_FROM), [gx1, gy1] = at(0, w + DITCH_TO), dg = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
+        dg.addColorStop(0, 'rgba(78,64,42,.85)'); dg.addColorStop(0.45, 'rgba(46,37,25,.95)'); dg.addColorStop(0.8, 'rgba(70,58,38,.9)'); dg.addColorStop(1, 'rgba(120,104,70,.55)');
+        ctx.globalAlpha = Math.min(1, (p - 0.5) * 2);
+        smoothFill([...inner, ...outer.slice().reverse()], dg);
+        ctx.globalAlpha = 1;
+      }
       // Trodden, spoil-strewn ground round the cut.
       ctx.globalAlpha = 0.5 + 0.5 * p;
       smoothFill(trenchOutline(t, f, 0, 0, 7), 'rgba(104,86,58,.55)');
@@ -1398,6 +1409,19 @@
       const g = ctx.createLinearGradient(0, top, 0, bottom);
       g.addColorStop(0, '#7a6242'); g.addColorStop(0.45, '#4d3c28'); g.addColorStop(1, '#2a2016');
       ctx.fillStyle = g; ctx.fillRect(-1e4, top - 2, 2e4, bottom - top + 4);
+      // Once dug, the walls are revetted with fascines (Blender brushwood
+      // bundles), darker towards the bottom.
+      const tile = view.props.fascine_wall;
+      if (tile && p > 0.6) {
+        if (!tile.pattern) tile.pattern = ctx.createPattern(tile.image, 'repeat');
+        const k = PPM * z() / tile.pxPerM;
+        tile.pattern.setTransform(new DOMMatrix([k, 0, 0, k, sx(t.x), top]));
+        ctx.globalAlpha = Math.min(1, (p - 0.6) / 0.4); ctx.fillStyle = tile.pattern; ctx.fillRect(-1e4, top - 2, 2e4, bottom - top + 4);
+        const sh = ctx.createLinearGradient(0, top, 0, bottom);
+        sh.addColorStop(0, 'rgba(20,14,8,0)'); sh.addColorStop(1, 'rgba(20,14,8,.6)');
+        ctx.fillStyle = sh; ctx.fillRect(-1e4, top - 2, 2e4, bottom - top + 4); ctx.globalAlpha = 1;
+        view.stats.fascines = (view.stats.fascines || 0) + 1;
+      }
       // Layers of soil showing in the far wall.
       ctx.strokeStyle = 'rgba(30,22,14,.28)'; ctx.lineWidth = Math.max(0.6, 0.8 * z());
       for (const k of [0.3, 0.62]) { smoothFill(trenchOutline(t, f, w * 0.12 * k, -depth * k)); ctx.stroke(); }
@@ -1470,6 +1494,44 @@
         ctx.beginPath(); ctx.ellipse(px, py, (1.5 + hash(i, 7) * 2) * z(), (1 + hash(i, 8)) * z(), 0, 0, 7); ctx.fill();
       }
     } };
+  }
+  // Gabions (wicker baskets of earth) in a row along the inside of the
+  // parapet, gaps between them for the muskets; on a parapet running across
+  // the screen a course of sandbags along its crest. Drawn after the leaning
+  // front rank when the bank is on the camera side (they stand in front of
+  // the men), before them otherwise.
+  function revetmentDrawables(t) {
+    const gab = view.props.gabion, bags = view.props.sandbags;
+    if (!gab || t.progress < 1) return [];
+    const X = sx(t.x), Y = gy(t.x, t.y);
+    if (X < -400 || X > innerWidth + 400 || Y < -200 || Y > innerHeight + 200) return [];
+    const f = trenchFrame(t), { half, w, at } = f, { lift, lipV } = parapetShape(t, f);
+    const near = Math.sin(t.facing) > 0, ridge = t.y + Math.sin(t.facing) * (w + 7);
+    const step = GABION_GAP * PPM, n = Math.max(1, Math.floor((2 * half - w * 1.2) / step));
+    const k = spriteK(), out = [];
+    out.push({ y: ridge + (near ? 1 : 0.2), draw: () => {
+      // Back to front on screen, so nearer baskets overlap farther ones.
+      const spots = [];
+      for (let i = 0; i <= n; i++) {
+        const u = -n * step / 2 + i * step + (hash(t.id * 13 + i, 2) - 0.5) * 3;
+        spots.push(at(u, lipV(u) + 3, Math.min(lift(u), 0.12)));
+      }
+      spots.sort((a, b) => a[1] - b[1]);
+      const baskets = () => { for (const [x, y] of spots) ctx.drawImage(gab.image, x - gab.pivot.x * k, y - gab.pivot.y * k, gab.w * k, gab.h * k); };
+      // Sandbags lie along X in their picture: only on a parapet running across
+      // the screen; on the crest, so behind the baskets when the bank is far.
+      const sacks = () => {
+        if (!bags || Math.abs(Math.sin(t.facing)) <= 0.82) return;
+        const bs = 1.7 * PPM, m = Math.max(1, Math.floor((2 * half - w * 1.6) / bs));
+        for (let i = 0; i <= m; i++) {
+          const u = -m * bs / 2 + i * bs, [x, y] = at(u, lipV(u) + 8, lift(u) * 0.95);
+          ctx.drawImage(bags.image, x - bags.pivot.x * k * 0.8, y - bags.pivot.y * k * 0.8, bags.w * k * 0.8, bags.h * k * 0.8);
+        }
+      };
+      if (near) { baskets(); sacks(); } else { sacks(); baskets(); }
+      view.stats.gabions = (view.stats.gabions || 0) + spots.length;
+    } });
+    return out;
   }
   // A shield over each regiment in the defensive stance: outlined while it
   // braces, filled once braced (regiment-orders-v1).
