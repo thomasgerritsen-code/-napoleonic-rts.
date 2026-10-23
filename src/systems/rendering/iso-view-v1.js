@@ -1312,14 +1312,8 @@
   let inner = global.renderStableFrameV1;
   function stableFrame(drawGame, now) {
     if (!view.on) return typeof inner === 'function' ? inner(drawGame, now) : drawGame();
-    // Once a second the 2D renderer runs too (its output is painted over), so
-    // effects it keeps for its own frames are still consumed and pruned.
-    // It runs with its own (top-down) projection.
-    if (view.frames % 60 === 0) {
-      screenToWorld = topDown.s2w; worldToScreen = topDown.w2s;
-      try { typeof inner === 'function' ? inner(drawGame, now) : drawGame(); } catch (_) {}
-      finally { screenToWorld = isoScreenToWorld; worldToScreen = isoWorldToScreen; }
-    }
+    // The game is drawn in the iso view only: the 2D renderer does not run at all
+    // (its effect lists are capped where they are filled; exploring is simulation).
     const t0 = performance.now();
     try { render(now); view.stats.renderMs = Math.round((view.stats.renderMs * 0.9 + (performance.now() - t0) * 0.1) * 10) / 10; }
     finally { const dpr = canvas.width / Math.max(1, innerWidth); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
@@ -1758,27 +1752,18 @@
   // ---- switching ----
   // The 2D game's own layers; overlays drawn on top of any view (data-overlay) stay.
   const otherLayers = () => [...document.querySelectorAll('canvas')].filter(c => c !== canvas && c.id !== 'minimap' && !c.dataset.overlay);
+  // The iso view is the game's only view: on for good, the 2D layers hidden
+  // (there is no switch back to the 2D map).
   function setOn(on) {
     view.on = on;
     screenToWorld = on ? isoScreenToWorld : topDown.s2w;
     worldToScreen = on ? isoWorldToScreen : topDown.w2s;
     for (const c of otherLayers()) c.style.visibility = on ? 'hidden' : '';
-    // Back in 2D: let the 2D terrain caches start afresh.
-    if (!on) { try { global.__DESKTOP_TERRAIN_TILES_V301__?.invalidate?.(); } catch (_) {} }
-    button.textContent = on ? '🗺 2D-kaart' : '🏰 Iso-weergave';
-    button.setAttribute('aria-pressed', String(on));
-    if (typeof overview !== 'undefined') overview.style.display = on ? '' : 'none';
   }
-  const button = document.createElement('button');
-  button.id = 'isoViewToggle'; button.type = 'button';
-  button.style.cssText = 'position:fixed;z-index:40;top:58px;right:10px;padding:6px 10px;border-radius:8px;border:1px solid rgba(244,216,109,.55);' +
-    'background:rgba(16,20,17,.86);color:#f5f1e8;font:650 13px system-ui,sans-serif;cursor:pointer';
-  button.addEventListener('click', () => setOn(!view.on));
-  document.body.appendChild(button);
   // Overzicht: decoration dimmed and the small village detail hidden, for a clear view of the battle.
   const overview = document.createElement('button');
   overview.id = 'isoOverviewToggle'; overview.type = 'button';
-  overview.style.cssText = 'position:fixed;z-index:40;top:58px;right:136px;padding:6px 10px;border-radius:8px;border:1px solid rgba(244,216,109,.55);' +
+  overview.style.cssText = 'position:fixed;z-index:40;top:58px;right:10px;padding:6px 10px;border-radius:8px;border:1px solid rgba(244,216,109,.55);' +
     'background:rgba(16,20,17,.86);color:#f5f1e8;font:650 13px system-ui,sans-serif;cursor:pointer';
   const setOverview = on => { view.overview = on; overview.textContent = on ? '👁 Overzicht: aan' : '👁 Overzicht: uit';
     overview.setAttribute('aria-pressed', String(on)); };

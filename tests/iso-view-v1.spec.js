@@ -45,7 +45,8 @@ test('with ?view=iso the game is drawn with the Blender sprites, terrain and pro
   expect(s.on).toBe(true);
   expect(s.ppm).toBe(22.5);
   expect(s.props).toBeGreaterThan(5);
-  await expect(page.locator('#isoViewToggle')).toHaveText('🗺 2D-kaart');
+  // The iso view is the only view: no switch to a 2D map.
+  await expect(page.locator('#isoViewToggle')).toHaveCount(0);
   // Iso projection: the ground is squashed to half height (give or take the
   // slope of the relief), and a screen point maps back to itself.
   const dy = await page.evaluate(() => screenToWorld(innerWidth / 2, innerHeight / 2 + 100).y - screenToWorld(innerWidth / 2, innerHeight / 2).y);
@@ -111,20 +112,21 @@ test('iso view: clicking a soldier\'s body selects him, a box selects, right-cli
   expect(errors).toEqual([]);
 });
 
-test('iso view: the toggle switches to the 2D map and back, with the matching projection', async ({ page }) => {
-  const errors = await openGame(page, 'test=iso-toggle&view=iso');
+test('iso view: the only view - no 2D map to switch to, and the 2D renderer never runs', async ({ page }) => {
+  const errors = await openGame(page, 'test=iso-only&view=iso');
   await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 0, null, { timeout: 60_000 });
-  const dy = () => page.evaluate(() => (screenToWorld(innerWidth / 2, innerHeight / 2 + 100).y - screenToWorld(innerWidth / 2, innerHeight / 2).y) * camera.zoom);
-  // Iso: about 200 (the relief bends it a little); 2D: exactly 100.
-  const isoDy = async () => { const d = await dy(); expect(d).toBeGreaterThan(150); expect(d).toBeLessThan(270); };
-  await isoDy();
-  await page.locator('#isoViewToggle').click();
-  await expect(page.locator('#isoViewToggle')).toHaveText('🏰 Iso-weergave');
-  expect(await page.evaluate(() => window.__ISO_VIEW_V1__.isOn())).toBe(false);
-  expect(await dy()).toBeCloseTo(100, 3);
-  await page.locator('#isoViewToggle').click();
-  expect(await page.evaluate(() => window.__ISO_VIEW_V1__.isOn())).toBe(true);
-  await isoDy();
+  await expect(page.locator('#isoViewToggle')).toHaveCount(0);
+  // The 2D frame (and its full-screen 2D fog) is not drawn, not even now and then.
+  const drawn = await page.evaluate(async () => {
+    let n = 0; const base = drawFogOverlay; drawFogOverlay = function () { n++; return base.apply(this, arguments); };
+    await new Promise(r => setTimeout(r, 2500));
+    drawFogOverlay = base;
+    return { n, frames: window.__ISO_VIEW_V1__.stats().frames ?? null, on: window.__ISO_VIEW_V1__.isOn() };
+  });
+  expect(drawn.on).toBe(true);
+  expect(drawn.n).toBe(0);
+  const dy = await page.evaluate(() => (screenToWorld(innerWidth / 2, innerHeight / 2 + 100).y - screenToWorld(innerWidth / 2, innerHeight / 2).y) * camera.zoom);
+  expect(dy).toBeGreaterThan(150);
   expect(errors).toEqual([]);
 });
 
@@ -182,9 +184,6 @@ test('iso view: soldiers stay readable - side rings, scenery in front of them tu
   await page.evaluate(() => { camera.zoom = 0.45; });
   s = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
   expect(s.detailed).toBe(false);
-  // In the 2D map the Overzicht button is hidden.
-  await page.locator('#isoViewToggle').click();
-  await expect(page.locator('#isoOverviewToggle')).toBeHidden();
   expect(errors).toEqual([]);
 });
 
@@ -1228,28 +1227,4 @@ test('iso view: visibility cache - the same answers as the full search, far fewe
   expect(r.builds).toBe(0);
   expect(r.visible).toBeGreaterThan(5);
   expect(errors).toEqual([]);
-});
-
-test('iso view: adaptive resolution - slow frames draw at one pixel per point, quick ones sharp again', async ({ browser, baseURL }) => {
-  test.setTimeout(150_000);
-  const context = await browser.newContext({ baseURL, viewport: { width: 900, height: 600 }, deviceScaleFactor: 2 });
-  const page = await context.newPage();
-  const errors = await openGame(page, 'test=iso-adaptive&view=iso');
-  await page.waitForFunction(() => window.__ADAPTIVE_RESOLUTION_V1__ && window.__ISO_VIEW_V1__?.isOn(), null, { timeout: 60_000 });
-  const dpr = () => page.evaluate(() => canvas.width / innerWidth);
-  const sharp = await dpr();
-  // A heavy scene: every frame takes ~50 ms.
-  await page.evaluate(() => { window.__heavy = true; (function spin() { if (!window.__heavy) return; const t = performance.now(); while (performance.now() - t < 50); requestAnimationFrame(spin); })(); });
-  await page.waitForFunction(() => window.__ADAPTIVE_RESOLUTION_V1__.state().low, null, { timeout: 20_000 });
-  const lowered = await dpr();
-  await page.evaluate(() => { window.__heavy = false; });
-  // Quick frames (< 22 ms) bring it back; this headless browser draws without a
-  // graphics chip and is not that quick even at rest, so the restore is asked for.
-  await page.evaluate(() => window.__ADAPTIVE_RESOLUTION_V1__.set(false));
-  const restored = await dpr();
-  expect(sharp).toBeGreaterThan(1.4);
-  expect(lowered).toBeCloseTo(1, 1);
-  expect(restored).toBeCloseTo(sharp, 1);
-  expect(errors).toEqual([]);
-  await context.close();
 });

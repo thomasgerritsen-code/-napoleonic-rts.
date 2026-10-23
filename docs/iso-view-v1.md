@@ -467,7 +467,10 @@ Gemeten met een veldslag van ruim 330 eenheden (12 regimenten, 4 ruiterregimente
 - **Mist**: het masker met zijn golvende rand wordt 3-5 keer per seconde opnieuw
   gemaakt (was 5-8, overvloeiend dus even vloeiend), en het teruglezen van de pixels
   laat de grafische chip niet meer wachten (`willReadFrequently`).
-- **Aanpasbare resolutie** (`adaptive-resolution-v1.js`): op een scherm met hoge
-  pixeldichtheid (telefoon) wordt bij trage frames (boven 34 ms, 1,5 s lang) op 1
-  beeldpunt per punt getekend - minder dan de helft van de pixels - en weer scherp na
-  een rustige periode (6 s, daarna telkens langer als het te vroeg bleek).
+- **Alleen de iso-weergave**: het spel heeft geen 2D-kaart meer. De knop "2D-kaart" is
+  weg, en de 2D-renderer draait ook niet meer verborgen mee (hij tekende eens per
+  seconde een volledig 2D-beeld met 2D-mist, wat elke seconde een hapering gaf). Zijn
+  effectlijsten hebben elk een maximum en verkennen hoort bij de simulatie, dus er
+  hoeft niets voor te tekenen. Wie de gewone link opent (zonder `?view=iso`) komt
+  meteen in de iso-weergave; alleen geautomatiseerde browsers (de testset) krijgen
+  nog de oude 2D-pagina. De resolutie blijft altijd scherp.
