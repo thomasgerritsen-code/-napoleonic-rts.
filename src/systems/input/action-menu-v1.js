@@ -152,6 +152,42 @@
     updateHud = function updateHudWithActionMenu(...args) { const r = base.apply(this, args); organize(); return r; };
   }
   organize();
+
+  // Compact top bar on a phone: sound, wind and weather show as icons only
+  // (their words go to the tooltip), so the resources keep their room.
+  const narrow = root.matchMedia ? root.matchMedia('(max-width: 860px), (pointer: coarse)') : { matches: false };
+  const COMPACT = {
+    'topdown-audio-toggle': t => t.split(' ')[0],
+    'topdown-wind-direction-v267': t => t.replace(/^Wind\s*/, ''),
+    'weather-indicator': t => t.split(' ')[0]
+  };
+  const topStyle = document.createElement('style');
+  topStyle.textContent = `@media (max-width: 860px), (pointer: coarse){
+    .topbar #topdown-audio-toggle,.topbar #topdown-wind-direction-v267,.topbar #weather-indicator{min-width:0!important;flex:0 0 auto!important;padding:3px 6px!important;font-size:.95rem!important;line-height:1!important}
+    .topbar #topdown-audio-toggle{min-height:38px!important}
+    .topbar .resources{flex:1 1 auto!important;min-width:0!important;gap:1px!important}
+    .topbar .resources span{padding:4px 2px!important}}
+    @media (max-width: 430px){.topbar .resources{font-size:.66rem!important}.topbar #topdown-audio-toggle,.topbar #topdown-wind-direction-v267,.topbar #weather-indicator{padding:3px 4px!important;font-size:.85rem!important}}`;
+  document.head.appendChild(topStyle);
+  function compactTop() {
+    if (!narrow.matches) return;
+    for (const [id, short] of Object.entries(COMPACT)) {
+      const el = document.getElementById(id); if (!el) continue;
+      const text = el.textContent || '';
+      if (el.dataset.short === text) continue;
+      el.title = text; el.setAttribute('aria-label', text);
+      const c = short(text); el.dataset.short = c; el.textContent = c;
+    }
+  }
+  for (const id of Object.keys(COMPACT)) {
+    const el = document.getElementById(id);
+    if (el) new MutationObserver(compactTop).observe(el, { childList: true, characterData: true, subtree: true });
+  }
+  setTimeout(compactTop, 0); addEventListener('load', () => setTimeout(() => {
+    compactTop();
+    for (const id of Object.keys(COMPACT)) { const el = document.getElementById(id); if (el && !el.dataset.watched) { el.dataset.watched = '1'; new MutationObserver(compactTop).observe(el, { childList: true, characterData: true, subtree: true }); } }
+  }, 50));
+
   root.__ACTION_MENU_V1__ = Object.freeze({
     version: '1.0', organize, groups: GROUPS.map(g => g.id), groupOf,
     visible: () => [...actionsEl.querySelectorAll(':scope > button')].filter(b => !b.classList.contains('menu-hidden')).map(b => b.dataset.action || 'formation:' + b.dataset.formation),
