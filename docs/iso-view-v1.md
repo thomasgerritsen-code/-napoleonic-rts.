@@ -122,8 +122,8 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   schanskorven en zandzakken; 72% minder). Het regiment doet het werk zolang het
   erin blijft staan (zichtbaar aan het graven; takkenbossen en korven verschijnen
   gaandeweg); loopt het weg, dan wacht het werk. De Britse commandant versterkt
-  zijn eigen loopgraven als hij hout en ijzer over heeft. De tamboer gaat mee de loopgraaf in en staat
-  aan het uiteinde achter de rijen (al tijdens het graven); de officier blijft erbuiten. Wie in een voltooide
+  zijn eigen loopgraven als hij hout en ijzer over heeft. De tamboer en de officier gaan mee de loopgraaf
+  in, elk aan een uiteinde achter de rijen (al tijdens het graven). Wie in een voltooide
   loopgraaf staat - van welke kant ook - lijdt 50% minder verlies en verliest nog
   minder moraal dan alleen ingegraven. In de iso-weergave staan de mannen erin lager,
   en de wal verbergt hun benen. Een loopgraaf blijft liggen als het regiment vertrekt;

@@ -415,6 +415,7 @@ test('iso view: a defending line digs a trench, men in it lose less, and a regim
     const firedAtWill = (O.stats().atWill || 0) - atWill0;
     intruder.dead = true;
     const drummerIn = regimentMembers(b).some(u => u.type === 'drummer' && O.trenchAt(u.x, u.y));
+    const officerIn = regimentMembers(b).some(u => u.type === 'officer' && O.trenchAt(u.x, u.y));
     const mannedB = b.trenchId === t.id, facingB = b.facing;
     // The second regiment marches off and comes back: it steps in again, without
     // the defensive stance switched on.
@@ -425,7 +426,7 @@ test('iso view: a defending line digs a trench, men in it lose less, and a regim
     orderGroupPathV06(b, t.x + 50, t.y + 60, 'line', 0);
     for (let k = 0; k < 30; k++) window.__RTS_DEBUG__.tick(1);
     const again = regimentMembers(b).filter(u => u.type === 'infantry' && O.trenchAt(u.x, u.y)).length;
-    return { finished: t && t.progress >= 1, lostIn: h1 - man.hp, lostOut: h2 - out.hp, manned: mannedB, inB, drummerIn, firedAtWill, facing: facingB, tf: t.facing,
+    return { finished: t && t.progress >= 1, lostIn: h1 - man.hp, lostOut: h2 - out.hp, manned: mannedB, inB, drummerIn, officerIn, firedAtWill, facing: facingB, tf: t.facing,
       left, again, mannedAgain: b.trenchId === t.id };
   });
   expect(r.finished).toBe(true);
@@ -434,6 +435,7 @@ test('iso view: a defending line digs a trench, men in it lose less, and a regim
   expect(r.inB).toBeGreaterThan(10);
   // The drummer goes down into the trench with them.
   expect(r.drummerIn).toBe(true);
+  expect(r.officerIn).toBe(true);
   expect(r.firedAtWill).toBeGreaterThan(0);
   expect(r.facing).toBeCloseTo(r.tf, 2);
   expect(r.left).toBe(true);
