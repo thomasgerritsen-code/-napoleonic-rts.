@@ -12,6 +12,10 @@ Same camera, sun and 30° view as the infantry (render-iso-infantry.py).
   linstock. States: idle 2, ram 4, load 2, aim 2, ready 2, touch 2, haul 4,
   march 6 and the three falls (4 each) in 176x128 cells like the infantry.
 
+--model picks the piece: 6 (the 6-pounder, default), 12 (the heavy 12-pounder:
+a longer, thicker barrel), how (the howitzer: a short wide barrel cocked up to
+lob shells) or light (the horse artillery's light piece).
+
   python scripts/render-iso-artillery.py --side france --piece gun --out art/frames/iso-proof
 """
 from __future__ import annotations
@@ -40,6 +44,9 @@ GUN_STATES = [("idle", 1), ("fire", 2), ("roll", 4)]
 GUNNER_STATES = [("idle", 2), ("ram", 4), ("load", 2), ("aim", 2), ("ready", 2), ("touch", 2), ("haul", 4),
                  ("march", 6), ("die", 4), ("diefwd", 4), ("dieside", 4)]
 PREFIX = {"gun": "g", "gunner": "a"}
+# Gun models: barrel scale (across, along, across), elevation (degrees) and the sprite suffix.
+MODELS = {"6": ((1, 1, 1), -2, ""), "12": ((1.3, 1.22, 1.3), -2, "12"), "how": ((1.6, 0.58, 1.6), 16, "h"),
+          "light": ((0.8, 0.84, 0.8), -2, "l")}
 CARRIAGE = {"france": "#5d6a3a", "britain": "#7b8790"}
 WHEEL_R, AXLE_Z, BARREL_Z = 0.68, 0.68, 1.0
 MUZZLE_Y = 1.45
@@ -87,7 +94,7 @@ def wheel(name, parent, x, wood, iron):
     return spin
 
 
-def build_gun(side: str) -> dict:
+def build_gun(side: str, model: str = "6") -> dict:
     wood = material(CARRIAGE[side], 0.7, pattern="planks", scale=3)
     iron = material("#2a2a2a", 0.45, 0.6, pattern="plain")
     bronze = material("#b08d4a", 0.35, 0.85, pattern="plain")
@@ -124,6 +131,9 @@ def build_gun(side: str) -> dict:
     flash = part("ball", (0.17, 1, 1.8, 1), (0, MUZZLE_Y + 0.25, 0), infantry.glow("#ffb347", 4), barrel, name="flash")
     flame = part("cyl", (0.13, 0.75, 0.0), (0, MUZZLE_Y + 0.6, 0), infantry.glow("#ff6a1a", 3.5), barrel,
                  rot=(-90, 0, 0), name="flame")
+    scale, elevation, _ = MODELS[model]
+    barrel.scale = scale
+    barrel.rotation_euler = Euler((math.radians(elevation), 0, 0))
     return {"root": root, "kick": kick, "barrel": barrel, "spins": spins, "flash": [flash, flame]}
 
 
@@ -267,6 +277,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--states", nargs="*", help="render only these states (review)")
     ap.add_argument("--supersample", type=int, default=2)
+    ap.add_argument("--model", choices=sorted(MODELS), default="6", help="gun model (piece gun only)")
     args = ap.parse_args(argv)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     setup_render(args.samples)
@@ -281,9 +292,10 @@ def main(argv: list[str]) -> int:
     else:
         shadow_catcher("ground", [(0.2 + 0.85 * math.cos(a / 24 * math.tau), 0.05 + 0.85 * math.sin(a / 24 * math.tau))
                                   for a in range(24)])
-    rig = build_gun(args.side) if gun else build_gunner(args.side)
-    prefix = ("fr" if args.side == "france" else "br") + PREFIX[args.piece]
-    out = Path(args.out).resolve() / "artillery" / f"{args.side}_{args.piece}"
+    rig = build_gun(args.side, args.model) if gun else build_gunner(args.side)
+    suffix = MODELS[args.model][2] if gun else ""
+    prefix = ("fr" if args.side == "france" else "br") + PREFIX[args.piece] + suffix
+    out = Path(args.out).resolve() / "artillery" / f"{args.side}_{args.piece}{suffix}"
     out.mkdir(parents=True, exist_ok=True)
     muzzle = {}
     states = GUN_STATES if gun else GUNNER_STATES

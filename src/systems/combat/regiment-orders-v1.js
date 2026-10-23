@@ -259,6 +259,11 @@
     if (d < 0.5) return true;
     return (dx * Math.cos(t.facing) + dy * Math.sin(t.facing)) / d > 0.17;
   }
+  // A shell lobbed by a howitzer (troops-v1 'lobbed') drops into the trench: no cover.
+  function lobbed(victim) {
+    const src = hitSource(victim);
+    return !!(src && src.troop && global.NRTS_CONFIG?.troops?.kinds?.[src.troop]?.lobbed);
+  }
   // Horses at a trench: the cut, its bank and the ditch in front of it.
   const ditchReach = t => t.width / 2 + 46;
   const obstacleAt = (x, y) => trenches.find(t => t.progress >= 0.5 && (() => {
@@ -275,7 +280,7 @@
     }
     const t = victim && victim.kind === 'unit' && trenches.length ? trenchAt(victim.x, victim.y) : null;
     if (t) {
-      if (fromFront(t, victim)) { stats.inTrench++; const L = levelOf(t); return baseDamage(victim, damage * (L.damage ?? cfg.trenchDamage), shock * (L.shock ?? cfg.trenchShock)); }
+      if (fromFront(t, victim) && !lobbed(victim)) { stats.inTrench++; const L = levelOf(t); return baseDamage(victim, damage * (L.damage ?? cfg.trenchDamage), shock * (L.shock ?? cfg.trenchShock)); }
       stats.flanked = (stats.flanked || 0) + 1;
     }
     const reg = regOf(victim);

@@ -87,6 +87,8 @@
   const load = (key, kinds) => Promise.all(kinds.map(k => loadSheet(key, k))).then(indexAtlas)
     .then(a => { view.atlases[key] = a; }).catch(err => console.warn(err.message));
   const INFANTRY = ['infantry', 'fallen', 'combat', 'morale'];
+  // A gun's model (troops-v1) by its sprite suffix.
+  const GUN_MODEL = { heavy12: '12', howitzer: 'h', horseart: 'l' };
   function loadAll() {
     const first = [load('fr', INFANTRY), load('br', INFANTRY)];
     for (const p of ['fr', 'br']) {
@@ -99,8 +101,11 @@
     // cuirassiers (frck), Polish lancers (frcl), Scots Greys (brcg).
     const looks = ['fr', 'br'].flatMap(p => ['', '2', '3', '4', '5'].map(l => p + l)).concat(global.NRTS_CONFIG?.troops ? ['fr6', 'fr7', 'br6'] : []);
     const horse = ['fr', 'br'].flatMap(p => [p + 'c2', p + 'co']).concat(global.NRTS_CONFIG?.troops ? ['frck', 'frcl', 'brcg'] : []);
+    // Gun models (troops-v1): 12-pounder, howitzer, horse artillery.
+    const guns = global.NRTS_CONFIG?.troops ? ['fr', 'br'].flatMap(p => Object.values(GUN_MODEL).map(m => [p + 'g' + m, 'gun' + m])) : [];
     return Promise.all(first).then(() => Promise.all(looks.filter(k => k.length > 2).map(k => load(k, INFANTRY))
       .concat(horse.map(k => load(k, ['cavalry', 'cavfight'])))
+      .concat(guns.map(([k, kind]) => load(k, [kind])))
       // Spade work in a trench being dug, per look.
       .concat(looks.map(k => loadSheet(k, 'dig')
         .then(part => { view.atlases[k + ':dig'] = indexAtlas([part]); }).catch(err => console.warn(err.message))))));
@@ -669,15 +674,18 @@
     }
   }
 
+  // Officers on horseback ride the cavalry officer's horse.
+  const gunKey = (u, p) => { const k = p + 'g' + (GUN_MODEL[u.troop] || ''); return view.atlases[k] ? k : p + 'g'; };
+  const mountedKey = (u, p) => u.type === 'officer' && u.troop === 'mounted' && view.atlases[p + 'co'] ? p + 'co' : null;
   // Animation for one live unit: [atlas key, animation, frame].
   function frameFor(u, m, now) {
     const p = u.side === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
     const since = now - m.firedAt, step = (stride, n) => Math.floor((m.walk % stride) / stride * n) % n;
-    if (u.type === 'cavalry') {
+    if (u.type === 'cavalry' || mountedKey(u, p)) {
       // Period regiments have their own riders (troops-v1); huzaren ride the bays.
       const coat = u.troop === 'cuirassier' ? (view.atlases[p + 'ck'] ? 'k' : '2') : u.troop === 'lancer' ? 'l' : u.troop === 'greys' ? 'g'
         : u.troop === 'hussar' ? '' : (hash(u.id, 5) < 0.5 ? '' : '2');
-      const key = view.atlases[p + 'c' + coat] ? p + 'c' + coat : p + 'c';
+      const key = mountedKey(u, p) || (view.atlases[p + 'c' + coat] ? p + 'c' + coat : p + 'c');
       if (m.moving) {
         const gait = m.speed > 4.5 || u.chargeTimer > 0 ? 'gallop' : m.speed > 2.4 ? 'trot' : 'walk';
         const stride = gait === 'gallop' ? 3.6 : gait === 'trot' ? 2.8 : 2.4;
@@ -694,9 +702,10 @@
       return [key, 'idle_' + d, Math.floor(now / 0.7 + hash(u.id, 2) * 2) % 2];
     }
     if (u.type === 'artillery') {
-      if (m.moving) return [p + 'g', 'roll_' + d, step(1.2, 4)];
-      if (since < 0.3) return [p + 'g', 'fire_' + d, since < 0.12 ? 0 : 1];
-      return [p + 'g', 'idle_' + d, 0];
+      const g = gunKey(u, p);
+      if (m.moving) return [g, 'roll_' + d, step(1.2, 4)];
+      if (since < 0.3) return [g, 'fire_' + d, since < 0.12 ? 0 : 1];
+      return [g, 'idle_' + d, 0];
     }
     if (crewIds.has(u.id)) {
       if (m.moving) return [p + 'a', 'march_' + d, step(MARCH_STRIDE, 6)];
@@ -736,6 +745,7 @@
     const u = m.u, p = u.side === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
     let key, anim;
     if (u.type === 'cavalry') { key = p + 'c'; anim = 'die_' + d; }
+    else if (mountedKey(u, p)) { key = mountedKey(u, p); anim = 'die_' + d; }
     else if (u.type === 'artillery') return;
     else if (crewIds.has(u.id)) { key = p + 'a'; anim = ['die', 'diefwd', 'dieside'][Math.floor(hash(u.id, 4) * 3)] + '_' + d; }
     else if (u.type === 'worker') return;

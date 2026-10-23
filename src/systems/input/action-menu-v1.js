@@ -84,6 +84,10 @@
     .actions.menu-v1 button[data-action="train-guard"]::before{content:"🦅"}
     .actions.menu-v1 button[data-action="train-sapper"]::before{content:"🪓"}
     .actions.menu-v1 button[data-action="train-lancer"]::before{content:"🚩"}
+    .actions.menu-v1 button[data-action="train-heavy12"]::before{content:"💥"}
+    .actions.menu-v1 button[data-action="train-howitzer"]::before{content:"🎇"}
+    .actions.menu-v1 button[data-action="train-horseart"]::before{content:"🏇"}
+    .actions.menu-v1 button[data-action="train-mounted"]::before{content:"🎖"}
     .actions.menu-v1 button[data-action="quick-regiment"]::before,.actions.menu-v1 button[data-action="quick-regiment-barracks"]::before{content:"⚑"}
     .actions.menu-v1 button[data-action="train-missing"]::before{content:"➕"}
     .actions.menu-v1 button[data-action="auto-regiment"]::before{content:"🔁"}

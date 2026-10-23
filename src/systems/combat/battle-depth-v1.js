@@ -84,8 +84,10 @@
   };
 
   // ---- artillery: craters, works knocked down, towers hit ----
-  function shellLands(x, y, dx, dy) {
+  function shellLands(x, y, dx, dy, troop) {
     stats.shells++;
+    // Howitzer shells (troops-v1 'works') tear up earthworks and towers harder.
+    const works = root.NRTS_CONFIG?.troops?.kinds?.[troop]?.works || 1;
     const d = Math.hypot(dx, dy) || 1;
     craters.push({ x, y, dx: dx / d, dy: dy / d, t: elapsed });
     if (craters.length > cfg.maxCraters) craters.splice(0, craters.length - cfg.maxCraters);
@@ -95,7 +97,7 @@
       const across = (x - t.x) * Math.cos(t.facing) + (y - t.y) * Math.sin(t.facing);
       if (Math.abs(along) > t.length / 2 + 8 || across < -t.width / 2 - 8 || across > t.width / 2 + 34) continue;
       stats.trenchHits++;
-      t.integrity = (t.integrity ?? 100) - cfg.shellDamage;
+      t.integrity = (t.integrity ?? 100) - cfg.shellDamage * works;
       if (t.integrity <= 0) {
         if ((t.level || 1) > 1) { t.level--; t.integrity = 100; stats.levelsLost++; }
         else { t.integrity = 0; if (!t.breached) stats.breaches++; t.breached = true; }
@@ -103,7 +105,7 @@
     }
     for (const b of buildings) {
       if (b.dead || b.type !== 'tower' || Math.hypot(b.x - x, b.y - y) > cfg.towerSplash) continue;
-      stats.towerHits++; baseDamage(b, cfg.towerShellDamage, 0);
+      stats.towerHits++; baseDamage(b, cfg.towerShellDamage * works, 0);
     }
   }
   if (typeof updateProjectiles === 'function') {
@@ -112,7 +114,7 @@
       const flying = [];
       for (const p of projectiles) if (p.artillery && !p.dead && p.target && !p.target.dead) flying.push([p, p.x, p.y, p.target.x, p.target.y]);
       const r = base(dt);
-      for (const [p, x0, y0, tx, ty] of flying) if (p.dead && Math.hypot(p.x - tx, p.y - ty) < 14) shellLands(tx, ty, tx - x0, ty - y0);
+      for (const [p, x0, y0, tx, ty] of flying) if (p.dead && Math.hypot(p.x - tx, p.y - ty) < 14) shellLands(tx, ty, tx - x0, ty - y0, p.troop);
       return r;
     };
   }

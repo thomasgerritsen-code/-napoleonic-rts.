@@ -146,7 +146,7 @@
     // Period troops (open map only): each with a strength and a weakness.
     // sides: who fields it (France trains, Britain's AI recruits by britishShare);
     // names: the British name for a kind both armies field.
-    troops: OPEN_MAP ? Object.freeze({ fillReach:700, britishShare:Object.freeze({ grenadier:0.15, voltigeur:0.15, rifle:0.15, greys:0.45, hussar:0.55 }), kinds:Object.freeze({
+    troops: OPEN_MAP ? Object.freeze({ fillReach:700, britishShare:Object.freeze({ grenadier:0.15, voltigeur:0.15, rifle:0.15, greys:0.45, hussar:0.55, heavy12:0.3, howitzer:0.2, horseart:0.2, mounted:0.35 }), kinds:Object.freeze({
       grenadier: Object.freeze({ base:'infantry', label:'Grenadier', plural:'Grenadiers', sides:['france', 'britain'], extra:Object.freeze({ food:60, wood:30 }), time:1.4,
         hp:1.4, melee:1.3, shock:0.7, speed:0.85, pro:'40% meer leven, 30% sterker met de bajonet, 30% minder moraalverlies', con:'15% trager en duurder' }),
       voltigeur: Object.freeze({ base:'infantry', label:'Voltigeur', plural:'Voltigeurs', sides:['france', 'britain'], names:Object.freeze({ britain:['Light Company', 'Light Companies'] }),
@@ -165,7 +165,18 @@
       hussar: Object.freeze({ base:'cavalry', label:'Huzaar', plural:'Huzaren', sides:['france', 'britain'], names:Object.freeze({ britain:['Light Dragoon', 'Light Dragoons'] }), extra:Object.freeze({}), time:0.9,
         hp:0.75, charge:0.8, speed:1.25, vision:1.4, reload:0.8, pro:'25% sneller, 40% verder zicht, sneller weer klaar', con:'25% minder leven en lichtere charge' }),
       greys: Object.freeze({ base:'cavalry', label:'Scots Grey', plural:'Scots Greys', sides:['britain'], extra:Object.freeze({ food:100, wood:50 }), time:1.4,
-        hp:1.35, charge:1.4, speed:0.9, pro:'zware dragonders op grijze paarden: 35% meer leven, 40% zwaardere charge', con:'10% trager, geen kuras' })
+        hp:1.35, charge:1.4, speed:0.9, pro:'zware dragonders op grijze paarden: 35% meer leven, 40% zwaardere charge', con:'10% trager, geen kuras' }),
+      // Guns from the foundry (the plain gun is the 6-pounder).
+      heavy12: Object.freeze({ base:'artillery', label:'12-ponder', plural:'12-ponders', sides:['france', 'britain'], extra:Object.freeze({ wood:80, iron:80 }), time:1.4,
+        hp:1.2, ranged:1.35, range:1.2, speed:0.7, reload:1.2, pro:'zware kogel: 35% meer schade en 20% verder', con:'30% trager te verplaatsen, laadt 20% trager, duur in ijzer' }),
+      howitzer: Object.freeze({ base:'artillery', label:'Houwitser', plural:'Houwitsers', sides:['france', 'britain'], extra:Object.freeze({ wood:40, iron:60 }), time:1.2,
+        ranged:0.85, reload:1.15, lobbed:true, works:2.5, pro:'werpt granaten in een boog: loopgraven geven geen dekking, 2,5x schade aan loopgraven en torens', con:'15% minder schade in het open veld, laadt trager' }),
+      horseart: Object.freeze({ base:'artillery', label:'Rijdende artillerie', plural:'Rijdende artillerie', sides:['france', 'britain'], names:Object.freeze({ britain:['Royal Horse Artillery', 'Royal Horse Artillery'] }),
+        extra:Object.freeze({ food:60, wood:20 }), time:1.0,
+        hp:0.85, ranged:0.8, speed:1.7, reload:0.85, pro:'licht stuk: 70% sneller, laadt 15% sneller, snel op een andere plek', con:'20% minder schade, 15% minder leven' }),
+      // An officer on horseback, from the stable.
+      mounted: Object.freeze({ base:'officer', building:'stable', label:'Officier te paard', plural:'Officieren te paard', sides:['france', 'britain'], extra:Object.freeze({ food:80, wood:40 }), time:1.2,
+        hp:1.3, speed:1.7, vision:1.3, steady:0.85, pro:'te paard: 70% sneller, ziet 30% verder, zijn regiment verliest 15% minder moraal', con:'duurder, alleen uit de stal' })
     }) }) : null,
     // Grouped, context-sensitive bottom menu (open map only).
     actionMenu: OPEN_MAP ? Object.freeze({ version:1 }) : null,

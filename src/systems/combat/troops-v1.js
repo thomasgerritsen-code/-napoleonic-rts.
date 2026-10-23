@@ -84,17 +84,22 @@
   }
 
   // ---- training: barracks and stable get a button per kind ----
-  const BUILDING_FOR = { infantry: 'barracks', cavalry: 'stable' };
+  const BUILDING_FOR = { infantry: 'barracks', cavalry: 'stable', artillery: 'foundry', officer: 'barracks' };
+  const buildingFor = key => T[key].building || BUILDING_FOR[T[key].base];
   const costOf = key => { const t = T[key], base = TRAINING[t.base].cost, c = {}; for (const k of ['food', 'wood', 'iron']) { const v = (base[k] || 0) + (t.extra?.[k] || 0); if (v) c[k] = v; } return c; };
   const costText = c => [c.food ? `${c.food} 🍞` : '', c.wood ? `${c.wood} 🪵` : '', c.iron ? `${c.iron} ⛏️` : ''].filter(Boolean).join(' · ');
   function trainTroop(key, b = selectedBuilding) {
     const t = T[key];
-    if (!b || b.dead || !b.complete || b.side !== 'france' || b.type !== BUILDING_FOR[t.base] || !fields(key, 'france')) return false;
+    if (!b || b.dead || !b.complete || b.side !== 'france' || b.type !== buildingFor(key) || !fields(key, 'france')) return false;
     if (t.max && strength('france', key) >= t.max) { statusEl.textContent = `Hooguit ${t.max} ${t.plural}.`; return false; }
     const extra = t.extra || {};
     // The base price is paid by the game's own queue; the kind's extra on top.
     if (!canAfford('france', costOf(key))) { statusEl.textContent = `Niet genoeg grondstoffen voor een ${t.label}: ${costText(costOf(key))}.`; return false; }
-    if (!queueUnitForBuilding('france', b, t.base)) { statusEl.textContent = 'Kan nu niet trainen (bevolkingsruimte of grondstoffen).'; return false; }
+    // A kind trained away from its type's usual building (the mounted officer at the
+    // stable) is queued here by hand; the rest through the game's own queue.
+    const own = BUILDING_FOR[t.base] === b.type;
+    if (own ? !queueUnitForBuilding('france', b, t.base) : populationUsed('france') + TYPES[t.base].pop > economies.france.popCap) { statusEl.textContent = 'Kan nu niet trainen (bevolkingsruimte of grondstoffen).'; return false; }
+    if (!own) { pay('france', TRAINING[t.base].cost); b.queue.push({ type: t.base, label: t.label, time: TRAINING[t.base].time }); }
     pay('france', extra);
     const item = b.queue[b.queue.length - 1];
     item.troop = key; item.label = t.label; item.time *= t.time || 1;
@@ -123,6 +128,11 @@
           .sort((p, q) => Math.hypot(p.x - b.x, p.y - b.y) - Math.hypot(q.x - b.x, q.y - b.y))[0];
         if (u) { applyTroop(u, head.troop); stats.trained++; }
       }
+      // British guns and officers come in kinds one by one (regiments get theirs when formed).
+      for (const u of fresh) {
+        if (u.side !== 'britain' || u.troop || (u.type !== 'artillery' && u.type !== 'officer')) continue;
+        const key = rollBritish(u.type); if (key) { applyTroop(u, key); stats.british++; }
+      }
     }
     return r;
   };
@@ -138,6 +148,17 @@
   if (typeof visionRadius === 'function') {
     const base = visionRadius;
     visionRadius = function visionRadiusByTroop(e) { const t = troopOf(e); return base(e) * (t?.vision || 1); };
+  }
+  // A regiment's officer on horseback: its shock factor, looked up once a second.
+  const steadyCache = new Map();
+  function steadiness(reg) {
+    if (!reg || reg.officerId == null) return 1;
+    let c = steadyCache.get(reg.id);
+    if (!c || elapsed - c.at > 1 || elapsed < c.at) {
+      const officer = regimentMembers(reg).find(u => u.id === reg.officerId && !u.dead);
+      c = { at: elapsed, value: troopOf(officer)?.steady || 1 }; steadyCache.set(reg.id, c);
+    }
+    return c.value;
   }
   let striker = null;
   const baseFire = fire;
@@ -163,6 +184,8 @@
       // The lance: deadly against foot out of square and men in flight, weaker against horse.
       if (s?.vsInfantry && victim.type !== 'cavalry' && (victim.routing || regOf(victim)?.formation !== 'square')) { damage *= s.vsInfantry; stats.lance++; }
       else if (s?.vsCavalry && victim.type === 'cavalry') damage *= s.vsCavalry;
+      // A mounted officer steadies his regiment.
+      shock *= steadiness(regOf(victim));
       const v = troopOf(victim);
       if (v) {
         shock *= v.shock || 1;
@@ -198,7 +221,10 @@
   if (typeof createCavalryRegimentV06 === 'function') {
     const baseCav = createCavalryRegimentV06;
     createCavalryRegimentV06 = function createCavalryRegimentOfOneKind(side, candidateUnits, name = null) {
-      const { list, kind } = side === 'france' ? oneKind(side, candidateUnits || [], 'cavalry', 4) : { list: candidateUnits, kind: null };
+      const picked = side === 'france' ? oneKind(side, candidateUnits || [], 'cavalry', 4) : { list: candidateUnits || [], kind: null };
+      // Horsemen follow an officer on horseback when there is one.
+      const onHorse = u => u?.type === 'officer' && kindOf(u) === 'mounted';
+      const list = [...picked.list.filter(onHorse), ...picked.list.filter(u => !onHorse(u))], kind = picked.kind;
       const reg = baseCav(side, list, name);
       if (reg && name) reg.customName = true;
       return settle(reg, 'cavalry', kind);
@@ -212,8 +238,11 @@
       base(force);
       const b = typeof selectedBuilding !== 'undefined' ? selectedBuilding : null;
       if (!b || b.dead || !b.complete || b.side !== 'france') return;
+      // At the foundry the plain gun is the 6-pounder, beside the other models.
+      const plainGun = actionsEl.querySelector('[data-action="train-artillery"]');
+      if (plainGun && !plainGun.dataset.renamed) { plainGun.innerHTML = plainGun.innerHTML.replace(/^Artillerie/, '6-ponder'); plainGun.dataset.renamed = '1'; plainGun.title = '6-ponder veldkanon: het standaardstuk.'; }
       for (const [key, t] of Object.entries(T)) {
-        if (BUILDING_FOR[t.base] !== b.type || !fields(key, 'france') || actionsEl.querySelector(`[data-action="train-${key}"]`)) continue;
+        if (buildingFor(key) !== b.type || !fields(key, 'france') || actionsEl.querySelector(`[data-action="train-${key}"]`)) continue;
         const c = costOf(key), btn = makeDynamicButton(`train-${key}`, `${t.label}<br><small>${costText(c)}</small>`, !canAfford('france', c));
         btn.title = `${t.label}: ${t.pro} — maar ${t.con}.`;
         actionsEl.appendChild(btn);

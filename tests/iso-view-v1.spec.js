@@ -1130,3 +1130,68 @@ test('iso view: press a place and drag - an arrow shows the front, the regiment 
   expect(phone.dist).toBeLessThan(40);
   expect(errors).toEqual([]);
 });
+
+test('iso view: gun models at the foundry and the officer on horseback from the stable', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-guns&view=iso');
+  await page.waitForFunction(() => window.__TROOPS_V1__ && window.__REGIMENT_ORDERS_V1__ && window.__RTS_DEBUG__, null, { timeout: 60_000 });
+  // The gun models' sprites (when they are in the repository) stream in after the base sheets.
+  const gunSheets = !process.env.NO_ATLAS && (await page.request.get('graphics-lab/assets/sprites/iso/frg12_iso_gun12_atlas.json')).ok();
+  if (gunSheets) await page.waitForFunction(() => ['frg12', 'frgh', 'frgl', 'brg12', 'frco'].every(k => window.__ISO_VIEW_V1__?.atlasKeys?.().includes(k)), null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const X = window.__TROOPS_V1__, O = window.__REGIMENT_ORDERS_V1__, out = {};
+    economies.france.food = 20000; economies.france.wood = 20000; economies.france.iron = 5000;
+    const fd = buildings.find(q => q.side === 'france' && q.type === 'foundry' && q.complete) || createBuilding('france', 'foundry', 900, 1300, true);
+    const st = buildings.find(q => q.side === 'france' && q.type === 'stable' && q.complete) || createBuilding('france', 'stable', 1100, 1100, true);
+    selectedUnits.clear(); selectedBuilding = fd; actionSignature = ''; updateHud(true);
+    out.foundry = [...actionsEl.querySelectorAll('[data-action^="train-"]')].map(b => b.dataset.action);
+    out.plainLabel = actionsEl.querySelector('[data-action="train-artillery"]')?.textContent || '';
+    // The officer on horseback is trained at the stable.
+    selectedBuilding = st; actionSignature = ''; updateHud(true);
+    out.stable = [...actionsEl.querySelectorAll('[data-action^="train-"]')].map(b => b.dataset.action);
+    economies.france.popCap = 400;
+    out.queued = X.trainTroop('mounted', st);
+    for (let k = 0; k < 40; k++) window.__RTS_DEBUG__.tick(1);
+    const rider = units.find(u => !u.dead && u.side === 'france' && u.type === 'officer' && u.troop === 'mounted');
+    out.rider = !!rider;
+    // Horsemen follow the officer on horseback, not one on foot.
+    const cav = [0, 1, 2, 3].map(i => createUnit('france', 'cavalry', 2300 + i * 30, 1300));
+    const foot = createUnit('france', 'officer', 2280, 1300), horse = createUnit('france', 'officer', 2280, 1320); X.applyTroop(horse, 'mounted');
+    const creg = createCavalryRegimentV06('france', [...cav, foot, horse]);
+    out.cavOfficer = creg?.officerId === horse.id;
+    // Pace: the horse artillery is quick, the 12-pounder slow; the rider outpaces a foot officer.
+    const mk = (type, troop, x, y) => { const u = createUnit('france', type, x, y); if (troop) X.applyTroop(u, troop); return u; };
+    const pace = (type, troop) => { const u = mk(type, troop, 1000, 1500); const x = u.x; for (let k = 0; k < 10; k++) moveToward(u, 3000, 1500, 0.1); u.dead = true; return u.x - x; };
+    // (Guns only roll with a crew; for the pace alone that check is lifted.)
+    const canOperate = canArtilleryOperateV06; canArtilleryOperateV06 = () => true;
+    try { out.pace = { gun: pace('artillery', null), heavy: pace('artillery', 'heavy12'), horse: pace('artillery', 'horseart'), foot: pace('officer', null), rider: pace('officer', 'mounted') }; }
+    finally { canArtilleryOperateV06 = canOperate; }
+    // Shells into a trench: the parapet covers against a 6-pounder's ball, not a howitzer's shell.
+    const t = { id: 9101, side: 'britain', x: 2400, y: 1800, facing: Math.PI, length: 200, width: 60, progress: 1, startedAt: 0, level: 1 };
+    O.trenches().push(t);
+    const hitIn = troop => {
+      const v = createUnit('britain', 'infantry', t.x, t.y), h = v.hp;
+      const shell = { x: v.x - 6, y: v.y, target: v, troop, dead: false, artillery: true, damage: 0 };
+      projectiles.push(shell); applyDamage(v, 30, 8); shell.dead = true; projectiles.splice(projectiles.indexOf(shell), 1);
+      v.dead = true; return h - v.hp;
+    };
+    out.trenchHit = { ball: hitIn(null), shell: hitIn('howitzer') };
+    out.kinds = { heavy: X.kinds.heavy12.ranged, how: X.kinds.howitzer.works };
+    const V = window.__ISO_VIEW_V1__;
+    out.keys = V.atlasKeys();
+    return out;
+  });
+  expect(r.foundry).toEqual(expect.arrayContaining(['train-artillery', 'train-heavy12', 'train-howitzer', 'train-horseart']));
+  expect(r.plainLabel).toContain('6-ponder');
+  expect(r.stable).toContain('train-mounted');
+  expect(r.queued).toBe(true);
+  expect(r.rider).toBe(true);
+  expect(r.cavOfficer).toBe(true);
+  expect(r.pace.horse).toBeGreaterThan(r.pace.gun * 1.4);
+  expect(r.pace.heavy).toBeLessThan(r.pace.gun * 0.8);
+  expect(r.pace.rider).toBeGreaterThan(r.pace.foot * 1.4);
+  expect(r.trenchHit.shell).toBeGreaterThan(r.trenchHit.ball * 1.8);
+  expect(r.kinds.heavy).toBeGreaterThan(1);
+  if (gunSheets) expect(r.keys).toEqual(expect.arrayContaining(['frg12', 'frgh', 'frgl', 'brg12', 'brgh', 'brgl']));
+  expect(errors).toEqual([]);
+});

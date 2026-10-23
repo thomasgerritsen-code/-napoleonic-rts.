@@ -210,6 +210,19 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   25% treffender, schiet naar believen, scherpe ogen — maar laadt 60% trager),
   *Light Dragoons* (huzaren) en de *Scots Greys* (zware dragonders met berenmuts op
   grijze paarden: 35% meer leven, 40% zwaardere charge — maar 10% trager).
+  - *Kanonnen* (gieterij): naast de gewone *6-ponder* drie stukken, elk met een eigen
+    loop in de iso-weergave:
+    - *12-ponder* (💥, lange zware loop): 35% meer schade en 20% verder — maar 30% trager
+      te verplaatsen, laadt 20% trager en kost extra ijzer.
+    - *Houwitser* (🎇, korte wijde loop schuin omhoog): werpt granaten in een boog, dus
+      loopgraven geven geen dekking, en doet 2,5x schade aan loopgraven en torens —
+      maar 15% minder schade in het open veld en laadt trager.
+    - *Rijdende artillerie* (🏇, licht stuk; bij de Britten *Royal Horse Artillery*):
+      70% sneller, laadt 15% sneller — maar 20% minder schade en minder leven.
+  - *Officier te paard* (🎖, uit de stal): rijdt op het paard van de cavalerie-officier,
+    70% sneller, ziet 30% verder en zijn regiment verliest 15% minder moraal — maar
+    duurder. Een cavalerieregiment kiest een officier te paard als die er is. De Britten
+    hebben ook officieren te paard, 12-ponders, houwitsers en rijdende artillerie.
   **Eén soort per regiment**: soldaten van verschillende soorten staan nooit samen in
   een regiment. Kies je een gemengde groep, dan vormt de soort waar de meeste mannen van
   zijn het regiment; de anderen blijven los, en wat er tot 12 ontbreekt wordt aangevuld

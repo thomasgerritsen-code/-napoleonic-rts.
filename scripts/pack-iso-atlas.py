@@ -87,6 +87,10 @@ CAV_SIDES.update({"francek": "frck", "francel": "frcl", "britaing": "brcg"})
 # Artillery: kind -> (folder piece, sprite letter, states, cell, pivot)
 ARTILLERY = {
     "gun": ("gun", "g", [("idle", 1), ("fire", 2), ("roll", 4)], (256, 176), {"x": 128, "y": 112}),
+    # Gun models (render-iso-artillery.py --model): 12-pounder, howitzer, horse artillery.
+    "gun12": ("gun12", "g12", [("idle", 1), ("fire", 2), ("roll", 4)], (256, 176), {"x": 128, "y": 112}),
+    "gunh": ("gunh", "gh", [("idle", 1), ("fire", 2), ("roll", 4)], (256, 176), {"x": 128, "y": 112}),
+    "gunl": ("gunl", "gl", [("idle", 1), ("fire", 2), ("roll", 4)], (256, 176), {"x": 128, "y": 112}),
     "gunner": ("gunner", "a", [("idle", 2), ("ram", 4), ("load", 2), ("aim", 2), ("ready", 2), ("touch", 2),
                                ("haul", 4)], (CELL_W, CELL_H), PIVOT),
     "gunner2": ("gunner", "a", [("march", 6), ("die", 4), ("diefwd", 4), ("dieside", 4)], (CELL_W, CELL_H), PIVOT),
@@ -141,7 +145,7 @@ def pack(frames_dir: Path, side: str, kind: str) -> tuple[bytes, dict, int]:
         piece, letter, states, cell, pivot = ARTILLERY[kind]
         folder = frames_dir / "artillery" / f"{side}_{piece}"
         atlas, sheet, w = pack_cells(folder, SIDES[side] + letter, kind, states, cell, pivot)
-        if kind == "gun":
+        if kind.startswith("gun") and kind != "gunner" and kind != "gunner2":
             muzzle = json.loads((folder / "muzzle.json").read_text())["fire"]
             if sorted(muzzle) != sorted(DIRECTIONS):
                 raise PngError(f"{side}: gun muzzle.json must list all 8 directions")
