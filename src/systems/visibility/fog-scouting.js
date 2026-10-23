@@ -9,7 +9,9 @@
   const oldVisible=isVisibleToFrance;
   isVisibleToFrance=function(e){const visible=oldVisible(e);if(visible&&e?.side==='britain')sightings.set(e.id,{id:e.id,x:e.x,y:e.y,type:e.type||e.kind,seenAt:elapsed});return visible;};
   function scoutReport(){for(const e of [...livingUnits('britain'),...livingBuildings('britain')])if(canSee('france',e))sightings.set(e.id,{id:e.id,x:e.x,y:e.y,type:e.type||e.kind,seenAt:elapsed});return [...sightings.values()].map(v=>({...v,age:elapsed-v.seenAt}));}
-  const api=Object.freeze({canSee,report:scoutReport,cavalryVision:430,lastSeen:id=>sightings.get(id)||null});
+  // note(e): record a sighting (for callers that decide visibility themselves, e.g. a cache).
+  const note=e=>{if(e?.side==='britain')sightings.set(e.id,{id:e.id,x:e.x,y:e.y,type:e.type||e.kind,seenAt:elapsed});};
+  const api=Object.freeze({canSee,report:scoutReport,cavalryVision:430,lastSeen:id=>sightings.get(id)||null,note});
   nrts.subsystems.register('fog-scouting',api,{phase:'architecture-v2',legacyBridge:false,responsibility:'side-aware visibility, cavalry scouting and last-known enemy intelligence'});
   global.__FOG_SCOUTING_V1__=api;
 })(window);

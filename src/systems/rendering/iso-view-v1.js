@@ -365,7 +365,8 @@
   // Right-drag (the game's facing order): an arrow from the destination along the facing.
   function drawFacingArrow() {
     const d = typeof rightDragV06 !== 'undefined' ? rightDragV06 : null;
-    if (!d || !d.moved) return;
+    // The facing-arrow overlay (facing-arrow-v1) draws the drag on its own layer.
+    if (!d || !d.moved || global.__FACING_ARROW_V1__) return;
     const ang = Math.atan2(d.ey - d.sy, d.ex - d.sx);
     ctx.strokeStyle = 'rgba(255,236,150,.95)'; ctx.lineWidth = 3; ctx.beginPath();
     ctx.arc(d.sx, d.sy, 10, 0, 7); ctx.moveTo(d.sx, d.sy); ctx.lineTo(d.ex, d.ey);
@@ -910,6 +911,9 @@
   // between redraws, so edges glide as men move instead of stepping.
   const fogA = document.createElement('canvas'), fogB = document.createElement('canvas'), fogMix = document.createElement('canvas');
   const mixCtx = fogMix.getContext('2d');
+  // The mask is read back for its billowing rim (getImageData) a few times a
+  // second: kept in memory so the read does not stall the graphics chip.
+  for (const c of [fogA, fogB]) c.getContext('2d', { willReadFrequently: true });
   let fog = fogA, fogCtx2 = fogA.getContext('2d');
   const seenLayer = document.createElement('canvas'), seenCtx = seenLayer.getContext('2d');
   const sightLayer = document.createElement('canvas'), sightCtx = sightLayer.getContext('2d');
@@ -960,6 +964,8 @@
   // The fog canvas reaches FOG_M (half-size px) past each screen edge, so while
   // the camera pans it is shifted and only redrawn every 60 ms.
   const FOG_M = 64;
+  // Redraws of the mask (ms): it is cross-faded, so a few a second look smooth.
+  const FOG_REDRAW_MOVING = 180, FOG_REDRAW_STILL = 320;
   const disc = (x, y, r, n) => Array.from({ length: n }, (_, i) => [x + Math.cos(i / n * Math.PI * 2) * r, y + Math.sin(i / n * Math.PI * 2) * r]);
   // A ground shape (game px) lifted onto the relief, at half size.
   function groundPath(c, pts) {
@@ -974,10 +980,10 @@
     // Shift since the last redraw (screen px); redraw when zoomed, shifted far, or stale.
     const F = view.fogCam, dx = F ? (F.x - camera.x) * z() : 0, dy = F ? (F.y - camera.y) * z() * SQ : 0;
     const moved = !F || F.zoom !== camera.zoom || dx !== 0 || dy !== 0;
-    if (!F || F.zoom !== camera.zoom || Math.abs(dx) > FOG_M || Math.abs(dy) > FOG_M || now - view.fogAt > (moved ? 120 : 200)) {
+    if (!F || F.zoom !== camera.zoom || Math.abs(dx) > FOG_M || Math.abs(dy) > FOG_M || now - view.fogAt > (moved ? FOG_REDRAW_MOVING : FOG_REDRAW_STILL)) {
       // The newest becomes the one before; draw into the other canvas.
       view.fogPrev = F && F.zoom === camera.zoom ? { canvas: fog, cam: F } : null;
-      view.fogFade = Math.min(250, Math.max(50, now - view.fogAt));
+      view.fogFade = Math.min(400, Math.max(50, now - view.fogAt));
       fog = fog === fogA ? fogB : fogA; fogCtx2 = fog.getContext('2d');
       view.fogCam = { x: camera.x, y: camera.y, zoom: camera.zoom }; view.fogAt = now;
       const pad = 2 * FOG_M + 2 * PPM * z(), a = isoScreenToWorld(-pad, -pad), b = flatScreenToWorld(innerWidth + pad, innerHeight + pad);
@@ -1037,7 +1043,7 @@
   // Cloud edges: the soft ramp of the mask is pushed in or out by the cloud
   // noise (where the cloud is thick it reaches farther), then sharpened - so
   // the rim billows like a cloud instead of fading like an airbrush. Done on each
-  // redraw of the mask (5-8 times a second); the noise is fixed to the ground
+  // redraw of the mask (3-5 times a second); the noise is fixed to the ground
   // and drifts with the cloud deck. Both rims are shaped: cloud to haze over
   // ground seen before, and haze (or cloud) to clear ground in sight.
   const EDGE_SPAN = 1300, EDGE_PUSH = 1.1;
@@ -1179,6 +1185,9 @@
     drawTrenchBeds(t);
     drawCraters();
     const k = spriteK(), seen = new Set(), list = [];
+    // The faint rings in the side's colour under every man, horse and gun lie on
+    // the ground under everything: gathered into one path a side, filled once.
+    const rings = { france: new Path2D(), britain: new Path2D() };
     const visible = u => u.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance(u);
     // Where the front rank of each manned trench stands (across the trench).
     const frontV = new Map(), O = global.__REGIMENT_ORDERS_V1__;
@@ -1233,13 +1242,11 @@
       // along its crest, so chest, arms and musket hang over it.
       const crest = m.parapet && Math.sin(sunk.facing) > 0 ? view.trenchCrests.get(sunk.id) : null;
       const lip = !crest && sunk && view.trenchLips.get(sunk.id);
+      const rr = (u.type === 'cavalry' ? 0.95 : u.type === 'artillery' ? 1.1 : 0.42) * PPM * z(), ring = rings[u.side] || rings.britain;
+      ring.moveTo(X + rr, Y); ring.ellipse(X, Y, rr, rr * SQ, 0, 0, Math.PI * 2);
       list.push({ y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
         if (crest) { ctx.save(); const dy = CREST_OVERHANG * PPM * LIFT * z(); clipBelowLine(crest.map(q => [q[0], q[1] + dy])); }
         else if (lip) { ctx.save(); clipAboveLip(lip); }
-        // A faint ring in the side's colour under every man, horse and gun.
-        const rr = (u.type === 'cavalry' ? 0.95 : u.type === 'artillery' ? 1.1 : 0.42) * PPM * z();
-        ctx.fillStyle = u.side === 'france' ? 'rgba(70,110,230,.38)' : 'rgba(225,60,50,.38)';
-        ctx.beginPath(); ctx.ellipse(X, Y, rr, rr * SQ, 0, 0, 7); ctx.fill();
         if (u.type === 'worker' && !view.atlases[(u.side === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); if (crest || lip) ctx.restore(); return; }
         const [key, anim, f] = frameFor(u, m, t);
         // Until its atlas has loaded a unit is simply not drawn yet.
@@ -1276,6 +1283,8 @@
     drawRanges();
     drawSelection();
     drawOrders(t);
+    ctx.fillStyle = 'rgba(70,110,230,.38)'; ctx.fill(rings.france);
+    ctx.fillStyle = 'rgba(225,60,50,.38)'; ctx.fill(rings.britain);
     list.sort((p, q) => p.y - q.y);
     const men = list.filter(d => d.unit).map(d => d.unit);
     st.seeThrough = 0;

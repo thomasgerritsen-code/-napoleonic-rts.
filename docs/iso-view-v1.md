@@ -442,3 +442,32 @@ weergaven; terug in 2D begint de terreincache opnieuw.
 2. Tekenen via de GPU voor 520 eenheden op zwakke telefoons.
 3. Hoogte in het spel zelf: hoogte geeft verder zicht, maar heuvels blokkeren het zicht
    (nog) niet en het schootsveld houdt er geen rekening mee.
+
+## Prestaties bij grote veldslagen
+
+Gemeten met een veldslag van ruim 330 eenheden (12 regimenten, 4 ruiterregimenten,
+8 kanonnen) in de iso-weergave:
+
+| | voor | na |
+|---|---|---|
+| frame | 112 ms | 72 ms |
+| simulatie per frame | 33 ms | 19 ms |
+| zichtbaarheid per frame | 11,4 ms | 0,5 ms |
+
+- **Zichtbaarheid** (`visibility-cache-v1.js`): "kan Frankrijk dit zien?" werd per
+  Britse eenheid meerdere keren per frame gevraagd en liep elke keer alle Franse
+  eenheden af. Nu staan de Franse waarnemers één keer per spelmoment in een raster;
+  een vraag kijkt alleen naar de cellen eromheen, en het antwoord blijft dat moment
+  bewaard. Dezelfde antwoorden (getest), en de verkenning onthoudt nog steeds waar ze
+  de vijand het laatst zag. Het zichtbereik per eenheid wordt ook per moment bewaard.
+- **Zichtlijnen**: of een punt in het bos ligt, wordt per cel van 12 px onthouden
+  (bossen bewegen niet) in plaats van elke stap het hele terrein (rivieren, wegen)
+  opnieuw te vragen.
+- **Ringen onder de eenheden**: in één pad per kant getekend in plaats van één per man.
+- **Mist**: het masker met zijn golvende rand wordt 3-5 keer per seconde opnieuw
+  gemaakt (was 5-8, overvloeiend dus even vloeiend), en het teruglezen van de pixels
+  laat de grafische chip niet meer wachten (`willReadFrequently`).
+- **Aanpasbare resolutie** (`adaptive-resolution-v1.js`): op een scherm met hoge
+  pixeldichtheid (telefoon) wordt bij trage frames (boven 34 ms, 1,5 s lang) op 1
+  beeldpunt per punt getekend - minder dan de helft van de pixels - en weer scherp na
+  een rustige periode (6 s, daarna telkens langer als het te vroeg bleek).

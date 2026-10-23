@@ -147,7 +147,17 @@
   }
   if (typeof visionRadius === 'function') {
     const base = visionRadius;
-    visionRadius = function visionRadiusByTroop(e) { const t = troopOf(e); return base(e) * (t?.vision || 1); };
+    // Asked for every pair of watcher and watched each frame: kept per unit for the
+    // current moment of the game (it only changes as time passes).
+    // (It depends on the moment, the place - the relief - and the weather, whose
+    // changes bump root.__VISION_EPOCH__.)
+    visionRadius = function visionRadiusByTroop(e) {
+      const unit = e && e.kind === 'unit', epoch = root.__VISION_EPOCH__ || 0;
+      if (unit && e.visionAt === elapsed && e.visionX === e.x && e.visionY === e.y && e.visionEpoch === epoch && e.visionTroop === e.troop) return e.visionCached;
+      const t = troopOf(e), v = base(e) * (t?.vision || 1);
+      if (unit) { e.visionAt = elapsed; e.visionX = e.x; e.visionY = e.y; e.visionEpoch = epoch; e.visionTroop = e.troop; e.visionCached = v; }
+      return v;
+    };
   }
   // A regiment's officer on horseback: its shock factor, looked up once a second.
   const steadyCache = new Map();

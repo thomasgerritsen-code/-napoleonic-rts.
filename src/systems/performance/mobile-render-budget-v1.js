@@ -25,7 +25,13 @@
     return coarse || shortEdge <= CONTRACT.mobileShortEdgeCssPx;
   }
 
+  // An optional lower cap set while a scene is heavy (adaptive-resolution-v1);
+  // unset, the budget is as before.
   function desiredDpr() {
+    const adaptive = Number(root.__ADAPTIVE_DPR_CAP__) || Infinity;
+    return Math.min(budgetDpr(), adaptive);
+  }
+  function budgetDpr() {
     const nativeDpr = Math.max(1, Number(root.devicePixelRatio) || 1);
     if (mobileTarget()) return Math.min(nativeDpr, CONTRACT.mobileDprCap);
     // A large monitor may otherwise require 4-8x as many pixels as a phone

@@ -30,6 +30,7 @@
   function set(kind, hold = null) {
     if (!KINDS[kind]) return false;
     st.from = st.kind; st.kind = kind; st.blend = 0; st.changes++;
+    root.__VISION_EPOCH__ = (root.__VISION_EPOCH__ || 0) + 1;   // sight changes: cached vision is stale
     st.until = elapsed + (hold ?? (cfg.minSpell + rng() * (cfg.maxSpell - cfg.minSpell)));
     st.forced = hold != null;
     label();

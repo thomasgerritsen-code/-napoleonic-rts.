@@ -1195,3 +1195,61 @@ test('iso view: gun models at the foundry and the officer on horseback from the 
   if (gunSheets) expect(r.keys).toEqual(expect.arrayContaining(['frg12', 'frgh', 'frgl', 'brg12', 'brgh', 'brgl']));
   expect(errors).toEqual([]);
 });
+
+test('iso view: visibility cache - the same answers as the full search, far fewer searches', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-visibility&view=iso');
+  await page.waitForFunction(() => window.__VISIBILITY_CACHE_V1__ && window.__RTS_DEBUG__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const V = window.__VISIBILITY_CACHE_V1__, out = { mismatch: 0, checked: 0 };
+    // French and British spread over the field, a hussar and a tower among the watchers.
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 60; i++) createUnit('france', i % 9 ? 'infantry' : 'cavalry', 1200 + rnd() * 2000, 900 + rnd() * 1400);
+    const hus = createUnit('france', 'cavalry', 2000, 1500); window.__TROOPS_V1__.applyTroop(hus, 'hussar');
+    const brits = []; for (let i = 0; i < 150; i++) brits.push(createUnit('britain', 'infantry', 1000 + rnd() * 2400, 700 + rnd() * 1800));
+    for (let round = 0; round < 3; round++) {
+      window.__RTS_DEBUG__.tick(0.5);
+      for (const b of brits) { if (b.dead) continue; out.checked++; if (isVisibleToFrance(b) !== V.original(b)) out.mismatch++; }
+      // A plain point (a regiment's centre) as well.
+      for (let i = 0; i < 40; i++) { const pt = { side: 'britain', x: 1000 + rnd() * 2400, y: 700 + rnd() * 1800 }; out.checked++; if (isVisibleToFrance(pt) !== V.original(pt)) out.mismatch++; }
+    }
+    // Weather changes the sight: the cache follows at once.
+    window.__WEATHER_V1__?.set('fog', true);
+    for (const b of brits) { if (b.dead) continue; out.checked++; if (isVisibleToFrance(b) !== V.original(b)) out.mismatch++; }
+    // Asked again in the same moment: answered from the cache.
+    const s0 = V.stats(); for (const b of brits) isVisibleToFrance(b); const s1 = V.stats();
+    out.reanswered = s1.answered - s0.answered; out.builds = s1.builds - s0.builds;
+    out.visible = brits.filter(b => !b.dead && isVisibleToFrance(b)).length;
+    return out;
+  });
+  expect(r.checked).toBeGreaterThan(500);
+  expect(r.mismatch).toBe(0);
+  expect(r.reanswered).toBe(0);
+  expect(r.builds).toBe(0);
+  expect(r.visible).toBeGreaterThan(5);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: adaptive resolution - slow frames draw at one pixel per point, quick ones sharp again', async ({ browser, baseURL }) => {
+  test.setTimeout(150_000);
+  const context = await browser.newContext({ baseURL, viewport: { width: 900, height: 600 }, deviceScaleFactor: 2 });
+  const page = await context.newPage();
+  const errors = await openGame(page, 'test=iso-adaptive&view=iso');
+  await page.waitForFunction(() => window.__ADAPTIVE_RESOLUTION_V1__ && window.__ISO_VIEW_V1__?.isOn(), null, { timeout: 60_000 });
+  const dpr = () => page.evaluate(() => canvas.width / innerWidth);
+  const sharp = await dpr();
+  // A heavy scene: every frame takes ~50 ms.
+  await page.evaluate(() => { window.__heavy = true; (function spin() { if (!window.__heavy) return; const t = performance.now(); while (performance.now() - t < 50); requestAnimationFrame(spin); })(); });
+  await page.waitForFunction(() => window.__ADAPTIVE_RESOLUTION_V1__.state().low, null, { timeout: 20_000 });
+  const lowered = await dpr();
+  await page.evaluate(() => { window.__heavy = false; });
+  // Quick frames (< 22 ms) bring it back; this headless browser draws without a
+  // graphics chip and is not that quick even at rest, so the restore is asked for.
+  await page.evaluate(() => window.__ADAPTIVE_RESOLUTION_V1__.set(false));
+  const restored = await dpr();
+  expect(sharp).toBeGreaterThan(1.4);
+  expect(lowered).toBeCloseTo(1, 1);
+  expect(restored).toBeCloseTo(sharp, 1);
+  expect(errors).toEqual([]);
+  await context.close();
+});

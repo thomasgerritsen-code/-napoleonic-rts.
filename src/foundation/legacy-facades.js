@@ -69,9 +69,9 @@
     subsystems: ['movement', 'formation', 'navigation', 'ai-production', 'ai-tactics', 'combat', 'simulation']
   });
 })(window);
-const fogScoutingScript=document.createElement('script');fogScoutingScript.src='src/systems/visibility/fog-scouting.js?build=fs1';fogScoutingScript.async=false;document.body.appendChild(fogScoutingScript);
+const fogScoutingScript=document.createElement('script');fogScoutingScript.src='src/systems/visibility/fog-scouting.js?build=fs2';fogScoutingScript.async=false;document.body.appendChild(fogScoutingScript);
 const moraleCommandScript=document.createElement('script');moraleCommandScript.src='src/systems/morale/command-morale.js?build=mc2';moraleCommandScript.async=false;document.body.appendChild(moraleCommandScript);
-const tacticalTerrainScript=document.createElement('script');tacticalTerrainScript.src='src/systems/terrain/tactical-terrain.js?build=tl1';tacticalTerrainScript.async=false;document.body.appendChild(tacticalTerrainScript);
+const tacticalTerrainScript=document.createElement('script');tacticalTerrainScript.src='src/systems/terrain/tactical-terrain.js?build=tl2';tacticalTerrainScript.async=false;document.body.appendChild(tacticalTerrainScript);
 const staminaDisciplineScript=document.createElement('script');staminaDisciplineScript.src='src/systems/movement/stamina-discipline.js?build=sd1';staminaDisciplineScript.async=false;document.body.appendChild(staminaDisciplineScript);
 const cavArtScript=document.createElement('script');cavArtScript.src='src/systems/combat/cavalry-artillery.js?build=ca1';cavArtScript.async=false;document.body.appendChild(cavArtScript);
 const weatherScript=document.createElement('script');weatherScript.src='src/systems/world/battlefield-weather.js?build=bw1';weatherScript.async=false;document.body.appendChild(weatherScript);

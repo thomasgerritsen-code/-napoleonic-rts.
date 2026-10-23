@@ -141,6 +141,10 @@
     // Gun crews (open map only): crew a cannon from loose men or a regiment, by button or by clicking the gun.
     // Drag-to-face arrow (open map only): screen px before a drag shows; world px per file and front bar limits.
     facingArrow: OPEN_MAP ? Object.freeze({ dragPx:12, filePitch:18, minFront:40, maxFront:420, fadeMs:1400, colour:'#f2d27a' }) : null,
+    // Visibility answered from a per-moment grid of French watchers (open map only): smallest cell in px; sight lines sample woods per losCell px.
+    visibilityCache: OPEN_MAP ? Object.freeze({ minCell:200, losCell:12 }) : null,
+    // Lower pixel density while the iso view's frames are slow (open map only): ms thresholds.
+    adaptiveResolution: OPEN_MAP ? Object.freeze({ lowDpr:1, slowMs:34, quickMs:22, lowerAfterMs:1500, raiseAfterMs:6000, maxWaitMs:60000 }) : null,
     gunCrew: OPEN_MAP ? Object.freeze({ reach:600, keepInRegiment:6, clickRadius:26 }) : null,
     // Troop kinds, each with a strength and a weakness (open map only). Multipliers on the base type.
     // Period troops (open map only): each with a strength and a weakness.
