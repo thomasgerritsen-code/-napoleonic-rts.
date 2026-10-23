@@ -820,7 +820,9 @@ test('iso view: troop kinds - grenadiers, voltigeurs, kurassiers and huzaren are
     const foe = createUnit('britain', 'infantry', 1300, 1500);
     const bayonet = troop => { let tot = 0; for (let i = 0; i < 12; i++) { const u = mk('infantry', troop, 1290), h = foe.hp; u.attackMode = 'bayonet'; fire(u, foe); for (let k = 0; k < 40; k++) updateProjectiles(0.02); u.dead = true; tot += h - foe.hp; foe.hp = 100; } return tot; };
     out.bayonet = [bayonet(null), bayonet('grenadier'), bayonet('voltigeur')];
-    const balls = troop => { const c = mk('cavalry', troop, 1300, 1600); let sum = 0; for (let i = 0; i < 12; i++) { const s = createUnit('britain', 'infantry', 1450, 1600), h = c.hp; fire(s, c); for (let k = 0; k < 40; k++) updateProjectiles(0.02); s.dead = true; sum += h - c.hp; c.hp = c.maxHp; } c.dead = true; return sum; };
+    // Clear weather (no misfires) and damage per hit, so chance does not decide it.
+    window.__WEATHER_V1__?.set('clear', true); window.__WEATHER_V1__?.setWetness?.(0);
+    const balls = troop => { const c = mk('cavalry', troop, 1300, 1600); let sum = 0, hits = 0; for (let i = 0; i < 30; i++) { const s = createUnit('britain', 'infantry', 1450, 1600), h = c.hp; fire(s, c); for (let k = 0; k < 40; k++) updateProjectiles(0.02); s.dead = true; if (c.hp < h) { sum += h - c.hp; hits++; } c.hp = c.maxHp; } c.dead = true; return hits ? sum / hits : 0; };
     out.balls = [balls(null), balls('cuirassier')];
     const pace = (type, troop) => { const u = mk(type, troop, 1000); const x = u.x; for (let k = 0; k < 10; k++) moveToward(u, 3000, 1500, 0.1); u.dead = true; return u.x - x; };
     out.pace = { line: pace('infantry', null), grenadier: pace('infantry', 'grenadier'), voltigeur: pace('infantry', 'voltigeur'), horse: pace('cavalry', null), hussar: pace('cavalry', 'hussar'), cuirassier: pace('cavalry', 'cuirassier') };
