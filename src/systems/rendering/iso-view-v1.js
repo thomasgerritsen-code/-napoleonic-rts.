@@ -1130,12 +1130,13 @@
       const sunk = !deck && (orders?.trenchAt?.(u.x, u.y) || orders?.diggingAt?.(u.x, u.y));
       const musketeer = u.type === 'infantry' && !crewIds.has(u.id);
       // Musketeers in a trench being dug are at work with the spade, deeper as it grows.
-      m.digging = sunk && sunk.progress < 1 && musketeer ? sunk : null;
+      // ...also while they revet or fortify a finished one (an upgrade bought for resources).
+      m.digging = sunk && (sunk.progress < 1 || sunk.upgrade) && musketeer && orders?.diggingAt?.(u.x, u.y) ? sunk : null;
       if (m.digging) st.digging++;
       // The front rank of a finished trench steps up to the parapet and leans on it.
       let wx = u.x, wy = u.y;
       m.parapet = null;
-      if (sunk && sunk.progress >= 1 && musketeer && !m.moving && !u.routing) {
+      if (sunk && sunk.progress >= 1 && !m.digging && musketeer && !m.moving && !u.routing) {
         const nx = Math.cos(sunk.facing), ny = Math.sin(sunk.facing), v = (u.x - sunk.x) * nx + (u.y - sunk.y) * ny;
         // Front rank: within half a rank of the man nearest the parapet.
         if (v > (frontV.get(sunk.id) ?? v) - 8) {
@@ -1412,11 +1413,13 @@
       // Once dug, the walls are revetted with fascines (Blender brushwood
       // bundles), darker towards the bottom.
       const tile = view.props.fascine_wall;
-      if (tile && p > 0.6) {
+      // Fascines come with level 2 (bought), growing in while the men put them up.
+      const lvl = t.level || 1, revet = lvl >= 2 ? 1 : t.upgrade?.to === 2 ? t.upgrade.progress : 0;
+      if (tile && p > 0.6 && revet > 0) {
         if (!tile.pattern) tile.pattern = ctx.createPattern(tile.image, 'repeat');
         const k = PPM * z() / tile.pxPerM;
         tile.pattern.setTransform(new DOMMatrix([k, 0, 0, k, sx(t.x), top]));
-        ctx.globalAlpha = Math.min(1, (p - 0.6) / 0.4); ctx.fillStyle = tile.pattern; ctx.fillRect(-1e4, top - 2, 2e4, bottom - top + 4);
+        ctx.globalAlpha = Math.min(1, (p - 0.6) / 0.4) * revet; ctx.fillStyle = tile.pattern; ctx.fillRect(-1e4, top - 2, 2e4, bottom - top + 4);
         const sh = ctx.createLinearGradient(0, top, 0, bottom);
         sh.addColorStop(0, 'rgba(20,14,8,0)'); sh.addColorStop(1, 'rgba(20,14,8,.6)');
         ctx.fillStyle = sh; ctx.fillRect(-1e4, top - 2, 2e4, bottom - top + 4); ctx.globalAlpha = 1;
@@ -1445,7 +1448,7 @@
       ctx.restore();
       // A crumbly light lip.
       ctx.strokeStyle = 'rgba(168,142,100,.6)'; ctx.lineWidth = Math.max(0.8, 1.1 * z()); smoothFill(lip); ctx.stroke();
-      if (t.progress < 1 && elapsed - (t.dugAt ?? -99) < 2) {
+      if ((t.progress < 1 || t.upgrade) && elapsed - (t.dugAt ?? -99) < 2) {
         // Earth flying from the spades towards the parapet.
         ctx.fillStyle = 'rgba(120,96,62,.9)';
         for (let i = 0; i < 9; i++) {
@@ -1502,7 +1505,9 @@
   // the men), before them otherwise.
   function revetmentDrawables(t) {
     const gab = view.props.gabion, bags = view.props.sandbags;
-    if (!gab || t.progress < 1) return [];
+    // Gabions and sandbags come with level 3, set up one by one while the men build.
+    const build = (t.level || 1) >= 3 ? 1 : t.upgrade?.to === 3 ? t.upgrade.progress : 0;
+    if (!gab || t.progress < 1 || build <= 0) return [];
     const X = sx(t.x), Y = gy(t.x, t.y);
     if (X < -400 || X > innerWidth + 400 || Y < -200 || Y > innerHeight + 200) return [];
     const f = trenchFrame(t), { half, w, at } = f, { lift, lipV } = parapetShape(t, f);
@@ -1513,6 +1518,7 @@
       // Back to front on screen, so nearer baskets overlap farther ones.
       const spots = [];
       for (let i = 0; i <= n; i++) {
+        if (build < 1 && hash(t.id * 7 + i, 9) > build) continue;
         const u = -n * step / 2 + i * step + (hash(t.id * 13 + i, 2) - 0.5) * 3;
         spots.push(at(u, lipV(u) + 3, Math.min(lift(u), 0.12)));
       }
@@ -1521,7 +1527,7 @@
       // Sandbags lie along X in their picture: only on a parapet running across
       // the screen; on the crest, so behind the baskets when the bank is far.
       const sacks = () => {
-        if (!bags || Math.abs(Math.sin(t.facing)) <= 0.82) return;
+        if (!bags || build < 1 || Math.abs(Math.sin(t.facing)) <= 0.82) return;
         const bs = 1.7 * PPM, m = Math.max(1, Math.floor((2 * half - w * 1.6) / bs));
         for (let i = 0; i <= m; i++) {
           const u = -m * bs / 2 + i * bs, [x, y] = at(u, lipV(u) + 8, lift(u) * 0.95);

@@ -59,7 +59,9 @@
   };
   const trenchAt = (x, y) => trenches.find(t => t.progress >= 1 && inTrench(t, x, y)) || null;
   // A trench being dug right now (its regiment worked on it in the last second or two).
-  const diggingAt = (x, y) => trenches.find(t => t.progress < 1 && elapsed - (t.dugAt ?? -99) < 2 && inTrench(t, x, y)) || null;
+  const diggingAt = (x, y) => trenches.find(t => (t.progress < 1 || t.upgrade) && elapsed - (t.dugAt ?? -99) < 2 && inTrench(t, x, y)) || null;
+  const levels = cfg.trenchLevels || [null, {}];
+  const levelOf = t => levels[t.level || 1] || {};
   const foeNear = (side, c, r) => units.some(e => !e.dead && !e.routing && e.side !== side && e.type !== 'worker' && Math.hypot(e.x - c.x, e.y - c.y) < r);
   function lineGeometry(reg, m) {
     const facing = Number.isFinite(reg.facing) ? reg.facing : -Math.PI / 2, ax = Math.cos(facing + Math.PI / 2), ay = Math.sin(facing + Math.PI / 2);
@@ -90,6 +92,7 @@
     const own = reg.trenchId ? trenches.find(t => t.id === reg.trenchId) : null;
     if (reg.trenchId && (!own || Math.hypot(own.x - c.x, own.y - c.y) > cfg.trenchSnap)) reg.trenchId = null;
     if (reg.trenchId && own && reg.trenchStill >= 1) drummerIntoTrench(reg, m, own);
+    if (reg.trenchId && own && own.progress >= 1) upgradeWork(reg, own);
     if (reg.trenchId || reg.trenchStill < 2) return;
     const t = trenches.filter(q => q.progress >= 1 && Math.hypot(q.x - c.x, q.y - c.y) < cfg.trenchSnap)
       .sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
@@ -99,6 +102,41 @@
     reg.formation = 'line';
     if (typeof arrangeFacingRegimentV146 === 'function') arrangeFacingRegimentV146(reg, t.x, t.y, 'line', t.facing);
     // The trench covers them as soon as they stand in it; bracing follows when they halt.
+  }
+  // ---- upgrading a trench for resources: level 2 revets the walls with
+  // fascines, level 3 adds gabions and sandbags; each covers better. The
+  // regiment in it does the work (shown digging) while it stands there. ----
+  const costText = c => [c.wood ? `${c.wood} 🪵` : '', c.iron ? `${c.iron} ⛏️` : '', c.food ? `${c.food} 🍞` : ''].filter(Boolean).join(' · ');
+  const ownTrench = reg => { const t = reg && reg.trenchId ? trenches.find(q => q.id === reg.trenchId) : null; return t && t.progress >= 1 ? t : null; };
+  function upgradeTrench(reg = selectedRegs()[0]) {
+    const t = ownTrench(reg);
+    if (!t) { if (reg?.side === 'france') statusEl.textContent = 'Dit regiment staat niet in een voltooide loopgraaf.'; return false; }
+    const to = (t.level || 1) + 1, next = levels[to];
+    if (!next || t.upgrade) return false;
+    if (!canAfford(reg.side, next.cost)) { if (reg.side === 'france') statusEl.textContent = `Niet genoeg grondstoffen: ${costText(next.cost)} nodig.`; return false; }
+    pay(reg.side, next.cost);
+    t.upgrade = { to, progress: 0, by: reg.id };
+    stats.upgradesStarted = (stats.upgradesStarted || 0) + 1;
+    if (reg.side === 'france') { statusEl.textContent = `${reg.name} versterkt de loopgraaf: ${next.label} (${next.seconds} s).`; actionSignature = ''; updateHud(true); }
+    return true;
+  }
+  function upgradeWork(reg, t) {
+    if (!t.upgrade) {
+      // The British commander improves the works he defends when he can spare it.
+      const next = levels[(t.level || 1) + 1];
+      if (reg.side === 'britain' && reg.defend && next && reg.trenchStill >= 3 && canAfford('britain', { wood: (next.cost.wood || 0) + 200, iron: (next.cost.iron || 0) + 40 }))
+        upgradeTrench(reg);
+      return;
+    }
+    if (t.upgrade.by !== reg.id || reg.trenchStill < 1) return;
+    const next = levels[t.upgrade.to];
+    t.upgrade.progress = Math.min(1, t.upgrade.progress + 1 / (next.seconds || 10));
+    t.dugAt = elapsed;
+    if (t.upgrade.progress >= 1) {
+      t.level = t.upgrade.to; t.upgrade = null; stats.upgrades = (stats.upgrades || 0) + 1;
+      if (reg.side === 'france') statusEl.textContent = `Loopgraaf van ${reg.name} is nu: ${next.label}.`;
+    }
+    if (reg.side === 'france' && selectedRegs().includes(reg)) { actionSignature = ''; updateHud(true); }
   }
   // The drummer goes down into the trench too, at one end behind the ranks,
   // instead of standing out in front on the open field.
@@ -118,7 +156,7 @@
     if (!t && !near) {
       if (trenches.length >= cfg.maxTrenches) return;
       const g = lineGeometry(reg, m);
-      t = { id: ++trenchSeq, side: reg.side, x: g.x, y: g.y, facing: g.facing, length: g.length, width: g.width, progress: 0, startedAt: elapsed };
+      t = { id: ++trenchSeq, side: reg.side, x: g.x, y: g.y, facing: g.facing, length: g.length, width: g.width, progress: 0, startedAt: elapsed, level: 1 };
       trenches.push(t); reg.trenchId = t.id; stats.dug++;
     }
     if (!t) return;
@@ -174,7 +212,7 @@
     }
     const t = victim && victim.kind === 'unit' && trenches.length ? trenchAt(victim.x, victim.y) : null;
     if (t) {
-      if (fromFront(t, victim)) { stats.inTrench++; return baseDamage(victim, damage * cfg.trenchDamage, shock * cfg.trenchShock); }
+      if (fromFront(t, victim)) { stats.inTrench++; const L = levelOf(t); return baseDamage(victim, damage * (L.damage ?? cfg.trenchDamage), shock * (L.shock ?? cfg.trenchShock)); }
       stats.flanked = (stats.flanked || 0) + 1;
     }
     const reg = regOf(victim);
@@ -264,6 +302,15 @@
         b.title = 'Verdedigende houding: in linie of carré stilstaand graaft het regiment zich in - minder verlies, minder moraalverlies, sneller herladen.';
         actionsEl.appendChild(b);
       }
+      const t = regs.length === 1 ? ownTrench(regs[0]) : null;
+      if (t && !actionsEl.querySelector('[data-action="trench-upgrade"]')) {
+        const level = t.level || 1, next = levels[level + 1];
+        const b = t.upgrade ? makeDynamicButton('trench-upgrade', `⛏ Versterken…<br><small>${levels[t.upgrade.to].label} · ${Math.round(t.upgrade.progress * 100)}%</small>`, true)
+          : next ? makeDynamicButton('trench-upgrade', `⛏ Loopgraaf → ${next.label}<br><small>${costText(next.cost)}</small>`, !canAfford('france', next.cost))
+          : makeDynamicButton('trench-upgrade', `Loopgraaf: ${levels[level].label}<br><small>maximaal</small>`, true);
+        b.title = next ? `Niveau ${level + 1}: ${next.label} - neemt ${Math.round((1 - next.damage) * 100)}% van het vuur van voren op (nu ${Math.round((1 - (levels[level].damage ?? cfg.trenchDamage)) * 100)}%).` : 'Hoogste niveau bereikt.';
+        actionsEl.appendChild(b);
+      }
       const loose = looseInfantry().length;
       if (regs.length === 1 && loose && !actionsEl.querySelector('[data-action="reinforce-regiment"]')) {
         const have = regimentMembers(regs[0]).filter(u => u.type === 'infantry').length;
@@ -277,6 +324,7 @@
       if (!b || b.disabled) return;
       if (b.dataset.action === 'defend-stance') toggleDefend();
       else if (b.dataset.action === 'reinforce-regiment') reinforce();
+      else if (b.dataset.action === 'trench-upgrade') upgradeTrench();
     });
   }
   addEventListener('keydown', e => {
@@ -286,7 +334,7 @@
   });
 
   global.__REGIMENT_ORDERS_V1__ = Object.freeze({
-    version: 'regiment-orders-v1', config: cfg, isBraced, toggleDefend, reinforce,
+    version: 'regiment-orders-v1', config: cfg, isBraced, toggleDefend, reinforce, upgradeTrench, levelOf,
     trenches: () => trenches, trenchAt, diggingAt, obstacleAt,
     stats: () => ({ ...stats, trenches: trenches.length, finished: trenches.filter(t => t.progress >= 1).length, braced: regiments.filter(isBraced).length, defending: regiments.filter(r => !r.destroyed && r.defend).length })
   });

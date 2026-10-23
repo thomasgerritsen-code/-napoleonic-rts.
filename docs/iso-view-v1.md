@@ -114,7 +114,15 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   de loopgraaf); van opzij of van achteren staan de mannen in het open (alleen de
   ingegraven-bonus blijft). Ruiterij kan er niet overheen stormen: in de gracht,
   over de wal en door de loopgraaf gaat een ruiter stapvoets (30% snelheid), zijn
-  charge breekt en hij krijgt 40% meer schade. De tamboer gaat mee de loopgraaf in en staat
+  charge breekt en hij krijgt 40% meer schade.
+- **Loopgraaf versterken** (knop als je één regiment in een voltooide loopgraaf
+  selecteert): niveau 1 *Veldschans* (gegraven: kuil, wal, gracht; 50% minder
+  verlies van voren), niveau 2 *Bekleed* (120 hout, 10 s: takkenbossen tegen de
+  wanden; 62% minder), niveau 3 *Versterkt* (160 hout + 40 ijzer, 14 s:
+  schanskorven en zandzakken; 72% minder). Het regiment doet het werk zolang het
+  erin blijft staan (zichtbaar aan het graven; takkenbossen en korven verschijnen
+  gaandeweg); loopt het weg, dan wacht het werk. De Britse commandant versterkt
+  zijn eigen loopgraven als hij hout en ijzer over heeft. De tamboer gaat mee de loopgraaf in en staat
   aan het uiteinde achter de rijen (al tijdens het graven); de officier blijft erbuiten. Wie in een voltooide
   loopgraaf staat - van welke kant ook - lijdt 50% minder verlies en verliest nog
   minder moraal dan alleen ingegraven. In de iso-weergave staan de mannen erin lager,

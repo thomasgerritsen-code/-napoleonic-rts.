@@ -598,6 +598,9 @@ test('iso view: a trench covers only against fire from its front, horses cross i
       const v = Math.hypot(c.x - x, c.y - y) / 0.25;
       if (O.obstacleAt(c.x, c.y)) ditch = Math.max(ditch, v); else if (!open) open = v;
     }
+    // Revetted and fortified for resources (levels 2 and 3) so the field-work kit shows.
+    a.trenchId = t.id; economies.france.wood = 2000; economies.france.iron = 500;
+    t.level = 3;
     return { front, flank, open, ditch, charge: c.chargeTimer };
   });
   expect(r.front).toBeLessThan(r.flank * 0.85);
@@ -605,6 +608,49 @@ test('iso view: a trench covers only against fire from its front, horses cross i
   expect(r.ditch).toBeLessThan(r.open * 0.5);
   expect(r.charge).toBe(0);
   // Fascines line the walls, gabions stand along the parapet.
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().fascines > 0 && window.__ISO_VIEW_V1__.stats().gabions > 0);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: a trench can be upgraded for resources - the men revet it, then fortify it, and it covers better', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await openGame(page, 'test=iso-upgrade&view=iso');
+  await page.waitForFunction(() => window.__REGIMENT_ORDERS_V1__ && window.__ISO_VIEW_V1__?.stats().props >= 19, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const O = window.__REGIMENT_ORDERS_V1__, us = [];
+    for (let i = 0; i < 14; i++) us.push(createUnit('france', 'infantry', 900 + (i % 7) * 20, 1300 + (i < 7 ? 0 : 18)));
+    us.push(createUnit('france', 'officer', 880, 1300), createUnit('france', 'drummer', 880, 1310));
+    const a = createRegiment('france', us);
+    arrangeFacingRegimentV146(a, 960, 1300, 'line', Math.PI / 2);
+    selectWholeRegiment(a); O.toggleDefend();
+    for (let k = 0; k < 45; k++) window.__RTS_DEBUG__.tick(1);
+    const t = O.trenches()[0];
+    const man = regimentMembers(a).find(u => u.type === 'infantry' && O.trenchAt(u.x, u.y));
+    const loss = () => { let sum = 0; for (let i = 0; i < 10; i++) { const s = createUnit('britain', 'infantry', man.x + Math.cos(t.facing) * 150, man.y + Math.sin(t.facing) * 150), h = man.hp; fire(s, man); for (let k = 0; k < 40; k++) updateProjectiles(0.02); s.dead = true; sum += h - man.hp; man.hp = 100; } return sum; };
+    economies.france.wood = 1000; economies.france.iron = 200;
+    actionSignature = ''; updateHud(true);
+    const button = document.querySelector('[data-action="trench-upgrade"]');
+    const label1 = button?.textContent;
+    const l1 = loss();
+    button.click();
+    const wood = economies.france.wood;
+    for (let k = 0; k < 4; k++) window.__RTS_DEBUG__.tick(1);
+    const digging = regimentMembers(a).filter(u => O.diggingAt?.(u.x, u.y)).length;
+    for (let k = 0; k < 10; k++) window.__RTS_DEBUG__.tick(1);
+    const level2 = t.level, l2 = loss();
+    O.upgradeTrench(a);
+    for (let k = 0; k < 16; k++) window.__RTS_DEBUG__.tick(1);
+    camera.x = t.x; camera.y = t.y; camera.zoom = 1.6;
+    return { label1, paid: 1000 - wood, digging, level2, level3: t.level, l1, l2, l3: loss(), maxed: O.upgradeTrench(a) };
+  });
+  expect(r.label1).toContain('Bekleed');
+  expect(r.paid).toBe(120);
+  expect(r.digging).toBeGreaterThan(5);
+  expect(r.level2).toBe(2);
+  expect(r.level3).toBe(3);
+  expect(r.l2).toBeLessThan(r.l1);
+  expect(r.l3).toBeLessThan(r.l2);
+  expect(r.maxed).toBe(false);
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().fascines > 0 && window.__ISO_VIEW_V1__.stats().gabions > 0);
   expect(errors).toEqual([]);
 });
