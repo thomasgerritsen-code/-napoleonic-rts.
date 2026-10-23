@@ -681,3 +681,51 @@ test('iso view: the bottom menu shows only what fits the selection, in labelled 
   expect(tc.v).toContain('train-worker');
   expect(errors).toEqual([]);
 });
+
+test('iso view: flank and rear blows hurt more, tirailleurs spread out, round shot knocks down a trench, morale shows', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-depth&view=iso');
+  await page.waitForFunction(() => window.__BATTLE_DEPTH_V1__ && window.__REGIMENT_ORDERS_V1__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const D = window.__BATTLE_DEPTH_V1__, O = window.__REGIMENT_ORDERS_V1__;
+    const mk = (x, y) => { const us = []; for (let i = 0; i < 12; i++) us.push(createUnit('france', 'infantry', x + (i % 6) * 20, y + (i < 6 ? 0 : 18))); us.push(createUnit('france', 'officer', x - 20, y), createUnit('france', 'drummer', x - 20, y + 10)); return createRegiment('france', us); };
+    const a = mk(900, 1300); arrangeFacingRegimentV146(a, 960, 1300, 'line', 0);
+    for (let k = 0; k < 6; k++) window.__RTS_DEBUG__.tick(1);
+    const man = regimentMembers(a).find(u => u.type === 'infantry');
+    const hit = ang => { const s = createUnit('britain', 'infantry', man.x + Math.cos(ang) * 150, man.y + Math.sin(ang) * 150), h = man.hp; fire(s, man); for (let k = 0; k < 40; k++) updateProjectiles(0.02); s.dead = true; const d = h - man.hp; man.hp = 100; man.morale = 100; return d; };
+    const sum = ang => { let d = 0; for (let i = 0; i < 12; i++) d += hit(ang); return d; };
+    const front = sum(0), flank = sum(Math.PI / 2), rear = sum(Math.PI);
+    const spanOf = () => { const m = regimentMembers(a).filter(u => u.type === 'infantry'); return Math.max(...m.map(u => u.targetX)) - Math.min(...m.map(u => u.targetX)) + Math.max(...m.map(u => u.targetY)) - Math.min(...m.map(u => u.targetY)); };
+    const closed = spanOf();
+    selectWholeRegiment(a); actionSignature = ''; updateHud(true);
+    document.querySelector('[data-action="skirmish"]').click();
+    const open = spanOf(), skirmish = a.skirmish;
+    for (let k = 0; k < 8; k++) window.__RTS_DEBUG__.tick(1);
+    const skFront = sum(0);
+    const charge = () => { const s = createUnit('britain', 'cavalry', man.x + 10, man.y), h = man.hp; fire(s, man); s.dead = true; const d = h - man.hp; man.hp = 100; return d; };
+    const horseOpen = charge(); D.toggleSkirmish([a]); const horseClosed = charge();
+    // Round shot falling on a revetted trench.
+    const b = mk(1500, 1300); arrangeFacingRegimentV146(b, 1560, 1300, 'line', Math.PI / 2); O.toggleDefend([b]);
+    for (let k = 0; k < 45; k++) window.__RTS_DEBUG__.tick(1);
+    const t = O.trenches()[0]; t.level = 2;
+    const target = regimentMembers(b).find(u => O.trenchAt(u.x, u.y));
+    for (let i = 0; i < 10; i++) { projectiles.push({ x: t.x, y: t.y + 260, target, side: 'britain', damage: 1, speed: 280, artillery: true, dead: false }); for (let k = 0; k < 80; k++) updateProjectiles(0.02); }
+    const level = t.level, integrity = t.integrity;
+    for (let k = 0; k < 30; k++) window.__RTS_DEBUG__.tick(1);
+    regimentMembers(a).forEach(u => u.morale = 35);
+    camera.x = 1000; camera.y = 1320; camera.zoom = 1.3; selectedUnits.clear();
+    return { front, flank, rear, closed, open, skirmish, skFront, horseOpen, horseClosed, level, integrity, repaired: t.integrity, craters: D.craters().length, morale: D.regimentMorale(a) };
+  });
+  expect(r.flank).toBeGreaterThan(r.front * 1.1);
+  expect(r.rear).toBeGreaterThan(r.flank);
+  expect(r.skirmish).toBe(true);
+  expect(r.open).toBeGreaterThan(r.closed * 1.6);
+  expect(r.skFront).toBeLessThan(r.front * 0.85);
+  expect(r.horseOpen).toBeGreaterThan(r.horseClosed * 1.3);
+  expect(r.level).toBe(1);
+  expect(r.repaired).toBeGreaterThan(r.integrity);
+  expect(r.craters).toBe(10);
+  expect(r.morale.wavering).toBe(true);
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().moraleBars > 0);
+  expect(errors).toEqual([]);
+});

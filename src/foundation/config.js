@@ -129,6 +129,10 @@
         Object.freeze({ label:'Veldschans' }),
         Object.freeze({ label:'Bekleed', cost:Object.freeze({ wood:120 }), seconds:10, damage:0.38, shock:0.35 }),
         Object.freeze({ label:'Versterkt', cost:Object.freeze({ wood:160, iron:40 }), seconds:14, damage:0.28, shock:0.25 })]) }) : null,
+    // Flank/rear blows, shells on the works, tirailleurs, morale shown (open map only).
+    battleDepth: OPEN_MAP ? Object.freeze({ flankDamage:1.25, rearDamage:1.5, flankShock:1.5, rearShock:2.0, waverAt:45,
+      shellDamage:14, breachedCover:0.8, repairPerSecond:2, towerSplash:44, towerShellDamage:30, maxCraters:80,
+      skirmishSpread:2.3, skirmishCover:0.72, skirmishWoodCover:0.55, skirmishVsCavalry:1.7, skirmishRange:1.15 }) : null,
     // Grouped, context-sensitive bottom menu (open map only).
     actionMenu: OPEN_MAP ? Object.freeze({ version:1 }) : null,
     // Buildable musketry tower (open map only): range and vision in game px.

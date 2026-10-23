@@ -828,12 +828,54 @@
     }
     ctx.globalAlpha = 1; view.stats.smoke = view.smoke.length;
   }
+  // Musket balls fly at shoulder height; round shot arcs from the muzzle to
+  // its first graze (a shadow under it), then skips on along the ground.
+  const shotFrom = new WeakMap();
   function drawProjectiles() {
-    ctx.fillStyle = 'rgba(30,28,24,.9)';
     for (const p of projectiles) {
       if (p.dead) continue;
-      ctx.beginPath(); ctx.arc(sx(p.x), gy(p.x, p.y) - 1.2 * LIFT * PPM * z(), Math.max(1, 1.4 * z()), 0, 7); ctx.fill();
+      if (!p.artillery) {
+        ctx.fillStyle = 'rgba(30,28,24,.9)';
+        ctx.beginPath(); ctx.arc(sx(p.x), gy(p.x, p.y) - 1.2 * LIFT * PPM * z(), Math.max(1, 1.4 * z()), 0, 7); ctx.fill();
+        continue;
+      }
+      let from = shotFrom.get(p);
+      if (!from) { from = { x: p.x, y: p.y, d: Math.max(1, Math.hypot((p.target?.x ?? p.x) - p.x, (p.target?.y ?? p.y) - p.y)) }; shotFrom.set(p, from); }
+      const left = Math.hypot((p.target?.x ?? p.x) - p.x, (p.target?.y ?? p.y) - p.y), f = Math.max(0, Math.min(1, 1 - left / from.d));
+      const h = (0.9 + Math.sin(f * Math.PI) * Math.min(4, from.d / PPM * 0.12)) * LIFT * PPM * z();
+      const X = sx(p.x), Y = gy(p.x, p.y), r = Math.max(1.6, 2.4 * z());
+      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(X, Y, r * 1.2, r * 0.5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1d1c1a'; ctx.beginPath(); ctx.arc(X, Y - h, r, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(X - r * 0.35, Y - h - r * 0.35, r * 0.35, 0, 7); ctx.fill();
     }
+  }
+  // Where round shot fell (battle-depth-v1): a scorched crater that fades over
+  // a minute and a half; fresh, a spray of earth and the ball skipping on.
+  function drawCraters() {
+    const D = global.__BATTLE_DEPTH_V1__; if (!D) return;
+    let n = 0;
+    for (const c of D.craters()) {
+      const age = elapsed - c.t; if (age > 90 || age < 0) continue;
+      const X = sx(c.x), Y = gy(c.x, c.y);
+      if (X < -60 || X > innerWidth + 60 || Y < -60 || Y > innerHeight + 60) continue;
+      const r = 0.9 * PPM * z(), a = Math.min(1, (90 - age) / 30);
+      ctx.fillStyle = `rgba(52,40,28,${0.55 * a})`; ctx.beginPath(); ctx.ellipse(X, Y, r, r * SQ, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = `rgba(28,22,15,${0.6 * a})`; ctx.beginPath(); ctx.ellipse(X, Y, r * 0.55, r * 0.55 * SQ, 0, 0, 7); ctx.fill();
+      if (age < 0.9) {
+        // Earth thrown up, and the ball skipping on along its line.
+        ctx.fillStyle = `rgba(120,96,62,${0.8 * (1 - age / 0.9)})`;
+        for (let i = 0; i < 7; i++) {
+          const ang = hash(c.t * 10 + i, 3) * 7, sp = (0.6 + hash(i, c.t) * 0.8) * PPM * z() * age * 2.2;
+          ctx.beginPath(); ctx.arc(X + Math.cos(ang) * sp, Y + Math.sin(ang) * sp * SQ - Math.sin(Math.min(1, age / 0.9) * Math.PI) * 0.9 * PPM * z(), Math.max(1, 1.6 * z()), 0, 7); ctx.fill();
+        }
+        if (age < 0.6) {
+          const run = age / 0.6, bx = c.x + c.dx * run * 3.5 * PPM, by = c.y + c.dy * run * 3.5 * PPM, bh = Math.sin(run * Math.PI) * 0.8 * LIFT * PPM * z();
+          ctx.fillStyle = '#1d1c1a'; ctx.beginPath(); ctx.arc(sx(bx), gy(bx, by) - bh, Math.max(1.6, 2.4 * z()), 0, 7); ctx.fill();
+        }
+      }
+      n++;
+    }
+    view.stats.craters = n;
   }
   // ---- fog of war, in three shades as in the classic RTS games ----
   // Never seen: under drifting clouds. Seen before (the game's explored cells):
@@ -1110,6 +1152,7 @@
     drawTerrain();
     view.stats.trenches = 0;
     drawTrenchBeds(t);
+    drawCraters();
     const k = spriteK(), seen = new Set(), list = [];
     const visible = u => u.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance(u);
     // Where the front rank of each manned trench stands (across the trench).
@@ -1541,7 +1584,35 @@
   }
   // A shield over each regiment in the defensive stance: outlined while it
   // braces, filled once braced (regiment-orders-v1).
+  // Morale over every regiment in sight (battle-depth-v1): a bar from green to
+  // red, a red "!" when it wavers, a white flag when most of it runs; a small
+  // drum and sword show the drummer and officer who hold it together.
+  function drawMorale() {
+    const D = global.__BATTLE_DEPTH_V1__; if (!D) return;
+    let n = 0;
+    for (const reg of regiments) {
+      if (reg.destroyed) continue;
+      const m = regimentMembers(reg).filter(u => !u.dead); if (!m.length) continue;
+      if (reg.side === 'britain' && typeof isVisibleToFrance === 'function' && !m.some(u => isVisibleToFrance(u))) continue;
+      const info = D.regimentMorale(reg); if (!info) continue;
+      const c = centroid(m), X = sx(c.x), Y = gy(c.x, c.y) - 2.4 * LIFT * PPM * z() - (reg.defend ? 34 : 14);
+      if (X < -60 || X > innerWidth + 60 || Y < -40 || Y > innerHeight + 40) continue;
+      const w = 34 + 6 * Math.min(2, z()), h = 5, f = Math.max(0, Math.min(1, info.morale / 100));
+      ctx.fillStyle = 'rgba(15,13,10,.75)'; ctx.fillRect(X - w / 2 - 1.5, Y - 1.5, w + 3, h + 3);
+      ctx.fillStyle = `hsl(${Math.round(f * 115)},70%,${42 + f * 8}%)`; ctx.fillRect(X - w / 2, Y, w * f, h);
+      ctx.strokeStyle = reg.side === 'france' ? 'rgba(120,150,235,.9)' : 'rgba(230,110,100,.9)'; ctx.lineWidth = 1; ctx.strokeRect(X - w / 2 - 1.5, Y - 1.5, w + 3, h + 3);
+      ctx.font = '600 10px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      if (info.routing >= 0.5) { ctx.fillStyle = '#fff'; ctx.fillText('🏳', X, Y - 2); }
+      else if (info.wavering) { ctx.fillStyle = (Math.floor(performance.now() / 350) % 2) ? '#ff5a45' : '#ffd0c8'; ctx.font = '800 12px system-ui,sans-serif'; ctx.fillText('!', X, Y - 1); }
+      ctx.font = '9px system-ui,sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      ctx.fillText((info.officer ? '⚔' : '') + (info.drummer ? '🥁' : ''), X + w / 2 + 4, Y + h / 2);
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+      n++;
+    }
+    view.stats.moraleBars = n;
+  }
   function drawStances() {
+    drawMorale();
     const R = global.__REGIMENT_ORDERS_V1__; if (!R) return;
     for (const reg of regiments) {
       if (reg.destroyed || !reg.defend) continue;

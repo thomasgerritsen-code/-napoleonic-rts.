@@ -18,7 +18,7 @@
   ];
   const ACTION_GROUP = {
     halt: 'bevel', bayonet: 'bevel', charge: 'bevel', 'artillery-mode': 'bevel', 'defend-stance': 'bevel', 'trench-upgrade': 'bevel',
-    'rotate-left': 'formatie', 'rotate-right': 'formatie',
+    'rotate-left': 'formatie', 'rotate-right': 'formatie', skirmish: 'formatie',
     'create-regiment': 'regiment', 'reinforce-regiment': 'regiment', 'select-nearby-infantry': 'regiment', 'add-nearest-regiment': 'regiment',
     'toggle-regiment-tap-selection': 'regiment', 'create-cavalry-regiment': 'regiment', 'create-battery': 'regiment',
     'farm-assign': 'werk', 'resume-construction': 'werk', 'set-rally': 'productie'
@@ -33,7 +33,7 @@
   }
   // Order inside a group: the main choices first (formations, training,
   // standing orders), then the finer ones.
-  const RANK = { line: 1, column: 2, square: 3, 'rotate-left': 6, 'rotate-right': 7, halt: 1, bayonet: 2, charge: 2, 'artillery-mode': 3,
+  const RANK = { line: 1, column: 2, square: 3, skirmish: 4, 'rotate-left': 6, 'rotate-right': 7, halt: 1, bayonet: 2, charge: 2, 'artillery-mode': 3,
     'defend-stance': 4, 'trench-upgrade': 5, 'create-regiment': 1, 'reinforce-regiment': 2, 'set-rally': 9, 'farm-assign': 1, 'resume-construction': 2,
     'build-house': 1, 'build-farm': 2, 'build-barracks': 3, 'build-tower': 4, 'build-stable': 5, 'build-foundry': 6 };
   const rank = el => 10 + (RANK[el.dataset.formation || el.dataset.action] ?? (el.dataset.action?.startsWith('train-') ? 0 : 8));
@@ -75,6 +75,7 @@
     .actions.menu-v1 button[data-menu-group="werk"]{--cap:#7aa34a}
     .actions.menu-v1 button[data-menu-group="bouwen"]{--cap:#9a6b3a}
     .actions.menu-v1 .menu-label{font-family:Georgia,'Times New Roman',serif;font-size:.66rem;color:#e9c76a;text-shadow:0 1px 0 rgba(0,0,0,.6)}
+    .actions.menu-v1 button[data-action="skirmish"]::before{content:"🌿"}
     .actions.menu-v1 button[data-action="build-house"]::before{content:"🏠"}
     .actions.menu-v1 button[data-action="build-farm"]::before{content:"🌾"}
     .actions.menu-v1 button[data-action="build-barracks"]::before{content:"🏛"}

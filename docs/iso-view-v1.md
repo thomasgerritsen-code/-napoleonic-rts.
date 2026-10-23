@@ -132,6 +132,23 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   loopgraaf heeft, en gaat in verdedigende houding. Wie wegloopt, laat de loopgraaf
   los, zodat hij vrij is voor de volgende (of voor hetzelfde regiment). Ook de Britse
   commandant graaft in waar hij verdedigt.
+- **Moraal**: boven elk regiment in zicht een balkje van groen naar rood; een
+  knipperend rood "!" als het wankelt (onder 45), een witte vlag als het merendeel
+  vlucht; een zwaardje en trommel tonen dat officier en tamboer er nog zijn (die
+  houden de moraal op peil).
+- **Flank en rug**: een regiment (niet in carré) dat van opzij geraakt wordt krijgt
+  25% meer schade en 50% meer moraalverlies; van achteren 50% en het dubbele.
+  Bij een cavaleriecharge rekent de charge de flank al mee; het moraalverlies groeit wel.
+- **Artillerie**: kanonskogels vliegen in een boog met een schaduw eronder en
+  stuiteren na de inslag verder, met opspattende aarde en een krater die anderhalve
+  minuut zichtbaar blijft. Een kogel op een loopgraaf beschadigt hem: genoeg
+  treffers en hij zakt een niveau, op niveau 1 ontstaat een bres (veel minder
+  dekking); een kogel naast een schiettoren raakt de toren. Mannen in de loopgraaf
+  herstellen hem zolang ze erin staan.
+- **Tirailleurs** (knop 🌿 bij Formatie): het regiment stelt zich verspreid op (ruim
+  twee keer zo ver uit elkaar), vuurt naar believen en 15% verder, is moeilijk te
+  raken (28% minder, tussen bomen 45% minder), maar ruiterij doet er 70% meer schade.
+  Nog eens drukken (of carré) sluit de gelederen.
 - **Menu onderin**: toont alleen wat bij je selectie past, in groepen met een kopje
   en een vaste volgorde. Boeren: *Werk* (akker, bouw hervatten) en *Bouwen*
   (woning, graanakker, kazerne, schiettoren, stal, gieterij). Soldaten: *Bevel*
