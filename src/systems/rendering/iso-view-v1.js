@@ -17,7 +17,7 @@
   const PPM = 22.5, SQ = 0.5, SPRITE_PPM = 128 / 3.1, LIFT = 0.866;
   const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
   const HD = params.has('hd');
-  const MARCH_STRIDE = 1.5, DIE_FRAME = 0.17, CORPSE_MAX = 320, SMOKE_MAX = 260;
+  const MARCH_STRIDE = 1.5, DIE_FRAME = 0.17, CORPSE_MAX = 320, SMOKE_MAX = 260, BLOOD_SPREAD = 6;
   // Village houses in the game are about a third of real size next to its
   // soldiers; drawn at their footprint they would be shorter than a man. They are
   // drawn this much larger than the footprint (the footprint still decides where
@@ -782,22 +782,123 @@
     return [key, 'idle_' + d, Math.floor((now * 1000 + u.id * 137) / 500) % 2];
   }
   // Fall: the man's own look and a fall chosen by his id; it plays once and stays.
+  // The atlas and fall of a man going down facing d (null for guns and peasants).
+  function fallOf(u, d) {
+    const p = u.side === 'france' ? 'fr' : 'br', fall = ['die', 'diefwd', 'dieside'][Math.floor(hash(u.id, 4) * 3)] + '_' + d;
+    if (u.type === 'cavalry') return { key: p + 'c', anim: 'die_' + d };
+    if (mountedKey(u, p)) return { key: mountedKey(u, p), anim: 'die_' + d };
+    if (u.type === 'artillery' || u.type === 'worker') return null;
+    if (crewIds.has(u.id)) return { key: p + 'a', anim: fall };
+    return { key: u.type === 'officer' || u.type === 'drummer' ? p : lookOf(u), anim: fall };
+  }
   function addCorpse(m, now) {
-    const u = m.u, p = u.side === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
-    let key, anim;
-    if (u.type === 'cavalry') { key = p + 'c'; anim = 'die_' + d; }
-    else if (mountedKey(u, p)) { key = mountedKey(u, p); anim = 'die_' + d; }
-    else if (u.type === 'artillery') return;
-    else if (crewIds.has(u.id)) { key = p + 'a'; anim = ['die', 'diefwd', 'dieside'][Math.floor(hash(u.id, 4) * 3)] + '_' + d; }
-    else if (u.type === 'worker') return;
-    else { key = u.type === 'officer' || u.type === 'drummer' ? p : lookOf(u); anim = ['die', 'diefwd', 'dieside'][Math.floor(hash(u.id, 4) * 3)] + '_' + d; }
-    view.corpses.push({ x: m.x, y: m.y, key, anim, t0: now });
+    const f = fallOf(m.u, DIRS[m.dir]); if (!f) return;
+    // A wounded man (medics-v1) lies there alive: he is drawn with the wounded, not as a corpse.
+    const w = global.__MEDICS_V1__?.byId?.(m.u.id);
+    if (w) { w.iso = { ...f, t0: now }; return; }
+    pushCorpse(m.x, m.y, f, now);
+  }
+  function pushCorpse(x, y, f, t0) {
+    view.corpses.push({ x, y, key: f.key, anim: f.anim, t0 });
     if (view.corpses.length > CORPSE_MAX) view.corpses.splice(0, view.corpses.length - CORPSE_MAX);
+  }
+  // ---- the wounded and the stretcher teams (medics-v1) ----
+  // A wounded man lies as he fell, bleeding, with a small white mark so he is told
+  // from the dead; the bearers carry him off between them on a canvas stretcher.
+  function medicsDrawables(list, t, k) {
+    const M = global.__MEDICS_V1__; if (!M) return;
+    const seen = w => w.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance({ side: w.side, x: w.x, y: w.y });
+    let lying = 0, teams = 0;
+    for (const w of M.wounded()) {
+      if (!w.iso) w.iso = { ...(fallOf(w.u, 'e') || { key: '', anim: '' }), t0: t - 1 };
+      if (w.state === 'dead' && !w.corpse) { w.corpse = true; if (w.iso.key) pushCorpse(w.x, w.y, w.iso, w.iso.t0); continue; }
+      if (w.state !== 'lying' || !seen(w)) continue;
+      const X = sx(w.x), Y = gy(w.x, w.y);
+      if (X < -60 || X > innerWidth + 60 || Y < -40 || Y > innerHeight + 80) continue;
+      lying++;
+      list.push({ y: w.y - 0.5, draw: () => {
+        bloodPool(X, Y, t - w.iso.t0, hash(w.id, 7));
+        drawSprite(view.atlases[w.iso.key], w.iso.anim, Math.min(3, Math.floor((t - w.iso.t0) / DIE_FRAME)), X, Y, k);
+        // Alive: a small white mark over him, slowly fading in and out.
+        const a = 0.55 + 0.35 * Math.sin(t * 2.4 + w.id), mr = Math.max(2.2, 3 * z()), my = Y - 0.7 * LIFT * PPM * z();
+        ctx.fillStyle = `rgba(250,248,240,${a})`; ctx.beginPath(); ctx.arc(X, my, mr, 0, 7); ctx.fill();
+        ctx.fillStyle = `rgba(150,20,20,${a})`; ctx.fillRect(X - mr * 0.18, my - mr * 0.6, mr * 0.36, mr * 1.2); ctx.fillRect(X - mr * 0.6, my - mr * 0.18, mr * 1.2, mr * 0.36);
+      } });
+    }
+    for (const tm of M.teams()) {
+      if (!seenTeam(tm)) continue;
+      const X = sx(tm.x), Y = gy(tm.x, tm.y);
+      if (X < -80 || X > innerWidth + 80 || Y < -60 || Y > innerHeight + 100) continue;
+      teams++;
+      const carried = tm.state === 'carry' && tm.target, c = Math.cos(tm.facing), sn = Math.sin(tm.facing), half = 0.95 * PPM;
+      const ends = [[tm.x - c * half, tm.y - sn * half], [tm.x + c * half, tm.y + sn * half]].sort((a, b) => a[1] - b[1]);
+      list.push({ y: tm.y, draw: () => {
+        const p = tm.side === 'france' ? 'fr' : 'br', d = DIRS[dirOf(tm.facing)], atlas = view.atlases[p + 'w'];
+        const anim = (tm.moving ? 'march_' : 'idle_') + d, f = tm.moving ? Math.floor((t * 4 + tm.id) % 6) : Math.floor(t / 0.7 + tm.id) % 2;
+        drawSprite(atlas, anim, f, sx(ends[0][0]), gy(ends[0][0], ends[0][1]), k);
+        // The stretcher at the bearers' hands: two poles and the canvas between.
+        const lift = 0.75 * LIFT * PPM * z(), nx = -sn * 0.3 * PPM, ny = c * 0.3 * PPM;
+        const corner = (ex, ey, s) => [sx(ex + nx * s), gy(ex + nx * s, ey + ny * s) - lift];
+        const a = [tm.x - c * half * 0.8, tm.y - sn * half * 0.8], b = [tm.x + c * half * 0.8, tm.y + sn * half * 0.8];
+        const q = [corner(a[0], a[1], -1), corner(b[0], b[1], -1), corner(b[0], b[1], 1), corner(a[0], a[1], 1)];
+        ctx.fillStyle = '#d9d1ba'; ctx.beginPath(); ctx.moveTo(...q[0]); for (const pt of q.slice(1)) ctx.lineTo(...pt); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#5a4026'; ctx.lineWidth = Math.max(1, 1.6 * z()); ctx.beginPath(); ctx.moveTo(...q[0]); ctx.lineTo(...q[1]); ctx.moveTo(...q[3]); ctx.lineTo(...q[2]); ctx.stroke();
+        if (carried && tm.target.iso?.key) drawSprite(view.atlases[tm.target.iso.key], tm.target.iso.anim, 3, X, Y - lift * 0.85, k * 0.95);
+        drawSprite(atlas, anim, (f + 3) % (tm.moving ? 6 : 2), sx(ends[1][0]), gy(ends[1][0], ends[1][1]), k);
+      } });
+    }
+    st().wounded = lying; st().stretcherTeams = teams;
+  }
+  const seenTeam = tm => tm.side === 'france' || typeof isVisibleToFrance !== 'function' || isVisibleToFrance({ side: tm.side, x: tm.x, y: tm.y });
+  const st = () => view.stats;
+  // ---- hand grenades (grenades-v1): the lit grenade in its arc, the burst, the scorch ----
+  const burstSeen = new WeakSet();
+  function drawGrenades() {
+    const G = global.__GRENADES_V1__; if (!G) return;
+    for (const g of G.flying()) {
+      const f = Math.min(1, (elapsed - g.t0) / g.flight), x = g.x0 + (g.x1 - g.x0) * f, y = g.y0 + (g.y1 - g.y0) * f;
+      const h = (1.4 + Math.sin(f * Math.PI) * 2.6) * LIFT * PPM * z(), X = sx(x), Y = gy(x, y), r = Math.max(1.4, 1.9 * z());
+      ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(X, Y, r * 1.1, r * 0.45, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1b1a18'; ctx.beginPath(); ctx.arc(X, Y - h, r, 0, 7); ctx.fill();
+      // The fuse fizzing.
+      ctx.fillStyle = Math.random() < 0.5 ? '#ffd27a' : '#ff8a2a'; ctx.beginPath(); ctx.arc(X + r * 0.8, Y - h - r * 0.9, Math.max(1, r * 0.55), 0, 7); ctx.fill();
+    }
+    const now = performance.now() / 1000;
+    for (const b of G.bursts()) {
+      const age = elapsed - b.t; if (age < 0 || age > 0.5) continue;
+      const X = sx(b.x), Y = gy(b.x, b.y), R = G.config.radius * z() * (0.4 + age * 1.4);
+      if (!burstSeen.has(b)) {
+        burstSeen.add(b);
+        // Smoke from the burst, and the bang.
+        for (let i = 0; i < 6; i++) { const s = hash(b.x + i, b.y); view.smoke.push({ wx: b.x + (s - 0.5) * 30, wy: b.y + (hash(i, b.x) - 0.5) * 20, h: 0.4 + s * 0.6, born: now, life: 2.5 + s * 2, size: 0.5 + s * 0.4, seed: s }); }
+        if (view.smoke.length > SMOKE_MAX) view.smoke.splice(0, view.smoke.length - SMOKE_MAX);
+        try { labAudio.ctl?.cannon?.(panOf(X), true); } catch (_) {}
+      }
+      const a = 1 - age / 0.5, gr = ctx.createRadialGradient(X, Y - R * 0.3, 0, X, Y - R * 0.3, R);
+      gr.addColorStop(0, `rgba(255,244,200,${a})`); gr.addColorStop(0.35, `rgba(255,160,60,${0.85 * a})`); gr.addColorStop(1, 'rgba(255,90,20,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(X, Y - R * 0.3, R, R * 0.8, 0, 0, 7); ctx.fill();
+    }
+  }
+  function drawScorches() {
+    const G = global.__GRENADES_V1__; if (!G) return;
+    for (const c of G.scorches()) {
+      const age = elapsed - c.t; if (age < 0 || age > 60) continue;
+      const X = sx(c.x), Y = gy(c.x, c.y); if (X < -40 || X > innerWidth + 40 || Y < -40 || Y > innerHeight + 40) continue;
+      const r = 0.75 * PPM * z(), a = Math.min(1, (60 - age) / 20);
+      ctx.fillStyle = `rgba(30,24,18,${0.5 * a})`; ctx.beginPath(); ctx.ellipse(X, Y, r, r * SQ, 0, 0, 7); ctx.fill();
+    }
+  }
+  // Blood seeping out under a fallen man: a dark pool that spreads over a few seconds.
+  function bloodPool(X, Y, age, seed) {
+    const g = Math.min(1, Math.max(0, age) / BLOOD_SPREAD), r = (0.25 + 0.4 * g) * PPM * z() * (0.85 + seed * 0.3);
+    const ox = (seed - 0.5) * 0.5 * PPM * z();
+    ctx.fillStyle = `rgba(92,10,8,${0.55 + 0.25 * g})`; ctx.beginPath(); ctx.ellipse(X + ox, Y, r, r * SQ * 0.9, seed * 2, 0, 7); ctx.fill();
+    ctx.fillStyle = `rgba(55,4,4,${0.5 * g})`; ctx.beginPath(); ctx.ellipse(X + ox * 0.8, Y, r * 0.55, r * 0.55 * SQ, seed * 2, 0, 7); ctx.fill();
   }
 
   // ---- props for buildings and resources ----
-  const BUILDING_PROP = { towncenter: 'barracks', barracks: 'barracks', house: 'cottage', tower: 'tower' };
-  const SIDED_PROPS = new Set(['barracks', 'tower']);
+  const BUILDING_PROP = { towncenter: 'barracks', barracks: 'barracks', house: 'cottage', tower: 'tower', hospital: 'hospital' };
+  const SIDED_PROPS = new Set(['barracks', 'tower', 'hospital']);
   function buildingDrawable(b) {
     if (b.dead) return null;
     if (b.side === 'britain' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(b)) return null;
@@ -808,7 +909,7 @@
     // props carry their eaves and yard beyond the walls).
     // A tower stands tall over the men (a bit over half true size, like a
     // house's miniature footprint would make it a stump next to them).
-    const k = b.type === 'tower' ? spriteK() * 0.55 : b.w * z() * 1.45 / prop.w;
+    const k = b.type === 'tower' ? spriteK() * 0.55 : b.type === 'hospital' ? spriteK() * 0.7 : b.w * z() * 1.45 / prop.w;
     if (b.type === 'tower') towerSmoke(b, prop, k);
     return { y: b.y + b.h * 0.3, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       ctx.globalAlpha *= b.complete === false ? 0.45 + 0.5 * (b.construction || 0) : 1;
@@ -941,6 +1042,7 @@
       n++;
     }
     view.stats.craters = n;
+    drawScorches();
   }
   // ---- fog of war, in three shades as in the classic RTS games ----
   // Never seen: under drifting clouds. Seen before (the game's explored cells):
@@ -1305,9 +1407,10 @@
     for (const c of view.corpses) {
       const X = sx(c.x), Y = gy(c.x, c.y);
       if (X < -60 || X > innerWidth + 60 || Y < -40 || Y > innerHeight + 80) continue;
-      list.push({ y: c.y - 0.5, draw: () => drawSprite(view.atlases[c.key], c.anim, Math.min(3, Math.floor((t - c.t0) / DIE_FRAME)), X, Y, k) });
+      list.push({ y: c.y - 0.5, draw: () => { bloodPool(X, Y, t - c.t0, hash(c.x, c.y)); drawSprite(view.atlases[c.key], c.anim, Math.min(3, Math.floor((t - c.t0) / DIE_FRAME)), X, Y, k); } });
     }
     st.corpses = view.corpses.length;
+    medicsDrawables(list, t, k);
     for (const b of buildings) { const d = buildingDrawable(b); if (d) list.push(d); }
     for (const h of villageHouses()) { const d = houseDrawable(h); if (d) list.push(d); }
     for (const b of crossings()) { const d = bridgeDrawable(b); if (d) list.push(d); }
@@ -1338,6 +1441,7 @@
       ctx.globalAlpha = a; d.draw(); ctx.globalAlpha = 1;
     }
     drawProjectiles();
+    drawGrenades();
     drawStances();
     if (detailed()) drawChimneySmoke(t);
     drawSmoke(t);

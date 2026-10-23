@@ -443,6 +443,27 @@ weergaven; terug in 2D begint de terreincache opnieuw.
 3. Hoogte in het spel zelf: hoogte geeft verder zicht, maar heuvels blokkeren het zicht
    (nog) niet en het schootsveld houdt er geen rekening mee.
 
+## Granaten, gesneuvelden, gewonden en het veldhospitaal
+
+- **Granaten** (`grenades-v1.js`): grenadiers en de Oude Garde steken binnen 45-135 px
+  van de vijand een handgranaat aan en werpen die in een boog (een sissend lontje in
+  de vlucht). Waar hij neerkomt barst hij: een steekvlam, rook, een knal en een
+  schroeiplek die in een minuut vervaagt. Alle vijanden binnen 46 px lopen schade
+  en schrik op (minder naarmate ze verder staan), ook in een loopgraaf - een granaat
+  valt erin. Elke man gooit hooguit eens per ~16 s.
+- **Gesneuvelden** liggen in een bloedplas die in een paar seconden uitvloeit.
+- **Gewonden** (`medics-v1.js`): van de gevallen musketiers, officieren en tamboers
+  is bijna de helft gewond in plaats van dood. Ze liggen waar ze vielen, bloedend,
+  met een klein wit teken. Haalt niemand hen, dan bloeden ze na 90 s dood.
+- **Veldhospitaal** (⛺, 180 🪵 60 🍞, een "ambulance" naar Larrey: linnen tenten, een
+  ambulancekar, brancards en de vlag): twee brancardteams - twee dragers en een
+  brancard - halen de gewonden van hun kant op, de dichtstbijzijnde eerst, en dragen
+  ze naar het hospitaal. Daar herstellen ze in 45 s en gaan ze terug naar hun eigen
+  regiment (als dat nog bestaat, van hun soort is en plaats heeft; anders wachten ze
+  vrij bij het hospitaal). Zonder bevolkingsruimte wachten ze tot er plaats is. De
+  dragers vechten niet en worden niet beschoten. De Britten zetten na een paar
+  minuten hun eigen hospitaal achter hun hoofdgebouw.
+
 ## Prestaties bij grote veldslagen
 
 Gemeten met een veldslag van ruim 330 eenheden (12 regimenten, 4 ruiterregimenten,

@@ -175,6 +175,34 @@
    },
    "w": 227
   },
+  "hospital_br": {
+   "footprint": {
+    "d": 9.31,
+    "w": 9.94
+   },
+   "h": 324,
+   "heightM": 5.1,
+   "image": "hospital_br.webp",
+   "pivot": {
+    "x": 248,
+    "y": 201
+   },
+   "w": 537
+  },
+  "hospital_fr": {
+   "footprint": {
+    "d": 9.8,
+    "w": 9.27
+   },
+   "h": 381,
+   "heightM": 5.1,
+   "image": "hospital_fr.webp",
+   "pivot": {
+    "x": 254,
+    "y": 257
+   },
+   "w": 510
+  },
   "oak": {
    "footprint": {
     "d": 5.99,

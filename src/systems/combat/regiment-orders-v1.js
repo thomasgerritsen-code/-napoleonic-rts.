@@ -259,8 +259,9 @@
     if (d < 0.5) return true;
     return (dx * Math.cos(t.facing) + dy * Math.sin(t.facing)) / d > 0.17;
   }
-  // A shell lobbed by a howitzer (troops-v1 'lobbed') drops into the trench: no cover.
+  // A shell lobbed by a howitzer (troops-v1 'lobbed') or a grenade drops into the trench: no cover.
   function lobbed(victim) {
+    if (global.__GRENADE_BLAST__) return true;   // a grenade bursting (grenades-v1) drops in too
     const src = hitSource(victim);
     return !!(src && src.troop && global.NRTS_CONFIG?.troops?.kinds?.[src.troop]?.lobbed);
   }

@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 import bpy
-from mathutils import Vector
+from mathutils import Euler, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from infantry_atlas_png import read_rgba, write_rgba  # noqa: E402
@@ -392,6 +392,78 @@ def build_tower(root, side):
         part("box", (0.17, 0.08, fh), (fw / 2, 0, fz), M("#c0282d", "cloth"), root, name="cross")
 
 
+# --- field hospital ------------------------------------------------------------------
+def ridge_tent(root, x, y, length, width, height, canvas, dark, open_front=True):
+    """A ridge tent: a canvas prism with its gables, ridge pole and guy ropes."""
+    # Two canvas slopes from the ridge down to the ground, and the gables.
+    half = width / 2
+    slant, tilt = math.hypot(half, height), math.degrees(math.atan2(height, half))
+    for sy in (-1, 1):
+        part("box", (length, slant, 0.05), (x, y + sy * half / 2, height / 2), canvas, root, rot=(-sy * tilt, 0, 0), name="slope")
+    for ex in (-1, 1):
+        # A three-sided cone is a triangle: turned to stand across the tent, its point up.
+        gable = empty("gable", root, (x + ex * length / 2, y, 0), (90, 0, 0))
+        tri = part("cyl", (1.0, 0.04), (0, height / 3, 0), canvas, gable, rot=(0, 90, 0), name="gable", segments=3, smooth=False)
+        tri.scale = (half / 0.866, 2 * height / 3, 1)
+    part("cyl", (0.05, length + 0.4), (x, y, height + 0.02), dark, root, rot=(0, 90, 0), name="ridge")
+    for ex in (-1, 1):
+        part("cyl", (0.05, height + 0.2), (x + ex * (length / 2 + 0.05), y, (height + 0.2) / 2), dark, root, name="pole")
+    if open_front:
+        # The near gable stands open: a dark doorway with the flaps tied back.
+        part("box", (0.04, width * 0.42, height * 0.62), (x - length / 2 - 0.03, y, height * 0.31), M("#2a241c", "plain", 0.9), root,
+             name="door")
+        for sy in (-1, 1):
+            part("box", (0.05, width * 0.18, height * 0.6), (x - length / 2 - 0.08, y + sy * width * 0.27, height * 0.3), canvas, root,
+                 rot=(0, 0, sy * 25), name="flap")
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            part("cyl", (0.012, 1.6), (x + sx * length * 0.38, y + sy * (width / 2 + 0.55), 0.55), M("#8a7a5c", "plain", 0.8), root,
+                 rot=(sy * 48, 0, 0), name="guy")
+            part("box", (0.06, 0.06, 0.25), (x + sx * length * 0.38, y + sy * (width / 2 + 1.05), 0.1), dark, root, name="peg")
+
+
+def build_hospital(root, side):
+    """A field hospital (an ambulance, after Larrey): two canvas tents, a light
+    two-wheeled ambulance wagon, stretchers laid out, chests and a water cask,
+    and the nation's flag on a pole."""
+    canvas = M("#e6e0cf", "cloth", 0.95, scale=2, alt="#d6cfba")
+    dark = M("#5a4026", "planks", 0.8)
+    ridge_tent(root, 0, 0, 5.2, 3.6, 2.8, canvas, dark)
+    ridge_tent(root, 0.6, 3.6, 3.4, 2.6, 2.2, canvas, dark, open_front=False)
+    # The wagon: a box body with a canvas tilt on two wheels and its shafts down.
+    wagon = empty("wagon", root, (-4.4, -0.6, 0), (0, 0, 70))
+    body = M("#4d5a3a" if side == "fr" else "#5d646b", "planks", 0.8)
+    part("box", (1.1, 2.0, 0.6), (0, 0, 1.0), body, wagon, name="wagonbody")
+    part("cyl", (0.62, 2.0, 0.62), (0, 0, 1.3), canvas, wagon, rot=(90, 0, 0), name="tilt", segments=16).scale = (1, 1, 0.7)
+    for x in (-0.68, 0.68):
+        part("cyl", (0.62, 0.08), (x, 0.2, 0.62), dark, wagon, rot=(0, 90, 0), name="wheel", segments=18)
+        part("cyl", (0.1, 0.12), (x, 0.2, 0.62), M("#2a2a2a", "plain", 0.5, metal=0.5), wagon, rot=(0, 90, 0), name="hub")
+    for x in (-0.4, 0.4):
+        part("box", (0.07, 2.2, 0.07), (x, -2.0, 0.45), dark, wagon, rot=(-18, 0, 0), name="shaft")
+    # Stretchers on the ground before the tent: two poles and the canvas between.
+    for i, (x, y) in enumerate(((-3.4, 2.2), (-3.2, 3.4))):
+        st = empty("stretcher", root, (x, y, 0.12), (0, 0, 8 * (1 - 2 * i)))
+        for sy in (-0.28, 0.28):
+            part("cyl", (0.035, 2.3), (0, sy, 0), dark, st, rot=(0, 90, 0), name="handle")
+        part("box", (1.8, 0.52, 0.03), (0, 0, 0.01), M("#cfc6ae", "cloth", 0.95), st, name="sling")
+    for x, y, r in ((2.9, -1.4, 10), (3.4, -0.6, -20)):
+        part("box", (0.8, 0.55, 0.5), (x, y, 0.25), dark, root, rot=(0, 0, r), name="chest")
+    part("cyl", (0.32, 0.8, 0.28), (3.2, 0.6, 0.4), M("#6b4a2d", "planks", 0.8), root, name="cask")
+    # The flag on its pole beside the tent.
+    fx, fy, fz = 2.6, 2.0, 4.6
+    part("cyl", (0.05, 5.0, 0.035), (fx, fy, 2.5), M("#d8d2c4", "plain", 0.5), root, name="pole")
+    fw, fh = 1.5, 1.0
+    if side == "fr":
+        for i, c in enumerate(("#24315c", "#efeee8", "#b02a2e")):
+            part("box", (fw / 3, 0.05, fh), (fx + fw / 6 + i * fw / 3, fy, fz), M(c, "cloth", 0.9), root, name="stripe")
+    else:
+        part("box", (fw, 0.05, fh), (fx + fw / 2, fy, fz), M("#22336b", "cloth", 0.9), root, name="flag")
+        part("box", (fw, 0.07, 0.24), (fx + fw / 2, fy, fz), M("#f2efe6", "cloth"), root, name="cross")
+        part("box", (0.24, 0.07, fh), (fx + fw / 2, fy, fz), M("#f2efe6", "cloth"), root, name="cross")
+        part("box", (fw, 0.08, 0.13), (fx + fw / 2, fy, fz), M("#c0282d", "cloth"), root, name="cross")
+        part("box", (0.13, 0.08, fh), (fx + fw / 2, fy, fz), M("#c0282d", "cloth"), root, name="cross")
+
+
 # --- field-work kit (trenches) ---------------------------------------------------
 def build_gabion(root):
     """A gabion: a wicker basket of upright stakes and woven withies, filled
@@ -448,6 +520,8 @@ BUILDERS = {
     "gabion": build_gabion, "sandbags": build_sandbags,
     "tower_fr": lambda r: build_tower(r, "fr"),
     "tower_br": lambda r: build_tower(r, "br"),
+    "hospital_fr": lambda r: build_hospital(r, "fr"),
+    "hospital_br": lambda r: build_hospital(r, "br"),
     "barracks_fr": lambda r: build_barracks(r, "fr"),
     "barracks_br": lambda r: build_barracks(r, "br"),
     "farmhouse": build_farmhouse, "barn": build_barn, "cottage": build_cottage, "well": build_well,
@@ -469,7 +543,7 @@ def world_points():
 
 
 # Buildings turn to the camera at an angle so two facades and a gable show.
-YAW = {"tower_fr": 20, "tower_br": -20, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
+YAW = {"tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
 
 
 def render_prop(kind: str, out: Path, samples: int) -> dict:

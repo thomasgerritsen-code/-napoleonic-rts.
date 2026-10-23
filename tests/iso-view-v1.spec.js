@@ -1249,3 +1249,90 @@ test('iso view: sharp sprites - sheets drawn magnified load at full size, unseen
   expect(far.sharpMB).toBe(0);
   expect(errors).toEqual([]);
 });
+
+test('iso view: grenadiers throw grenades that burst among the enemy', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-grenades&view=iso');
+  await page.waitForFunction(() => window.__GRENADES_V1__ && window.__TROOPS_V1__ && window.__RTS_DEBUG__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const X = window.__TROOPS_V1__, G = window.__GRENADES_V1__;
+    const mk = (side, troop, x, y) => { const u = createUnit(side, 'infantry', x, y); if (troop) X.applyTroop(u, troop); return u; };
+    const gren = [], line = [], brits = [];
+    for (let i = 0; i < 8; i++) gren.push(mk('france', 'grenadier', 2200 + i * 18, 1780));
+    for (let i = 0; i < 8; i++) line.push(mk('france', null, 2600 + i * 18, 1780));
+    for (let i = 0; i < 16; i++) brits.push(mk('britain', null, 2200 + i * 30, 1680));
+    for (let k = 0; k < 40; k++) window.__RTS_DEBUG__.tick(0.5);
+    const s = G.stats();
+    return { thrown: s.thrown, burst: s.burst, hits: s.hits, scorches: G.scorches().length,
+      byLine: line.filter(u => u.threwAt != null).length, byGren: gren.filter(u => u.threwAt != null).length };
+  });
+  expect(r.thrown).toBeGreaterThan(3);
+  expect(r.burst).toBe(r.thrown);
+  expect(r.hits).toBeGreaterThan(r.burst);   // a burst hurts more than one man
+  expect(r.scorches).toBe(r.burst);
+  expect(r.byGren).toBeGreaterThan(2);
+  expect(r.byLine).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: wounded are fetched by stretcher teams, mend at the field hospital and rejoin their regiment', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-medics&view=iso');
+  await page.waitForFunction(() => window.__MEDICS_V1__ && window.__TROOPS_V1__ && window.__RTS_DEBUG__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const M = window.__MEDICS_V1__, X = window.__TROOPS_V1__, out = {};
+    economies.france.popCap = 400;
+    // A regiment of voltigeurs; one of them falls wounded.
+    const m = []; for (let i = 0; i < 12; i++) { const u = createUnit('france', 'infantry', 2300 + (i % 6) * 18, 1700 + Math.floor(i / 6) * 18); X.applyTroop(u, 'voltigeur'); m.push(u); }
+    m.push(createUnit('france', 'officer', 2280, 1700), createUnit('france', 'drummer', 2280, 1715));
+    const reg = createRegiment('france', m), victim = m[3];
+    // Killed outright by a heavy blow: wounded or dead, as chance has it - here made wounded.
+    const w = M.wound(victim); victim.dead = true; victim.hp = 0;
+    out.lying = w.state;
+    // Without a hospital nobody comes: a British wounded man bleeds to death.
+    const brit = createUnit('britain', 'infantry', 3000, 900), bw = M.wound(brit); brit.dead = true;
+    // The field hospital sends its stretcher teams.
+    createBuilding('france', 'hospital', 2250, 1900, true);
+    let carried = false;
+    // (A mended man waits for room in the population; the test keeps room.)
+    for (let k = 0; k < 240 && w.state !== 'healed'; k++) { economies.france.popCap = 400; window.__RTS_DEBUG__.tick(0.5); if (w.state === 'carried') carried = true; }
+    out.carried = carried; out.state = w.state;
+    const back = units.find(u => u.id === w.healedAs);
+    out.back = !!back && !back.dead; out.troop = back?.troop; out.inReg = back?.regimentId === reg.id;
+    for (let k = 0; k < 200 && bw.state !== 'dead'; k++) window.__RTS_DEBUG__.tick(0.5);
+    out.brit = bw.state; out.bledAfter = Math.round(elapsed - bw.at);
+    out.stats = M.stats();
+    return out;
+  });
+  expect(r.lying).toBe('lying');
+  expect(r.carried).toBe(true);
+  expect(r.state).toBe('healed');
+  expect(r.back).toBe(true);
+  expect(r.troop).toBe('voltigeur');
+  expect(r.inReg).toBe(true);
+  expect(r.brit).toBe('dead');
+  expect(r.bledAfter).toBeGreaterThanOrEqual(90);
+  expect(r.stats.rejoined).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('iso view: the fallen bleed, the wounded show among them and the hospital tent stands', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-fallen&view=iso');
+  await page.waitForFunction(() => window.__MEDICS_V1__ && window.__ISO_VIEW_V1__?.stats().sprites > 0 && window.__ISO_VIEW_V1__.atlasKeys().includes('frw'), null, { timeout: 60_000 });
+  // Six men on the field, seen alive first; then they fall, every second one wounded.
+  await page.evaluate(() => {
+    createBuilding('france', 'hospital', 2250, 1900, true);
+    window.__fallen = []; for (let i = 0; i < 6; i++) window.__fallen.push(createUnit('france', 'infantry', 2300 + i * 20, 1760));
+    camera.x = 2300; camera.y = 1800; camera.zoom = 1.5;
+  });
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { const M = window.__MEDICS_V1__; window.__fallen.forEach((u, i) => { if (i % 2) M.wound(u); u.dead = true; u.hp = 0; }); });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().corpses >= 3 && window.__ISO_VIEW_V1__.stats().wounded >= 1, null, { timeout: 30_000 });
+  await page.evaluate(() => { window.__RTS_DEBUG__.tick(1); });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().stretcherTeams >= 1, null, { timeout: 30_000 });
+  const s = await page.evaluate(() => window.__ISO_VIEW_V1__.stats());
+  expect(s.corpses).toBeGreaterThanOrEqual(3);
+  expect(s.stretcherTeams).toBeGreaterThanOrEqual(1);
+  expect(errors).toEqual([]);
+});

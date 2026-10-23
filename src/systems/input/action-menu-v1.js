@@ -95,6 +95,7 @@
     .actions.menu-v1 button[data-action="build-farm"]::before{content:"🌾"}
     .actions.menu-v1 button[data-action="build-barracks"]::before{content:"🏛"}
     .actions.menu-v1 button[data-action="build-tower"]::before{content:"🗼"}
+    .actions.menu-v1 button[data-action="build-hospital"]::before{content:"⛺"}
     .actions.menu-v1 button[data-action="build-stable"]::before{content:"🐎"}
     .actions.menu-v1 button[data-action="build-foundry"]::before{content:"🔥"}
     .actions.menu-v1 button[data-action="farm-assign"]::before{content:"🧺"}
