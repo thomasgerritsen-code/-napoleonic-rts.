@@ -20,7 +20,7 @@
     halt: 'bevel', bayonet: 'bevel', charge: 'bevel', 'artillery-mode': 'bevel', 'defend-stance': 'bevel', 'trench-upgrade': 'bevel',
     'rotate-left': 'formatie', 'rotate-right': 'formatie', skirmish: 'formatie',
     'create-regiment': 'regiment', 'reinforce-regiment': 'regiment', 'select-nearby-infantry': 'regiment', 'add-nearest-regiment': 'regiment',
-    'toggle-regiment-tap-selection': 'regiment', 'create-cavalry-regiment': 'regiment', 'create-battery': 'regiment',
+    'toggle-regiment-tap-selection': 'regiment', 'create-cavalry-regiment': 'regiment', 'create-battery': 'regiment', 'crew-gun': 'regiment',
     'farm-assign': 'werk', 'resume-construction': 'werk', 'set-rally': 'productie',
     'quick-regiment': 'regiment', 'quick-regiment-barracks': 'productie', 'train-missing': 'productie', 'auto-regiment': 'productie'
   };
@@ -106,6 +106,7 @@
     .actions.menu-v1 button[data-action="add-nearest-regiment"]::before{content:"➕"}
     .actions.menu-v1 button[data-action="create-cavalry-regiment"]::before{content:"🐎"}
     .actions.menu-v1 button[data-action="create-battery"]::before{content:"💣"}
+    .actions.menu-v1 button[data-action="crew-gun"]::before{content:"💣"}
     .actions.menu-v1 button[data-action="train-worker"]::before{content:"👨‍🌾"}
     .actions.menu-v1 button[data-action="train-infantry"]::before{content:"💂"}
     .actions.menu-v1 button[data-action="train-officer"]::before{content:"🎖"}

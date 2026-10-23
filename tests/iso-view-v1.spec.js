@@ -954,3 +954,61 @@ test('iso view: a click on a trench with a regiment selected sends it there to m
   expect(r.left).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('iso view: gun crews - a cannon is crewed by button, by a click on it, and from a regiment', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-gun-crew&view=iso');
+  await page.waitForFunction(() => window.__GUN_CREW_V1__ && window.__ACTION_MENU_V1__ && window.__RTS_DEBUG__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const G = window.__GUN_CREW_V1__, out = {};
+    // Manned: a battery with two living crew (it can fire once they reach the gun).
+    const crewed = gun => !!gun.regimentId && artilleryCrewV06(getRegiment(gun.regimentId)).filter(u => !u.dead).length >= 2;
+    // 1. Only the cannon selected, loose men nearby: the button fetches two.
+    const g1 = createUnit('france', 'artillery', 2450, 1750);   // dry ground (men do not wade the river)
+    const loose = [createUnit('france', 'infantry', 2510, 1750), createUnit('france', 'infantry', 2510, 1770)];
+    selectedUnits.clear(); selectedBuilding = null; selectedUnits.add(g1); actionSignature = ''; updateHud(true);
+    const btn = actionsEl.querySelector('[data-action="crew-gun"]');
+    out.button = !!btn && !btn.disabled && !btn.classList.contains('menu-hidden');
+    out.oldButton = !!actionsEl.querySelector('[data-action="create-battery"]');
+    btn?.click();
+    out.g1 = crewed(g1); out.looseUsed = loose.every(u => u.regimentId === g1.regimentId);
+    // 2. A regiment selected, a click on an uncrewed cannon: two of its men go.
+    const g2 = createUnit('france', 'artillery', 2100, 1500);
+    const m = []; for (let i = 0; i < 12; i++) m.push(createUnit('france', 'infantry', 1900 + (i % 6) * 18, 1600 + Math.floor(i / 6) * 18));
+    m.push(createUnit('france', 'officer', 1880, 1600), createUnit('france', 'drummer', 1880, 1614));
+    const reg = createRegiment('france', m);
+    selectedUnits.clear(); for (const u of regimentMembers(reg)) selectedUnits.add(u);
+    issueMove(g2.x + 4, g2.y + 3);
+    out.g2 = crewed(g2); out.regLeft = regimentMembers(reg).filter(u => u.type === 'infantry').length;
+    out.status = statusEl.textContent;
+    // 3. A battery that lost a man is refilled from the nearest regiment by the button.
+    const b2 = getRegiment(g2.regimentId), dead = artilleryCrewV06(b2)[0]; dead.dead = true;
+    out.short = crewed(g2);
+    selectedUnits.clear(); selectedUnits.add(g2);
+    out.refill = G.crewSelected(); out.refilled = crewed(g2);
+    // A regiment never gives up more than it can spare.
+    const more = [0, 1, 2, 3].map(i => G.crewGun(createUnit('france', 'artillery', 1950 + i * 40, 1450)));
+    out.more = more; out.regFloor = regimentMembers(reg).filter(u => u.type === 'infantry').length;
+    // Crew walk to the gun and it fires.
+    for (let k = 0; k < 15; k++) window.__RTS_DEBUG__.tick(1);
+    out.atGun = artilleryCrewV06(getRegiment(g1.regimentId)).every(u => Math.hypot(u.x - g1.x, u.y - g1.y) < 60);
+    out.fires = canArtilleryOperateV06(g1);
+    out.stats = G.stats();
+    return out;
+  });
+  expect(r.button).toBe(true);
+  expect(r.oldButton).toBe(false);
+  expect(r.g1).toBe(true);
+  expect(r.looseUsed).toBe(true);
+  expect(r.g2).toBe(true);
+  expect(r.regLeft).toBe(10);
+  expect(r.status).toContain('kanon');
+  expect(r.short).toBe(false);
+  expect(r.refill).toBe(1);
+  expect(r.refilled).toBe(true);
+  expect(r.more).toEqual([2, 0, 0, 0]);   // 9 men: one more crew of two, then the regiment keeps its 6 (one man short of a crew)
+  expect(r.regFloor).toBe(7);
+  expect(r.atGun).toBe(true);
+  expect(r.fires).toBe(true);
+  expect(errors).toEqual([]);
+});

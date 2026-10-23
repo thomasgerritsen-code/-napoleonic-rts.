@@ -132,6 +132,12 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   loopgraaf heeft, en gaat in verdedigende houding. Wie wegloopt, laat de loopgraaf
   los, zodat hij vrij is voor de volgende (of voor hetzelfde regiment). Ook de Britse
   commandant graaft in waar hij verdedigt.
+- **Kanon bemannen** (een kanon heeft 2 musketiers nodig): selecteer een kanon en
+  druk op *Kanon bemannen* (💣) - het haalt zelf 2 man, eerst losse soldaten, anders
+  uit het dichtstbijzijnde regiment (dat houdt altijd minstens 6 musketiers). Of
+  selecteer soldaten (los of een heel regiment) en klik/tik op een eigen onbemand
+  kanon: 2 van hen lopen erheen. Een batterij die een man verloor, vul je op dezelfde
+  manier aan. Het kanon vuurt zodra de bemanning bij het stuk staat.
 - **Loopgraaf bezetten met een klik**: met een regiment geselecteerd klik (of tik)
   je op een bestaande loopgraaf. Het regiment marcheert erheen, stelt zich in linie
   langs de loopgraaf op met het front de kant van de loopgraaf op, bezet hem en gaat
