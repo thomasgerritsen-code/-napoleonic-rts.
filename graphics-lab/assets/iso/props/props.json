@@ -1,0 +1,405 @@
+{
+ "props": {
+  "barn": {
+   "footprint": {
+    "d": 12.29,
+    "w": 13.39
+   },
+   "h": 575,
+   "heightM": 8.67,
+   "image": "barn.webp",
+   "pivot": {
+    "x": 303,
+    "y": 371
+   },
+   "w": 731
+  },
+  "barracks_br": {
+   "footprint": {
+    "d": 15.13,
+    "w": 17.67
+   },
+   "h": 706,
+   "heightM": 10.82,
+   "image": "barracks_br.webp",
+   "pivot": {
+    "x": 392,
+    "y": 457
+   },
+   "w": 939
+  },
+  "barracks_fr": {
+   "footprint": {
+    "d": 15.13,
+    "w": 17.67
+   },
+   "h": 706,
+   "heightM": 10.82,
+   "image": "barracks_fr.webp",
+   "pivot": {
+    "x": 392,
+    "y": 457
+   },
+   "w": 939
+  },
+  "beech": {
+   "footprint": {
+    "d": 6.6,
+    "w": 7.08
+   },
+   "h": 439,
+   "heightM": 8.13,
+   "image": "beech.webp",
+   "pivot": {
+    "x": 171,
+    "y": 298
+   },
+   "w": 462
+  },
+  "birch": {
+   "footprint": {
+    "d": 2.82,
+    "w": 3.41
+   },
+   "h": 383,
+   "heightM": 7.79,
+   "image": "birch.webp",
+   "pivot": {
+    "x": 98,
+    "y": 285
+   },
+   "w": 306
+  },
+  "bridge": {
+   "footprint": {
+    "d": 4.95,
+    "w": 12.1
+   },
+   "h": 235,
+   "heightM": 2.7,
+   "image": "bridge.webp",
+   "pivot": {
+    "x": 277,
+    "y": 149
+   },
+   "w": 592
+  },
+  "bridge_stone": {
+   "footprint": {
+    "d": 5.1,
+    "w": 12.8
+   },
+   "h": 208,
+   "heightM": 2.04,
+   "image": "bridge_stone.webp",
+   "pivot": {
+    "x": 291,
+    "y": 126
+   },
+   "w": 612
+  },
+  "bridge_wood": {
+   "footprint": {
+    "d": 4.43,
+    "w": 12.16
+   },
+   "h": 194,
+   "heightM": 2.0,
+   "image": "bridge_wood.webp",
+   "pivot": {
+    "x": 278,
+    "y": 119
+   },
+   "w": 585
+  },
+  "bush": {
+   "footprint": {
+    "d": 1.92,
+    "w": 2.83
+   },
+   "h": 109,
+   "heightM": 1.59,
+   "image": "bush.webp",
+   "pivot": {
+    "x": 83,
+    "y": 64
+   },
+   "w": 194
+  },
+  "cottage": {
+   "footprint": {
+    "d": 9.63,
+    "w": 9.88
+   },
+   "h": 462,
+   "heightM": 7.82,
+   "image": "cottage.webp",
+   "pivot": {
+    "x": 231,
+    "y": 292
+   },
+   "w": 574
+  },
+  "farmhouse": {
+   "footprint": {
+    "d": 10.74,
+    "w": 11.98
+   },
+   "h": 524,
+   "heightM": 9.02,
+   "image": "farmhouse.webp",
+   "pivot": {
+    "x": 274,
+    "y": 334
+   },
+   "w": 678
+  },
+  "fascine_wall": {
+   "h": 166,
+   "image": "fascine_wall.webp",
+   "pxPerM": 123.871,
+   "tileM": 4.0,
+   "w": 495
+  },
+  "fence": {
+   "footprint": {
+    "d": 0.13,
+    "w": 6.13
+   },
+   "h": 73,
+   "heightM": 1.25,
+   "image": "fence.webp",
+   "pivot": {
+    "x": 153,
+    "y": 48
+   },
+   "w": 325
+  },
+  "fern": {
+   "footprint": {
+    "d": 1.72,
+    "w": 1.65
+   },
+   "h": 71,
+   "heightM": 0.54,
+   "image": "fern.webp",
+   "pivot": {
+    "x": 61,
+    "y": 34
+   },
+   "w": 130
+  },
+  "gabion": {
+   "footprint": {
+    "d": 0.69,
+    "w": 0.72
+   },
+   "h": 75,
+   "heightM": 1.02,
+   "image": "gabion.webp",
+   "pivot": {
+    "x": 42,
+    "y": 46
+   },
+   "w": 98
+  },
+  "hawthorn": {
+   "footprint": {
+    "d": 2.25,
+    "w": 2.94
+   },
+   "h": 139,
+   "heightM": 1.97,
+   "image": "hawthorn.webp",
+   "pivot": {
+    "x": 85,
+    "y": 89
+   },
+   "w": 204
+  },
+  "haystack": {
+   "footprint": {
+    "d": 3.0,
+    "w": 3.0
+   },
+   "h": 195,
+   "heightM": 3.4,
+   "image": "haystack.webp",
+   "pivot": {
+    "x": 89,
+    "y": 125
+   },
+   "w": 227
+  },
+  "hazel": {
+   "footprint": {
+    "d": 2.4,
+    "w": 3.02
+   },
+   "h": 182,
+   "heightM": 3.04,
+   "image": "hazel.webp",
+   "pivot": {
+    "x": 88,
+    "y": 118
+   },
+   "w": 222
+  },
+  "hospital_br": {
+   "footprint": {
+    "d": 9.31,
+    "w": 9.94
+   },
+   "h": 324,
+   "heightM": 5.1,
+   "image": "hospital_br.webp",
+   "pivot": {
+    "x": 248,
+    "y": 201
+   },
+   "w": 537
+  },
+  "hospital_fr": {
+   "footprint": {
+    "d": 9.8,
+    "w": 9.27
+   },
+   "h": 381,
+   "heightM": 5.1,
+   "image": "hospital_fr.webp",
+   "pivot": {
+    "x": 254,
+    "y": 257
+   },
+   "w": 510
+  },
+  "oak": {
+   "footprint": {
+    "d": 5.99,
+    "w": 7.11
+   },
+   "h": 443,
+   "heightM": 8.23,
+   "image": "oak.webp",
+   "pivot": {
+    "x": 173,
+    "y": 308
+   },
+   "w": 465
+  },
+  "pine": {
+   "footprint": {
+    "d": 4.16,
+    "w": 4.84
+   },
+   "h": 455,
+   "heightM": 8.98,
+   "image": "pine.webp",
+   "pivot": {
+    "x": 126,
+    "y": 332
+   },
+   "w": 383
+  },
+  "poplar": {
+   "footprint": {
+    "d": 2.41,
+    "w": 2.38
+   },
+   "h": 436,
+   "heightM": 9.18,
+   "image": "poplar.webp",
+   "pivot": {
+    "x": 76,
+    "y": 330
+   },
+   "w": 284
+  },
+  "sandbags": {
+   "footprint": {
+    "d": 0.36,
+    "w": 1.58
+   },
+   "h": 41,
+   "heightM": 0.44,
+   "image": "sandbags.webp",
+   "pivot": {
+    "x": 59,
+    "y": 20
+   },
+   "w": 126
+  },
+  "spruce": {
+   "footprint": {
+    "d": 4.2,
+    "w": 4.09
+   },
+   "h": 426,
+   "heightM": 8.5,
+   "image": "spruce.webp",
+   "pivot": {
+    "x": 111,
+    "y": 307
+   },
+   "w": 345
+  },
+  "tower_br": {
+   "footprint": {
+    "d": 8.74,
+    "w": 8.74
+   },
+   "h": 675,
+   "heightM": 13.22,
+   "image": "tower_br.webp",
+   "pivot": {
+    "x": 207,
+    "y": 475
+   },
+   "w": 604
+  },
+  "tower_fr": {
+   "footprint": {
+    "d": 8.74,
+    "w": 8.74
+   },
+   "h": 682,
+   "heightM": 13.22,
+   "image": "tower_fr.webp",
+   "pivot": {
+    "x": 207,
+    "y": 482
+   },
+   "w": 604
+  },
+  "well": {
+   "footprint": {
+    "d": 2.51,
+    "w": 2.87
+   },
+   "h": 186,
+   "heightM": 3.15,
+   "image": "well.webp",
+   "pivot": {
+    "x": 86,
+    "y": 123
+   },
+   "w": 218
+  },
+  "willow": {
+   "footprint": {
+    "d": 5.33,
+    "w": 5.81
+   },
+   "h": 364,
+   "heightM": 6.65,
+   "image": "willow.webp",
+   "pivot": {
+    "x": 138,
+    "y": 246
+   },
+   "w": 389
+  }
+ },
+ "pxPerM": 41.2903,
+ "source": "scripts/render-iso-props.py (Blender, original procedural models)"
+}

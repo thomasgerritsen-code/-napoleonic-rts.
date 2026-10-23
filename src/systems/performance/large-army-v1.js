@@ -5,7 +5,8 @@
   if (!nrts) throw new Error('NRTS foundation runtime must load before large-army performance authority.');
 
   const CELL = 160;
-  const MAX_2D_DPR = 1.5;
+  // The iso view (NRTS_CONFIG.render, open map only) may draw sharper.
+  const MAX_2D_DPR = Math.max(1.5, global.NRTS_CONFIG?.render?.mobileDprCap || 0, global.NRTS_CONFIG?.render?.desktopDprCap || 0);
   const LOD_UNIT_THRESHOLD = 360;
   const LOD_ZOOM_THRESHOLD = 0.82;
   const STATIC_TERRAIN_REFRESH_MS = 1000;
