@@ -172,11 +172,28 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
     bajonet, 30% minder moraalverlies — maar 15% trager en duurder (+60 🍞 +30 🪵).
   - *Voltigeur* (🪶, lichte compagnie): 25% verder schieten, vuurt naar believen, 15%
     sneller — maar 25% minder leven en zwak van dichtbij (+30 🍞).
-  - *Kurassier* (🛡, zwarte paarden): 50% meer leven, het kuras houdt 30% van het
-    musketvuur tegen, 30% zwaardere charge — maar 15% trager en kost ijzer.
+  - *Oude Garde* (🦅, berenmuts met rode bovenlap, rode epauletten): de veteranen
+    van de keizer — 60% meer leven, 50% sterker met de bajonet, 15% treffender,
+    wijken bijna nooit — maar heel duur (+150 🍞 +80 🪵 +30 ⛏️), traag op te leiden
+    en hooguit 24 man.
+  - *Sapeur* (🪓, genie met berenmuts, baard, leren schort en bijl): een regiment
+    met sapeurs graaft, versterkt en herstelt loopgraven sneller (half sapeurs = 2x,
+    allemaal = 3x) — maar 20% zwakker vuur.
+  - *Kurassier* (🛡, stalen kuras en helm met paardenstaart, zwarte paarden): 50% meer
+    leven, het kuras houdt 30% van het musketvuur tegen, 30% zwaardere charge — maar
+    15% trager en kost ijzer.
+  - *Poolse Lansier* (🚩, czapka en lans met rood-witte wimpel): 80% zwaarder tegen
+    infanterie die niet in carré staat en tegen vluchtende troepen — maar 25% zwakker
+    tegen andere ruiters.
   - *Huzaar* (🐎, bruine paarden): 25% sneller, 40% verder zicht, sneller weer klaar —
     maar 25% minder leven en een lichtere charge.
-  Een regiment dat vooral uit één soort bestaat heet ernaar (bv. "Franse Grenadiers 4").
+  De Britten werven hun eigen soorten, met Britse namen: *Grenadiers*, *Light
+  Companies* (voltigeurs), *95th Rifles* (groene jassen, Baker-geweer: 60% verder,
+  25% treffender, schiet naar believen, scherpe ogen — maar laadt 60% trager),
+  *Light Dragoons* (huzaren) en de *Scots Greys* (zware dragonders met berenmuts op
+  grijze paarden: 35% meer leven, 40% zwaardere charge — maar 10% trager).
+  Een regiment dat vooral uit één soort bestaat heet ernaar (bv. "Franse Grenadiers 4",
+  "Britse 95th Rifles 7").
 - **Menu onderin**: toont alleen wat bij je selectie past, in groepen met een kopje
   en een vaste volgorde. Boeren: *Werk* (akker, bouw hervatten) en *Bouwen*
   (woning, graanakker, kazerne, schiettoren, stal, gieterij). Soldaten: *Bevel*

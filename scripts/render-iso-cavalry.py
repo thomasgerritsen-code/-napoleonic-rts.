@@ -16,6 +16,10 @@ States in 8 directions, 224x192 cells with the hooves' centre at (112,152):
   cavalry:  idle 2, walk 6, trot 6
   cavfight: gallop 6, slash 3, rear 2, die 4 (horse and rider go down together)
 --role officer / trumpeter renders the squadron's officer and trumpeter.
+--kind renders a period regiment instead of the light trooper:
+  cuirassier (France): steel cuirass, crested helmet with horsehair mane, black horse;
+  lancer (France): Polish lancer of the Guard in a czapka, with a pennoned lance;
+  greys (Britain): Royal North British Dragoons in bearskins on grey horses.
 
   python scripts/render-iso-cavalry.py --side france --out art/frames/iso-proof
 """
@@ -64,6 +68,23 @@ RECOLOUR = {"coat": ("coat", "chest", "tails", "upperarm", "forearm"), "lapel": 
 STRIPPED = ("pack", "packstrap", "roll", "messtin", "cartridge", "canteen", "tuft", "haversack", "belt", "beltplate",
             "scabbard")
 LEGS = {"FR": (0.16, 0.5), "FL": (-0.16, 0.5), "HR": (0.16, -0.55), "HL": (-0.16, -0.55)}
+# Period regiments (--kind): uniform overrides, horse coat and the folder suffix.
+KINDS = {
+    "light": {"suffix": ""},
+    "cuirassier": {"side": "france", "suffix": "k", "horse": COATS[2],
+                   "uniform": {"coat": "#1f2b55", "lapel": "#1f2b55", "collar": "#b3262b", "cuff": "#b3262b",
+                               "turnback": "#b3262b", "breeches": "#e9e2cf", "strap": "#1f2b55",
+                               "cloth": "#1f2b55", "lace": "#e9e2cc", "pompom": "#b3262b"}},
+    "lancer": {"side": "france", "suffix": "l", "horse": COATS[1],
+               "uniform": {"coat": "#1d2650", "lapel": "#a3203a", "collar": "#a3203a", "cuff": "#a3203a",
+                           "turnback": "#a3203a", "breeches": "#1d2650", "strap": "#1d2650",
+                           "cloth": "#1d2650", "lace": "#a3203a", "pompom": "#f1ebdd"}},
+    "greys": {"side": "britain", "suffix": "g", "horse": GREY,
+              "uniform": {"coat": "#b3262b", "lapel": "#b3262b", "collar": "#24315c", "cuff": "#24315c",
+                          "turnback": "#24315c", "breeches": "#8c9095", "strap": "#b3262b",
+                          "cloth": "#24315c", "lace": "#d8b54a", "pompom": "#f1ebdd"}},
+}
+HEADGEAR = ("shako", "lid", "visor", "plate", "chinscale", "plume", "band", "pompom", "cord")
 HIP_Z = 1.02
 HEAD_TILT = -112   # head relative to the neck, degrees about X
 
@@ -102,13 +123,15 @@ def draped(name, rx, rz, angle, y0, y1, mat, parent, point=0.0, zc=0.2):
     return obj
 
 
-def build_horse(side: str, variant: int, role: str = "trooper") -> dict:
+def build_horse(side: str, variant: int, role: str = "trooper", kind: str = "light") -> dict:
     coat_hex, dark_hex = GREY if (side == "britain" and variant == 2) or role == "trumpeter" else COATS[variant]
+    if "horse" in KINDS[kind]:
+        coat_hex, dark_hex = KINDS[kind]["horse"]
     coat = material(coat_hex, 0.55, pattern="skin")
     dark = material(dark_hex, 0.6, pattern="skin")
     hoof = material("#1a1714", 0.5, pattern="plain")
     leather = material("#3a2414", 0.5, pattern="plain")
-    colours = UNIFORM[side]
+    colours = KINDS[kind].get("uniform", UNIFORM[side])
     cloth = material(colours["cloth"], 0.85, pattern="cloth")
     lace = material(GOLD if role == "officer" else colours["lace"], 0.4 if role == "officer" else 0.7,
                     0.7 if role == "officer" else 0.0, pattern="plain")
@@ -209,14 +232,14 @@ def build_horse(side: str, variant: int, role: str = "trooper") -> dict:
             "saddle": saddle, "steel": steel, "leather": leather}
 
 
-def build_rider(side: str, horse: dict, role: str = "trooper") -> dict:
+def build_rider(side: str, horse: dict, role: str = "trooper", kind: str = "light") -> dict:
     rig = infantry.build_soldier(side, 1)
     hide_tree(rig["musket"])
     rig["armed"] = False
     for obj in bpy.data.objects:
         if obj.name.split(".")[0] in STRIPPED:
             obj.hide_render = True
-    colours = dict(UNIFORM[side])
+    colours = dict(KINDS[kind].get("uniform", UNIFORM[side]))
     if role == "trumpeter":
         colours["coat"] = colours["lapel"] = TRUMPETER_COAT[side]
     mats = {k: material(v, 0.8, pattern="cloth") for k, v in colours.items()}
@@ -252,6 +275,58 @@ def build_rider(side: str, horse: dict, role: str = "trooper") -> dict:
         part("cyl", (0.1, 0.03, 0.105), (0, 0, 0.245), gold, rig["head"], name="shakoband")
         part("cyl", (0.17, 0.1, 0.16), (0, 0, 0.02), material("#c9a33c" if side == "france" else "#8f1d2c", 0.7,
              pattern="cloth"), torso, name="sash")
+    head = rig["head"]
+    if kind != "light":
+        for obj in bpy.data.objects:
+            if obj.name.split(".")[0] in HEADGEAR and obj.parent == head:
+                obj.hide_render = True
+    if kind == "cuirassier":
+        # Steel cuirass (breast and back plates) and the crested helmet with a
+        # black horsehair mane and a red plume.
+        steel = horse["steel"]
+        brass = material("#c9a33c", 0.3, 0.85, pattern="plain")
+        part("ball", (0.2, 1.08, 0.82, 1.15), (0, 0.035, 0.38), steel, torso, name="cuirass", segments=20)
+        part("box", (0.36, 0.05, 0.03), (0, 0.0, 0.62), brass, torso, name="cuirassrim")
+        part("ball", (0.112, 1.0, 1.05, 0.9), (0, -0.005, 0.13), steel, head, name="helmet", segments=18)
+        part("cyl", (0.122, 0.035), (0, 0, 0.07), material("#2a2018", 0.8, pattern="cloth", scale=3), head, name="turban")
+        part("box", (0.025, 0.2, 0.08), (0, -0.01, 0.25), brass, head, name="crest")
+        part("box", (0.03, 0.08, 0.36), (0, -0.13, 0.08), material("#141210", 0.9, pattern="cloth"), head,
+             rot=(-14, 0, 0), name="horsehair")
+        part("cyl", (0.022, 0.2, 0.034), (-0.1, 0.02, 0.24), material("#b3262b", 0.8, pattern="cloth"), head,
+             name="kplume")
+        part("box", (0.13, 0.05, 0.012), (0, 0.105, 0.075), brass, head, rot=(-12, 0, 0), name="kvisor")
+    elif kind == "lancer":
+        # Czapka: the Polish cap with its square top, white plume; and the lance with
+        # a red-over-white pennant (the sabre blade is hidden, the lance takes its place).
+        crimson = material("#a3203a", 0.8, pattern="cloth")
+        part("cyl", (0.098, 0.13, 0.085), (0, 0, 0.12), material("#171717", 0.4, pattern="plain"), head, name="czapka")
+        part("cyl", (0.085, 0.04, 0.06), (0, 0, 0.2), crimson, head, name="czapkawaist")
+        part("box", (0.19, 0.19, 0.07), (0, 0, 0.255), crimson, head, rot=(0, 0, 45), name="czapkatop")
+        part("cyl", (0.025, 0.18, 0.038), (-0.07, 0.04, 0.37), material("#f1ebdd", 0.8, pattern="cloth"), head,
+             name="lplume")
+        part("box", (0.13, 0.06, 0.014), (0, 0.1, 0.075), material("#171717", 0.4, pattern="plain"), head,
+             rot=(-12, 0, 0), name="lvisor")
+        for obj in rig["sabre"].children:
+            obj.hide_render = True
+        lance = empty("lance", rig["sabre"])
+        part("cyl", (0.016, 2.3), (0, 0.03, -0.25), material("#5d3d22", 0.6, pattern="bark", scale=2.5), lance,
+             name="pole", segments=8)
+        part("cyl", (0.02, 0.16, 0.003), (0, 0.03, -1.47), horse["steel"], lance, rot=(180, 0, 0), name="lancetip",
+             segments=8)
+        part("box", (0.006, 0.22, 0.06), (0, 0.15, -1.27), material("#b3262b", 0.85, pattern="cloth"), lance,
+             name="pennant")
+        part("box", (0.006, 0.22, 0.06), (0, 0.15, -1.21), material("#f1ebdd", 0.85, pattern="cloth"), lance,
+             name="pennant")
+    elif kind == "greys":
+        # Scots Greys: the tall bearskin with a white plume on the left.
+        fur = material("#141210", 0.95, pattern="cloth", scale=3)
+        part("cyl", (0.108, 0.36, 0.126), (0, -0.01, 0.2), fur, head, name="bearskin", segments=20)
+        part("ball", (0.126, 1, 1, 0.45), (0, -0.01, 0.38), fur, head, name="bearskintop")
+        part("cyl", (0.028, 0.24, 0.036), (-0.1, 0.02, 0.36), material("#f1ebdd", 0.8, pattern="cloth"), head,
+             name="gplume")
+        part("box", (0.012, 0.012, 0.14), (0.07, 0.09, 0.2), material("#d8b54a", 0.4, 0.6, pattern="plain"), head,
+             rot=(0, 40, 0), name="gcord")
+    rig["kind"] = kind
     rig["trumpets"] = []
     if role == "trumpeter":
         brass = material("#d9b45a", 0.3, 0.85, pattern="plain")
@@ -364,6 +439,13 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
             torso.rotation_euler = Euler((rad((20, 22, 24)[frame]), 0, 0))
             trumpet_to_lips(rider, rad)
             return
+        if rider.get("kind") == "lancer":
+            # Thrust: the lance drawn back, driven forward, recovered.
+            torso.rotation_euler = Euler((rad((10, 26, 18)[frame]), 0, rad((12, -6, 0)[frame])))
+            sh_r.rotation_euler = Euler((rad((70, 96, 88)[frame]), rad(4), 0))
+            el_r.rotation_euler = Euler((rad((40, 2, 14)[frame]), 0, 0))
+            rider["sabre"].rotation_euler = Euler((rad((-10, -4, -6)[frame]), 0, 0))
+            return
         torso.rotation_euler = Euler((rad((6, 18, 30)[frame]), 0, rad((20, 0, -24)[frame])))
         sh_r.rotation_euler = Euler((rad((170, 120, 60)[frame]), rad((20, 0, -10)[frame]), 0))
         el_r.rotation_euler = Euler((rad((30, 10, 0)[frame]), 0, 0))
@@ -380,6 +462,8 @@ def pose(horse, rider, state, frame, frames, direction) -> None:
             leg(horse, key, -up + 6, 10, -6)
         neck.rotation_euler = Euler((rad(-20 - up / 2), 0, 0))
         torso.rotation_euler = Euler((rad(18), 0, 0))
+        if rider.get("kind") == "lancer":
+            return
         sh_r.rotation_euler = Euler((rad(150), rad(16), 0))
         el_r.rotation_euler = Euler((rad(20), 0, 0))
         return
@@ -418,6 +502,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--side", choices=sorted(infantry.PALETTES), required=True)
     ap.add_argument("--variant", type=int, choices=sorted(COATS), default=1)
     ap.add_argument("--role", choices=sorted(ROLES), default="trooper")
+    ap.add_argument("--kind", choices=sorted(KINDS), default="light")
     ap.add_argument("--out", default="art/frames/iso-proof")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--states", nargs="*", help="render only these states (review)")
@@ -428,9 +513,11 @@ def main(argv: list[str]) -> int:
     ss = args.supersample
     camera(CELL[0] * ss, CELL[1] * ss, SPRITE_PX_PER_M * ss, (PIVOT[0] * ss, PIVOT[1] * ss))
     shadow_catcher("ground", [(1.6 * math.cos(a / 32 * math.tau), 1.6 * math.sin(a / 32 * math.tau)) for a in range(32)])
-    horse = build_horse(args.side, args.variant, args.role)
-    rider = build_rider(args.side, horse, args.role)
-    suffix = ROLES[args.role] or ("" if args.variant == 1 else str(args.variant))
+    if KINDS[args.kind].get("side", args.side) != args.side:
+        ap.error(f"{args.kind} rides for {KINDS[args.kind]['side']}")
+    horse = build_horse(args.side, args.variant, args.role, args.kind)
+    rider = build_rider(args.side, horse, args.role, args.kind)
+    suffix = KINDS[args.kind]["suffix"] or ROLES[args.role] or ("" if args.variant == 1 else str(args.variant))
     prefix = ("fr" if args.side == "france" else "br") + "c" + suffix
     out = Path(args.out).resolve() / "cavalry" / f"{args.side}{suffix}"
     out.mkdir(parents=True, exist_ok=True)

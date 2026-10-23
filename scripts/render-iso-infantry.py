@@ -68,12 +68,24 @@ VARIANTS = {
     # white plume and wings) and voltigeurs / the British light company.
     4: {"company": "grenadier", "moustache": True, "skin": "#c99470"},
     5: {"company": "light", "hair": "#3a2a1c"},
+    # Nation-specific troops: the French Imperial Guard grenadier (bearskin with
+    # the red top patch, red epaulettes) and the British 95th Rifles (rifle-green
+    # jacket, black facings and belts, green tuft).
+    6: {"france": {"company": "guard", "moustache": True, "skin": "#c4906c", "height": 1.03},
+        "britain": {"coat": "#24341f", "lapel": "#24341f", "collar": "#151515", "cuff": "#151515", "turnback": "#151515",
+                    "strap": "#24341f", "belt": "#1a1a1a", "pompom": "#2f5a33", "button": "#1c1c1c", "plate": "#3a3a3a",
+                    "breeches": "#24341f", "pack": "#1d1d1d", "sideburns": True}},
+    # The sapper of the Guard: bearskin, full beard, white leather apron and an axe.
+    7: {"france": {"company": "sapper", "beard": True, "hair": "#2a1d14", "skin": "#c99470", "height": 1.04}},
 }
 
 
 def build_soldier(side: str, variant: int = 1) -> dict:
     look = dict(VARIANTS[variant])
-    if side == "britain" and "breeches" in look:
+    national = "france" in look or "britain" in look
+    if national:
+        look = dict(look.get(side, {}))
+    if side == "britain" and "breeches" in look and not national:
         look.update(breeches="#5f646b", gaiter="#585d63")
     p = {**PALETTES[side], **COMMON, **{k: v for k, v in look.items() if isinstance(v, str) and k != "company"}}
     M = {k: material(v) for k, v in p.items()}
@@ -146,7 +158,8 @@ def build_soldier(side: str, variant: int = 1) -> dict:
     company = look.get("company")
     if company:
         british_colours = {"grenadier": ("#f1ebdd", "#b3262b"), "light": ("#2f5a33", "#b3262b")}
-        french_colours = {"grenadier": ("#b02a2e", "#b02a2e"), "light": ("#d9b43a", "#3e6b34")}
+        french_colours = {"grenadier": ("#b02a2e", "#b02a2e"), "light": ("#d9b43a", "#3e6b34"),
+                          "guard": ("#b02a2e", "#b02a2e"), "sapper": ("#b02a2e", "#b02a2e")}
         plume, shoulder = (british_colours if british else french_colours)[company]
         pm, sm = material(plume, 0.8, pattern="cloth"), material(shoulder, 0.8, pattern="cloth")
         for x in (0.2, -0.2):
@@ -162,7 +175,28 @@ def build_soldier(side: str, variant: int = 1) -> dict:
                          name="fringe", segments=6)
         if company == "light" and not british:
             part("cyl", (0.08, 0.075), (0, 0, 0.6), material("#d9b43a", 0.8, pattern="cloth"), torso, name="collar")
-    if look.get("cover"):
+    if look.get("beard"):
+        part("ball", (0.075, 1.15, 0.8, 1.1), (0, 0.065, -0.07), M["hair"], head, name="beard")
+        part("box", (0.08, 0.025, 0.018), (0, 0.105, -0.04), M["hair"], head, name="moustache")
+    if company == "sapper":
+        # White buff leather apron to the knees, and the felling axe on the back.
+        leather = material("#e9e2cf", 0.7, pattern="cloth")
+        part("box", (0.3, 0.02, 0.62), (0, 0.13, 0.02), leather, torso, name="apron")
+        axe = empty("sapperaxe", torso, (0.05, -0.27, 0.3), (0, 28, 0))
+        part("cyl", (0.02, 0.95), (0, 0, 0), M["wood"], axe, name="haft")
+        part("box", (0.03, 0.2, 0.14), (0, 0.06, 0.42), M["steel"], axe, name="axehead")
+        for x in (-0.04, 0.04):
+            part("box", (0.012, 0.012, 0.09), (x, 0.142, 0.48), M["plate"], torso, rot=(0, 40 if x > 0 else -40, 0), name="badge")
+    if company in ("guard", "sapper"):
+        # Bearskin: a tall black fur cap with the red top patch and white cords,
+        # a red plume on the left; no shako.
+        fur = material("#141210", 0.95, pattern="cloth", scale=3)
+        part("cyl", (0.108, 0.36, 0.126), (0, -0.01, 0.2), fur, head, name="bearskin", segments=20)
+        part("ball", (0.126, 1, 1, 0.45), (0, -0.01, 0.38), fur, head, name="bearskintop")
+        part("box", (0.09, 0.012, 0.09), (0, -0.115, 0.3), material("#b02a2e", 0.8, pattern="cloth"), head, rot=(0, 45, 0), name="patch")
+        part("cyl", (0.028, 0.24, 0.036), (-0.1, 0.02, 0.36), pm, head, name="plume")
+        part("box", (0.012, 0.012, 0.14), (0.07, 0.09, 0.2), M["belt"], head, rot=(0, 40, 0), name="cord")
+    elif look.get("cover"):
         # Campaign oilcloth cover: glossy black, hides plate, cords and pompom.
         oil = material("#121212", 0.28, pattern="plain")
         part("cyl", (0.1, 0.21, 0.115), (0, 0, 0.165), oil, head, name="shako")

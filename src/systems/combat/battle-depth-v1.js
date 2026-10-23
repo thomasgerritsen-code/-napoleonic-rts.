@@ -128,10 +128,12 @@
         for (const t of O?.trenches?.() || []) {
           if (t.progress < 1 || (t.integrity ?? 100) >= 100) continue;
           // Whoever stands in it (at least a few men, not routing) digs it back up.
-          let men = 0;
-          for (const u of units) if (!u.dead && !u.routing && u.type === 'infantry' && O.trenchAt(u.x, u.y) === t && ++men >= 3) break;
+          let men = 0, sappers = 0;
+          for (const u of units) if (!u.dead && !u.routing && u.type === 'infantry' && O.trenchAt(u.x, u.y) === t) { men++; if (u.troop === 'sapper') sappers++; }
           if (men < 3) continue;
-          t.integrity = Math.min(100, t.integrity + cfg.repairPerSecond * step); stats.repairs++;
+          // Sappers (troops-v1) repair faster.
+          const work = 1 + (root.NRTS_CONFIG?.troops?.kinds?.sapper?.work || 0) * sappers / men;
+          t.integrity = Math.min(100, t.integrity + cfg.repairPerSecond * work * step); stats.repairs++;
           if (t.breached && t.integrity >= 50) t.breached = false;
         }
       }

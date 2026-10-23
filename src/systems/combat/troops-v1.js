@@ -1,12 +1,17 @@
 'use strict';
-// Troop kinds (open map only, NRTS_CONFIG.troops): musketeers and horsemen
-// come in kinds with a strength and a weakness each. They are the game's own
-// infantry and cavalry with a 'troop' tag, trained at the barracks and the
-// stable for an extra price; the British field them too.
-//   Grenadier  - elite: tougher, harder with the bayonet, steadier; slower, dearer.
-//   Voltigeur  - light: shoots farther and at will, quicker; frailer, weak hand to hand.
-//   Kurassier  - heavy horse: tough, armoured against musket balls, crushing charge; slow, costs iron.
-//   Huzaar     - light horse: fast, sees far, quick to reload; frail, lighter charge.
+// Troop kinds (open map only, NRTS_CONFIG.troops): the regiments of the
+// Napoleonic wars, each with a strength and a weakness. They are the game's
+// own infantry and cavalry with a 'troop' tag, trained at the barracks and
+// the stable for an extra price; the British AI recruits its own.
+//   Grenadier      - elite: tougher, harder with the bayonet, steadier; slower, dearer.
+//   Voltigeur      - light (British: Light Company): shoots farther and at will; frail.
+//   Oude Garde     - the Emperor's veterans: very tough and steady; very dear, capped.
+//   Sapeur         - engineers: their regiment digs, upgrades and repairs works faster.
+//   95th Rifles    - (British) Baker rifle: far and accurate; slow to load.
+//   Kurassier      - heavy horse: armoured against musket balls, crushing charge; slow.
+//   Poolse Lansier - lance: deadly against infantry out of square and fugitives; weak against horse.
+//   Huzaar         - light horse (British: Light Dragoon): fast, sees far; frail.
+//   Scots Grey     - (British) heavy dragoons on greys: tough, heavy charge; slower.
 (function installTroopsV1(root) {
   const cfg = root.NRTS_CONFIG?.troops;
   if (!cfg) return;
@@ -14,7 +19,11 @@
   if (root.__TROOPS_V1__ || typeof TRAINING === 'undefined') return;
   const T = cfg.kinds;
   const troopOf = u => (u && u.troop && T[u.troop]) || null;
-  const stats = { trained: 0, british: 0, armour: 0 };
+  // A kind's name in the given army ([label, plural]).
+  const nameOf = (key, side = 'france') => T[key].names?.[side] || [T[key].label, T[key].plural];
+  const fields = (key, side) => (T[key].sides || ['france', 'britain']).includes(side);
+  const regOf = u => (u && u.regimentId && typeof getRegiment === 'function') ? getRegiment(u.regimentId) : null;
+  const stats = { trained: 0, british: 0, armour: 0, lance: 0 };
 
   function applyTroop(u, key) {
     const t = T[key]; if (!t || u.troop) return;
@@ -28,7 +37,8 @@
   const costText = c => [c.food ? `${c.food} 🍞` : '', c.wood ? `${c.wood} 🪵` : '', c.iron ? `${c.iron} ⛏️` : ''].filter(Boolean).join(' · ');
   function trainTroop(key, b = selectedBuilding) {
     const t = T[key];
-    if (!b || b.dead || !b.complete || b.side !== 'france' || b.type !== BUILDING_FOR[t.base]) return false;
+    if (!b || b.dead || !b.complete || b.side !== 'france' || b.type !== BUILDING_FOR[t.base] || !fields(key, 'france')) return false;
+    if (t.max && strength('france', key) >= t.max) { statusEl.textContent = `Hooguit ${t.max} ${t.plural}.`; return false; }
     const extra = t.extra || {};
     // The base price is paid by the game's own queue; the kind's extra on top.
     if (!canAfford('france', costOf(key))) { statusEl.textContent = `Niet genoeg grondstoffen voor een ${t.label}: ${costText(costOf(key))}.`; return false; }
@@ -39,6 +49,12 @@
     statusEl.textContent = `${t.label} toegevoegd aan productie.`;
     actionSignature = ''; updateHud(true);
     return true;
+  }
+  // Men of a kind in the field and in the queues.
+  function strength(side, key) {
+    let n = units.filter(u => !u.dead && u.side === side && u.troop === key).length;
+    for (const b of buildings) if (!b.dead && b.side === side) for (const q of b.queue || []) if (q.troop === key) n++;
+    return n;
   }
   // Newly trained men get the kind of the order that made them.
   const baseUpdateBuildings = updateBuildings;
@@ -58,9 +74,11 @@
       // The British field the kinds as well: a share of their new men.
       for (const u of fresh) {
         if (u.side !== 'britain' || u.troop) continue;
-        const roll = Math.random();
-        if (u.type === 'infantry') { if (roll < cfg.britishShare) applyTroop(u, 'grenadier'); else if (roll < cfg.britishShare * 2) applyTroop(u, 'voltigeur'); }
-        else if (u.type === 'cavalry') applyTroop(u, roll < 0.5 ? 'cuirassier' : 'hussar');
+        let roll = Math.random();
+        for (const [key, share] of Object.entries(cfg.britishShare)) {
+          if (T[key]?.base !== u.type || !fields(key, 'britain')) continue;
+          if ((roll -= share) < 0) { applyTroop(u, key); break; }
+        }
         if (u.troop) stats.british++;
       }
     }
@@ -100,6 +118,9 @@
       // Hand to hand (no ball in flight): the striker's melee weight, a charge's weight.
       const s = striker && !striker.dead ? troopOf(striker) : null;
       if (s) damage *= striker.type === 'cavalry' ? (s.charge || 1) : (s.melee || 1);
+      // The lance: deadly against foot out of square and men in flight, weaker against horse.
+      if (s?.vsInfantry && victim.type !== 'cavalry' && (victim.routing || regOf(victim)?.formation !== 'square')) { damage *= s.vsInfantry; stats.lance++; }
+      else if (s?.vsCavalry && victim.type === 'cavalry') damage *= s.vsCavalry;
       const v = troopOf(victim);
       if (v) {
         shock *= v.shock || 1;
@@ -132,7 +153,7 @@
       const m = regimentMembers(reg).filter(u => u.type === 'infantry' || u.type === 'cavalry'), count = {};
       for (const u of m) if (u.troop) count[u.troop] = (count[u.troop] || 0) + 1;
       const [key, n] = Object.entries(count).sort((a, b) => b[1] - a[1])[0] || [];
-      if (key && n >= m.length / 2) { reg.troop = key; reg.name = `${side === 'france' ? 'Franse' : 'Britse'} ${T[key].plural} ${reg.id}`; }
+      if (key && n >= m.length / 2) { reg.troop = key; reg.name = `${side === 'france' ? 'Franse' : 'Britse'} ${nameOf(key, side)[1]} ${reg.id}`; }
     }
     return reg;
   };
@@ -145,7 +166,7 @@
       const b = typeof selectedBuilding !== 'undefined' ? selectedBuilding : null;
       if (!b || b.dead || !b.complete || b.side !== 'france') return;
       for (const [key, t] of Object.entries(T)) {
-        if (BUILDING_FOR[t.base] !== b.type || actionsEl.querySelector(`[data-action="train-${key}"]`)) continue;
+        if (BUILDING_FOR[t.base] !== b.type || !fields(key, 'france') || actionsEl.querySelector(`[data-action="train-${key}"]`)) continue;
         const c = costOf(key), btn = makeDynamicButton(`train-${key}`, `${t.label}<br><small>${costText(c)}</small>`, !canAfford('france', c));
         btn.title = `${t.label}: ${t.pro} — maar ${t.con}.`;
         actionsEl.appendChild(btn);
@@ -165,12 +186,20 @@
       const counts = {};
       for (const u of sel) counts[u.troop] = (counts[u.troop] || 0) + 1;
       const [key] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+      const [label, plural] = nameOf(key, sel[0].side);
       const det = typeof selectionDetailsEl !== 'undefined' ? selectionDetailsEl : document.getElementById('selectionDetails');
-      if (det && !det.textContent.includes(T[key].label)) det.textContent = `${det.textContent} · ${T[key].plural}: ${T[key].pro}; ${T[key].con}`;
+      if (det && !det.textContent.includes(label)) det.textContent = `${det.textContent} · ${plural}: ${T[key].pro}; ${T[key].con}`;
     }
     return r;
   };
 
-  root.__TROOPS_V1__ = Object.freeze({ version: '1.0', kinds: T, applyTroop, trainTroop, costOf, troopOf, stats: () => ({ ...stats,
+  // Sappers speed up their regiment's spade work: 1 + work x their share.
+  function workFactor(reg) {
+    const k = T.sapper; if (!k?.work || !reg) return 1;
+    const m = regimentMembers(reg).filter(u => !u.dead && u.type === 'infantry');
+    return m.length ? 1 + k.work * m.filter(u => u.troop === 'sapper').length / m.length : 1;
+  }
+
+  root.__TROOPS_V1__ = Object.freeze({ version: '1.1', kinds: T, applyTroop, trainTroop, costOf, troopOf, nameOf, workFactor, strength, stats: () => ({ ...stats,
     french: Object.fromEntries(Object.keys(T).map(k => [k, units.filter(u => !u.dead && u.side === 'france' && u.troop === k).length])) }) });
 })(window);

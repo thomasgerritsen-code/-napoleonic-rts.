@@ -95,11 +95,15 @@
     }
     first.push(loadProps(), loadVillage(), loadGround(), load('frw', ['worker']), load('brw', ['worker']));
     // Extra looks stream in afterwards; until then everyone uses the base look.
-    return Promise.all(first).then(() => Promise.all(['2', '3', '4', '5'].flatMap(l => ['fr', 'br'].map(p => load(p + l, INFANTRY)))
-      .concat(['fr', 'br'].flatMap(p => [load(p + 'c2', ['cavalry', 'cavfight']), load(p + 'co', ['cavalry', 'cavfight'])]))
+    // Period troops (troops-v1): Old Guard (fr6), sappers (fr7), 95th Rifles (br6);
+    // cuirassiers (frck), Polish lancers (frcl), Scots Greys (brcg).
+    const looks = ['fr', 'br'].flatMap(p => ['', '2', '3', '4', '5'].map(l => p + l)).concat(global.NRTS_CONFIG?.troops ? ['fr6', 'fr7', 'br6'] : []);
+    const horse = ['fr', 'br'].flatMap(p => [p + 'c2', p + 'co']).concat(global.NRTS_CONFIG?.troops ? ['frck', 'frcl', 'brcg'] : []);
+    return Promise.all(first).then(() => Promise.all(looks.filter(k => k.length > 2).map(k => load(k, INFANTRY))
+      .concat(horse.map(k => load(k, ['cavalry', 'cavfight'])))
       // Spade work in a trench being dug, per look.
-      .concat(['', '2', '3', '4', '5'].flatMap(l => ['fr', 'br'].map(p => loadSheet(p + l, 'dig')
-        .then(part => { view.atlases[p + l + ':dig'] = indexAtlas([part]); }).catch(err => console.warn(err.message)))))));
+      .concat(looks.map(k => loadSheet(k, 'dig')
+        .then(part => { view.atlases[k + ':dig'] = indexAtlas([part]); }).catch(err => console.warn(err.message))))));
   }
   function loadProps() {
     return fetch(ASSETS + 'iso/props/props.json').then(r => r.json()).then(m => Promise.all(Object.entries(m.props)
@@ -648,6 +652,7 @@
   const lookOf = u => {
     const p = u.side === 'france' ? 'fr' : 'br', h = hash(u.id, 7), kinds = !!global.__TROOPS_V1__;
     const key = u.troop === 'grenadier' ? p + '4' : u.troop === 'voltigeur' ? p + '5'
+      : u.troop === 'guard' || u.troop === 'rifle' ? p + '6' : u.troop === 'sapper' ? p + '7'
       : !kinds && h < 0.1 ? p + '4' : !kinds && h < 0.2 ? p + '5' : p + ['', '2', '3'][Math.floor(hash(u.id, 13) * 3)];
     return view.atlases[key] ? key : p;
   };
@@ -667,8 +672,9 @@
     const p = u.side === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
     const since = now - m.firedAt, step = (stride, n) => Math.floor((m.walk % stride) / stride * n) % n;
     if (u.type === 'cavalry') {
-      // Kurassiers ride the dark horses, huzaren the bays (troops-v1).
-      const coat = u.troop === 'cuirassier' ? '2' : u.troop === 'hussar' ? '' : (hash(u.id, 5) < 0.5 ? '' : '2');
+      // Period regiments have their own riders (troops-v1); huzaren ride the bays.
+      const coat = u.troop === 'cuirassier' ? (view.atlases[p + 'ck'] ? 'k' : '2') : u.troop === 'lancer' ? 'l' : u.troop === 'greys' ? 'g'
+        : u.troop === 'hussar' ? '' : (hash(u.id, 5) < 0.5 ? '' : '2');
       const key = view.atlases[p + 'c' + coat] ? p + 'c' + coat : p + 'c';
       if (m.moving) {
         const gait = m.speed > 4.5 || u.chargeTimer > 0 ? 'gallop' : m.speed > 2.4 ? 'trot' : 'walk';
@@ -1765,7 +1771,7 @@
 
   global.__ISO_VIEW_V1__ = Object.freeze({
     version: 'iso-view-v1', optIn: 'view=iso',
-    isOn: () => view.on, setOn, setOverview,
+    isOn: () => view.on, setOn, setOverview, atlasKeys: () => Object.keys(view.atlases), lookOf,
     stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,

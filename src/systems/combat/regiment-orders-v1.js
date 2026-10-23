@@ -130,7 +130,7 @@
     }
     if (t.upgrade.by !== reg.id || reg.trenchStill < 1) return;
     const next = levels[t.upgrade.to];
-    t.upgrade.progress = Math.min(1, t.upgrade.progress + 1 / (next.seconds || 10));
+    t.upgrade.progress = Math.min(1, t.upgrade.progress + workFactor(reg) / (next.seconds || 10));
     t.dugAt = elapsed;
     if (t.upgrade.progress >= 1) {
       t.level = t.upgrade.to; t.upgrade = null; stats.upgrades = (stats.upgrades || 0) + 1;
@@ -151,6 +151,8 @@
       if (Math.hypot((d.targetX ?? d.x) - x, (d.targetY ?? d.y) - y) > 3) { d.targetX = x; d.targetY = y; stats[key] = (stats[key] || 0) + 1; }
     }
   }
+  // Sappers (troops-v1) make a regiment dig and build faster.
+  const workFactor = reg => global.__TROOPS_V1__?.workFactor?.(reg) || 1;
   function trenchWork(reg, m, c) {
     // By a trench already: finish digging it, or (finished) nothing to dig here.
     const near = trenches.find(t => Math.hypot(t.x - c.x, t.y - c.y) < cfg.trenchSnap);
@@ -165,7 +167,7 @@
     }
     if (!t) return;
     // A second has passed since the last check (refresh runs the stance once a second).
-    const rate = (foeNear(reg.side, c, 260) ? 0.4 : 1) / cfg.digSeconds;
+    const rate = (foeNear(reg.side, c, 260) ? 0.4 : 1) * workFactor(reg) / cfg.digSeconds;
     t.progress = Math.min(1, t.progress + rate);
     t.diggers = reg.id; t.dugAt = elapsed;
     if (t.progress >= 1) reg.trenchId = t.id;

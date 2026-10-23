@@ -81,6 +81,9 @@
     .actions.menu-v1 button[data-action="train-voltigeur"]::before{content:"🪶"}
     .actions.menu-v1 button[data-action="train-cuirassier"]::before{content:"🛡"}
     .actions.menu-v1 button[data-action="train-hussar"]::before{content:"🐎"}
+    .actions.menu-v1 button[data-action="train-guard"]::before{content:"🦅"}
+    .actions.menu-v1 button[data-action="train-sapper"]::before{content:"🪓"}
+    .actions.menu-v1 button[data-action="train-lancer"]::before{content:"🚩"}
     .actions.menu-v1 button[data-action="quick-regiment"]::before,.actions.menu-v1 button[data-action="quick-regiment-barracks"]::before{content:"⚑"}
     .actions.menu-v1 button[data-action="train-missing"]::before{content:"➕"}
     .actions.menu-v1 button[data-action="auto-regiment"]::before{content:"🔁"}

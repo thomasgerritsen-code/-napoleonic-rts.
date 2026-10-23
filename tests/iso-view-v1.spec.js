@@ -831,7 +831,7 @@ test('iso view: troop kinds - grenadiers, voltigeurs, kurassiers and huzaren are
     out.name = createRegiment('france', gs)?.name;
     return out;
   });
-  expect(r.made).toEqual({ grenadier: 1, voltigeur: 1, cuirassier: 1, hussar: 1 });
+  expect(r.made).toMatchObject({ grenadier: 1, voltigeur: 1, cuirassier: 1, hussar: 1 });
   expect(r.grenadierHp).toBeGreaterThan(r.voltigeurHp);
   expect(r.bayonet[1]).toBeGreaterThan(r.bayonet[0]);
   expect(r.bayonet[2]).toBeLessThan(r.bayonet[0]);
@@ -842,5 +842,74 @@ test('iso view: troop kinds - grenadiers, voltigeurs, kurassiers and huzaren are
   expect(r.pace.cuirassier).toBeLessThan(r.pace.horse);
   expect(r.sight[1]).toBeGreaterThan(r.sight[0] * 1.3);
   expect(r.name).toContain('Grenadiers');
+  expect(errors).toEqual([]);
+});
+
+test('iso view: period troops - Old Guard, sapeurs, Polish lancers; 95th Rifles and Scots Greys for Britain', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-period&view=iso');
+  await page.waitForFunction(() => window.__TROOPS_V1__ && window.__ACTION_MENU_V1__, null, { timeout: 60_000 });
+  // The new looks and riders stream in after the base sheets.
+  if (!process.env.NO_ATLAS) await page.waitForFunction(() => ['fr6', 'fr7', 'br6', 'frck', 'frcl', 'brcg', 'fr6:dig'].every(k => window.__ISO_VIEW_V1__?.atlasKeys?.().includes(k)), null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const X = window.__TROOPS_V1__, out = {};
+    economies.france.food = 20000; economies.france.wood = 20000; economies.france.iron = 5000; economies.france.popCap = 400;
+    const bk = buildings.find(q => q.side === 'france' && q.type === 'barracks' && q.complete) || createBuilding('france', 'barracks', 900, 1100, true);
+    const st = buildings.find(q => q.side === 'france' && q.type === 'stable' && q.complete) || createBuilding('france', 'stable', 1100, 1100, true);
+    selectedUnits.clear(); selectedBuilding = bk; actionSignature = ''; updateHud(true);
+    out.barracks = [...document.querySelectorAll('[data-action^="train-"]')].map(b => b.dataset.action);
+    selectedBuilding = st; actionSignature = ''; updateHud(true);
+    out.stable = [...document.querySelectorAll('[data-action^="train-"]')].map(b => b.dataset.action);
+    // The Old Guard is capped.
+    for (let i = 0; i < 24; i++) X.applyTroop(createUnit('france', 'infantry', 600 + i * 10, 900), 'guard');
+    economies.france.popCap = 400;   // the HUD recounts houses
+    out.guardOverCap = X.trainTroop('guard', bk);
+    out.sapperOk = X.trainTroop('sapper', bk);
+    // Sappers speed up their regiment's spade work.
+    const mk = (side, type, troop, x, y) => { const u = createUnit(side, type, x, y); if (troop) X.applyTroop(u, troop); return u; };
+    const line = []; for (let i = 0; i < 12; i++) line.push(mk('france', 'infantry', i < 6 ? 'sapper' : null, 1600 + i * 18, 1300));
+    line.push(createUnit('france', 'officer', 1580, 1300), createUnit('france', 'drummer', 1580, 1310));
+    out.work = X.workFactor(createRegiment('france', line));
+    // The lance: against foot out of square, and against horse.
+    const hit = (troop, victimType) => {
+      let sum = 0;
+      for (let i = 0; i < 8; i++) {
+        const v = createUnit('britain', victimType, 2400, 1800 + i * 60);
+        const a = mk('france', 'cavalry', troop, 2390, 1800 + i * 60), h = v.hp;
+        fire(a, v); for (let k = 0; k < 40; k++) updateProjectiles(0.02);
+        sum += h - v.hp; a.dead = true; v.dead = true;
+      }
+      return sum;
+    };
+    out.lance = { line: [hit(null, 'infantry'), hit('lancer', 'infantry')], horse: [hit(null, 'cavalry'), hit('lancer', 'cavalry')] };
+    out.lanceHits = X.stats().lance;
+    out.names = { light: X.nameOf('voltigeur', 'britain'), hussar: X.nameOf('hussar', 'britain'), rifle: X.nameOf('rifle', 'britain') };
+    // The rifle shoots farther than the line (the enemy index refreshes on a tick).
+    const rifle = mk('britain', 'infantry', 'rifle', 1700, 1700), plain = mk('britain', 'infantry', null, 1700, 2200);
+    out.rifleHp = [rifle.maxHp, plain.maxHp];
+    const marks = [rifle, plain].map(u => createUnit('france', 'infantry', u.x - TYPES.infantry.range * 1.4, u.y));
+    window.__RTS_DEBUG__.tick(0.02);
+    // The shooter steps to 1.4x the line's range of its (now indexed) mark.
+    out.rifleReach = [rifle, plain].map((u, i) => { u.x = marks[i].x + TYPES.infantry.range * 1.4; u.y = marks[i].y; u.reload = 0; u.attackMode = 'fire'; updateUnit(u, 0.01); return u.reload > 0.5; });
+    marks.forEach(m => { m.dead = true; });
+    // Looks: Old Guard, sappers and riflemen in their own uniforms; the new riders.
+    const V = window.__ISO_VIEW_V1__;
+    out.looks = V.lookOf ? [V.lookOf(mk('france', 'infantry', 'guard', 500, 500)), V.lookOf(mk('france', 'infantry', 'sapper', 500, 520)), V.lookOf(rifle)] : null;
+    return out;
+  });
+  expect(r.barracks).toEqual(expect.arrayContaining(['train-guard', 'train-sapper', 'train-grenadier', 'train-voltigeur']));
+  expect(r.barracks).not.toContain('train-rifle');
+  expect(r.stable).toEqual(expect.arrayContaining(['train-lancer', 'train-cuirassier', 'train-hussar']));
+  expect(r.stable).not.toContain('train-greys');
+  expect(r.guardOverCap).toBe(false);
+  expect(r.sapperOk).toBe(true);
+  expect(r.work).toBeCloseTo(2, 1);
+  expect(r.lance.line[1]).toBeGreaterThan(r.lance.line[0] * 1.4);
+  expect(r.lance.horse[1]).toBeLessThan(r.lance.horse[0] * 1.1);
+  expect(r.lanceHits).toBeGreaterThan(0);
+  expect(r.names).toEqual({ light: ['Light Company', 'Light Companies'], hussar: ['Light Dragoon', 'Light Dragoons'], rifle: ['95th Rifleman', '95th Rifles'] });
+  expect(r.rifleHp[0]).toBeLessThan(r.rifleHp[1]);
+  expect(r.rifleReach).toEqual([true, false]);
+  if (r.looks) expect(r.looks).toEqual(['fr6', 'fr7', 'br6']);
   expect(errors).toEqual([]);
 });

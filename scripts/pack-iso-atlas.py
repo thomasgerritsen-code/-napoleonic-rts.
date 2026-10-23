@@ -55,6 +55,8 @@ SHEETS = {
 MUZZLE_STATE = {"infantry": "fire", "combat": "kfire"}
 # Folder -> sprite prefix; folders 2 and 3 hold the alternative soldier looks.
 SIDES = {side + v: prefix + v for side, prefix in (("france", "fr"), ("britain", "br")) for v in ("", "2", "3", "4", "5")}
+# Nation-specific looks: Old Guard (france6), sappers (france7), 95th Rifles (britain6).
+SIDES.update({"france6": "fr6", "france7": "fr7", "britain6": "br6"})
 
 
 def frame_names(prefix: str, states) -> list[tuple[str, str, int, int]]:
@@ -80,6 +82,8 @@ CAVALRY = {"cavalry": [("idle", 2), ("walk", 6), ("trot", 6)],
 # Troopers in two coat colours, plus the squadron's officer (o) and trumpeter (t).
 CAV_SIDES = {side + v: prefix + "c" + v for side, prefix in (("france", "fr"), ("britain", "br"))
              for v in ("", "2", "o", "t")}
+# Period regiments: cuirassiers (k) and Polish lancers (l) for France, Scots Greys (g).
+CAV_SIDES.update({"francek": "frck", "francel": "frcl", "britaing": "brcg"})
 # Artillery: kind -> (folder piece, sprite letter, states, cell, pivot)
 ARTILLERY = {
     "gun": ("gun", "g", [("idle", 1), ("fire", 2), ("roll", 4)], (256, 176), {"x": 128, "y": 112}),
@@ -221,7 +225,7 @@ def main(argv: list[str]) -> int:
             special = {**dict.fromkeys(ROLES, "roles"), **dict.fromkeys(ARTILLERY, "artillery"),
                        **dict.fromkeys(CAVALRY, "cavalry"), "worker": "workers"}
             jobs = [(s, k) for s, k in jobs if (k in special and special[k] in args.only)
-                    or (k not in special and s in args.only)]
+                    or (k not in special and s in args.only) or (k in CAVALRY and s in args.only)]
         if args.kinds:
             jobs = [(s, k) for s, k in jobs if k in args.kinds]
         for side, kind in jobs:

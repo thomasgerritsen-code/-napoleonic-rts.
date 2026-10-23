@@ -139,15 +139,29 @@
     // One-button regiments: fill up from the nearest free men; auto-regiment at the barracks (open map only).
     quickRegiment: OPEN_MAP ? Object.freeze({ reach:700, barracksReach:520 }) : null,
     // Troop kinds, each with a strength and a weakness (open map only). Multipliers on the base type.
-    troops: OPEN_MAP ? Object.freeze({ britishShare:0.2, kinds:Object.freeze({
-      grenadier: Object.freeze({ base:'infantry', label:'Grenadier', plural:'Grenadiers', extra:Object.freeze({ food:60, wood:30 }), time:1.4,
+    // Period troops (open map only): each with a strength and a weakness.
+    // sides: who fields it (France trains, Britain's AI recruits by britishShare);
+    // names: the British name for a kind both armies field.
+    troops: OPEN_MAP ? Object.freeze({ britishShare:Object.freeze({ grenadier:0.15, voltigeur:0.15, rifle:0.15, greys:0.45, hussar:0.55 }), kinds:Object.freeze({
+      grenadier: Object.freeze({ base:'infantry', label:'Grenadier', plural:'Grenadiers', sides:['france', 'britain'], extra:Object.freeze({ food:60, wood:30 }), time:1.4,
         hp:1.4, melee:1.3, shock:0.7, speed:0.85, pro:'40% meer leven, 30% sterker met de bajonet, 30% minder moraalverlies', con:'15% trager en duurder' }),
-      voltigeur: Object.freeze({ base:'infantry', label:'Voltigeur', plural:'Voltigeurs', extra:Object.freeze({ food:30 }), time:1.1,
+      voltigeur: Object.freeze({ base:'infantry', label:'Voltigeur', plural:'Voltigeurs', sides:['france', 'britain'], names:Object.freeze({ britain:['Light Company', 'Light Companies'] }),
+        extra:Object.freeze({ food:30 }), time:1.1,
         hp:0.75, melee:0.7, range:1.25, speed:1.15, pro:'25% verder schieten, vuurt naar believen, 15% sneller', con:'25% minder leven en zwak van dichtbij' }),
-      cuirassier: Object.freeze({ base:'cavalry', label:'Kurassier', plural:'Kurassiers', extra:Object.freeze({ food:100, wood:50, iron:40 }), time:1.4,
+      guard: Object.freeze({ base:'infantry', label:'Oude Garde', plural:'Oude Garde', sides:['france'], extra:Object.freeze({ food:150, wood:80, iron:30 }), time:1.8, max:24,
+        hp:1.6, melee:1.5, ranged:1.15, shock:0.35, speed:0.9, pro:'keizerlijke veteranen: 60% meer leven, 50% sterker met de bajonet, wijken bijna nooit', con:'heel duur, traag op te leiden, hooguit 24 man' }),
+      sapper: Object.freeze({ base:'infantry', label:'Sapeur', plural:'Sapeurs', sides:['france'], extra:Object.freeze({ food:40, wood:40 }), time:1.2,
+        hp:1.1, melee:1.25, ranged:0.8, work:2, pro:'genie met bijl en schop: een regiment met sapeurs graaft, versterkt en herstelt tot 3x zo snel', con:'20% zwakker vuur' }),
+      rifle: Object.freeze({ base:'infantry', label:'95th Rifleman', plural:'95th Rifles', sides:['britain'], extra:Object.freeze({ food:60, wood:30 }), time:1.3,
+        hp:0.9, range:1.6, ranged:1.25, reload:1.6, vision:1.25, pro:'Baker-geweer: 60% verder en 25% treffender, schiet naar believen, scherpe ogen', con:'laadt 60% trager, 10% minder leven' }),
+      cuirassier: Object.freeze({ base:'cavalry', label:'Kurassier', plural:'Kurassiers', sides:['france'], extra:Object.freeze({ food:100, wood:50, iron:40 }), time:1.4,
         hp:1.5, armour:0.3, charge:1.3, speed:0.85, pro:'50% meer leven, kuras houdt 30% van musketvuur tegen, 30% zwaardere charge', con:'15% trager, kost ijzer' }),
-      hussar: Object.freeze({ base:'cavalry', label:'Huzaar', plural:'Huzaren', extra:Object.freeze({}), time:0.9,
-        hp:0.75, charge:0.8, speed:1.25, vision:1.4, reload:0.8, pro:'25% sneller, 40% verder zicht, sneller weer klaar', con:'25% minder leven en lichtere charge' })
+      lancer: Object.freeze({ base:'cavalry', label:'Poolse Lansier', plural:'Poolse Lansiers', sides:['france'], extra:Object.freeze({ food:60, wood:40 }), time:1.2,
+        charge:1.2, vsInfantry:1.5, vsCavalry:0.75, speed:1.05, pro:'lans: 80% zwaarder tegen infanterie buiten carré en vluchtende troepen', con:'25% zwakker tegen andere ruiters' }),
+      hussar: Object.freeze({ base:'cavalry', label:'Huzaar', plural:'Huzaren', sides:['france', 'britain'], names:Object.freeze({ britain:['Light Dragoon', 'Light Dragoons'] }), extra:Object.freeze({}), time:0.9,
+        hp:0.75, charge:0.8, speed:1.25, vision:1.4, reload:0.8, pro:'25% sneller, 40% verder zicht, sneller weer klaar', con:'25% minder leven en lichtere charge' }),
+      greys: Object.freeze({ base:'cavalry', label:'Scots Grey', plural:'Scots Greys', sides:['britain'], extra:Object.freeze({ food:100, wood:50 }), time:1.4,
+        hp:1.35, charge:1.4, speed:0.9, pro:'zware dragonders op grijze paarden: 35% meer leven, 40% zwaardere charge', con:'10% trager, geen kuras' })
     }) }) : null,
     // Grouped, context-sensitive bottom menu (open map only).
     actionMenu: OPEN_MAP ? Object.freeze({ version:1 }) : null,
