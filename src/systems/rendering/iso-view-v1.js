@@ -642,9 +642,13 @@
     if (view.smoke.length > SMOKE_MAX) view.smoke.splice(0, view.smoke.length - SMOKE_MAX);
   }
 
+  // A man's look: grenadiers and voltigeurs (troops-v1) wear the elite
+  // companies' uniforms (looks 4 and 5); on the open map the line keeps to the
+  // three line looks, elsewhere a few men of each company are mixed in.
   const lookOf = u => {
-    const p = u.side === 'france' ? 'fr' : 'br', h = hash(u.id, 7);
-    const key = h < 0.1 ? p + '4' : h < 0.2 ? p + '5' : p + ['', '2', '3'][Math.floor(hash(u.id, 13) * 3)];
+    const p = u.side === 'france' ? 'fr' : 'br', h = hash(u.id, 7), kinds = !!global.__TROOPS_V1__;
+    const key = u.troop === 'grenadier' ? p + '4' : u.troop === 'voltigeur' ? p + '5'
+      : !kinds && h < 0.1 ? p + '4' : !kinds && h < 0.2 ? p + '5' : p + ['', '2', '3'][Math.floor(hash(u.id, 13) * 3)];
     return view.atlases[key] ? key : p;
   };
   const crewIds = new Set();
@@ -663,7 +667,9 @@
     const p = u.side === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
     const since = now - m.firedAt, step = (stride, n) => Math.floor((m.walk % stride) / stride * n) % n;
     if (u.type === 'cavalry') {
-      const key = view.atlases[p + 'c' + (hash(u.id, 5) < 0.5 ? '' : '2')] ? p + 'c' + (hash(u.id, 5) < 0.5 ? '' : '2') : p + 'c';
+      // Kurassiers ride the dark horses, huzaren the bays (troops-v1).
+      const coat = u.troop === 'cuirassier' ? '2' : u.troop === 'hussar' ? '' : (hash(u.id, 5) < 0.5 ? '' : '2');
+      const key = view.atlases[p + 'c' + coat] ? p + 'c' + coat : p + 'c';
       if (m.moving) {
         const gait = m.speed > 4.5 || u.chargeTimer > 0 ? 'gallop' : m.speed > 2.4 ? 'trot' : 'walk';
         const stride = gait === 'gallop' ? 3.6 : gait === 'trot' ? 2.8 : 2.4;

@@ -798,3 +798,49 @@ test('iso view: one button forms a regiment from a few chosen men, and a barrack
   expect(r.auto).toBe(1);
   expect(errors).toEqual([]);
 });
+
+test('iso view: troop kinds - grenadiers, voltigeurs, kurassiers and huzaren are trained with a strength and a weakness', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-troops&view=iso');
+  await page.waitForFunction(() => window.__TROOPS_V1__ && window.__ACTION_MENU_V1__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const X = window.__TROOPS_V1__, out = {};
+    economies.france.food = 9000; economies.france.wood = 9000; economies.france.iron = 900; economies.france.popCap = 400;
+    const bk = buildings.find(q => q.side === 'france' && q.type === 'barracks' && q.complete) || createBuilding('france', 'barracks', 900, 1100, true);
+    const st = buildings.find(q => q.side === 'france' && q.type === 'stable' && q.complete) || createBuilding('france', 'stable', 1100, 1100, true);
+    selectedUnits.clear(); selectedBuilding = bk; actionSignature = ''; updateHud(true);
+    document.querySelector('[data-action="train-grenadier"]').click(); document.querySelector('[data-action="train-voltigeur"]').click();
+    selectedBuilding = st; actionSignature = ''; updateHud(true);
+    document.querySelector('[data-action="train-cuirassier"]').click(); document.querySelector('[data-action="train-hussar"]').click();
+    for (let k = 0; k < 40; k++) window.__RTS_DEBUG__.tick(1);
+    out.made = X.stats().french;
+    out.grenadierHp = units.find(u => u.troop === 'grenadier')?.maxHp;
+    out.voltigeurHp = units.find(u => u.troop === 'voltigeur')?.maxHp;
+    const mk = (type, troop, x, y = 1500) => { const u = createUnit('france', type, x, y); if (troop) X.applyTroop(u, troop); return u; };
+    const foe = createUnit('britain', 'infantry', 1300, 1500);
+    const bayonet = troop => { let tot = 0; for (let i = 0; i < 12; i++) { const u = mk('infantry', troop, 1290), h = foe.hp; u.attackMode = 'bayonet'; fire(u, foe); for (let k = 0; k < 40; k++) updateProjectiles(0.02); u.dead = true; tot += h - foe.hp; foe.hp = 100; } return tot; };
+    out.bayonet = [bayonet(null), bayonet('grenadier'), bayonet('voltigeur')];
+    const balls = troop => { const c = mk('cavalry', troop, 1300, 1600); let sum = 0; for (let i = 0; i < 12; i++) { const s = createUnit('britain', 'infantry', 1450, 1600), h = c.hp; fire(s, c); for (let k = 0; k < 40; k++) updateProjectiles(0.02); s.dead = true; sum += h - c.hp; c.hp = c.maxHp; } c.dead = true; return sum; };
+    out.balls = [balls(null), balls('cuirassier')];
+    const pace = (type, troop) => { const u = mk(type, troop, 1000); const x = u.x; for (let k = 0; k < 10; k++) moveToward(u, 3000, 1500, 0.1); u.dead = true; return u.x - x; };
+    out.pace = { line: pace('infantry', null), grenadier: pace('infantry', 'grenadier'), voltigeur: pace('infantry', 'voltigeur'), horse: pace('cavalry', null), hussar: pace('cavalry', 'hussar'), cuirassier: pace('cavalry', 'cuirassier') };
+    out.sight = [visionRadius(mk('cavalry', null, 1000)), visionRadius(mk('cavalry', 'hussar', 1000))];
+    // A regiment mostly of grenadiers is named for them.
+    const gs = []; for (let i = 0; i < 12; i++) gs.push(mk('infantry', 'grenadier', 1600 + i * 18, 1300));
+    gs.push(createUnit('france', 'officer', 1580, 1300), createUnit('france', 'drummer', 1580, 1310));
+    out.name = createRegiment('france', gs)?.name;
+    return out;
+  });
+  expect(r.made).toEqual({ grenadier: 1, voltigeur: 1, cuirassier: 1, hussar: 1 });
+  expect(r.grenadierHp).toBeGreaterThan(r.voltigeurHp);
+  expect(r.bayonet[1]).toBeGreaterThan(r.bayonet[0]);
+  expect(r.bayonet[2]).toBeLessThan(r.bayonet[0]);
+  expect(r.balls[1]).toBeLessThan(r.balls[0] * 0.8);
+  expect(r.pace.grenadier).toBeLessThan(r.pace.line);
+  expect(r.pace.voltigeur).toBeGreaterThan(r.pace.line);
+  expect(r.pace.hussar).toBeGreaterThan(r.pace.horse);
+  expect(r.pace.cuirassier).toBeLessThan(r.pace.horse);
+  expect(r.sight[1]).toBeGreaterThan(r.sight[0] * 1.3);
+  expect(r.name).toContain('Grenadiers');
+  expect(errors).toEqual([]);
+});

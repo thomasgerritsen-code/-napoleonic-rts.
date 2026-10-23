@@ -138,6 +138,17 @@
       misfire:0.3, mudSlow:0.18, mudSlowGuns:0.3 }) : null,
     // One-button regiments: fill up from the nearest free men; auto-regiment at the barracks (open map only).
     quickRegiment: OPEN_MAP ? Object.freeze({ reach:700, barracksReach:520 }) : null,
+    // Troop kinds, each with a strength and a weakness (open map only). Multipliers on the base type.
+    troops: OPEN_MAP ? Object.freeze({ britishShare:0.2, kinds:Object.freeze({
+      grenadier: Object.freeze({ base:'infantry', label:'Grenadier', plural:'Grenadiers', extra:Object.freeze({ food:60, wood:30 }), time:1.4,
+        hp:1.4, melee:1.3, shock:0.7, speed:0.85, pro:'40% meer leven, 30% sterker met de bajonet, 30% minder moraalverlies', con:'15% trager en duurder' }),
+      voltigeur: Object.freeze({ base:'infantry', label:'Voltigeur', plural:'Voltigeurs', extra:Object.freeze({ food:30 }), time:1.1,
+        hp:0.75, melee:0.7, range:1.25, speed:1.15, pro:'25% verder schieten, vuurt naar believen, 15% sneller', con:'25% minder leven en zwak van dichtbij' }),
+      cuirassier: Object.freeze({ base:'cavalry', label:'Kurassier', plural:'Kurassiers', extra:Object.freeze({ food:100, wood:50, iron:40 }), time:1.4,
+        hp:1.5, armour:0.3, charge:1.3, speed:0.85, pro:'50% meer leven, kuras houdt 30% van musketvuur tegen, 30% zwaardere charge', con:'15% trager, kost ijzer' }),
+      hussar: Object.freeze({ base:'cavalry', label:'Huzaar', plural:'Huzaren', extra:Object.freeze({}), time:0.9,
+        hp:0.75, charge:0.8, speed:1.25, vision:1.4, reload:0.8, pro:'25% sneller, 40% verder zicht, sneller weer klaar', con:'25% minder leven en lichtere charge' })
+    }) }) : null,
     // Grouped, context-sensitive bottom menu (open map only).
     actionMenu: OPEN_MAP ? Object.freeze({ version:1 }) : null,
     // Buildable musketry tower (open map only): range and vision in game px.

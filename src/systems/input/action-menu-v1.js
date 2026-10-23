@@ -77,6 +77,10 @@
     .actions.menu-v1 button[data-menu-group="bouwen"]{--cap:#9a6b3a}
     .actions.menu-v1 .menu-label{font-family:Georgia,'Times New Roman',serif;font-size:.66rem;color:#e9c76a;text-shadow:0 1px 0 rgba(0,0,0,.6)}
     .actions.menu-v1 button[data-action="skirmish"]::before{content:"🌿"}
+    .actions.menu-v1 button[data-action="train-grenadier"]::before{content:"🎩"}
+    .actions.menu-v1 button[data-action="train-voltigeur"]::before{content:"🪶"}
+    .actions.menu-v1 button[data-action="train-cuirassier"]::before{content:"🛡"}
+    .actions.menu-v1 button[data-action="train-hussar"]::before{content:"🐎"}
     .actions.menu-v1 button[data-action="quick-regiment"]::before,.actions.menu-v1 button[data-action="quick-regiment-barracks"]::before{content:"⚑"}
     .actions.menu-v1 button[data-action="train-missing"]::before{content:"➕"}
     .actions.menu-v1 button[data-action="auto-regiment"]::before{content:"🔁"}

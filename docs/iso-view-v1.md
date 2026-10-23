@@ -166,6 +166,17 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   nog mist in de wachtrij) en *Auto-regiment* (aan: de kazerne vormt zelf een
   regiment bij het verzamelpunt zodra er genoeg vrije mannen zijn). De knop laat
   zien wat er is (bv. 12/12 · O✓ · T✗) en noemt wat er ontbreekt.
+- **Troepsoorten** (train in de kazerne en de stal, tegen een meerprijs; de Britten
+  hebben ze ook):
+  - *Grenadier* (🎩, uniform met berenmuts): 40% meer leven, 30% sterker met de
+    bajonet, 30% minder moraalverlies — maar 15% trager en duurder (+60 🍞 +30 🪵).
+  - *Voltigeur* (🪶, lichte compagnie): 25% verder schieten, vuurt naar believen, 15%
+    sneller — maar 25% minder leven en zwak van dichtbij (+30 🍞).
+  - *Kurassier* (🛡, zwarte paarden): 50% meer leven, het kuras houdt 30% van het
+    musketvuur tegen, 30% zwaardere charge — maar 15% trager en kost ijzer.
+  - *Huzaar* (🐎, bruine paarden): 25% sneller, 40% verder zicht, sneller weer klaar —
+    maar 25% minder leven en een lichtere charge.
+  Een regiment dat vooral uit één soort bestaat heet ernaar (bv. "Franse Grenadiers 4").
 - **Menu onderin**: toont alleen wat bij je selectie past, in groepen met een kopje
   en een vaste volgorde. Boeren: *Werk* (akker, bouw hervatten) en *Bouwen*
   (woning, graanakker, kazerne, schiettoren, stal, gieterij). Soldaten: *Bevel*
