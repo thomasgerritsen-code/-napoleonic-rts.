@@ -158,6 +158,14 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   In de regen ketsen musketten (tot 30% van de schoten), modder vertraagt (18%,
   kanonnen 30%) en het zicht is 20% korter; mist legt een waas over het veld en
   halveert ongeveer het zicht.
+- **Regiment maken** (⚑): selecteer een paar losse soldaten en tik *Regiment maken*:
+  het neemt hen en vult aan met de dichtstbijzijnde vrije musketiers (tot 12, of meer
+  als je er meer koos, tot 36), een officier en een tamboer, stelt ze in linie op
+  naar de vijand en selecteert het regiment. Bij de kazerne staat dezelfde knop
+  (voor de vrije mannen rond het verzamelpunt), *Train ontbrekende* (zet wat er
+  nog mist in de wachtrij) en *Auto-regiment* (aan: de kazerne vormt zelf een
+  regiment bij het verzamelpunt zodra er genoeg vrije mannen zijn). De knop laat
+  zien wat er is (bv. 12/12 · O✓ · T✗) en noemt wat er ontbreekt.
 - **Menu onderin**: toont alleen wat bij je selectie past, in groepen met een kopje
   en een vaste volgorde. Boeren: *Werk* (akker, bouw hervatten) en *Bouwen*
   (woning, graanakker, kazerne, schiettoren, stal, gieterij). Soldaten: *Bevel*

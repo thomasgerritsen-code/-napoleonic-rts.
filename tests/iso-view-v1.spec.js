@@ -761,3 +761,40 @@ test('iso view: the weather changes - rain soaks the ground, powder misfires, mu
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().tracks > 10 || (window.__RTS_DEBUG__.tick(0.1), false), null, { timeout: 30_000, polling: 100 });
   expect(errors).toEqual([]);
 });
+
+test('iso view: one button forms a regiment from a few chosen men, and a barracks trains what is missing and forms it by itself', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = await openGame(page, 'test=iso-quick&view=iso');
+  await page.waitForFunction(() => window.__QUICK_REGIMENT_V1__ && window.__ACTION_MENU_V1__, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const out = {};
+    const sel = []; for (let i = 0; i < 3; i++) sel.push(createUnit('france', 'infantry', 1000 + i * 20, 1300));
+    for (let i = 0; i < 12; i++) createUnit('france', 'infantry', 1100 + (i % 6) * 20, 1360 + Math.floor(i / 6) * 20);
+    createUnit('france', 'officer', 1150, 1400); createUnit('france', 'drummer', 1170, 1400);
+    selectedUnits.clear(); sel.forEach(u => selectedUnits.add(u)); actionSignature = ''; updateHud(true);
+    out.oldButton = !!document.querySelector('[data-action="create-regiment"]');
+    document.querySelector('[data-action="quick-regiment"]').click();
+    const reg = regiments.filter(q => q.side === 'france' && !q.destroyed).pop();
+    out.formed = reg && regimentMembers(reg).filter(u => u.type === 'infantry').length;
+    out.kept = sel.every(u => u.regimentId === reg.id);
+    // A barracks with nobody free around it: train what is missing, then it forms by itself.
+    units.filter(u => u.side === 'france' && !u.regimentId && ['infantry', 'officer', 'drummer'].includes(u.type)).forEach(u => { u.dead = true; });
+    const bk = buildings.find(q => q.side === 'france' && q.type === 'barracks' && q.complete) || createBuilding('france', 'barracks', 900, 1100, true);
+    selectedUnits.clear(); selectedBuilding = bk; actionSignature = ''; updateHud(true);
+    out.disabled = document.querySelector('[data-action="quick-regiment-barracks"]').disabled;
+    economies.france.food = 5000; economies.france.wood = 5000; economies.france.popCap = 300;
+    document.querySelector('[data-action="train-missing"]').click();
+    out.queued = bk.queue.length;
+    const n0 = regiments.filter(q => q.side === 'france' && !q.destroyed).length;
+    for (let k = 0; k < 150; k++) window.__RTS_DEBUG__.tick(1);
+    out.auto = regiments.filter(q => q.side === 'france' && !q.destroyed).length - n0;
+    return out;
+  });
+  expect(r.oldButton).toBe(false);
+  expect(r.formed).toBe(12);
+  expect(r.kept).toBe(true);
+  expect(r.disabled).toBe(true);
+  expect(r.queued).toBe(14);
+  expect(r.auto).toBe(1);
+  expect(errors).toEqual([]);
+});

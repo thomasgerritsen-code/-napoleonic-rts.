@@ -21,7 +21,8 @@
     'rotate-left': 'formatie', 'rotate-right': 'formatie', skirmish: 'formatie',
     'create-regiment': 'regiment', 'reinforce-regiment': 'regiment', 'select-nearby-infantry': 'regiment', 'add-nearest-regiment': 'regiment',
     'toggle-regiment-tap-selection': 'regiment', 'create-cavalry-regiment': 'regiment', 'create-battery': 'regiment',
-    'farm-assign': 'werk', 'resume-construction': 'werk', 'set-rally': 'productie'
+    'farm-assign': 'werk', 'resume-construction': 'werk', 'set-rally': 'productie',
+    'quick-regiment': 'regiment', 'quick-regiment-barracks': 'productie', 'train-missing': 'productie', 'auto-regiment': 'productie'
   };
   function groupOf(el) {
     if (el.dataset.formation) return 'formatie';
@@ -34,7 +35,7 @@
   // Order inside a group: the main choices first (formations, training,
   // standing orders), then the finer ones.
   const RANK = { line: 1, column: 2, square: 3, skirmish: 4, 'rotate-left': 6, 'rotate-right': 7, halt: 1, bayonet: 2, charge: 2, 'artillery-mode': 3,
-    'defend-stance': 4, 'trench-upgrade': 5, 'create-regiment': 1, 'reinforce-regiment': 2, 'set-rally': 9, 'farm-assign': 1, 'resume-construction': 2,
+    'defend-stance': 4, 'trench-upgrade': 5, 'create-regiment': 1, 'quick-regiment': 0, 'reinforce-regiment': 2, 'quick-regiment-barracks': 5, 'train-missing': 6, 'auto-regiment': 7, 'set-rally': 9, 'farm-assign': 1, 'resume-construction': 2,
     'build-house': 1, 'build-farm': 2, 'build-barracks': 3, 'build-tower': 4, 'build-stable': 5, 'build-foundry': 6 };
   const rank = el => 10 + (RANK[el.dataset.formation || el.dataset.action] ?? (el.dataset.action?.startsWith('train-') ? 0 : 8));
   function context() {
@@ -76,6 +77,9 @@
     .actions.menu-v1 button[data-menu-group="bouwen"]{--cap:#9a6b3a}
     .actions.menu-v1 .menu-label{font-family:Georgia,'Times New Roman',serif;font-size:.66rem;color:#e9c76a;text-shadow:0 1px 0 rgba(0,0,0,.6)}
     .actions.menu-v1 button[data-action="skirmish"]::before{content:"🌿"}
+    .actions.menu-v1 button[data-action="quick-regiment"]::before,.actions.menu-v1 button[data-action="quick-regiment-barracks"]::before{content:"⚑"}
+    .actions.menu-v1 button[data-action="train-missing"]::before{content:"➕"}
+    .actions.menu-v1 button[data-action="auto-regiment"]::before{content:"🔁"}
     .actions.menu-v1 button[data-action="build-house"]::before{content:"🏠"}
     .actions.menu-v1 button[data-action="build-farm"]::before{content:"🌾"}
     .actions.menu-v1 button[data-action="build-barracks"]::before{content:"🏛"}
@@ -138,7 +142,7 @@
         });
         if (!c.any) {
           const hint = document.createElement('span');
-          hint.className = 'menu-hint'; hint.textContent = 'Tik boeren aan om te bouwen en te werken, soldaten om bevelen te geven, of een gebouw om te trainen.';
+          hint.className = 'menu-hint'; hint.textContent = 'Tik boeren aan om te bouwen en te werken, soldaten om bevelen te geven of een regiment te maken, of een gebouw om te trainen.';
           hint.style.order = '-1';
           actionsEl.appendChild(hint);
         }

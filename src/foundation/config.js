@@ -136,6 +136,8 @@
     // Changing weather and wet ground with tracks (open map only); times in game seconds.
     weather: OPEN_MAP ? Object.freeze({ start:'clear', minSpell:150, maxSpell:300, turnSeconds:25, soakSeconds:60, drySeconds:240,
       misfire:0.3, mudSlow:0.18, mudSlowGuns:0.3 }) : null,
+    // One-button regiments: fill up from the nearest free men; auto-regiment at the barracks (open map only).
+    quickRegiment: OPEN_MAP ? Object.freeze({ reach:700, barracksReach:520 }) : null,
     // Grouped, context-sensitive bottom menu (open map only).
     actionMenu: OPEN_MAP ? Object.freeze({ version:1 }) : null,
     // Buildable musketry tower (open map only): range and vision in game px.
