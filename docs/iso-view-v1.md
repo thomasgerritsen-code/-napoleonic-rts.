@@ -116,6 +116,14 @@ kaart precies zoals hij is (37 wegen, 224 huizen).
   loopgraaf heeft, en gaat in verdedigende houding. Wie wegloopt, laat de loopgraaf
   los, zodat hij vrij is voor de volgende (of voor hetzelfde regiment). Ook de Britse
   commandant graaft in waar hij verdedigt.
+- **Schiettoren**: boeren bouwen hem met de knop **Schiettoren** (260 hout). Een
+  vierkante toren (Blender-model): stenen voet met schietgaten, een uitkragende
+  houten schutterskamer met schietsleuven en musketlopen, een piramidedak en de
+  vlag van de eigen kant. Klaar? Dan vuurt het garnizoen elke ~2,6 s een salvo van
+  2 schoten op de dichtstbijzijnde vijand binnen ~240 px (en zichtbaar), met
+  kruitdamp uit de sleuven. Vanaf de toren zie je ver (zicht 420, hoger op een
+  heuvel). De vijand kan hem beschieten en slopen (1100 HP). De Britse commandant
+  bouwt er na 5 minuten zelf één of twee, aan de kant van de Fransen.
 - **Grotere regimenten**: 12 tot 36 musketiers. "Selecteer nabij" vult aan tot 36, een
   officier verzamelt alle vrije musketiers in zijn buurt (tot 36), en **Versterk
   regiment** (één regiment + losse musketiers geselecteerd) voegt ze toe.

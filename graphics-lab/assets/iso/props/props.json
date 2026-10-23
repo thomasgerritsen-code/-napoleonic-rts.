@@ -182,6 +182,34 @@
    },
    "w": 284
   },
+  "tower_br": {
+   "footprint": {
+    "d": 8.74,
+    "w": 8.74
+   },
+   "h": 675,
+   "heightM": 13.22,
+   "image": "tower_br.webp",
+   "pivot": {
+    "x": 207,
+    "y": 475
+   },
+   "w": 604
+  },
+  "tower_fr": {
+   "footprint": {
+    "d": 8.74,
+    "w": 8.74
+   },
+   "h": 682,
+   "heightM": 13.22,
+   "image": "tower_fr.webp",
+   "pivot": {
+    "x": 207,
+    "y": 482
+   },
+   "w": 604
+  },
   "well": {
    "footprint": {
     "d": 2.51,

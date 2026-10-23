@@ -330,7 +330,70 @@ def build_bridge_wood(root):
         along(root, posts, height, y, (0.08, 0.08), timber, lift=0.5, name="rail")
 
 
+def build_tower(root, side):
+    """A defensive musketry tower: rubble-stone base with loopholes, a jettied
+    timber fighting room with firing slits and musket barrels poking out, a
+    pyramid roof and the nation's flag on a short mast."""
+    french = side == "fr"
+    stone = M("#a39b8b", "wall", 0.92, scale=2.2, alt="#7d766a")
+    timber = M("#6b4a2d", "planks", 0.8)
+    dark = M("#3b2717", "planks", 0.8)
+    slit = M("#16130f", "plain", 0.4)
+    b, base_h = 4.6, 4.4
+    part("box", (b + 0.5, b + 0.5, 0.6), (0, 0, 0.3), M("#837c6f", "wall", 0.9, alt="#6a645a"), root, name="plinth")
+    # Battered (slightly tapering) stone base.
+    part("cyl", (b * 0.74, base_h, b * 0.7), (0, 0, base_h / 2 + 0.3), stone, root, rot=(0, 0, 45), name="base", segments=4, smooth=False)
+    part("box", (b + 0.3, b + 0.3, 0.28), (0, 0, base_h + 0.3), M("#cfc6b0", "plain", 0.8), root, name="course")
+    for sgn_x, sgn_y in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+        for k in (-0.9, 0.9):
+            x = sgn_x * (b / 2 - 0.12) + (k if sgn_y else 0)
+            y = sgn_y * (b / 2 - 0.12) + (k if sgn_x else 0)
+            part("box", (0.14 if sgn_x else 0.16, 0.16 if sgn_x else 0.14, 0.7), (x, y, 2.8), slit, root, name="loophole")
+    door(root, 0, -b / 2 + 0.05, 1.1, 2.0, color="#3d2a1a")
+    # Jettied timber fighting room on corbels.
+    u, up_h, z0 = b + 1.1, 2.8, base_h + 0.45
+    for x in (-u / 2 + 0.4, 0, u / 2 - 0.4):
+        for y in (-1, 1):
+            part("box", (0.3, 0.9, 0.3), (x, y * (b / 2 + 0.2), z0 - 0.1), dark, root, name="corbel")
+            part("box", (0.9, 0.3, 0.3), (y * (b / 2 + 0.2), x, z0 - 0.1), dark, root, name="corbel")
+    part("box", (u, u, up_h), (0, 0, z0 + up_h / 2), timber, root, name="room")
+    for x in (-u / 2, u / 2):
+        for y in (-u / 2, u / 2):
+            part("box", (0.3, 0.3, up_h + 0.1), (x, y, z0 + up_h / 2), dark, root, name="post")
+    part("box", (u + 0.12, u + 0.12, 0.22), (0, 0, z0 + 0.15), dark, root, name="sill")
+    part("box", (u + 0.12, u + 0.12, 0.22), (0, 0, z0 + up_h - 0.1), dark, root, name="plate")
+    # Firing slits, three a side, with barrels poking out on the two faces the camera sees.
+    for i in (-1, 0, 1):
+        for face, (nx, ny) in enumerate(((0, -1), (1, 0), (0, 1), (-1, 0))):
+            x = nx * (u / 2 + 0.02) + (i * 1.5 if ny else 0)
+            y = ny * (u / 2 + 0.02) + (i * 1.5 if nx else 0)
+            part("box", (0.75 if ny else 0.06, 0.06 if ny else 0.75, 0.32), (x, y, z0 + 1.55), slit, root, name="slit")
+            if face < 2 and i != 0:
+                part("cyl", (0.03, 1.1), (x + nx * 0.5, y + ny * 0.5, z0 + 1.52), M("#2b2b2b", "plain", 0.4, metal=0.6), root,
+                     rot=(90 if ny else 0, 90 if nx else 0, 0), name="barrel")
+    # Pyramid roof of shingles, a little overhang, with a mast and the flag.
+    rz = z0 + up_h
+    part("cyl", ((u + 1.0) * 0.72, 2.6, 0.08), (0, 0, rz + 1.3), M("#55504a", "slate", 0.8), root, rot=(0, 0, 45), name="roof",
+         segments=4, smooth=False)
+    part("cyl", (0.06, 3.0, 0.04), (0, 0, rz + 2.6 + 1.3), M("#d8d2c4", "plain", 0.5), root, name="pole")
+    part("ball", (0.12,), (0, 0, rz + 2.6 + 2.85), M("#c9a33c", "plain", 0.3, metal=0.9), root, name="finial")
+    fw, fh, fz = 1.8, 1.2, rz + 2.6 + 2.2
+    if french:
+        for i, c in enumerate(("#24315c", "#efeee8", "#b02a2e")):
+            part("box", (fw / 3, 0.05, fh), (fw / 6 + i * fw / 3, 0, fz), M(c, "cloth", 0.9), root, name="stripe")
+    else:
+        part("box", (fw, 0.05, fh), (fw / 2, 0, fz), M("#22336b", "cloth", 0.9), root, name="flag")
+        for a in (33, -33):
+            part("box", (2.05, 0.06, 0.15), (fw / 2, 0, fz), M("#f2efe6", "cloth"), root, rot=(0, a, 0), name="saltire")
+        part("box", (fw, 0.07, 0.3), (fw / 2, 0, fz), M("#f2efe6", "cloth"), root, name="cross")
+        part("box", (0.3, 0.07, fh), (fw / 2, 0, fz), M("#f2efe6", "cloth"), root, name="cross")
+        part("box", (fw, 0.08, 0.17), (fw / 2, 0, fz), M("#c0282d", "cloth"), root, name="cross")
+        part("box", (0.17, 0.08, fh), (fw / 2, 0, fz), M("#c0282d", "cloth"), root, name="cross")
+
+
 BUILDERS = {
+    "tower_fr": lambda r: build_tower(r, "fr"),
+    "tower_br": lambda r: build_tower(r, "br"),
     "barracks_fr": lambda r: build_barracks(r, "fr"),
     "barracks_br": lambda r: build_barracks(r, "br"),
     "farmhouse": build_farmhouse, "barn": build_barn, "cottage": build_cottage, "well": build_well,
@@ -352,7 +415,7 @@ def world_points():
 
 
 # Buildings turn to the camera at an angle so two facades and a gable show.
-YAW = {"barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
+YAW = {"tower_fr": 20, "tower_br": -20, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
 
 
 def render_prop(kind: str, out: Path, samples: int) -> dict:

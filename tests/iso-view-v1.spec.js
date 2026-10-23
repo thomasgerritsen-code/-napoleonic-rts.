@@ -461,3 +461,37 @@ test('iso view: men digging a trench are seen at work with the spade, then the f
   expect(st.missingNames.filter(n => /^(dig|rest|rfire)/.test(n))).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test('iso view: peasants build a schiettoren that fires at enemies in reach and sees far', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await openGame(page, 'test=iso-tower&view=iso');
+  await page.waitForFunction(() => window.__WATCHTOWER_V1__ && window.__ISO_VIEW_V1__?.stats().props >= 16, null, { timeout: 60_000 });
+  const r = await page.evaluate(() => {
+    const ws = [];
+    for (let i = 0; i < 3; i++) ws.push(createUnit('france', 'worker', 1100 + i * 12, 1400));
+    selectedUnits.clear(); ws.forEach(u => selectedUnits.add(u));
+    const button = document.querySelector('[data-action="build-tower"]');
+    button.click();
+    const mode = buildMode;
+    placeBuilding('tower', 1100, 1320);
+    const t = buildings.find(b => b.type === 'tower' && b.side === 'france');
+    for (let k = 0; k < 90 && !t.complete; k++) window.__RTS_DEBUG__.tick(1);
+    const foes = [], far = createUnit('britain', 'infantry', 1100, 1900);
+    for (let i = 0; i < 4; i++) foes.push(createUnit('britain', 'infantry', 1260 + i * 14, 1330));
+    const hp = list => list.reduce((s, u) => s + Math.max(0, u.hp), 0), before = hp(foes), farBefore = far.hp;
+    for (let k = 0; k < 10; k++) window.__RTS_DEBUG__.tick(1);
+    camera.x = t.x; camera.y = t.y; camera.zoom = 2;
+    return { button: !!button, mode, done: t.complete, lost: before - hp(foes), farLost: farBefore - far.hp,
+      sight: visionRadius(t), barracksSight: visionRadius({ kind: 'building', type: 'barracks', x: t.x, y: t.y }), stats: window.__WATCHTOWER_V1__.stats() };
+  });
+  expect(r.button).toBe(true);
+  expect(r.mode).toBe('tower');
+  expect(r.done).toBe(true);
+  expect(r.lost).toBeGreaterThan(40);
+  expect(r.farLost).toBe(0);
+  expect(r.sight).toBeGreaterThan(r.barracksSight);
+  expect(r.stats.volleys).toBeGreaterThan(2);
+  // The Blender tower stands on the map, smoke at its slits when it fires.
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().towerVolleys > 0 || (window.__RTS_DEBUG__.tick(1), false), null, { timeout: 20_000 });
+  expect(errors).toEqual([]);
+});

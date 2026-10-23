@@ -29,7 +29,7 @@
   const detailed = () => !view.overview && z() >= DETAIL_ZOOM;
   // Screen box of a sprite drawn at (X, Y) with its pivot, for the see-through test.
   const box = (X, Y, px, py, w, h, k) => [X - px * k, Y - py * k, X + (w - px) * k, Y + (h - py) * k];
-  const view = { on: true, atlases: {}, props: {}, village: null, dressing: null, chimneyAt: new Map(), chimneySmoke: [], info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(), trenchLips: new Map(), trenchCrests: new Map(),
+  const view = { on: true, atlases: {}, props: {}, village: null, dressing: null, chimneyAt: new Map(), chimneySmoke: [], info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(), trenchLips: new Map(), trenchCrests: new Map(), towerFired: new Map(),
     tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), miniAt: 0, fogAt: 0,
     stats: { renderMs: 0, seeThrough: 0, flags: 0, ground: false, houses: 0, dressing: 0, chimneySmoke: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
 
@@ -731,21 +731,39 @@
   }
 
   // ---- props for buildings and resources ----
-  const BUILDING_PROP = { towncenter: 'barracks', barracks: 'barracks', house: 'cottage' };
+  const BUILDING_PROP = { towncenter: 'barracks', barracks: 'barracks', house: 'cottage', tower: 'tower' };
+  const SIDED_PROPS = new Set(['barracks', 'tower']);
   function buildingDrawable(b) {
     if (b.dead) return null;
     if (b.side === 'britain' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(b)) return null;
     if (b.type === 'farm') return { y: b.y, draw: () => drawFarm(b) };
-    const base = BUILDING_PROP[b.type] || 'cottage', kind = base === 'barracks' ? 'barracks_' + (b.side === 'france' ? 'fr' : 'br') : base;
+    const base = BUILDING_PROP[b.type] || 'cottage', kind = SIDED_PROPS.has(base) ? base + '_' + (b.side === 'france' ? 'fr' : 'br') : base;
     const prop = view.props[kind]; if (!prop) return null;
     // Fit the rendered building to the game's footprint (a little larger: the
     // props carry their eaves and yard beyond the walls).
-    const k = b.w * z() * 1.45 / prop.w;
+    // A tower stands tall over the men (a bit over half true size, like a
+    // house's miniature footprint would make it a stump next to them).
+    const k = b.type === 'tower' ? spriteK() * 0.55 : b.w * z() * 1.45 / prop.w;
+    if (b.type === 'tower') towerSmoke(b, prop, k);
     return { y: b.y + b.h * 0.3, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       ctx.globalAlpha *= b.complete === false ? 0.45 + 0.5 * (b.construction || 0) : 1;
       ctx.drawImage(prop.image, sx(b.x) - prop.pivot.x * k, gy(b.x, b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       ctx.globalAlpha = 1; view.stats.props++;
     } };
+  }
+  // Powder smoke from the tower's firing slits when its garrison fires (watchtower-v1).
+  function towerSmoke(b, prop, k) {
+    if (!b.firedAt || view.towerFired.get(b.id) === b.firedAt) return;
+    view.towerFired.set(b.id, b.firedAt);
+    const now = performance.now() / 1000, a = b.towerFacing || 0;
+    // The slits sit about 6.3 m up the model: that height on screen, in the smoke's metres.
+    const h = 6.3 * SPRITE_PPM * k * 0.87 / (LIFT * PPM * z());
+    for (let i = 0; i < 3; i++) {
+      const s = hash(b.id + i * 5, Math.floor(now * 10));
+      view.smoke.push({ wx: b.x + Math.cos(a + (i - 1) * 0.5) * b.w * 0.45, wy: b.y + Math.sin(a + (i - 1) * 0.5) * b.h * 0.45,
+        h, born: now, life: 3 + s * 1.5, size: 0.35 + s * 0.25, seed: s });
+    }
+    view.stats.towerVolleys = (view.stats.towerVolleys || 0) + 1;
   }
   function drawFarm(b) {
     const x = sx(b.x - b.w / 2), y = sy(b.y - b.h / 2) - liftAt(b.x, b.y), w = b.w * z(), h = b.h * z() * SQ;

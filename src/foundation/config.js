@@ -120,6 +120,9 @@
     // stance that braces a standing line or square, and regiments up to maxInfantry men.
     regimentOrders: OPEN_MAP ? Object.freeze({ maxInfantry:36, braceSeconds:4, defendDamage:0.7, defendShock:0.55, defendReload:0.85,
       digDelay:3, digSeconds:25, trenchWidth:40, trenchDamage:0.5, trenchShock:0.45, trenchSnap:110, maxTrenches:40 }) : null,
+    // Buildable musketry tower (open map only): range and vision in game px.
+    towers: OPEN_MAP ? Object.freeze({ cost:Object.freeze({ wood:260 }), hp:1100, range:240, reload:2.6, shots:2, damage:18,
+      vision:420, aiAfter:300, aiMax:2 }) : null,
     architecture: Object.freeze({
       version:'2.1', serviceGeneration:21, allowNewVersionPatchFiles:false, legacyBaseline:'0.7.1', legacyBaselineCommit:'29b038d3655d05be968bff6a80cb8f3162f1c8e8', migrationStrategy:'strangler-by-subsystem'
     })
