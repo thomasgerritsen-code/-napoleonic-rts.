@@ -1,6 +1,14 @@
-# Napoleonic RTS — v1.4.1
+# Napoleonic RTS — v1.4.2
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
+
+## v1.4.2 — minder tekenwerk met hetzelfde beeld
+
+Onveranderde mistvormen worden hergebruikt en de schermprojectie leest de
+schermmaten eenmaal per frame. Dit vermindert herhaalde tekenberekeningen
+zonder extra terrein- of spritebuffers toe te voegen.
+Bewegende eenheden, weer, zachte mistranden en wolken blijven actief; resolutie,
+sprites, effecten en verversingsfrequenties blijven gelijk aan v1.4.1.
 
 ## v1.4.1 — mobiel herstel
 

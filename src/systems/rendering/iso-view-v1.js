@@ -53,9 +53,12 @@
   const dirOf = a => ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
 
   // ---- projection ----
+  // Reading window dimensions in every projected point can repeatedly enter
+  // the layout engine. A frame has one viewport; input outside a frame reads live.
+  let frameWidth = 0, frameHeight = 0;
   const z = () => camera.zoom;
-  const sx = wx => (wx - camera.x) * z() + innerWidth / 2;
-  const sy = wy => (wy - camera.y) * z() * SQ + innerHeight / 2;
+  const sx = wx => (wx - camera.x) * z() + (frameWidth || innerWidth) / 2;
+  const sy = wy => (wy - camera.y) * z() * SQ + (frameHeight || innerHeight) / 2;
   const spriteK = () => z() * PPM / SPRITE_PPM;
   // Relief: ground heights from the Blender ground (ground.json "relief", metres
   // on a grid in game metres, stored as cm). A point h metres up shows h*LIFT
@@ -1303,6 +1306,27 @@
   // The fog canvas reaches FOG_M (half-size px) past each screen edge, so while
   // the camera pans it is shifted and only redrawn every 60 ms.
   const FOG_M = 64;
+  // These are the exact rasterized polygons from the previous mask update.
+  // Wind, cloud-edge noise and crossfades still update on their original clocks.
+  const fogGeometry = { seen: null, sight: null };
+  function sameFogGeometry(cache, points, w, h) {
+    if (!cache || cache.x !== camera.x || cache.y !== camera.y || cache.zoom !== z() ||
+        cache.w !== w || cache.h !== h || cache.relief !== view.relief || cache.points.length !== points.length) return false;
+    for (let i = 0; i < points.length; i++) if (points[i] !== cache.points[i]) return false;
+    return true;
+  }
+  function drawFogGeometry(name, c, points, segments, w, h) {
+    if (sameFogGeometry(fogGeometry[name], points, w, h)) {
+      view.stats.fogGeometryReuses = (view.stats.fogGeometryReuses || 0) + 1;
+      return;
+    }
+    c.clearRect(0, 0, w, h); c.fillStyle = '#000'; c.beginPath();
+    for (let i = 0; i < points.length; i += 3) groundPath(c, disc(points[i], points[i + 1], points[i + 2], segments));
+    c.fill();
+    fogGeometry[name] = { x: camera.x, y: camera.y, zoom: z(), w, h, relief: view.relief, points };
+    const counter = name === 'seen' ? 'fogSeenBuilds' : 'fogSightBuilds';
+    view.stats[counter] = (view.stats[counter] || 0) + 1;
+  }
   // Redraws of the mask (ms): it is cross-faded, so a few a second look smooth.
   const FOG_REDRAW_MOVING = 180, FOG_REDRAW_STILL = 320;
   const disc = (x, y, r, n) => Array.from({ length: n }, (_, i) => [x + Math.cos(i / n * Math.PI * 2) * r, y + Math.sin(i / n * Math.PI * 2) * r]);
@@ -1315,7 +1339,10 @@
   function drawFog() {
     if (typeof frenchVisionSources !== 'function' || typeof visionRadius !== 'function') return;
     const w = Math.ceil(innerWidth / 2) + 2 * FOG_M, h = Math.ceil(innerHeight / 2) + 2 * FOG_M, now = performance.now();
-    for (const c of [fogA, fogB, fogMix, seenLayer, sightLayer]) if (c.width !== w || c.height !== h) { c.width = w; c.height = h; view.fogCam = null; view.fogPrev = null; }
+    for (const c of [fogA, fogB, fogMix, seenLayer, sightLayer]) if (c.width !== w || c.height !== h) {
+      c.width = w; c.height = h; view.fogCam = null; view.fogPrev = null;
+      fogGeometry.seen = fogGeometry.sight = null;
+    }
     // Shift since the last redraw (screen px); redraw when zoomed, shifted far, or stale.
     const F = view.fogCam, dx = F ? (F.x - camera.x) * z() : 0, dy = F ? (F.y - camera.y) * z() * SQ : 0;
     const moved = !F || F.zoom !== camera.zoom || dx !== 0 || dy !== 0;
@@ -1332,26 +1359,24 @@
       f.fillStyle = '#fff'; f.fillRect(0, 0, w, h);
       // Ground seen before: a disc on every explored cell on screen (they overlap
       // into a rounded outline), lifted onto the relief.
-      seenCtx.clearRect(0, 0, w, h); seenCtx.fillStyle = '#000'; seenCtx.beginPath();
-      let cells = 0;
+      const seenPoints = [];
       if (typeof exploredCells !== 'undefined' && typeof EXPLORE_CELL === 'number') {
         const C = EXPLORE_CELL, gx0 = Math.floor(Math.min(a.x, b.x) / C) - 1, gx1 = Math.ceil(Math.max(a.x, b.x) / C) + 1;
         const gy0 = Math.floor(Math.min(a.y, b.y) / C) - 1, gy1 = Math.ceil(Math.max(a.y, b.y) / C) + 1 + Math.ceil((view.relief ? view.relief.maxM : 0) * PPM / C * 2);
         for (let cy = gy0; cy <= gy1; cy++) for (let cx = gx0; cx <= gx1; cx++) {
           if (!exploredCells.has(`${cx},${cy}`)) continue;
-          groundPath(seenCtx, disc((cx + 0.5) * C, (cy + 0.5) * C, C * 0.8, 14)); cells++;
+          seenPoints.push((cx + 0.5) * C, (cy + 0.5) * C, C * 0.8);
         }
       }
-      seenCtx.fill();
+      drawFogGeometry('seen', seenCtx, seenPoints, 14, w, h);
       // In sight now: each source's circle, its rim lying on the relief.
-      sightCtx.clearRect(0, 0, w, h); sightCtx.fillStyle = '#000'; sightCtx.beginPath();
-      let sources = 0;
+      const sightPoints = [];
       for (const src of frenchVisionSources()) {
         const r = visionRadius(src);
         if (src.x + r < a.x || src.x - r > b.x || src.y + r < a.y || src.y - r > b.y + (view.relief ? view.relief.maxM * PPM * 2 : 0)) continue;
-        groundPath(sightCtx, disc(src.x, src.y, r, 48)); sources++;
+        sightPoints.push(src.x, src.y, r);
       }
-      sightCtx.fill();
+      drawFogGeometry('sight', sightCtx, sightPoints, 48, w, h);
       // Cut both out of the mist, blurred so the edges are soft.
       const soft = Math.max(3, 30 * z());
       f.globalCompositeOperation = 'destination-out';
@@ -1361,7 +1386,7 @@
       f.globalAlpha = 1; f.drawImage(sightLayer, 0, 0);
       f.filter = 'none'; f.globalCompositeOperation = 'source-over';
       billowEdges(f, w, h, now);
-      view.stats.fogCells = cells; view.stats.fogSources = sources;
+      view.stats.fogCells = seenPoints.length / 3; view.stats.fogSources = sightPoints.length / 3;
     }
     const cached = view.cloudCam;
     if (cached && cached.zoom === z() && cached.maskAt === view.fogAt &&
@@ -1676,8 +1701,13 @@
     // The game is drawn in the iso view only: the 2D renderer does not run at all
     // (its effect lists are capped where they are filled; exploring is simulation).
     const t0 = performance.now();
+    const oldWidth = frameWidth, oldHeight = frameHeight;
+    frameWidth = innerWidth; frameHeight = innerHeight;
     try { render(now); view.stats.renderMs = Math.round((view.stats.renderMs * 0.9 + (performance.now() - t0) * 0.1) * 10) / 10; }
-    finally { gpu?.end(); const dpr = canvas.width / Math.max(1, innerWidth); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    finally {
+      gpu?.end(); const dpr = canvas.width / Math.max(1, frameWidth); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      frameWidth = oldWidth; frameHeight = oldHeight;
+    }
   }
   Object.defineProperty(global, 'renderStableFrameV1', { configurable: true, get: () => stableFrame, set: v => { inner = v; } });
 
@@ -2149,6 +2179,7 @@
     for (const map of [view.info, view.regFire, view.gunFire, view.towerFired, view.trenchLips, view.trenchCrests]) map.clear();
     view.corpses.length = view.smoke.length = 0;
     view.attack = view.lastCam = view.fogCam = view.fogPrev = view.cloudCam = null;
+    fogGeometry.seen = fogGeometry.sight = null;
     view.lastNow = view.fogAt = 0;
     view.stats.corpses = view.stats.smoke = 0;
     queueMicrotask(frameStartingForce);
@@ -2163,6 +2194,7 @@
     plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
     stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: global.__ISO_GPU_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
+      fogGeometryPoints: ((fogGeometry.seen?.points.length || 0) + (fogGeometry.sight?.points.length || 0)) / 3,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
       relief: view.relief ? view.relief.maxM : 0, heightSight: !!view.heightSight, villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
