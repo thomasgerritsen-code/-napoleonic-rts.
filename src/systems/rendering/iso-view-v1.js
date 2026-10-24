@@ -1688,6 +1688,7 @@
     drawSmoke(t);
     drawFog();
     drawWeather(t);
+    drawDayNight();
     drawDragBox();
     drawFacingArrow();
     soundTick(t);
@@ -1883,6 +1884,16 @@
     ctx.globalAlpha = 1; view.stats.tracks = n; view.stats.trackDrawCalls = draws;
   }
 
+  function drawDayNight() {
+    const light = global.__DAY_NIGHT_V1__?.state();
+    view.stats.dayNight = light || null; view.stats.dayNightDraws = 0;
+    if (!light?.tint) return;
+    // Grade the battlefield, fog and weather together. The DOM HUD and the
+    // drag/facing feedback drawn afterwards retain their original brightness.
+    ctx.save(); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.filter = 'none';
+    ctx.fillStyle = light.tint; ctx.fillRect(0, 0, frameWidth || innerWidth, frameHeight || innerHeight); ctx.restore();
+    view.stats.dayNightDraws = 1;
+  }
   function drawWeather(now) {
     const w = weather(); if (!w) return;
     const W = innerWidth, H = innerHeight;

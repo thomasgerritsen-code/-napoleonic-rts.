@@ -10,7 +10,7 @@
   </script>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="theme-color" content="#111713" />
-  <title>Napoleonic RTS v1.4.3</title>
+  <title>Napoleonic RTS v1.4.4</title>
   <link rel="stylesheet" href="style.css?build=194victory" />
   <link rel="stylesheet" href="v05.css" />
   <link rel="stylesheet" href="v06.css" />
@@ -20,7 +20,7 @@
 <div id="app">
   <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
   <header class="hud topbar">
-    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v1.4.3</span></div>
+    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v1.4.4</span></div>
     <div class="resources"><span>🇫🇷 🍞 <strong id="food">0</strong></span><span>🪵 <strong id="wood">0</strong></span><span>⛏️ <strong id="iron">0</strong></span><span>👥 <strong id="population">0/0</strong></span></div>
     <div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button>
   </header>
@@ -34,9 +34,9 @@
   <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div><div id="message" class="message hidden"></div>
 </div>
 <script src="src/foundation/deployment-info.js?build=local"></script>
-<script src="src/foundation/version.js?build=143rain"></script>
+<script src="src/foundation/version.js?build=144day"></script>
 <script src="src/foundation/runtime.js?build=arch21"></script>
-<script src="src/foundation/config.js?build=143rain"></script>
+<script src="src/foundation/config.js?build=144day"></script>
 <script src="src/foundation/contracts.js"></script>
 <script src="src/foundation/legacy-manifest.js"></script>
 <script src="src/core.js?build=314a"></script>
@@ -148,6 +148,7 @@
 <script src="src/systems/combat/watchtower-v1.js?build=tower2"></script>
 <script src="src/systems/combat/battle-depth-v1.js?build=depth4"></script>
 <script src="src/systems/world/weather-v1.js?build=143rain"></script>
+<script src="src/systems/world/day-night-v1.js?build=144day"></script>
 <script src="src/systems/input/quick-regiment-v1.js?build=140a"></script>
 <script src="src/systems/input/gun-crew-v1.js?build=crew2"></script>
 <script src="src/systems/combat/grenades-v1.js?build=gren1"></script>
@@ -186,7 +187,7 @@
 <script src="src/systems/rendering/static-sprite-cache-v1.js?build=perf1"></script>
 <script src="src/systems/rendering/iso-gpu-v1.js?build=141mobile"></script>
 <script src="src/systems/rendering/wet-tracks-v1.js?build=143rain"></script>
-<script src="src/systems/rendering/iso-view-v1.js?build=143rain"></script>
+<script src="src/systems/rendering/iso-view-v1.js?build=144day"></script>
 <script src="src/systems/input/action-menu-v1.js?build=140a"></script>
 <script src="src/systems/input/officer-assignment-v1.js?build=officer1"></script>
 <script src="src/network/command-protocol.js?build=net1"></script>

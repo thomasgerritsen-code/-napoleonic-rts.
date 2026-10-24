@@ -1,6 +1,17 @@
-# Napoleonic RTS — v1.4.3
+# Napoleonic RTS — v1.4.4
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
+
+## v1.4.4 — dag- en nachtcyclus
+
+Een volledige dag duurt tien minuten speeltijd. De slag begint om 08:00;
+rond 3:45 speeltijd wordt het avond, rond 5:00 is het nacht en rond 8:45 komt
+de zon weer op. Het licht verloopt geleidelijk van daglicht naar warme
+schemering en blauw maanlicht. Een compacte klok toont de fase en het tijdstip.
+
+De kleurlaag gebruikt maximaal één tekenactie per frame en geen extra
+beeldbuffers. Bediening, regen, mist en sporen blijven werken; een nieuwe slag
+zet de klok terug op 08:00.
 
 ## v1.4.3 — regenbuien en zichtbare voet- en hoefsporen
 

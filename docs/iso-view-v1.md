@@ -583,3 +583,39 @@ Diagnose: `__WEATHER_V1__.state()` bevat regen, vocht en `nextRainAt`;
 `__ISO_VIEW_V1__.tracks()` geeft een kopie van de afdrukgegevens.
 Tests: `tests/headless/weather-showers-v143.test.js`,
 `tests/headless/wet-tracks-v143.test.js` en `tests/iso-rain-tracks-v143.spec.js`.
+
+## Dag en nacht (v1.4.4)
+
+De isometrische slag heeft een visuele dagcyclus van 600 spelseconden, beginnend
+om 08:00. Avond begint na 225 seconden (17:00), nacht na 300 seconden (20:00),
+zonsopkomst na 525 seconden (05:00) en na 600 seconden is het opnieuw 08:00.
+Bewolking en regen hebben hun eigen tijdschema en blijven tegelijk werken.
+
+`day-night-v1.js` berekent de toestand uitsluitend uit de bestaande simulatieklok.
+Bij stilstaande speeltijd blijft ook de tijd van de dag gelijk; een nieuwe slag
+begint weer op dag 1 om 08:00. De klok staat op desktop bij de spelnaam en op
+telefoons onder de resourcebalk. Bij het openen van het mobiele menu schuift hij
+onder de overzichtsknop, zodat Nieuwe slag bereikbaar blijft. Tekst en tooltip
+verversen alleen wanneer de getoonde tijd of fase verandert.
+
+Zonsopkomst en zonsondergang gebruiken vloeiende interpolatie met geleidelijke
+hellingen. Warme schemering en blauw maanlicht worden gecombineerd tot maximaal
+één transparante kleurlaag over het bestaande beeld, inclusief mist en regen.
+Overdag wordt geen kleurlaag getekend. De nacht behoudt ruim voldoende helderheid
+om troepen en terrein te herkennen; de DOM-bediening en het sleepkader/de
+richtingspijl blijven op hun gewone helderheid. Resolutie, afbeeldingen,
+GPU-contexten en terrein-/spoorcaches veranderen niet. Er komen geen canvassen,
+textures, deeltjes of afzonderlijke lampen bij. Spelregels, zicht, AI en schade
+blijven gelijk.
+
+Config: `NRTS_CONFIG.dayNight` (`cycleSeconds`, `startHour`, `nightOpacity`,
+`twilightOpacity`). Diagnose: `__DAY_NIGHT_V1__.state()`, `.at(spelseconden)` en
+`__ISO_VIEW_V1__.stats().dayNight` / `.dayNightDraws`. Het systeem bewaart alleen
+de laatste berekende toestand, zonder een oplopende geschiedenis.
+
+`tests/headless/day-night-v144.test.js` controleert fases, periodiciteit,
+continuïteit, klok/reset en isolatie van de gewone 2D-game.
+`tests/iso-day-night-v144.spec.js` controleert de exacte kleurcompositie en het
+terugkeren van hetzelfde dagbeeld, ongewijzigde eenheden/weer/zicht, mobiele
+indeling, tijd/reset, nachtelijke selectie/marsorders en regen/sporen op zowel
+Canvas2D als de desktop-GPU.

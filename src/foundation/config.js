@@ -133,6 +133,8 @@
     battleDepth: OPEN_MAP ? Object.freeze({ flankDamage:1.25, rearDamage:1.5, flankShock:1.5, rearShock:2.0, waverAt:45,
       shellDamage:14, breachedCover:0.8, repairPerSecond:2, towerSplash:44, towerShellDamage:30, maxCraters:80,
       skirmishSpread:2.3, skirmishCover:0.72, skirmishWoodCover:0.55, skirmishVsCavalry:1.7, skirmishRange:1.15 }) : null,
+    // A visual day in ten game minutes; no change to sight, combat or AI.
+    dayNight: OPEN_MAP ? Object.freeze({ cycleSeconds:600, startHour:8, nightOpacity:0.34, twilightOpacity:0.18 }) : null,
     // Changing weather and wet ground with tracks (open map only); times in game seconds.
     weather: OPEN_MAP ? Object.freeze({ start:'clear', minSpell:100, maxSpell:180, turnSeconds:15, soakSeconds:60, drySeconds:240,
       firstRainSeconds:105, cloudLeadSeconds:25, rainMinSeconds:65, rainMaxSeconds:100, dryMinSeconds:150, dryMaxSeconds:240,
