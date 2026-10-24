@@ -10,16 +10,49 @@
   const groupState=new Map(),unitState=new Map(),replanTrace=[];
   const stats={groupReplans:0,unitNudges:0,unsafeNudgesRejected:0,alternativeNudges:0,waterRescues:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0,crossingReplansSuppressed:0,crossingChangedReplans:0,formationReplansSuppressed:0,trafficYieldReplansSuppressed:0,nearTargetReplansSuppressed:0,phaseResets:0};
 
-  function villageObstacles(){const villages=global.VILLAGE_SCENERY_V4||global.__VILLAGE_SCENERY_V4_DATA__||[];return villages.flatMap(v=>v.houses||[]).map(h=>({id:`v:${h.id||`${h.kind}-${h.x}-${h.y}`}`,x:h.x,y:h.y,w:h.w,h:h.h,angle:h.angle||0,kind:'village'}));}
+  const obstacleCell=256,emptyVillages=[];
+  let villageSource=null,villageRects=[],villageGrid=new Map();
+  function villageObstacles(){
+    const villages=global.VILLAGE_SCENERY_V4||global.__VILLAGE_SCENERY_V4_DATA__||emptyVillages;
+    if(villages===villageSource)return villageRects;
+    villageSource=villages;villageGrid=new Map();stats.obstacleBuilds=(stats.obstacleBuilds||0)+1;
+    villageRects=villages.flatMap(v=>v.houses||[]).map(h=>({id:`v:${h.id||`${h.kind}-${h.x}-${h.y}`}`,x:h.x,y:h.y,w:h.w,h:h.h,angle:h.angle||0,kind:'village'}));
+    villageRects.forEach((o,i)=>{
+      const c=Math.abs(Math.cos(o.angle)),s=Math.abs(Math.sin(o.angle));
+      const ex=(o.w*c+o.h*s)/2,ey=(o.w*s+o.h*c)/2;
+      for(let y=Math.floor((o.y-ey)/obstacleCell);y<=Math.floor((o.y+ey)/obstacleCell);y++)
+        for(let x=Math.floor((o.x-ex)/obstacleCell);x<=Math.floor((o.x+ex)/obstacleCell);x++){
+          const key=`${x}:${y}`;if(!villageGrid.has(key))villageGrid.set(key,[]);villageGrid.get(key).push(i);
+        }
+    });
+    return villageRects;
+  }
   function gameplayObstacles(){return buildings.filter(b=>!b.dead).map(b=>({id:`g:${b.id}`,x:b.x,y:b.y,w:b.w,h:b.h,angle:0,kind:'gameplay'}));}
-  function obstacles(){return[...villageObstacles(),...gameplayObstacles()];}
+  function obstacles(a=null,b=a,pad=clearance){
+    const all=villageObstacles();let nearby=all;
+    // Invalid/very long segments use the original full scan. Apart from being
+    // cheaper than visiting empty cells, this prevents unbounded grid loops.
+    const finite=a&&b&&[a.x,a.y,b.x,b.y,pad].every(Number.isFinite);
+    const cellCount=finite?(Math.ceil((Math.abs(a.x-b.x)+pad*3)/obstacleCell)+2)*(Math.ceil((Math.abs(a.y-b.y)+pad*3)/obstacleCell)+2):Infinity;
+    if(finite&&cellCount<=Math.max(16,all.length*2)){
+      const ids=new Set(),margin=pad*Math.SQRT2;
+      for(let y=Math.floor((Math.min(a.y,b.y)-margin)/obstacleCell);y<=Math.floor((Math.max(a.y,b.y)+margin)/obstacleCell);y++)
+        for(let x=Math.floor((Math.min(a.x,b.x)-margin)/obstacleCell);x<=Math.floor((Math.max(a.x,b.x)+margin)/obstacleCell);x++)
+          for(const id of villageGrid.get(`${x}:${y}`)||[])ids.add(id);
+      nearby=[...ids].sort((a,b)=>a-b).map(i=>all[i]);
+    }
+    stats.obstacleQueries=(stats.obstacleQueries||0)+1;stats.obstacleCandidates=(stats.obstacleCandidates||0)+nearby.length;
+    // Player buildings stay live: placing, moving or destroying one is visible immediately.
+    return nearby.concat(gameplayObstacles());
+  }
+  nrts.events.on('game:reset',()=>{villageSource=null;});
   function toLocal(p,o){const c=Math.cos(o.angle||0),s=Math.sin(o.angle||0),dx=p.x-o.x,dy=p.y-o.y;return{x:dx*c+dy*s,y:-dx*s+dy*c};}
   function toWorld(p,o){const c=Math.cos(o.angle||0),s=Math.sin(o.angle||0);return{x:o.x+p.x*c-p.y*s,y:o.y+p.x*s+p.y*c};}
   function insideExpanded(p,o,pad=clearance){const q=toLocal(p,o);return Math.abs(q.x)<o.w*.5+pad&&Math.abs(q.y)<o.h*.5+pad;}
   function segmentAabbHitLocal(a,b,hw,hh){let t0=0,t1=1;const dx=b.x-a.x,dy=b.y-a.y,tests=[[-dx,a.x+hw],[dx,hw-a.x],[-dy,a.y+hh],[dy,hh-a.y]];for(const[p,q]of tests){if(Math.abs(p)<1e-9){if(q<0)return false;continue;}const r=q/p;if(p<0){if(r>t1)return false;if(r>t0)t0=r;}else{if(r<t0)return false;if(r<t1)t1=r;}}return t0<=t1&&t1>=0&&t0<=1;}
   function segmentHitsObstacle(a,b,o,pad=clearance){const la=toLocal(a,o),lb=toLocal(b,o),hw=o.w*.5+pad,hh=o.h*.5+pad,startInside=Math.abs(la.x)<hw&&Math.abs(la.y)<hh;if(startInside){const endInside=Math.abs(lb.x)<hw&&Math.abs(lb.y)<hh;if(!endInside){const startNorm=Math.max(Math.abs(la.x)/hw,Math.abs(la.y)/hh),endNorm=Math.max(Math.abs(lb.x)/hw,Math.abs(lb.y)/hh);if(endNorm>startNorm+1e-4)return false;}}return segmentAabbHitLocal(la,lb,hw,hh);}
-  function firstBlocker(a,b,ignoreId=null,pad=clearance){let best=null,bestD=Infinity;for(const o of obstacles()){if(o.id===ignoreId)continue;if(!segmentHitsObstacle(a,b,o,pad))continue;const d=Math.hypot(a.x-o.x,a.y-o.y);if(d<bestD){best=o;bestD=d;}}return best;}
-  function pointClear(p,ignoreId=null,pad=clearance){if(p.x<10||p.y<10||p.x>WORLD.width-10||p.y>WORLD.height-10)return false;for(const o of obstacles())if(o.id!==ignoreId&&insideExpanded(p,o,pad))return false;return true;}
+  function firstBlocker(a,b,ignoreId=null,pad=clearance){let best=null,bestD=Infinity;for(const o of obstacles(a,b,pad)){if(o.id===ignoreId)continue;if(!segmentHitsObstacle(a,b,o,pad))continue;const d=Math.hypot(a.x-o.x,a.y-o.y);if(d<bestD){best=o;bestD=d;}}return best;}
+  function pointClear(p,ignoreId=null,pad=clearance){if(p.x<10||p.y<10||p.x>WORLD.width-10||p.y>WORLD.height-10)return false;for(const o of obstacles(p,p,pad))if(o.id!==ignoreId&&insideExpanded(p,o,pad))return false;return true;}
   function projectTargetOutside(p,o,pad=clearance){if(!insideExpanded(p,o,pad))return p;const q=toLocal(p,o),hw=o.w*.5+pad,hh=o.h*.5+pad,px=hw-Math.abs(q.x),py=hh-Math.abs(q.y);if(px<py)q.x=(q.x<0?-1:1)*(hw+.5);else q.y=(q.y<0?-1:1)*(hh+.5);return toWorld(q,o);}
   function sanitizedTarget(target){let p={x:target.x,y:target.y};for(let pass=0;pass<6;pass++){let changed=false;for(const o of obstacles()){if(!insideExpanded(p,o,clearance))continue;p=projectTargetOutside(p,o,clearance);changed=true;}if(!changed)break;}return p;}
   function cornerCandidates(o){const hw=o.w*.5+clearance+cornerClearance,hh=o.h*.5+clearance+cornerClearance;return[[-hw,-hh],[-hw,hh],[hw,-hh],[hw,hh]].map(([x,y])=>toWorld({x,y},o));}

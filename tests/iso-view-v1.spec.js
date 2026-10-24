@@ -1136,7 +1136,7 @@ test('iso view: gun models at the foundry and the officer on horseback from the 
   await page.waitForFunction(() => window.__TROOPS_V1__ && window.__REGIMENT_ORDERS_V1__ && window.__RTS_DEBUG__, null, { timeout: 60_000 });
   // The gun models' sprites (when they are in the repository) stream in after the base sheets.
   const gunSheets = !process.env.NO_ATLAS && (await page.request.get('graphics-lab/assets/sprites/iso/frg12_iso_gun12_atlas.json')).ok();
-  if (gunSheets) await page.waitForFunction(() => ['frg12', 'frgh', 'frgl', 'brg12', 'frco'].every(k => window.__ISO_VIEW_V1__?.atlasKeys?.().includes(k)), null, { timeout: 60_000 });
+  if (gunSheets) await page.waitForFunction(() => ['frg12', 'frgh', 'frgl', 'brg12', 'brgh', 'brgl', 'frco'].every(k => window.__ISO_VIEW_V1__?.atlasKeys?.().includes(k)), null, { timeout: 60_000 });
   const r = await page.evaluate(() => {
     const X = window.__TROOPS_V1__, O = window.__REGIMENT_ORDERS_V1__, out = {};
     economies.france.food = 20000; economies.france.wood = 20000; economies.france.iron = 5000;

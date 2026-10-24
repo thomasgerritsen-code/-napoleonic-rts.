@@ -6,6 +6,7 @@
     // The game is played in the iso view only: a plain visit goes straight there.
     // (Automated browsers keep the old 2D page, which much of the test suite drives.)
     if (!location.search && !navigator.webdriver) location.replace(location.pathname + '?view=iso' + location.hash);
+    if (new URLSearchParams(location.search).get('view') === 'iso') window.__ISO_ASSETS_READY__ = false;
   </script>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="theme-color" content="#111713" />
@@ -33,7 +34,7 @@
   <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div><div id="message" class="message hidden"></div>
 </div>
 <script src="src/foundation/deployment-info.js?build=local"></script>
-<script src="src/foundation/version.js?build=318a"></script>
+<script src="src/foundation/version.js?build=perf1"></script>
 <script src="src/foundation/runtime.js?build=arch21"></script>
 <script src="src/foundation/config.js?build=313l"></script>
 <script src="src/foundation/contracts.js"></script>
@@ -52,7 +53,8 @@
 <script src="src/systems/input/mobile-regiment-multiselect-v1.js?build=regmulti3"></script>
 <script src="src/navigation.js"></script>
 <script src="src/visibility.js"></script>
-<script src="src/simulation-render.js?build=bridge249"></script>
+<script src="src/systems/performance/frame-work-v1.js?build=perf1"></script>
+<script src="src/simulation-render.js?build=perf1"></script>
 <script src="src/systems/ai/proximity-engagement-v1.js?build=contact2"></script>
 <script src="src/systems/rendering/order-target-feedback-v1.js?build=1321a"></script>
 <script src="src/v05.js?build=292a"></script>
@@ -61,7 +63,7 @@
 <script src="src/systems/artillery/compound-unit.js?build=a2"></script>
 <script src="src/v063.js?build=292a"></script>
 <script src="src/simulation-api.js?build=mobile160"></script>
-<script src="src/input.js?build=312b"></script>
+<script src="src/input.js?build=perf1"></script>
 <script src="src/systems/input/playability-controls-v1.js?build=317b"></script>
 <script src="src/v063-fixes.js"></script>
 <script src="src/v064.js"></script>
@@ -128,7 +130,7 @@
 <script src="src/systems/rendering/topdown-cavalry-v275.js?build=275a"></script>
 <script src="src/foundation/legacy-simulation-adapter.js?build=110a"></script>
 <script src="src/systems/artillery/crew-approach-v1.js?build=restore1"></script>
-<script src="src/systems/movement/stuck-recovery-v1.js?build=avoid3"></script>
+<script src="src/systems/movement/stuck-recovery-v1.js?build=perf1"></script>
 <script src="src/systems/navigation/river-crossing-recovery-v1.js?build=riverrecover1"></script>
 <script src="src/systems/movement/formation-traffic-v1.js?build=132a"></script>
 <script src="src/systems/movement/post-crossing-reform-v1322.js?build=1322b"></script>
@@ -181,7 +183,8 @@
 <script src="src/test-lab.js?build=100b"></script>
 <script src="src/systems/diagnostics/game-health-observer-v1.js?build=health1"></script>
 <script src="src/foundation/legacy-facades.js?build=259a"></script>
-<script src="src/systems/rendering/iso-view-v1.js?build=iso23"></script>
+<script src="src/systems/rendering/static-sprite-cache-v1.js?build=perf1"></script>
+<script src="src/systems/rendering/iso-view-v1.js?build=perf4"></script>
 <script src="src/systems/input/action-menu-v1.js?build=menu10"></script>
 <script>window.RTS_VERSION_INFO?.apply();</script>
 <script type="module" src="src/systems/movement/march-lab-live-v253.mjs?build=261a"></script>

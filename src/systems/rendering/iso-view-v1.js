@@ -33,6 +33,11 @@
     tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), miniAt: 0, fogAt: 0,
     stats: { renderMs: 0, seeThrough: 0, flags: 0, ground: false, houses: 0, dressing: 0, chimneySmoke: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
 
+  const assetState = { ready: false, completed: 0, total: 0, background: 0, failed: 0 };
+  global.__ISO_ASSETS_READY__ = false;
+  const drawScenery = (image, ...args) => global.__STATIC_SPRITE_CACHE_V1__
+    ? global.__STATIC_SPRITE_CACHE_V1__.draw(ctx, image, ...args) : ctx.drawImage(image, ...args);
+
   const hash = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; h ^= h >>> 13;
     return (Math.imul(h, 1103515245) >>> 0) / 4294967296; };
   // Game facing/heading (radians, y down) -> sprite direction index.
@@ -99,7 +104,7 @@
   const topDown = { s2w: screenToWorld, w2s: worldToScreen };
 
   // ---- atlases (the lab's, half resolution unless ?hd=1) ----
-  const loadImage = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im);
+  const loadImage = src => new Promise((res, rej) => { const im = new Image(); im.onload = async () => { try { await im.decode(); res(im); } catch (error) { rej(error); } };
     im.onerror = () => rej(new Error('iso: ontbreekt ' + src)); im.src = src; });
   function loadSheet(prefix, kind) {
     const dir = ASSETS + 'sprites/iso/';
@@ -118,6 +123,7 @@
   const sharp = { parts: new Set(), bytes: 0, loading: 0, loaded: 0, dropped: 0, sweptAt: 0, now: 0 };
   const bytesOf = part => part.sheet.meta.size.w * part.sheet.meta.size.h * 4;
   function sharpen(part, now) {
+    if (sharp.loading >= 1) return;
     part.sharpening = true;
     const need = bytesOf(part);
     // Make room: the sheets least recently drawn (not in the last two seconds) go back to half size.
@@ -148,42 +154,66 @@
     return { ...parts[0], byAnim };
   }
   const load = (key, kinds) => Promise.all(kinds.map(k => loadSheet(key, k))).then(indexAtlas)
-    .then(a => { view.atlases[key] = a; }).catch(err => console.warn(err.message));
+    .then(a => { view.atlases[key] = a; });
   const INFANTRY = ['infantry', 'fallen', 'combat', 'morale'];
   // A gun's model (troops-v1) by its sprite suffix.
   const GUN_MODEL = { heavy12: '12', howitzer: 'h', horseart: 'l' };
-  function loadAll() {
-    const first = [load('fr', INFANTRY), load('br', INFANTRY)];
-    for (const p of ['fr', 'br']) {
-      first.push(load(p + 'o', ['officer']), load(p + 'd', ['drummer']), load(p + 'c', ['cavalry', 'cavfight']),
-        load(p + 'g', ['gun']), load(p + 'a', ['gunner', 'gunner2']));
+  async function loadAll() {
+    const panel = document.createElement('section'); panel.id = 'isoLoading';
+    panel.setAttribute('role', 'status'); panel.setAttribute('aria-live', 'polite');
+    panel.style.cssText = 'position:fixed;inset:0;z-index:100;display:grid;place-content:center;gap:12px;text-align:center;background:#18201b;color:#f5f1e8;font:600 16px system-ui;padding:24px';
+    const label = document.createElement('div'), progress = document.createElement('progress');
+    label.textContent = 'Slagveld voorbereiden…'; progress.style.width = 'min(320px,80vw)';
+    panel.append(label, progress); document.body.appendChild(panel); canvas.setAttribute('aria-busy', 'true');
+    const first = [() => load('fr', INFANTRY), () => load('br', INFANTRY)];
+    for (const p of ['fr', 'br']) first.push(() => load(p + 'o', ['officer']), () => load(p + 'd', ['drummer']),
+      () => load(p + 'c', ['cavalry', 'cavfight']), () => load(p + 'g', ['gun']), () => load(p + 'a', ['gunner', 'gunner2']));
+    first.push(loadProps, loadVillage, loadGround, () => load('frw', ['worker']), () => load('brw', ['worker']));
+    assetState.total = first.length; progress.max = first.length; progress.value = 0;
+    let index = 0;
+    try {
+      await Promise.all(Array.from({ length: 4 }, async () => {
+        while (index < first.length) { const job = first[index++]; await job(); assetState.completed++; progress.value = assetState.completed; }
+      }));
+      assetState.ready = true; global.__ISO_ASSETS_READY__ = true;
+      global.RTS_VERSION_INFO?.finalizeBoot();
+      canvas.setAttribute('aria-busy', 'false'); panel.remove(); frameStartingForce();
+    } catch (error) {
+      assetState.failed++; label.textContent = 'Het slagveld kon niet volledig laden. Controleer je verbinding en probeer opnieuw.';
+      progress.remove(); const retry = document.createElement('button'); retry.textContent = 'Opnieuw laden';
+      retry.onclick = () => location.reload(); panel.appendChild(retry); console.warn('iso: laden', error); return;
     }
-    first.push(loadProps(), loadVillage(), loadGround(), load('frw', ['worker']), load('brw', ['worker']));
-    // Wildlife (wildlife-v1): red deer stag and hind, rabbit.
-    if (global.NRTS_CONFIG?.wildlife) first.push(load('wds', ['stag']), load('wdh', ['hind']), load('wrb', ['rabbit']));
-    // Extra looks stream in afterwards; until then everyone uses the base look.
-    // Period troops (troops-v1): Old Guard (fr6), sappers (fr7), 95th Rifles (br6);
-    // cuirassiers (frck), Polish lancers (frcl), Scots Greys (brcg).
     const looks = ['fr', 'br'].flatMap(p => ['', '2', '3', '4', '5'].map(l => p + l)).concat(global.NRTS_CONFIG?.troops ? ['fr6', 'fr7', 'br6'] : []);
     const horse = ['fr', 'br'].flatMap(p => [p + 'c2', p + 'co']).concat(global.NRTS_CONFIG?.troops ? ['frck', 'frcl', 'brcg'] : []);
-    // Gun models (troops-v1): 12-pounder, howitzer, horse artillery.
     const guns = global.NRTS_CONFIG?.troops ? ['fr', 'br'].flatMap(p => Object.values(GUN_MODEL).map(m => [p + 'g' + m, 'gun' + m])) : [];
-    return Promise.all(first).then(() => Promise.all(looks.filter(k => k.length > 2).map(k => load(k, INFANTRY))
-      .concat(horse.map(k => load(k, ['cavalry', 'cavfight'])))
-      .concat(guns.map(([k, kind]) => load(k, [kind])))
-      // Spade work in a trench being dug, per look.
-      .concat(looks.map(k => loadSheet(k, 'dig')
-        .then(part => { view.atlases[k + ':dig'] = indexAtlas([part]); }).catch(err => console.warn(err.message))))));
+    // Base digging and wildlife first; cosmetic uniform variations follow in two bounded streams.
+    const extra = looks.map(k => () => loadSheet(k, 'dig').then(part => { view.atlases[k + ':dig'] = indexAtlas([part]); }))
+      .concat(global.NRTS_CONFIG?.wildlife ? [() => load('wds', ['stag']), () => load('wdh', ['hind']), () => load('wrb', ['rabbit'])] : [])
+      .concat(looks.filter(k => k.length > 2).map(k => () => load(k, INFANTRY)))
+      .concat(horse.map(k => () => load(k, ['cavalry', 'cavfight'])))
+      .concat(guns.map(([k, kind]) => () => load(k, [kind])));
+    assetState.background = extra.length; let next = 0;
+    await Promise.all([0, 1].map(async worker => {
+      while (next < extra.length) {
+        await new Promise(resolve => {
+          if (global.__FRAME_WORK_V1__) global.__FRAME_WORK_V1__.enqueue('assets:' + worker, resolve, { maxDelayMs: 500 });
+          else setTimeout(resolve, 0);
+        });
+        const job = extra[next++]; if (!job) break;
+        try { await job(); } catch (error) { assetState.failed++; console.warn('iso: extra afbeelding', error); }
+        assetState.background--;
+      }
+    }));
   }
   function loadProps() {
     return fetch(ASSETS + 'iso/props/props.json').then(r => r.json()).then(m => Promise.all(Object.entries(m.props)
       .map(([kind, meta]) => loadImage(ASSETS + 'iso/props/' + meta.image).then(image => { view.props[kind] = { ...meta, image }; }))))
-      .catch(err => console.warn('iso: props', err));
+      ;
   }
   // The whole battlefield rendered in Blender (scripts/render-iso-gamemap.py).
   function loadGround() {
     const dir = ASSETS + 'iso/game/';
-    return fetch(dir + 'ground.json').then(r => r.ok ? r.json() : null).then(meta => meta && loadImage(dir + meta.image)
+    return fetch(dir + 'ground.json').then(r => { if (!r.ok) throw new Error('iso: grond ontbreekt'); return r.json(); }).then(meta => meta && loadImage(dir + meta.image)
       .then(img => {
         view.ground = { ...meta, img, k: meta.pxPerM / meta.gamePxPerM, pad: meta.padTop || 0 };
         const R = meta.relief;
@@ -194,7 +224,7 @@
         }
         view.woodTrees = null;
       }))
-      .catch(err => console.warn('iso: grond', err));
+      ;
   }
   // Village buildings: one sheet per kind with 16 headings (scripts/render-iso-village.py).
   function loadVillage() {
@@ -202,7 +232,7 @@
     return fetch(dir + 'village.json').then(r => r.json()).then(m => Promise.all(Object.entries(m.kinds)
       .map(([kind, meta]) => loadImage(dir + meta.image).then(image => [kind, { ...meta, image }])))
       .then(list => { view.village = { kinds: Object.fromEntries(list), pxPerM: m.pxPerM, headings: m.headings }; }))
-      .catch(err => console.warn('iso: dorpen', err));
+      ;
   }
   const villageHouses = () => (global.VILLAGE_SCENERY_V4 || global.__VILLAGE_SCENERY_V4_DATA__ || []).flatMap(v => v.houses || []);
   // The model's door side is its -y; the game's road side is local -y for side > 0
@@ -236,7 +266,7 @@
     if (detailed()) chimneys(house, kind, meta, heading);
     const k = houseScale(house, meta) * z() / V.pxPerM;
     return { y: house.y, box: box(X, Y, f.px, f.py, f.w, f.h, k), draw: () => {
-      ctx.drawImage(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k);
+      drawScenery(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k);
       view.stats.houses++;
     } };
   }
@@ -303,12 +333,12 @@
       const prop = view.props[it.prop]; if (!prop) return null;
       const k = DRESS_PPM * it.scale * z() / SPRITE_PPM;
       return { y: it.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
-        ctx.drawImage(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.dressing++; } };
+        drawScenery(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.dressing++; } };
     }
     const V = view.village, meta = V && V.kinds[it.edge]; if (!meta) return null;
     const f = meta.frames[((Math.round(-it.angle / (2 * Math.PI / V.headings)) % V.headings) + V.headings) % V.headings];
     return { y: it.y, draw: () => { const k = DRESS_PPM * z() / V.pxPerM;
-      ctx.drawImage(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k); view.stats.dressing++; } };
+      drawScenery(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k); view.stats.dressing++; } };
   }
 
   // ---- the game's woods: stands of oak and poplar (they slow movement in the game) ----
@@ -397,7 +427,7 @@
     const prop = view.props[tr.kind]; if (!prop) return null;
     const k = spriteK() * tr.scale;
     return { y: tr.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
-      ctx.drawImage(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
+      drawScenery(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
   }
 
   // ---- bridges: Blender props at the game's crossings (scripts/render-iso-props.py) ----
@@ -423,7 +453,7 @@
     const kind = bridgeKind(b), prop = view.props[kind]; if (!prop) return null;
     const k = spriteK() * b.length / (BRIDGE_DECKS[kind][0] * PPM);
     return { y: b.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
-      ctx.drawImage(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.bridges++; } };
+      drawScenery(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.bridges++; } };
   }
 
   // ---- orders as in the Graphics Lab: flags, a facing arrow, attack targets ----
@@ -1008,7 +1038,7 @@
     if (b.type === 'tower') towerSmoke(b, prop, k);
     return { y: b.y + b.h * 0.3, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       if (b.complete === false) { drawConstruction(b, prop, k); view.stats.props++; return; }
-      ctx.drawImage(prop.image, sx(b.x) - prop.pivot.x * k, gy(b.x, b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
+      drawScenery(prop.image, sx(b.x) - prop.pivot.x * k, gy(b.x, b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       view.stats.props++;
     } };
   }
@@ -1055,9 +1085,9 @@
     // Stage 2: the building rises from the bottom up; above the line, a faint outline.
     // The line climbs over the building itself (its opaque rows), not the empty margin of its picture.
     const rows = propRows(prop), rise = (p - 0.15) / 0.85, cut = top + h * (rows[0] + (rows[1] - rows[0]) * (1 - rise));
-    ctx.save(); ctx.globalAlpha *= 0.16; ctx.drawImage(prop.image, left, top, w, h); ctx.restore();
+    ctx.save(); ctx.globalAlpha *= 0.16; drawScenery(prop.image, left, top, w, h); ctx.restore();
     ctx.save(); ctx.beginPath(); ctx.rect(left - 2, cut, w + 4, top + h - cut + 2); ctx.clip();
-    ctx.drawImage(prop.image, left, top, w, h); ctx.restore();
+    drawScenery(prop.image, left, top, w, h); ctx.restore();
     if (rise < 0.98) {
       // The scaffold: poles from the ground to just above the line, a plank walk along it.
       const pole = '#6b4e2e', poles = 5, x0 = X - fw * 0.95, x1 = X + fw * 0.95, ground = Y + fh * 0.2;
@@ -1098,13 +1128,13 @@
       const prop = view.props[tree(['oak', 'beech', 'birch', 'pine', 'spruce', 'oak', 'poplar'][Math.floor(hash(r.id, 3) * 7)])]; if (!prop) return null;
       const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25);
       return { y: r.y, box: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
-        ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
+        drawScenery(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
     }
     if (r.type === 'iron') return { y: r.y, draw: () => drawRock(r) };
     // Berry bushes: some hawthorns with their red haws among the bushes.
     const prop = view.props[hash(r.id, 9) < 0.5 && view.props.hawthorn ? 'hawthorn' : 'bush']; if (!prop) return null;
     return { y: r.y, draw: () => { const k = spriteK() * 0.75;
-      ctx.drawImage(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
+      drawScenery(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       ctx.fillStyle = '#8c1f2a'; for (let i = 0; i < 5; i++) { ctx.beginPath();
         ctx.arc(sx(r.x) + (hash(r.id, i) - .5) * 18 * z(), gy(r.x, r.y) - (4 + hash(i, r.id) * 10) * z(), 1.6 * z() + .6, 0, 7); ctx.fill(); }
       view.stats.props++; } };
@@ -1321,6 +1351,12 @@
       billowEdges(f, w, h, now);
       view.stats.fogCells = cells; view.stats.fogSources = sources;
     }
+    const cached = view.cloudCam;
+    if (cached && cached.zoom === z() && cached.maskAt === view.fogAt &&
+        now - cached.at < 1000 / 15 && Math.abs((cached.x-camera.x)*z()) < 96 && Math.abs((cached.y-camera.y)*z()*SQ) < 96 &&
+        cached.width === innerWidth && cached.height === innerHeight) {
+      view.stats.cloudReuses = (view.stats.cloudReuses || 0) + 1; blitClouds(cached); return;
+    }
     // Blend the one before into the newest (additive mix of the two at weights
     // 1-t and t is an exact cross-fade), each shifted for the camera since.
     const off = cam => [(cam.x - camera.x) * z() / 2, (cam.y - camera.y) * z() * SQ / 2];
@@ -1395,9 +1431,14 @@
     shadeCtx.globalCompositeOperation = 'source-over'; shadeCtx.clearRect(0, 0, w, h);
     shadeCtx.fillStyle = 'rgba(12,18,28,.32)'; shadeCtx.fillRect(0, 0, w, h);
     shadeCtx.globalCompositeOperation = 'destination-in'; shadeCtx.drawImage(fogMix, 0, 0, w, h);
-    const so = Math.max(3, 14 * z());
-    ctx.drawImage(shadeCv, -2 * FOG_M + so, -2 * FOG_M + so * 1.6, w * 4, h * 4);
-    ctx.drawImage(cloudCv, -2 * FOG_M, -2 * FOG_M, w * 4, h * 4);
+    view.cloudCam = { x: camera.x, y: camera.y, zoom: z(), at: now, maskAt: view.fogAt, width: innerWidth, height: innerHeight };
+    view.stats.cloudBuilds = (view.stats.cloudBuilds || 0) + 1;
+    blitClouds(view.cloudCam);
+  }
+  function blitClouds(cam) {
+    const dx = (cam.x-camera.x)*z(), dy = (cam.y-camera.y)*z()*SQ, so = Math.max(3, 14*z());
+    ctx.drawImage(shadeCv, -2*FOG_M+so+dx, -2*FOG_M+so*1.6+dy, shadeCv.width*4, shadeCv.height*4);
+    ctx.drawImage(cloudCv, -2*FOG_M+dx, -2*FOG_M+dy, cloudCv.width*4, cloudCv.height*4);
   }
   // Height gives sight: on high ground a man sees farther (up to half as far
   // again on a hilltop), on the relief of this map (iso view only).
@@ -1470,6 +1511,7 @@
 
   // ---- the frame ----
   function render(now) {
+    global.__STATIC_SPRITE_CACHE_V1__?.beginFrame();
     sharp.now = performance.now(); sweepSharp(sharp.now);
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
@@ -1612,6 +1654,7 @@
   // ---- hooks: the game's frame calls renderStableFrameV1(draw) when it exists ----
   let inner = global.renderStableFrameV1;
   function stableFrame(drawGame, now) {
+    if (!assetState.ready) return;
     if (!view.on) return typeof inner === 'function' ? inner(drawGame, now) : drawGame();
     // The game is drawn in the iso view only: the 2D renderer does not run at all
     // (its effect lists are capped where they are filled; exploring is simulation).
@@ -2088,7 +2131,7 @@
     // previous battle. Keep the loaded artwork and static terrain caches.
     for (const map of [view.info, view.regFire, view.gunFire, view.towerFired, view.trenchLips, view.trenchCrests]) map.clear();
     view.corpses.length = view.smoke.length = 0;
-    view.attack = view.lastCam = view.fogCam = view.fogPrev = null;
+    view.attack = view.lastCam = view.fogCam = view.fogPrev = view.cloudCam = null;
     view.lastNow = view.fogAt = 0;
     view.stats.corpses = view.stats.smoke = 0;
     queueMicrotask(frameStartingForce);
@@ -2101,7 +2144,7 @@
     // The sprite a unit is drawn with now ([atlas, anim, frame]), and the kinds of tree and bush on the map.
     frameOf: id => { const u = units.find(q => q.id === id), m = view.info.get(id); return u && m ? frameFor(u, m, performance.now() / 1000) : null; },
     plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
-    stats: () => ({ ...view.stats, on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
+    stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,

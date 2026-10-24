@@ -24,6 +24,10 @@
   };
   const finalizeBoot = () => {
     apply();
+    if (root.__ISO_ASSETS_READY__ === false) {
+      document.documentElement.dataset.runtimeReady = 'loading';
+      return;
+    }
     if (app) app.style.visibility = 'visible';
     document.documentElement.dataset.runtimeReady = 'true';
   };
