@@ -1564,7 +1564,7 @@
     drawWetGround(t);
     drawTrenchBeds(t);
     drawCraters();
-    const k = spriteK(), seen = new Set(), list = [];
+    const k = spriteK(), seen = new Set(), list = [], trackWetness = weather()?.wetness || 0;
     // The faint rings in the side's colour under every man, horse and gun lie on
     // the ground under everything: gathered into one path a side, filled once.
     const rings = { france: new Path2D(), britain: new Path2D() };
@@ -1581,8 +1581,9 @@
       if (u.dead) continue;
       seen.add(u.id);
       const m = infoOf(u); track(u, m, t, dt);
-      if (!visible(u)) continue;
-      if (sx(u.x) < -80 || sx(u.x) > innerWidth + 80 || gy(u.x, u.y) < -40 || gy(u.x, u.y) > innerHeight + 140) continue;
+      if (!visible(u) || sx(u.x) < -80 || sx(u.x) > innerWidth + 80 || gy(u.x, u.y) < -40 || gy(u.x, u.y) > innerHeight + 140) {
+        wetTracks.sample(u, m, trackWetness, elapsed, false); continue;
+      }
       const orders = global.__REGIMENT_ORDERS_V1__, deck = deckAt(u.x, u.y);
       const sunk = !deck && (orders?.trenchAt?.(u.x, u.y) || orders?.diggingAt?.(u.x, u.y));
       const musketeer = u.type === 'infantry' && !crewIds.has(u.id);
@@ -1590,7 +1591,7 @@
       // ...also while they revet or fortify a finished one (an upgrade bought for resources).
       m.digging = sunk && (sunk.progress < 1 || sunk.upgrade) && musketeer && orders?.diggingAt?.(u.x, u.y) ? sunk : null;
       if (m.digging) st.digging++;
-      if (m.moving) leaveTrack(u, m);
+      wetTracks.sample(u, m, trackWetness, elapsed, !deck && !sunk);
       // The front rank of a finished trench steps up to the parapet and leans on it.
       let wx = u.x, wy = u.y;
       m.parapet = null;
@@ -1782,18 +1783,38 @@
   // whatever crosses it leaves tracks - boots, hooves, wheel ruts - that fade
   // as it dries; rain falls slanting with the wind, fog and cloud veil the
   // field. ----
-  const TRACK_MAX = 2600;
-  view.tracks = [];
+  const TRACK_CAPACITY = 2600;
+  const wetTracks = global.__WET_TRACKS_V1__.create({ capacity: TRACK_CAPACITY, ppm: PPM });
   const weather = () => global.__WEATHER_V1__?.state?.();
-  function leaveTrack(u, m) {
-    const w = weather(); if (!w || w.wetness < 0.2) return;
-    const kind = u.type === 'cavalry' ? 'hoof' : u.type === 'artillery' ? 'wheel' : 'boot';
-    const gap = (kind === 'hoof' ? 1.3 : kind === 'wheel' ? 0.7 : 0.8) * PPM;
-    if (m.trackX != null && Math.hypot(u.x - m.trackX, u.y - m.trackY) < gap) return;
-    const a = m.trackX != null ? Math.atan2(u.y - m.trackY, u.x - m.trackX) : (u.facing || 0);
-    m.trackX = u.x; m.trackY = u.y; m.trackStep = (m.trackStep || 0) + 1;
-    view.tracks.push({ x: u.x, y: u.y, a, kind, t: elapsed, s: m.trackStep & 1 });
-    if (view.tracks.length > TRACK_MAX) view.tracks.splice(0, view.tracks.length - TRACK_MAX);
+  // Small reusable vector stamps, matching the sprites' eight headings. There
+  // are no image uploads or per-track canvas contexts. Hooves are open-backed
+  // horseshoes, boots have a separate heel, wheels keep their paired ruts.
+  const trackShapes = Array.from({ length: 8 }, (_, dir) => {
+    const ca = Math.cos(dir * Math.PI / 4), sa = Math.sin(dir * Math.PI / 4);
+    const polygon = (path, points, along = 0, across = 0) => {
+      points.forEach(([d, e], i) => {
+        d += along; e += across;
+        const x = ca * d - sa * e, y = (sa * d + ca * e) * SQ;
+        if (i) path.lineTo(x, y); else path.moveTo(x, y);
+      }); path.closePath();
+    };
+    const boots = [0, 1].map(step => {
+      const p = new Path2D(), across = step ? 0.14 : -0.14;
+      polygon(p, [[-.04,-.085],[.14,-.085],[.20,-.04],[.20,.04],[.14,.085],[-.04,.085]], 0, across);
+      polygon(p, [[-.19,-.075],[-.09,-.075],[-.09,.075],[-.19,.075]], 0, across); return p;
+    });
+    const hoof = new Path2D(), wheel = new Path2D();
+    const shoe = [[-.10,-.10],[.06,-.12],[.14,-.06],[.16,0],[.14,.06],[.06,.12],[-.10,.10],[-.10,.045],[.04,.055],[.085,0],[.04,-.055],[-.10,-.045]];
+    for (const [d,e] of [[.3,.23],[.3,-.23],[-.4,.2],[-.4,-.2]]) polygon(hoof, shoe, d, e);
+    for (const e of [.75,-.75]) polygon(wheel, [[-.4,-.055],[.4,-.055],[.4,.055],[-.4,.055]], 0, e);
+    return { boots, hoof, wheel };
+  });
+  const trackBatches = Array.from({ length: 16 }, () => ({ path: null, count: 0 }));
+  const trackMatrix = new DOMMatrix(), trackOpacity = new Uint8Array(TRACK_CAPACITY);
+  let trackCache = null;
+  function clearTrackPaths() {
+    trackCache = null;
+    for (const batch of trackBatches) { batch.path = null; batch.count = 0; }
   }
   function drawWetGround(now) {
     const w = weather(); if (!w) return;
@@ -1815,34 +1836,53 @@
         }
       }
     }
-    // Tracks: they fade over a few minutes, faster as the ground dries.
-    if (!view.tracks.length) return;
-    const life = 90 + 150 * wet;
-    let n = 0;
-    ctx.fillStyle = 'rgba(48,38,27,.55)'; ctx.strokeStyle = 'rgba(48,38,27,.5)';
-    for (const tr of view.tracks) {
-      const age = elapsed - tr.t; if (age > life || age < 0) continue;
-      const X = sx(tr.x), Y = gy(tr.x, tr.y);
-      if (X < -20 || X > innerWidth + 20 || Y < -20 || Y > innerHeight + 20) continue;
-      ctx.globalAlpha = Math.min(1, (1 - age / life) * 1.4) * (0.4 + 0.6 * Math.max(wet, 0.3));
-      const ca = Math.cos(tr.a), sa = Math.sin(tr.a), k = PPM * z();
-      // Across the way of travel, on the ground (squeezed vertically like the ground).
-      const off = (d, e) => [X + (ca * d - sa * e) * k, Y + (sa * d + ca * e) * k * SQ];
-      if (tr.kind === 'boot') {
-        const [px, py] = off(0, tr.s ? 0.1 : -0.1);
-        ctx.beginPath(); ctx.ellipse(px, py, 0.13 * k, 0.05 * k, Math.atan2(sa * SQ, ca), 0, 7); ctx.fill();
-      } else if (tr.kind === 'hoof') {
-        for (const [d, e] of [[0.25, 0.18], [0.25, -0.18], [-0.35, 0.16], [-0.35, -0.16]]) {
-          const [px, py] = off(d, e); ctx.beginPath(); ctx.arc(px, py, 0.07 * k, 0.3, 5.9); ctx.fill();
-        }
-      } else {
-        ctx.lineWidth = Math.max(1, 0.1 * k);
-        for (const e of [0.75, -0.75]) { const [ax, ay] = off(-0.4, e), [bx, by] = off(0.4, e); ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); }
-      }
-      n++;
+    // One bounded ring, pruned even when no new unit crosses it. The existing
+    // fog is drawn later and still covers unknown ground and enemy trails.
+    wetTracks.prune(elapsed, wet);
+    view.stats.tracks = view.stats.trackDrawCalls = 0;
+    const store = wetTracks.stats();
+    if (!store.count) { clearTrackPaths(); return; }
+    const life = wetTracks.lifetime(wet), scale = PPM * z();
+    let opacityIndex = 0;
+    wetTracks.forEach(tr => {
+      const alpha = Math.min(1, (1 - (elapsed - tr.t) / life) * 1.4) * (0.5 + 0.5 * Math.max(wet, 0.3));
+      trackOpacity[opacityIndex++] = Math.min(15, Math.max(0, Math.round(alpha * 15)));
+    });
+    const C = trackCache;
+    let same = C && C.emitted === store.emitted && C.count === store.count && C.x === camera.x && C.y === camera.y &&
+      C.zoom === z() && C.w === innerWidth && C.h === innerHeight && C.relief === view.relief;
+    if (same) for (let i = 0; i < store.count; i++) if (trackOpacity[i] !== C.opacity[i]) { same = false; break; }
+    let n = same ? C.drawn : 0;
+    if (same) view.stats.trackCacheReuses = (view.stats.trackCacheReuses || 0) + 1;
+    else {
+      clearTrackPaths();
+      let index = 0;
+      trackMatrix.a = trackMatrix.d = scale;
+      wetTracks.forEach(tr => {
+        const bucket = trackOpacity[index++];
+        const X = sx(tr.x), Y = gy(tr.x, tr.y);
+        if (X < -30 || X > innerWidth + 30 || Y < -30 || Y > innerHeight + 30) return;
+        const batch = trackBatches[bucket];
+        if (!bucket) return;
+        if (!batch.path) batch.path = new Path2D();
+        trackMatrix.e = X; trackMatrix.f = Y;
+        const stamp = trackShapes[tr.direction];
+        batch.path.addPath(tr.kind === 'boot' ? stamp.boots[tr.step] : stamp[tr.kind], trackMatrix);
+        batch.count++; n++;
+      });
+      trackCache = { emitted: store.emitted, count: store.count, x: camera.x, y: camera.y, zoom: z(),
+        w: innerWidth, h: innerHeight, relief: view.relief, opacity: trackOpacity.slice(0, store.count), drawn: n };
+      view.stats.trackCacheBuilds = (view.stats.trackCacheBuilds || 0) + 1;
     }
-    ctx.globalAlpha = 1; view.stats.tracks = n;
+    ctx.fillStyle = '#38291c';
+    let draws = 0;
+    for (let i = 1; i < trackBatches.length; i++) {
+      const batch = trackBatches[i]; if (!batch.count) continue;
+      ctx.globalAlpha = i / 15 * 0.72; ctx.fill(batch.path); draws++;
+    }
+    ctx.globalAlpha = 1; view.stats.tracks = n; view.stats.trackDrawCalls = draws;
   }
+
   function drawWeather(now) {
     const w = weather(); if (!w) return;
     const W = innerWidth, H = innerHeight;
@@ -2178,6 +2218,7 @@
     // previous battle. Keep the loaded artwork and static terrain caches.
     for (const map of [view.info, view.regFire, view.gunFire, view.towerFired, view.trenchLips, view.trenchCrests]) map.clear();
     view.corpses.length = view.smoke.length = 0;
+    wetTracks.reset(); clearTrackPaths(); view.stats.tracks = view.stats.rainDrops = view.stats.trackDrawCalls = 0;
     view.attack = view.lastCam = view.fogCam = view.fogPrev = view.cloudCam = null;
     fogGeometry.seen = fogGeometry.sight = null;
     view.lastNow = view.fogAt = 0;
@@ -2194,10 +2235,12 @@
     plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
     stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: global.__ISO_GPU_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
+      wetTracks: wetTracks.stats(),
       fogGeometryPoints: ((fogGeometry.seen?.points.length || 0) + (fogGeometry.sight?.points.length || 0)) / 3,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
       relief: view.relief ? view.relief.maxM : 0, heightSight: !!view.heightSight, villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
+    tracks: () => wetTracks.snapshot(),
     screenOf: (wx, wy) => ({ x: sx(wx), y: gy(wx, wy) }),
     // Door direction of each village house against its gate on the road (for tests).
     doorCheck: () => villageHouses().filter(h => Number.isFinite(h.accessX)).map(h => {

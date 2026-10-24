@@ -1,6 +1,18 @@
-# Napoleonic RTS — v1.4.2
+# Napoleonic RTS — v1.4.3
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
+
+## v1.4.3 — regenbuien en zichtbare voet- en hoefsporen
+
+De eerste natuurlijke bui begint rond 1:45 speeltijd, voorafgegaan door bewolking.
+Buien duren ongeveer 65–100 seconden, met droge tussenpozen van 150–240 seconden.
+Op natte grond laten lopende soldaten afwisselende schoenafdrukken achter;
+cavalerie en officieren te paard laten hoefsporen achter. De afdrukken blijven
+na de bui even zichtbaar en vervagen wanneer de grond opdroogt.
+
+De sporen worden als kleine vectorvormen samen getekend, met maximaal 2600
+bewaarde afdrukgroepen. Stilstaande en ongeziene eenheden maken geen nieuwe
+sporen; brugdekken worden overgeslagen. Een nieuwe slag wist de oude sporen.
 
 ## v1.4.2 — minder tekenwerk met hetzelfde beeld
 

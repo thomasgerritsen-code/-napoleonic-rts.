@@ -547,3 +547,39 @@ Gemeten met een veldslag van ruim 330 eenheden (12 regimenten, 4 ruiterregimente
   gevaar en nooit door de rivier, en komt verderop weer tot rust. Het wild is
   alleen decor: er wordt niet op geschoten en het houdt niemand tegen. Je ziet het
   alleen waar Frankrijk zicht heeft.
+
+## Regenbuien en sporen (v1.4.3)
+
+Een nieuwe slag begint helder. Rond 1:20 speeltijd trekt bewolking binnen; rond
+1:45 begint de eerste natuurlijke regenbui. Een bui duurt 65–100 spelseconden,
+met vervolgens 150–240 seconden zonder een nieuwe bui. Overgangen duren 15
+seconden. Wind stuurt de bestaande regendruppels aan; de bestaande effecten op
+zicht, modder en kruit blijven behouden. Buien en opdrogen volgen de
+simulatieklok; tijdens pauze verandert de weertoestand niet. De weergave gebruikt
+geen nieuwe afbeeldingen of GPU-contexten.
+
+Op vochtige grond verschijnen schoenafdrukken met afwisselend linker- en
+rechtervoet. Paarden en officieren te paard laten groepjes hoefijzerafdrukken
+achter; kanonnen behouden hun dubbele wielsporen. De grond blijft na de bui nat,
+en de afdrukken vervagen geleidelijk (levensduur 90–240 seconden, afhankelijk
+van het vocht). Stilstaande eenheden maken geen extra afdrukken. Beweging op
+brugdekken, in loopgraven en van ongeziene eenheden tekent geen modderspoor op
+het terrein. De sporen liggen op het reliëf, onder soldaten, gebouwen en mist.
+
+`wet-tracks-v1.js` bewaart maximaal 2600 afdrukgroepen in een ringbuffer en
+verwerkt hoogstens vier stappen per waargenomen eenheid per frame. Grote
+sprongen worden overgeslagen. Kleine vooraf opgebouwde vectorvormen volgen de
+acht looprichtingen; zichtbare afdrukken worden in maximaal vijftien vulacties
+per frame samengevoegd. Er zijn geen aparte canvassen of textures per afdruk.
+Dezelfde spoorpaden worden hergebruikt zolang camera, afdrukken en
+vervaging gelijk zijn. Verlopen afdrukken worden ook zonder nieuw verkeer
+opgeruimd. Nieuwe slag wist
+zowel sporen als weerklokken en start de weerreeks opnieuw. Schieten heeft een
+eigen toevalsstroom en verschuift de data van regenbuien niet.
+
+Diagnose: `__WEATHER_V1__.state()` bevat regen, vocht en `nextRainAt`;
+`__ISO_VIEW_V1__.stats()` bevat `rainDrops`, `tracks`, `trackDrawCalls` en
+`wetTracks`, `trackCacheBuilds` en `trackCacheReuses`;
+`__ISO_VIEW_V1__.tracks()` geeft een kopie van de afdrukgegevens.
+Tests: `tests/headless/weather-showers-v143.test.js`,
+`tests/headless/wet-tracks-v143.test.js` en `tests/iso-rain-tracks-v143.spec.js`.

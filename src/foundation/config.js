@@ -134,7 +134,8 @@
       shellDamage:14, breachedCover:0.8, repairPerSecond:2, towerSplash:44, towerShellDamage:30, maxCraters:80,
       skirmishSpread:2.3, skirmishCover:0.72, skirmishWoodCover:0.55, skirmishVsCavalry:1.7, skirmishRange:1.15 }) : null,
     // Changing weather and wet ground with tracks (open map only); times in game seconds.
-    weather: OPEN_MAP ? Object.freeze({ start:'clear', minSpell:150, maxSpell:300, turnSeconds:25, soakSeconds:60, drySeconds:240,
+    weather: OPEN_MAP ? Object.freeze({ start:'clear', minSpell:100, maxSpell:180, turnSeconds:15, soakSeconds:60, drySeconds:240,
+      firstRainSeconds:105, cloudLeadSeconds:25, rainMinSeconds:65, rainMaxSeconds:100, dryMinSeconds:150, dryMaxSeconds:240,
       misfire:0.3, mudSlow:0.18, mudSlowGuns:0.3 }) : null,
     // One-button regiments: fill up from the nearest free men; auto-regiment at the barracks (open map only).
     quickRegiment: OPEN_MAP ? Object.freeze({ reach:700, barracksReach:520 }) : null,
