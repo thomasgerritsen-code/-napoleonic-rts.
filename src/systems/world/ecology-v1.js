@@ -367,10 +367,8 @@
 
   const initialRefresh=refreshBaseVillageAccess();
 
-  // resetBtn bound the original resetGame before Architecture-v2 systems load, so
-  // updating createResourceClusters is too early: later reset work can still move a
-  // Town Center. Refresh after the complete reset instead. Direct resetGame callers
-  // use the wrapper; the existing button binding gets a post-dispatch microtask.
+  // Resource creation is too early: later reset work can still move a Town Center.
+  // Both direct callers and the reset button dispatch through the current wrapper.
   const previousResetGame=resetGame;
   resetGame=function resetGameEcologyV1(...args){
     const result=previousResetGame(...args);
@@ -382,11 +380,6 @@
     refreshBaseVillageAccess();
     return result;
   };
-  const resetButton=document.getElementById('resetBtn');
-  if(resetButton){
-    resetButton.addEventListener('click',()=>queueMicrotask(refreshBaseVillageAccess));
-  }
-
   const api=Object.freeze({
     version:'battlefield-ecology-v1.10-large-army-base-berries',
     validSpot:validResourceSpot,

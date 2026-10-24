@@ -68,6 +68,34 @@
     return { x: p.x, y: (lo + hi) / 2 };
   }
   function isoWorldToScreen(wx, wy) { return { x: sx(wx), y: gy(wx, wy) }; }
+
+  // The home base can be relocated into its village, well west of the soldiers.
+  // Fit the starting force as well as the base on a phone, rather than centring
+  // on the base alone. Only boot and a new battle may change this framing;
+  // streaming assets and ordinary frames must leave the player's camera alone.
+  function frameStartingForce() {
+    if (!global.matchMedia('(pointer:coarse),(max-width:860px)').matches) return;
+    const men = units.filter(u => !u.dead && u.side === 'france');
+    if (!men.length) return;
+    const bounds = men.map(u => ({ x: u.x, y: u.y * SQ - heightPx(u.x, u.y) * LIFT,
+      halfWidth: 28, above: u.type === 'cavalry' ? 65 : 48, below: 12 }));
+    const home = buildings.find(b => !b.dead && b.side === 'france' && b.type === 'towncenter');
+    if (home) bounds.push({ x: home.x, y: home.y * SQ - heightPx(home.x, home.y) * LIFT,
+      halfWidth: home.w * 0.8, above: home.h * SQ + 90, below: home.h * SQ });
+    const left = Math.min(...bounds.map(p => p.x - p.halfWidth));
+    const right = Math.max(...bounds.map(p => p.x + p.halfWidth));
+    const top = Math.min(...bounds.map(p => p.y - p.above));
+    const bottom = Math.max(...bounds.map(p => p.y + p.below));
+    const hudBottom = Math.max(document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0,
+      document.getElementById('isoOverviewToggle')?.getBoundingClientRect().bottom || 0);
+    const hudTop = document.querySelector('.bottombar')?.getBoundingClientRect().top || innerHeight;
+    const screenTop = hudBottom + 20, screenBottom = Math.max(screenTop + 80, hudTop - 20);
+    camera.zoom = Math.max(0.42, Math.min(0.72, (innerWidth - 48) / Math.max(1, right - left),
+      (screenBottom - screenTop) / Math.max(1, bottom - top)));
+    camera.x = (left + right) / 2;
+    camera.y = ((top + bottom) / 2 - ((screenTop + screenBottom) / 2 - innerHeight / 2) / camera.zoom) / SQ;
+    clampCamera();
+  }
   const topDown = { s2w: screenToWorld, w2s: worldToScreen };
 
   // ---- atlases (the lab's, half resolution unless ?hd=1) ----
@@ -2042,12 +2070,29 @@
     overview.setAttribute('aria-pressed', String(on)); };
   overview.addEventListener('click', () => setOverview(!view.overview));
   document.body.appendChild(overview);
+  // The phone menu opens Nieuwe slag at the top right: keep it tappable.
+  const overviewStyle = document.createElement('style');
+  overviewStyle.textContent = '@media (pointer:coarse),(max-width:860px){body.mobile-menu-open #isoOverviewToggle{right:auto!important;left:10px}}';
+  document.head.appendChild(overviewStyle);
   setOverview(false);
   // Other layers may be created after this file runs: hide them as they appear.
   new MutationObserver(() => { if (view.on) for (const c of otherLayers()) c.style.visibility = 'hidden'; })
     .observe(document.body, { childList: true, subtree: true });
   setOn(true);
   loadAll();
+  // By load, every legacy reset and the responsive HUD have finished booting.
+  if (document.readyState === 'complete') frameStartingForce();
+  else global.addEventListener('load', frameStartingForce, { once: true });
+  global.NRTS?.events?.on?.('game:reset', () => {
+    // Unit ids restart at one; no animation, corpse or shot may refer to the
+    // previous battle. Keep the loaded artwork and static terrain caches.
+    for (const map of [view.info, view.regFire, view.gunFire, view.towerFired, view.trenchLips, view.trenchCrests]) map.clear();
+    view.corpses.length = view.smoke.length = 0;
+    view.attack = view.lastCam = view.fogCam = view.fogPrev = null;
+    view.lastNow = view.fogAt = 0;
+    view.stats.corpses = view.stats.smoke = 0;
+    queueMicrotask(frameStartingForce);
+  });
 
   global.__ISO_VIEW_V1__ = Object.freeze({
     version: 'iso-view-v1', optIn: 'view=iso',

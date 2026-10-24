@@ -63,7 +63,9 @@
     else if (action === 'artillery-mode') toggleArtillery();
   });
 
-  document.getElementById('resetBtn').addEventListener('click', resetGame);
+  // Later systems extend resetGame to clear their own battle state. Resolve
+  // the current function when clicked instead of capturing the early version.
+  document.getElementById('resetBtn').addEventListener('click', () => resetGame());
 
   // ---------- Test/debug hooks ----------
   const TEST_MANUAL_SIMULATION = new URLSearchParams(location.search).has('test');

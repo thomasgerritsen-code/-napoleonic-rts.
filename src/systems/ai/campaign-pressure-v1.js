@@ -27,7 +27,13 @@
   if (!cfg || typeof aiChooseState !== 'function' || typeof AI_COMMANDER_V1 === 'undefined') return;
   const C = AI_COMMANDER_V1;
   const ATTACKING = new Set(['MASS', 'ADVANCE', 'ATTACK', 'FLANK']);
-  const state = { losingSince: null, nextWaveAt: cfg.firstWave, waves: 0, attackStarted: null, rebalanced: 0, trained: 0, lastBalanceAt: -99, log: [] };
+  const freshState = () => ({ losingSince: null, nextWaveAt: cfg.firstWave, waves: 0, attackStarted: null,
+    rebalanced: 0, trained: 0, lastBalanceAt: -99, farmers: 0, sentHome: 0, heldOrders: 0, keptLines: 0, rallied: 0, log: [] });
+  const state = freshState();
+  // These function wrappers are installed once for the page, not once per
+  // battle. Keep them separate from the attack clocks and economy counters.
+  let buildingTargetsInstalled = false, steadyLinesInstalled = false;
+  global.NRTS.events.on('game:reset', () => Object.assign(state, freshState()));
   const jitter = () => (Math.random() * 2 - 1) * cfg.jitter;
   const fighting = side => livingUnits(side).filter(u => u.type !== 'worker' && !u.routing);
   const armySize = regs => regs.reduce((n, r) => n + regimentMembers(r).filter(u => !u.dead && !u.routing).length, 0);
@@ -201,8 +207,8 @@
   // enemy building in reach (complete, in sight) is. Installed on the first AI
   // tick, after every later script has put its own target search in place.
   function installBuildingTargets() {
-    if (state.buildingTargets || typeof nearestEnemyEntity !== 'function') return;
-    state.buildingTargets = true;
+    if (buildingTargetsInstalled || typeof nearestEnemyEntity !== 'function') return;
+    buildingTargetsInstalled = true;
     const baseNearest = nearestEnemyEntity;
     nearestEnemyEntity = function nearestEnemyEntityWithBuildings(unit, maxRange) {
       const hit = baseNearest(unit, maxRange);
@@ -223,8 +229,8 @@
   // An engaged regiment ignores shifts of less than holdShift and moves larger
   // distances in line - except in a retreat.
   function installSteadyLines() {
-    if (state.steadyLines || typeof orderGroupPathV06 !== 'function') return;
-    state.steadyLines = true;
+    if (steadyLinesInstalled || typeof orderGroupPathV06 !== 'function') return;
+    steadyLinesInstalled = true;
     const baseOrder = orderGroupPathV06;
     orderGroupPathV06 = function orderGroupPathSteady(reg, x, y, formation, facing) {
       if (reg && !reg.destroyed && reg.side === 'britain' && C.state !== 'RETREAT') {
@@ -257,6 +263,6 @@
   global.__AI_PRESSURE_V1__ = Object.freeze({
     version: 'ai-campaign-pressure-v1', config: cfg,
     stats: () => ({ waves: state.waves, nextWaveAt: Math.round(state.nextWaveAt), state: C.state, rebalanced: state.rebalanced,
-      trained: state.trained, farmers: state.farmers || 0, sentHome: state.sentHome || 0, heldOrders: state.heldOrders || 0, keptLines: state.keptLines || 0, rallied: state.rallied || 0, buildingTargets: !!state.buildingTargets, log: state.log.slice() })
+      trained: state.trained, farmers: state.farmers || 0, sentHome: state.sentHome || 0, heldOrders: state.heldOrders || 0, keptLines: state.keptLines || 0, rallied: state.rallied || 0, buildingTargets: buildingTargetsInstalled, log: state.log.slice() })
   });
 })(window);

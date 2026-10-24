@@ -436,6 +436,19 @@ weergaven; terug in 2D begint de terreincache opnieuw.
 - Test: `tests/iso-view-v1.spec.js` (ook: de standaardkaart blijft 37 wegen en 224
   huizen; open kaart; mannen op het brugdek).
 
+## Nieuwe slag en mobiele startcamera
+
+- **Nieuwe slag** begint ook met een verse Britse commandant en aanvalsgolfplanning.
+  De knop roept de huidige resetfunctie aan, zodat ook later geladen systemen
+  (zoals loopgraven en gewonden) hun vorige slag opruimen.
+  Ook oude gesneuvelden, kruitrook en animatietoestanden verdwijnen uit de iso-weergave.
+- Op een telefoon past de startcamera het hoofdgebouw en de eigen troepen samen
+  tussen de bedieningsbalken. Dit gebeurt bij het openen en bij een nieuwe slag;
+  tijdens het spelen blijft de camera waar de speler hem heen verplaatst.
+  In het mobiele menu schuift **Overzicht** opzij zodat **Nieuwe slag** bereikbaar blijft.
+- Regressies: `tests/iso-reset-v1.spec.js` en `tests/iso-start-camera-v1.spec.js`.
+  Bestaande besturing, desktopcamera en de 2D-route blijven behouden.
+
 ## Nog niet (volgende stappen)
 
 1. De grond opnieuw renderen als de kaart van de game verandert (export + script).
