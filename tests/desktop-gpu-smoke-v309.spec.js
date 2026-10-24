@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const {test,expect}=require('@playwright/test');
 
 test('v309 GPU black powder smoke follows real combat events, drifting wind and clear frames',async({page})=>{
@@ -27,7 +28,7 @@ test('v309 GPU black powder smoke follows real combat events, drifting wind and 
       smokeCanvas:document.querySelectorAll('#game-smoke-gpu').length,
       pointer:getComputedStyle(document.getElementById('game-smoke-gpu')).pointerEvents};
   });
-  expect(result.version).toBe('1.3.59');
+  expect(result.version).toBe(currentReleaseVersion);
   expect(result.no3D).toBe(true);
   expect(result.smokeCanvas).toBe(1);
   expect(result.pointer).toBe('none');

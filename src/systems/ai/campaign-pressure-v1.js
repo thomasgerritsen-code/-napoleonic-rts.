@@ -133,7 +133,7 @@
   }
   function trainWhileSaving() {
     if (!/^middelen verzamelen voor|reserves aanvullen/.test(aiPlan || '')) return;
-    const free = t => freeUnits('britain', t).length;
+    const free = t => freeUnits('britain', t).filter(u=>t!=='officer'||officerCanLead(u,'infantry')).length;
     const queued = t => livingBuildings('britain').reduce((n, b) => n + (b.queue || []).filter(q => q.type === t).length, 0);
     const need = free('officer') + queued('officer') < 1 ? 'officer' : free('drummer') + queued('drummer') < 1 ? 'drummer'
       : free('infantry') + queued('infantry') < 12 ? 'infantry' : null;

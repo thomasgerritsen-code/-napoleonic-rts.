@@ -1,5 +1,17 @@
 # Iso-weergave v1 — de game in de Graphics Lab-stijl (opt-in)
 
+GPU-rendering en de voorbereiding op online multiplayer staan beschreven in
+[gpu-and-multiplayer.md](gpu-and-multiplayer.md).
+
+## Officieren aanwijzen
+
+Infanterie krijgt een officier te voet uit de kazerne; cavalerie krijgt een
+officier te paard uit de stal. Regimentvorming gebruikt uitsluitend een passend
+type officier. Selecteer voor vervanging één regiment en één vrije officier en
+druk **Officier aanwijzen**. De vorige officier wordt vrijgemaakt; bestaande
+routes en bevelen blijven behouden. Een verkeerde combinatie schakelt de knop
+uit. Ook de Britse AI houdt de twee officiertypen apart.
+
 `/?view=iso` toont de echte game in de 30°-camera van de Graphics Lab, met de
 Blender-sprites uit `graphics-lab/assets/`. Zonder die parameter laadt het bestand
 wel, maar doet het niets: de game blijft precies zoals hij is.

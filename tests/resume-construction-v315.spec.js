@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const {test,expect}=require('@playwright/test');
 
 async function openGame(page){
@@ -54,7 +55,7 @@ test('v315 selecting unfinished barracks offers no-cost Resume and original buil
   expect(outcome.costUnchanged).toBe(true);
   expect(outcome.progressAfter).toBeGreaterThan(outcome.progressBefore);
   expect(outcome.sameBuilding).toBe(true);
-  expect(outcome.version).toBe('1.3.64');
+  expect(outcome.version).toBe(currentReleaseVersion);
   expect(errors).toEqual([]);
 });
 

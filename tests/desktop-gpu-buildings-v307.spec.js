@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const {test,expect}=require('@playwright/test');
 
 test('v307 uses exact 2D rooftop art and one cached GPU batch while status stays live',async({page})=>{
@@ -41,7 +42,7 @@ test('v307 uses exact 2D rooftop art and one cached GPU batch while status stays
     return {painted,alpha:roofPixel[3],roof,initial,reused,damaged,
       construction,controls,version:window.RTS_VERSION};
   });
-  expect(result.version).toBe('1.3.55');
+  expect(result.version).toBe(currentReleaseVersion);
   expect(result.painted).toBe(true);
   expect(result.alpha).toBeGreaterThan(200);
   expect(result.roof.exactRoofGeometry).toBe(true);

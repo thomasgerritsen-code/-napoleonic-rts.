@@ -89,6 +89,10 @@
   const costOf = key => { const t = T[key], base = TRAINING[t.base].cost, c = {}; for (const k of ['food', 'wood', 'iron']) { const v = (base[k] || 0) + (t.extra?.[k] || 0); if (v) c[k] = v; } return c; };
   const costText = c => [c.food ? `${c.food} 🍞` : '', c.wood ? `${c.wood} 🪵` : '', c.iron ? `${c.iron} ⛏️` : ''].filter(Boolean).join(' · ');
   function trainTroop(key, b = selectedBuilding) {
+    if (root.__COMMAND_GATEWAY_V1__) return root.__COMMAND_GATEWAY_V1__.run('train-troop', {troop:key}, () => trainTroopNow(key,b), b);
+    return trainTroopNow(key,b);
+  }
+  function trainTroopNow(key, b) {
     const t = T[key];
     if (!b || b.dead || !b.complete || b.side !== 'france' || b.type !== buildingFor(key) || !fields(key, 'france')) return false;
     if (t.max && strength('france', key) >= t.max) { statusEl.textContent = `Hooguit ${t.max} ${t.plural}.`; return false; }

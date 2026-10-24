@@ -1,5 +1,13 @@
 'use strict';
 // ---------- Regiments ----------
+  function officerCanLead(unit, kind = 'infantry') {
+    if (unit?.type !== 'officer') return false;
+    const mounted = unit.troop === 'mounted';
+    // The older 2D test map has no mounted training; the playable iso army does.
+    if (kind === 'cavalry') return window.NRTS_CONFIG?.troops?.kinds?.mounted ? mounted : !mounted;
+    return kind === 'infantry' && !mounted;
+  }
+
   function freeUnits(side, type) {
     return livingUnits(side).filter(u => u.type === type && !u.regimentId && !u.routing);
   }
@@ -7,7 +15,7 @@
   function regimentEligibility(group) {
     const free = group.filter(u => !u.dead && !u.routing && !u.regimentId);
     const infantry = free.filter(u => u.type === 'infantry');
-    const officers = free.filter(u => u.type === 'officer');
+    const officers = free.filter(u => officerCanLead(u, 'infantry'));
     const drummers = free.filter(u => u.type === 'drummer');
     return {
       infantry: infantry.length,
@@ -43,7 +51,7 @@
   function createRegiment(side, candidateUnits, name = null) {
     const free = candidateUnits.filter(u => !u.dead && u.side === side && !u.routing && !u.regimentId);
     const infantry = free.filter(u => u.type === 'infantry').slice(0, 36);
-    const officer = free.find(u => u.type === 'officer');
+    const officer = free.find(u => officerCanLead(u, 'infantry'));
     const drummer = free.find(u => u.type === 'drummer');
     if (infantry.length < 12 || !officer || !drummer) return null;
 
@@ -163,7 +171,7 @@
     const group = [...selectedUnits];
     const eligibility = regimentEligibility(group);
     if (!eligibility.canCreate) {
-      statusEl.textContent = `Regiment vereist 12 musketiers + 1 officier + 1 drummer (nu ${eligibility.infantry}/${eligibility.officers}/${eligibility.drummers}).`;
+      statusEl.textContent = `Regiment vereist 12 musketiers + 1 officier te voet + 1 drummer (nu ${eligibility.infantry}/${eligibility.officers}/${eligibility.drummers}).`;
       return;
     }
     const reg = createRegiment('france', group);

@@ -1,5 +1,10 @@
 # Iso-prestaties: obstakels, tekenwerk, taakverdeling en laden
 
+Aanvullend: [GPU-weergave en multiplayerfundament](gpu-and-multiplayer.md).
+Booleaanse riviercontroles stoppen nu bij het eerste geblokkeerde punt en
+hergebruiken maximaal 512 exacte segmenten. De uitgebreide routecontrole voor
+bruggegevens blijft behouden. Reset wist de segmentcache.
+
 ## Gedrag
 
 1. **Obstakels:** statische dorpshuizen worden eenmaal opgebouwd en in vakken van

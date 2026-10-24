@@ -11,9 +11,10 @@
     const typeCounts = {};
     selected.forEach(u => typeCounts[u.type] = (typeCounts[u.type] || 0) + 1);
     const typePart = Object.entries(typeCounts).sort().map(([k,v]) => `${k}:${v}`).join(',');
+    const mountedPart = selected.filter(u => u.type === 'officer' && u.troop === 'mounted').map(u => u.id).sort().join(',');
     const regPart = [...new Set(selected.map(u => u.regimentId).filter(Boolean))].sort().join(',');
     const economyPart = `${Math.floor(economies.france.food)}:${Math.floor(economies.france.wood)}:${Math.floor(economies.france.iron)}:${elapsed>=120?'guns-open':'guns-locked'}:${populationUsed('france')}:${economies.france.popCap}`;
-    return `${buildingPart}|${typePart}|${regPart}|economy:${economyPart}`;
+    return `${buildingPart}|${typePart}|mounted:${mountedPart}|${regPart}|economy:${economyPart}`;
   }
 
   function makeDynamicButton(action, html, disabled = false) {

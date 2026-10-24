@@ -42,7 +42,7 @@
 
   function officerDraft(group, side = 'france') {
     const selected = (group || []).filter(unit => validLoose(unit, side));
-    const officers = selected.filter(unit => unit.type === 'officer');
+    const officers = selected.filter(unit => officerCanLead(unit, 'infantry'));
     if (officers.length !== 1) return null;
 
     const officer = officers[0];

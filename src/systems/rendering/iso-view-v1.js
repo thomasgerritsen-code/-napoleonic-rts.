@@ -35,8 +35,15 @@
 
   const assetState = { ready: false, completed: 0, total: 0, background: 0, failed: 0 };
   global.__ISO_ASSETS_READY__ = false;
-  const drawScenery = (image, ...args) => global.__STATIC_SPRITE_CACHE_V1__
-    ? global.__STATIC_SPRITE_CACHE_V1__.draw(ctx, image, ...args) : ctx.drawImage(image, ...args);
+  const gpu = global.__ISO_GPU_V1__;
+  function drawImage(image, ...args) {
+    if (!gpu?.draw(ctx, image, ...args)) ctx.drawImage(image, ...args);
+  }
+  function drawScenery(image, ...args) {
+    if (gpu?.draw(ctx, image, ...args)) return;
+    if (global.__STATIC_SPRITE_CACHE_V1__) global.__STATIC_SPRITE_CACHE_V1__.draw(ctx, image, ...args);
+    else ctx.drawImage(image, ...args);
+  }
 
   const hash = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; h ^= h >>> 13;
     return (Math.imul(h, 1103515245) >>> 0) / 4294967296; };
@@ -265,7 +272,7 @@
     const heading = headingOf(house, V.headings), f = meta.frames[heading];
     if (detailed()) chimneys(house, kind, meta, heading);
     const k = houseScale(house, meta) * z() / V.pxPerM;
-    return { y: house.y, box: box(X, Y, f.px, f.py, f.w, f.h, k), draw: () => {
+    return { gpu: true, y: house.y, box: box(X, Y, f.px, f.py, f.w, f.h, k), draw: () => {
       drawScenery(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k);
       view.stats.houses++;
     } };
@@ -332,12 +339,12 @@
     if (it.prop) {
       const prop = view.props[it.prop]; if (!prop) return null;
       const k = DRESS_PPM * it.scale * z() / SPRITE_PPM;
-      return { y: it.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+      return { gpu: true, y: it.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
         drawScenery(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.dressing++; } };
     }
     const V = view.village, meta = V && V.kinds[it.edge]; if (!meta) return null;
     const f = meta.frames[((Math.round(-it.angle / (2 * Math.PI / V.headings)) % V.headings) + V.headings) % V.headings];
-    return { y: it.y, draw: () => { const k = DRESS_PPM * z() / V.pxPerM;
+    return { gpu: true, y: it.y, draw: () => { const k = DRESS_PPM * z() / V.pxPerM;
       drawScenery(meta.image, f.x, f.y, f.w, f.h, X - f.px * k, Y - f.py * k, f.w * k, f.h * k); view.stats.dressing++; } };
   }
 
@@ -426,7 +433,7 @@
     if (X < -150 || X > innerWidth + 150 || Y < -30 || Y > innerHeight + 260) return null;
     const prop = view.props[tr.kind]; if (!prop) return null;
     const k = spriteK() * tr.scale;
-    return { y: tr.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+    return { gpu: true, y: tr.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       drawScenery(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
   }
 
@@ -452,7 +459,7 @@
     if (X < -400 || X > innerWidth + 400 || Y < -150 || Y > innerHeight + 200) return null;
     const kind = bridgeKind(b), prop = view.props[kind]; if (!prop) return null;
     const k = spriteK() * b.length / (BRIDGE_DECKS[kind][0] * PPM);
-    return { y: b.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+    return { gpu: true, y: b.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       drawScenery(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.bridges++; } };
   }
 
@@ -671,7 +678,7 @@
       const now = sharp.now, magnified = k * (canvas.width / innerWidth) / src.halfScale > SHARP_AT;
       if (magnified) { src.used = now; if (s < 1 && !src.sharpening) sharpen(src, now); }
     }
-    ctx.drawImage(src.image, fr.x * s, fr.y * s, fr.w * s, fr.h * s, x - p.x * k, y - p.y * k, fr.w * k, fr.h * k);
+    drawImage(src.image, fr.x * s, fr.y * s, fr.w * s, fr.h * s, x - p.x * k, y - p.y * k, fr.w * k, fr.h * k);
     return true;
   }
 
@@ -715,7 +722,7 @@
     const r0 = Math.max(0, G.pad + a.y * h), r1 = Math.min(G.img.height, G.pad + b.y * h);
     if (c1 <= c0 || r1 <= r0) return;
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(G.img, c0, r0, c1 - c0, r1 - r0, sx(c0 / k), sy((r0 - G.pad) / h), (c1 - c0) / k * z(), (r1 - r0) / h * z() * SQ);
+    drawImage(G.img, c0, r0, c1 - c0, r1 - r0, sx(c0 / k), sy((r0 - G.pad) / h), (c1 - c0) / k * z(), (r1 - r0) / h * z() * SQ);
   }
   function drawTerrain() {
     if (view.ground) { drawGround(); view.stats.ground = true; return; }
@@ -746,7 +753,7 @@
       if (!t) continue;
       t.used = view.tileTick;
       const X = sx(tx * T.world), Y = sy(ty * T.world), W = T.world * z(), H = T.world * z() * SQ;
-      ctx.drawImage(t.c, Math.floor(X), Math.floor(Y), Math.ceil(W + 1), Math.ceil(H + 1));
+      drawImage(t.c, Math.floor(X), Math.floor(Y), Math.ceil(W + 1), Math.ceil(H + 1));
       view.stats.tilesDrawn++;
     }
     // Keep at most 96 tiles (about 100 MB at 512 px): drop the least recently used.
@@ -969,7 +976,7 @@
       const frames = anim === 'walk' || anim === 'run' ? 6 : anim === 'hop' ? 4 : 2;
       const rate = anim === 'run' ? 0.09 : anim === 'hop' ? (a.state === 'run' ? 0.08 : 0.13) : anim === 'walk' ? 0.16 : 0.9;
       const f = Math.floor(t / rate + ph) % frames;
-      list.push({ y: a.y, draw: () => drawSprite(atlas, anim + '_' + d, f, X, Y, k) });
+      list.push({ gpu: true, y: a.y, draw: () => drawSprite(atlas, anim + '_' + d, f, X, Y, k) });
       n++;
     }
     st().wildlife = n;
@@ -1036,7 +1043,7 @@
     // house's miniature footprint would make it a stump next to them).
     const k = b.type === 'tower' ? spriteK() * 0.55 : b.type === 'hospital' ? spriteK() * 0.7 : b.w * z() * 1.45 / prop.w;
     if (b.type === 'tower') towerSmoke(b, prop, k);
-    return { y: b.y + b.h * 0.3, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+    return { gpu: b.complete !== false, y: b.y + b.h * 0.3, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       if (b.complete === false) { drawConstruction(b, prop, k); view.stats.props++; return; }
       drawScenery(prop.image, sx(b.x) - prop.pivot.x * k, gy(b.x, b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       view.stats.props++;
@@ -1127,7 +1134,7 @@
     if (r.type === 'wood') {
       const prop = view.props[tree(['oak', 'beech', 'birch', 'pine', 'spruce', 'oak', 'poplar'][Math.floor(hash(r.id, 3) * 7)])]; if (!prop) return null;
       const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25);
-      return { y: r.y, box: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+      return { gpu: true, y: r.y, box: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
         drawScenery(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
     }
     if (r.type === 'iron') return { y: r.y, draw: () => drawRock(r) };
@@ -1512,6 +1519,7 @@
   // ---- the frame ----
   function render(now) {
     global.__STATIC_SPRITE_CACHE_V1__?.beginFrame();
+    gpu?.beginFrame(innerWidth, innerHeight, canvas.width / Math.max(1, innerWidth), now);
     sharp.now = performance.now(); sweepSharp(sharp.now);
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
     view.frames++;
@@ -1519,7 +1527,9 @@
     const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = st.stances = st.digging = st.leaning = st.gabions = st.fascines = st.underConstruction = 0;
     panFix();
     ensureAttackHook();
+    gpu?.begin(ctx);
     drawTerrain();
+    gpu?.end();
     view.stats.trenches = 0;
     drawWetGround(t);
     drawTrenchBeds(t);
@@ -1584,7 +1594,7 @@
       const lip = !crest && sunk && view.trenchLips.get(sunk.id);
       const rr = (u.type === 'cavalry' ? 0.95 : u.type === 'artillery' ? 1.1 : 0.42) * PPM * z(), ring = rings[u.side] || rings.britain;
       ring.moveTo(X + rr, Y); ring.ellipse(X, Y, rr, rr * SQ, 0, 0, Math.PI * 2);
-      list.push({ y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
+      list.push({ gpu: !crest && !lip && (u.type !== 'worker' || !!view.atlases[(u.side === 'france' ? 'fr' : 'br') + 'w']), y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
         if (crest) { ctx.save(); const dy = CREST_OVERHANG * PPM * LIFT * z(); clipBelowLine(crest.map(q => [q[0], q[1] + dy])); }
         else if (lip) { ctx.save(); clipAboveLip(lip); }
         if (u.type === 'worker' && !view.atlases[(u.side === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); if (crest || lip) ctx.restore(); return; }
@@ -1631,6 +1641,7 @@
     const men = list.filter(d => d.unit).map(d => d.unit);
     st.seeThrough = 0;
     for (const d of list) {
+      if (d.gpu) gpu?.begin(ctx); else gpu?.end();
       if (!d.box) { d.draw(); continue; }
       // Scenery with a soldier behind it (inside its picture) turns see-through.
       const [x0, y0, x1, y1] = d.box, ix = (x1 - x0) * 0.12, iy = (y1 - y0) * 0.08;
@@ -1638,6 +1649,7 @@
       for (const p of men) if (p.wy < d.y && p.x > x0 + ix && p.x < x1 - ix && p.y > y0 + iy && p.y < y1 - iy) { a = Math.min(a, COVER_ALPHA); st.seeThrough++; break; }
       ctx.globalAlpha = a; d.draw(); ctx.globalAlpha = 1;
     }
+    gpu?.end();
     drawProjectiles();
     drawGrenades();
     drawStances();
@@ -1660,7 +1672,7 @@
     // (its effect lists are capped where they are filled; exploring is simulation).
     const t0 = performance.now();
     try { render(now); view.stats.renderMs = Math.round((view.stats.renderMs * 0.9 + (performance.now() - t0) * 0.1) * 10) / 10; }
-    finally { const dpr = canvas.width / Math.max(1, innerWidth); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    finally { gpu?.end(); const dpr = canvas.width / Math.max(1, innerWidth); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
   }
   Object.defineProperty(global, 'renderStableFrameV1', { configurable: true, get: () => stableFrame, set: v => { inner = v; } });
 
@@ -2144,7 +2156,7 @@
     // The sprite a unit is drawn with now ([atlas, anim, frame]), and the kinds of tree and bush on the map.
     frameOf: id => { const u = units.find(q => q.id === id), m = view.info.get(id); return u && m ? frameFor(u, m, performance.now() / 1000) : null; },
     plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
-    stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
+    stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: gpu?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,

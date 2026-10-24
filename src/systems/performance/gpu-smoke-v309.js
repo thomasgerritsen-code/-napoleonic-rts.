@@ -8,7 +8,7 @@
   const game=document.getElementById('game');
   const mobile=!!root.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile;
   const query=new URLSearchParams(location.search);
-  const disabledByQuery=query.get('gpuSmoke')==='off'||query.get('gpu')==='off';
+  const disabledByQuery=query.get('gpuSmoke')==='off'||query.get('gpu')==='off'||query.get('view')==='iso';
   const layer=document.createElement('canvas');
   layer.id='game-smoke-gpu';
   layer.setAttribute('aria-hidden','true');

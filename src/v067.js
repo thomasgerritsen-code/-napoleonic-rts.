@@ -128,7 +128,25 @@ function segmentWaterCrossingV067(ax,ay,bx,by){
   }
   return touchesRiver?{crossing,blocked}:null;
 }
-function segmentCrossesBlockedWaterV067(ax,ay,bx,by){return !!segmentWaterCrossingV067(ax,ay,bx,by)?.blocked;}
+// Boolean movement checks need neither a full route report nor repeated tests of
+// the exact same segment. Keep the original sampler for route/crossing metadata.
+const WATER_SEGMENT_CACHE_V1=new Map(),WATER_SEGMENT_STATS_V1={queries:0,hits:0,samples:0};
+function segmentCrossesBlockedWaterV067(ax,ay,bx,by){
+  WATER_SEGMENT_STATS_V1.queries++;
+  if(![ax,ay,bx,by].every(Number.isFinite))return false;
+  const key=`${ax}:${ay}:${bx}:${by}`,cached=WATER_SEGMENT_CACHE_V1.get(key);
+  if(cached!==undefined){WATER_SEGMENT_STATS_V1.hits++;return cached;}
+  const distance=Math.hypot(bx-ax,by-ay),samples=Math.max(1,Math.ceil(distance/12));
+  let blocked=false;
+  for(let i=0;i<=samples;i++){
+    const t=i/samples,x=ax+(bx-ax)*t,y=ay+(by-ay)*t,raw=riverHitV067(x,y);WATER_SEGMENT_STATS_V1.samples++;
+    if(raw&&raw.distance<=RIVER_NAV_HALF_WIDTH_V067&&!WATER_CROSSINGS_V067.some(c=>crossingPassageContainsV067(c,x,y))){blocked=true;break;}
+  }
+  if(WATER_SEGMENT_CACHE_V1.size>=512)WATER_SEGMENT_CACHE_V1.delete(WATER_SEGMENT_CACHE_V1.keys().next().value);
+  WATER_SEGMENT_CACHE_V1.set(key,blocked);return blocked;
+}
+window.NRTS?.events?.on?.('game:reset',()=>WATER_SEGMENT_CACHE_V1.clear());
+window.__WATER_SEGMENT_CACHE_V1__=Object.freeze({stats:()=>({...WATER_SEGMENT_STATS_V1,entries:WATER_SEGMENT_CACHE_V1.size,budget:512})});
 function crossingDelayV067(c,kind='infantry'){
   if(!c)return 0;
   if(c.type==='ford')return kind==='artillery'?7.5:kind==='cavalry'?3.2:3.8;

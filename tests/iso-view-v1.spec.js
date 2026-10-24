@@ -1048,7 +1048,7 @@ test('iso view: one kind to a regiment - kinds are never mixed, short lists fill
     out.planKind = p.kind; out.planAll = p.inf.every(u => u.troop === 'voltigeur'); out.planN = p.inf.length;
     // Cavalry: cuirassiers and hussars do not ride together.
     const cav = [0, 1, 2, 3].map(i => mk('france', 'cavalry', 'cuirassier', 2300 + i * 30, 1300)).concat([0, 1].map(i => mk('france', 'cavalry', 'hussar', 2300 + i * 30, 1340)));
-    const creg = createCavalryRegimentV06('france', [...cav, mk('france', 'officer', null, 2280, 1300)]);
+    const creg = createCavalryRegimentV06('france', [...cav, mk('france', 'officer', 'mounted', 2280, 1300)]);
     out.cavKinds = creg && kinds(creg);
     // The British raise whole regiments of one kind.
     let mixed = 0;

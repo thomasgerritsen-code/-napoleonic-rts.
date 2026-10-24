@@ -30,7 +30,7 @@
     const pickInf = chosenInf.filter(u => kindOf(u) === kind);
     const want = Math.max(12, Math.min(MAX, pickInf.length));
     const inf = [...pickInf, ...around.filter(u => kindOf(u) === kind && !pickInf.includes(u))].slice(0, want);
-    const officer = chosen.find(u => u.type === 'officer' && !u.regimentId) || near(free(side, 'officer'))[0] || null;
+    const officer = chosen.find(u => officerCanLead(u, 'infantry') && u.side === side && !u.dead && !u.routing && !u.regimentId) || near(free(side, 'officer').filter(u => officerCanLead(u, 'infantry')))[0] || null;
     const drummer = chosen.find(u => u.type === 'drummer' && !u.regimentId) || near(free(side, 'drummer'))[0] || null;
     const missing = { infantry: Math.max(0, 12 - inf.length), officer: officer ? 0 : 1, drummer: drummer ? 0 : 1 };
     return { inf, officer, drummer, missing, kind, ok: !missing.infantry && !missing.officer && !missing.drummer };
@@ -48,12 +48,12 @@
     return reg;
   }
   function missingText(m, kind = '') {
-    return [m.infantry ? `${m.infantry} ${kindName(kind, m.infantry)}` : '', m.officer ? 'een officier' : '', m.drummer ? 'een tamboer' : ''].filter(Boolean).join(', ');
+    return [m.infantry ? `${m.infantry} ${kindName(kind, m.infantry)}` : '', m.officer ? 'een officier te voet' : '', m.drummer ? 'een tamboer' : ''].filter(Boolean).join(', ');
   }
   function context() {
     const b = barracksSelected();
     if (b) return { anchor: { x: b.rallyX ?? b.x, y: b.rallyY ?? (b.y + b.h) }, chosen: [], barracks: b, reach: cfg.barracksReach };
-    const sel = [...selectedUnits].filter(u => !u.dead && u.side === 'france' && !u.regimentId && ['infantry', 'officer', 'drummer'].includes(u.type));
+    const sel = [...selectedUnits].filter(u => !u.dead && u.side === 'france' && !u.regimentId && ['infantry', 'officer', 'drummer'].includes(u.type) && (u.type !== 'officer' || officerCanLead(u, 'infantry')));
     if (!sel.length) return null;
     return { anchor: centroid(sel), chosen: sel, barracks: null, reach: cfg.reach };
   }
