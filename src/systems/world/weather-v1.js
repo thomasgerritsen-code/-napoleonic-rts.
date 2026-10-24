@@ -101,8 +101,9 @@
   (document.getElementById('topdown-wind-direction-v267') || document.getElementById('resetBtn'))?.insertAdjacentElement('afterend', tag);
   function label() {
     const k = KINDS[st.kind];
-    tag.textContent = `${k.icon} ${k.label}${st.wetness > 0.35 ? ' · nat' : ''}`;
-    tag.title = st.kind === 'rain' ? 'Regen: musketten ketsen vaker, modder vertraagt, minder zicht' : st.kind === 'fog' ? 'Mist: veel minder zicht' : 'Weer';
+    const snow = st.kind === 'rain' && (root.__SEASONS_V1__?.state().snow || 0) > .5;
+    tag.textContent = `${snow?'🌨':k.icon} ${snow?'Sneeuw':k.label}${st.wetness > 0.35 ? ' · nat' : ''}`;
+    tag.title = snow ? 'Sneeuw: nat kruit, zware grond en minder zicht' : st.kind === 'rain' ? 'Regen: musketten ketsen vaker, modder vertraagt, minder zicht' : st.kind === 'fog' ? 'Mist: veel minder zicht' : 'Weer';
   }
   let labelAt = 0;
   const baseHud = updateHud;

@@ -619,3 +619,49 @@ continuïteit, klok/reset en isolatie van de gewone 2D-game.
 terugkeren van hetzelfde dagbeeld, ongewijzigde eenheden/weer/zicht, mobiele
 indeling, tijd/reset, nachtelijke selectie/marsorders en regen/sporen op zowel
 Canvas2D als de desktop-GPU.
+
+## Vier seizoenen (v1.4.5)
+
+De isometrische slag begint in de lente. Elk seizoen duurt 240 spelseconden;
+een jaar duurt 960 seconden. In de laatste 45 seconden lopen de grondkleuren
+geleidelijk over naar het volgende seizoen. Lente en zomer houden hun groene
+bomen; de zomer krijgt warmere grond. In de herfst kleuren loofbomen, hagen en
+struiken koperbruin, terwijl dennen en sparren groen blijven. Winter brengt
+lichte sneeuw op de grond en boomkruinen. Bomen veranderen op vaste, gespreide
+momenten binnen de overgang, zodat niet het hele bos tegelijk omslaat.
+
+De seizoensklok volgt uitsluitend de simulatieklok en staat los van de bestaande
+dag/nachtcyclus. De compacte klok toont het seizoen op een tweede regel op
+telefoons. Nieuwe slag begint weer in de lente, op dag 1 om 08:00, en ruimt
+oude kleurvarianten en afdrukken op.
+
+De bestaande buien blijven hun tijdschema volgen. Richting winter gaan hun
+regendruppels over in langzamer vallende sneeuwvlokken; richting lente wordt het
+weer regen. Het totale aantal neerslagdeeltjes blijft gelijk aan het bestaande
+regenbudget. Op sneeuw worden plassen en natte-grondverdonkering teruggenomen;
+schoen-, hoef- en wielsporen blijven ook bij droog weer zichtbaar. Spelregels,
+kaartbotsingen, gebouwen, grondstoffen, AI en eenheidsstatistieken veranderen niet.
+
+`seasons-v1.js` berekent de toestand en de vaste boomverdeling. Het landschap
+krijgt hoogstens één extra kleurvulling per frame, onder eenheden en gebouwen.
+`seasonal-props-v1.js` verandert alleen groene bladerpixels van gedeelde
+plantafbeeldingen. De originele alpha, stam, schaduwen, afmetingen en dieptevolgorde
+blijven behouden. De kleurcache is maximaal 12 MiB; er wordt hoogstens één
+plantafbeelding per frame voorbereid. De bestaande cache voor geschaalde sprites
+en de bestaande GPU-batches blijven in gebruik. Er worden geen extra bestanden
+of afzonderlijke varianten per boom geladen.
+
+Config: `NRTS_CONFIG.seasons` (`seasonSeconds`, `transitionSeconds`,
+`paletteBudgetMiB`). Diagnose: `__SEASONS_V1__.state()` / `.at(spelseconden)`,
+`__SEASONAL_PROPS_V1__.stats()` en `__ISO_VIEW_V1__.stats()` (`seasons`,
+`seasonGroundDraws`, `seasonalProps`, `snowFlakes`, `precipitationParticles`).
+De seizoensmodule bewaart alleen de laatste berekende toestand.
+
+Tests: `tests/headless/seasons-v145.test.js` controleert periodiciteit,
+overgangen, winterdekking en stabiele boomkleuren. `tests/iso-seasons-v145.spec.js`
+controleert vier verschillende beelden en hetzelfde lentebeeld na een jaar,
+ongewijzigde wereld en weer, sneeuw en afdrukken, mobiele indeling/reset,
+alpha-/stam-/schaduwbehoud, cachegrenzen en de desktop-GPU. De dag/nachttests
+zetten de afzonderlijke seizoensklok vast op lente om de exacte lichtcompositie
+onafhankelijk te blijven controleren; seizoensbeelden worden juist met vast
+daglicht vergeleken.

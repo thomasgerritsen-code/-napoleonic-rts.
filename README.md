@@ -1,6 +1,20 @@
-# Napoleonic RTS — v1.4.4
+# Napoleonic RTS — v1.4.5
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
+
+## v1.4.5 — vier seizoenen
+
+Lente, zomer, herfst en winter volgen elkaar op: vier minuten per seizoen,
+zestien minuten voor een volledig jaar. De laatste 45 seconden gaan geleidelijk
+over naar het volgende seizoen. De klok toont nu ook het seizoen.
+
+De zomer krijgt warmere grond, de herfst koperkleurig loof en de winter sneeuw
+op grond en bomen. Winterse buien vallen als sneeuw; schoen- en hoefsporen zijn
+ook op droge sneeuw zichtbaar. Na de winter keert het groene landschap terug.
+
+Boomafbeeldingen worden gedeeld en hergebruikt, met maximaal 12 MiB extra cache
+en hoogstens één nieuwe kleurvariant per frame. De bestaande dag/nachtcyclus,
+regen, besturing en spelregels blijven behouden.
 
 ## v1.4.4 — dag- en nachtcyclus
 

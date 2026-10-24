@@ -47,6 +47,19 @@
     else ctx.drawImage(image, ...args);
   }
 
+  const seasonState = () => global.__SEASONS_V1__?.state();
+  function drawPlant(prop, kind, wx, wy, ...args) {
+    const palette = global.__SEASONS_V1__?.paletteFor(kind,wx,wy,seasonState()) || 'base';
+    const image = global.__SEASONAL_PROPS_V1__?.source(prop.image,palette) || prop.image;
+    drawScenery(image,...args);
+  }
+  function drawSeasonGround() {
+    const season=seasonState();view.stats.seasons=season||null;view.stats.seasonGroundDraws=0;
+    if(!season?.groundTint)return;
+    ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle=season.groundTint;
+    ctx.fillRect(0,0,frameWidth||innerWidth,frameHeight||innerHeight);ctx.restore();view.stats.seasonGroundDraws=1;
+  }
+
   const hash = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; h ^= h >>> 13;
     return (Math.imul(h, 1103515245) >>> 0) / 4294967296; };
   // Game facing/heading (radians, y down) -> sprite direction index.
@@ -348,7 +361,7 @@
       const prop = view.props[it.prop]; if (!prop) return null;
       const k = DRESS_PPM * it.scale * z() / SPRITE_PPM;
       return { gpu: true, y: it.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
-        drawScenery(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.dressing++; } };
+        drawPlant(prop,it.prop,it.x,it.y, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.dressing++; } };
     }
     const V = view.village, meta = V && V.kinds[it.edge]; if (!meta) return null;
     const f = meta.frames[((Math.round(-it.angle / (2 * Math.PI / V.headings)) % V.headings) + V.headings) % V.headings];
@@ -442,7 +455,7 @@
     const prop = view.props[tr.kind]; if (!prop) return null;
     const k = spriteK() * tr.scale;
     return { gpu: true, y: tr.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
-      drawScenery(prop.image, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
+      drawPlant(prop,tr.kind,tr.x,tr.y, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
   }
 
   // ---- bridges: Blender props at the game's crossings (scripts/render-iso-props.py) ----
@@ -1140,16 +1153,16 @@
   function resourceDrawable(r) {
     if (r.dead || r.amount <= 0) return null;
     if (r.type === 'wood') {
-      const prop = view.props[tree(['oak', 'beech', 'birch', 'pine', 'spruce', 'oak', 'poplar'][Math.floor(hash(r.id, 3) * 7)])]; if (!prop) return null;
+      const kind=tree(['oak', 'beech', 'birch', 'pine', 'spruce', 'oak', 'poplar'][Math.floor(hash(r.id, 3) * 7)]),prop=view.props[kind]; if (!prop) return null;
       const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25);
       return { gpu: true, y: r.y, box: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
-        drawScenery(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
+        drawPlant(prop,kind,r.x,r.y, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
     }
     if (r.type === 'iron') return { y: r.y, draw: () => drawRock(r) };
     // Berry bushes: some hawthorns with their red haws among the bushes.
-    const prop = view.props[hash(r.id, 9) < 0.5 && view.props.hawthorn ? 'hawthorn' : 'bush']; if (!prop) return null;
+    const kind=hash(r.id, 9) < 0.5 && view.props.hawthorn ? 'hawthorn' : 'bush',prop=view.props[kind]; if (!prop) return null;
     return { y: r.y, draw: () => { const k = spriteK() * 0.75;
-      drawScenery(prop.image, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
+      drawPlant(prop,kind,r.x,r.y, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       ctx.fillStyle = '#8c1f2a'; for (let i = 0; i < 5; i++) { ctx.beginPath();
         ctx.arc(sx(r.x) + (hash(r.id, i) - .5) * 18 * z(), gy(r.x, r.y) - (4 + hash(i, r.id) * 10) * z(), 1.6 * z() + .6, 0, 7); ctx.fill(); }
       view.stats.props++; } };
@@ -1549,6 +1562,7 @@
   // ---- the frame ----
   function render(now) {
     global.__STATIC_SPRITE_CACHE_V1__?.beginFrame();
+    global.__SEASONAL_PROPS_V1__?.beginFrame();
     gpu?.beginFrame(innerWidth, innerHeight, canvas.width / Math.max(1, innerWidth), now);
     sharp.now = performance.now(); sweepSharp(sharp.now);
     const t = now / 1000, dt = view.lastNow ? Math.min(0.1, t - view.lastNow) : 0; view.lastNow = t;
@@ -1561,10 +1575,11 @@
     drawTerrain();
     gpu?.end();
     view.stats.trenches = 0;
+    drawSeasonGround();
     drawWetGround(t);
     drawTrenchBeds(t);
     drawCraters();
-    const k = spriteK(), seen = new Set(), list = [], trackWetness = weather()?.wetness || 0;
+    const k = spriteK(), seen = new Set(), list = [], trackWetness = Math.max(weather()?.wetness || 0,(seasonState()?.snow || 0)*.8);
     // The faint rings in the side's colour under every man, horse and gun lie on
     // the ground under everything: gathered into one path a side, filled once.
     const rings = { france: new Path2D(), britain: new Path2D() };
@@ -1819,17 +1834,17 @@
   }
   function drawWetGround(now) {
     const w = weather(); if (!w) return;
-    const wet = w.wetness;
-    if (wet > 0.02) {
+    const snow=seasonState()?.snow||0,wet=Math.max(w.wetness,snow*.8),surfaceWet=w.wetness*(1-snow);
+    if (surfaceWet > 0.02) {
       // Soaked earth and grass: darker, a little cooler.
-      ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(150,158,170,${0.55 * wet})`; ctx.fillRect(0, 0, innerWidth, innerHeight);
+      ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(150,158,170,${0.55 * surfaceWet})`; ctx.fillRect(0, 0, innerWidth, innerHeight);
       ctx.globalCompositeOperation = 'source-over';
       // Puddles in low spots (a fixed scatter over the map), reflecting the sky.
-      if (wet > 0.35) {
+      if (surfaceWet > 0.35) {
         const cell = 150, x0 = flatScreenToWorld(-60, -60), x1 = flatScreenToWorld(innerWidth + 60, innerHeight + 60);
         for (let gx = Math.floor(x0.x / cell); gx <= Math.ceil(x1.x / cell); gx++) for (let gyy = Math.floor(x0.y / cell); gyy <= Math.ceil(x1.y / cell); gyy++) {
           if (hash(gx * 92821 + gyy, 7) > 0.22) continue;
-          const wx = (gx + hash(gx, gyy)) * cell, wy = (gyy + hash(gyy, gx + 3)) * cell, r = (8 + hash(gx + 5, gyy) * 16) * z() * Math.min(1, (wet - 0.35) * 2.5);
+          const wx = (gx + hash(gx, gyy)) * cell, wy = (gyy + hash(gyy, gx + 3)) * cell, r = (8 + hash(gx + 5, gyy) * 16) * z() * Math.min(1, (surfaceWet - 0.35) * 2.5);
           const X = sx(wx), Y = gy(wx, wy);
           const g = ctx.createRadialGradient(X, Y, 0, X, Y, r);
           g.addColorStop(0, 'rgba(112,126,138,.42)'); g.addColorStop(0.6, 'rgba(84,92,98,.34)'); g.addColorStop(0.85, 'rgba(58,50,40,.25)'); g.addColorStop(1, 'rgba(58,50,40,0)');
@@ -1907,16 +1922,24 @@
       // Streaks slanting with the wind, a fixed set wrapped over the screen.
       const wind = global.__MAP_AMBIENT_MOTION_V1__?.currentWind?.() || { x: 0.4, y: 0 };
       const vx = Math.max(-1, Math.min(1, wind.x)) * 160, vy = 620, len = 16, nx = vx / Math.hypot(vx, vy), ny = vy / Math.hypot(vx, vy);
-      const n = Math.round((W * H / 3600) * w.rain);
+      const n = Math.round((W * H / 3600) * w.rain),snow=seasonState()?.snow||0,flakes=Math.round(n*snow),drops=n-flakes;
       ctx.strokeStyle = 'rgba(205,214,228,.38)'; ctx.lineWidth = 1; ctx.beginPath();
-      for (let i = 0; i < n; i++) {
+      for (let i = 0; i < drops; i++) {
         const x = ((hash(i, 1) * (W + 200) + now * vx * (0.8 + hash(i, 2) * 0.4)) % (W + 200) + (W + 200)) % (W + 200) - 100;
         const y = ((hash(i, 3) * (H + 100) + now * vy * (0.8 + hash(i, 4) * 0.4)) % (H + 100)) - 50;
         ctx.moveTo(x, y); ctx.lineTo(x - nx * len, y - ny * len);
       }
-      ctx.stroke();
-      view.stats.rainDrops = n;
-    } else view.stats.rainDrops = 0;
+      if(drops)ctx.stroke();
+      if(flakes){
+        ctx.fillStyle='rgba(244,248,252,.82)';ctx.beginPath();
+        for(let i=0;i<flakes;i++){
+          const x=((hash(i,21)*(W+100)+now*vx*.25+Math.sin(now*.7+i)*9)%(W+100)+(W+100))%(W+100)-50;
+          const y=(hash(i,23)*(H+40)+now*(45+hash(i,24)*35))%(H+40)-20,r=1+hash(i,25)*1.2;
+          ctx.moveTo(x+r,y);ctx.arc(x,y,r,0,Math.PI*2);
+        }ctx.fill();
+      }
+      view.stats.rainDrops = drops;view.stats.snowFlakes=flakes;view.stats.precipitationParticles=n;
+    } else view.stats.rainDrops = view.stats.snowFlakes = view.stats.precipitationParticles = 0;
   }
   // ---- trenches (regiment-orders-v1): a rounded cut in the ground whose far
   // wall shows its depth, the parapet of thrown-up earth towards the enemy,
@@ -2229,7 +2252,7 @@
     // previous battle. Keep the loaded artwork and static terrain caches.
     for (const map of [view.info, view.regFire, view.gunFire, view.towerFired, view.trenchLips, view.trenchCrests]) map.clear();
     view.corpses.length = view.smoke.length = 0;
-    wetTracks.reset(); clearTrackPaths(); view.stats.tracks = view.stats.rainDrops = view.stats.trackDrawCalls = 0;
+    wetTracks.reset(); clearTrackPaths(); global.__SEASONAL_PROPS_V1__?.reset(); view.stats.tracks = view.stats.rainDrops = view.stats.trackDrawCalls = 0;
     view.attack = view.lastCam = view.fogCam = view.fogPrev = view.cloudCam = null;
     fogGeometry.seen = fogGeometry.sight = null;
     view.lastNow = view.fogAt = 0;
@@ -2246,7 +2269,7 @@
     plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
     stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: global.__ISO_GPU_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
-      wetTracks: wetTracks.stats(),
+      wetTracks: wetTracks.stats(), seasonalProps: global.__SEASONAL_PROPS_V1__?.stats(),
       fogGeometryPoints: ((fogGeometry.seen?.points.length || 0) + (fogGeometry.sight?.points.length || 0)) / 3,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,

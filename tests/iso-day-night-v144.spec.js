@@ -12,6 +12,7 @@ async function open(browser,viewport={width:844,height:390},mobile=true,query=''
  await page.waitForFunction(full=>window.__DAY_NIGHT_V1__&&window.__ISO_VIEW_V1__?.stats().assets.ready&&(!full||window.__ISO_VIEW_V1__.stats().assets.background===0),!query.includes('gpu=on'));
  await page.evaluate(warmFrames=>{
   window.lightRAF=false;
+  if(window.__SEASONS_V1__){const S=window.__SEASONS_V1__;window.__SEASONS_V1__={...S,state:()=>S.at(0)};}
   window.lightFrame=(time=elapsed)=>{elapsed=time;window.__DAY_NIGHT_V1__.refresh();window.renderStableFrameV1(()=>{},lightClock);return window.__ISO_VIEW_V1__.stats();};
   for(let i=0;i<warmFrames;i++)lightFrame();
  },query.includes('gpu=on')?12:120);

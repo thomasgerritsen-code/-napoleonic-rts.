@@ -30,22 +30,27 @@
     if (!cached || time !== cachedAt) { cachedAt = time; cached = at(time); }
     return cached;
   }
-  let badge = null, lastLabel = '';
+  let badge = null, clockLabel = null, seasonLabel = null, lastLabel = '';
   function refresh() {
     if (!badge) return;
-    const s = state(), text = `${s.icon} ${s.label} ${s.clock}`, key = `${s.day}|${text}`;
+    const s = state(), season = root.__SEASONS_V1__?.state(), text = `${s.icon} ${s.label} ${s.clock}`, key = `${s.day}|${text}|${season?.key}|${season?.year}`;
     if (key !== lastLabel) {
-      lastLabel = key; badge.textContent = text;
-      badge.setAttribute('aria-label', `Dag ${s.day}, ${s.label.toLowerCase()}, ${s.clock}`);
-      badge.title = `Dag ${s.day} · ${s.clock} · ${s.label}`;
+      lastLabel = key; clockLabel.textContent = text;
+      seasonLabel.textContent = season ? `${season.icon} ${season.label}` : '';
+      seasonLabel.hidden = !season; badge.dataset.season = season?.key || '';
+      badge.setAttribute('aria-label', `Dag ${s.day}, ${s.label.toLowerCase()}, ${s.clock}${season?`, ${season.label}, jaar ${season.year}`:''}`);
+      badge.title = `Dag ${s.day} · ${s.clock} · ${s.label}${season?` · ${season.label}, jaar ${season.year}`:''}`;
       badge.dataset.phase = s.phase;
     }
   }
   function boot() {
     badge = document.createElement('span'); badge.id = 'day-night-indicator';
+    clockLabel = document.createElement('span'); seasonLabel = document.createElement('span');
+    seasonLabel.className = 'season-label'; badge.append(clockLabel,seasonLabel);
     const style = document.createElement('style');
     style.textContent = `#day-night-indicator{display:inline-block;white-space:nowrap;margin-left:8px;padding:4px 7px;border:1px solid rgba(245,241,232,.18);border-radius:7px;background:rgba(16,20,17,.86);color:#f5f1e8;font:600 12px/1.35 system-ui,sans-serif;font-variant-numeric:tabular-nums;pointer-events:none;user-select:none}
-      @media(max-width:860px),(pointer:coarse){#day-night-indicator{position:fixed;z-index:19;left:max(10px,env(safe-area-inset-left));top:calc(max(4px,env(safe-area-inset-top)) + 54px);margin:0;padding:5px 8px}body.mobile-menu-open #day-night-indicator{top:calc(max(4px,env(safe-area-inset-top)) + 104px)}}`;
+      #day-night-indicator .season-label{margin-left:7px}#day-night-indicator .season-label[hidden]{display:none}
+      @media(max-width:860px),(pointer:coarse){#day-night-indicator{position:fixed;z-index:19;left:max(10px,env(safe-area-inset-left));top:calc(max(4px,env(safe-area-inset-top)) + 54px);margin:0;padding:5px 8px}#day-night-indicator .season-label{display:block;margin:2px 0 0;font-size:11px;line-height:1.1}body.mobile-menu-open #day-night-indicator{top:calc(max(4px,env(safe-area-inset-top)) + 104px)}}`;
     document.head.appendChild(style);
     const mobile = root.matchMedia('(max-width:860px),(pointer:coarse)');
     const place = () => (mobile.matches ? document.body : document.querySelector('.brand') || document.body).appendChild(badge);
