@@ -5,7 +5,8 @@
   const params = new URLSearchParams(location.search);
   if (params.get('view') !== 'iso') return;
   const surface = document.createElement('canvas');
-  const mobile = matchMedia('(pointer:coarse)').matches;
+  const mobile = root.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile ??
+    (matchMedia('(pointer:coarse)').matches || Math.min(innerWidth, innerHeight) <= 700);
   const budget = (mobile ? 48 : 96) * 2 ** 20;
   const TILE = 512, STORAGE = TILE + 2, LAYER_BYTES = STORAGE * STORAGE * 4;
   const layerCount = Math.floor(budget / LAYER_BYTES);
@@ -14,7 +15,10 @@
     bytes: 0, contextLosses: 0, fallbacks: 0, lastError: null, software: false };
   let gl, program, buffer, vao, resolution, sampler, target, arrayTexture = null;
   let freeLayers = [];
-  let nextSourceId = 1, lost = false, failed = false, enabled = params.get('gpu') !== 'off';
+  // Copying WebGL runs back into Canvas2D can stall mobile GPUs. Retain the
+  // cached Canvas path on phones; gpu=on remains an explicit diagnostic override.
+  let nextSourceId = 1, lost = false, failed = false;
+  let enabled = params.get('gpu') !== 'off' && (!mobile || params.get('gpu') === 'on');
   let width = 0, height = 0, dpr = 1, frame = 0, uploaded = 0, uploadBytes = 0;
   let pending = [], bounds = null, running = false;
   const vertices = new Float32Array(6 * 6 * 2048);
@@ -209,7 +213,8 @@
   }
   function end() { flush(); running = false; }
   root.__ISO_GPU_V1__ = Object.freeze({ beginFrame, begin, draw, end, clear, active,
-    stats: () => ({ ...stats, active: active(), supported: !!gl, lost, textureCount: textures.size, budget,
+    stats: () => ({ ...stats, active: active(), supported: !!gl, lost, mobile,
+      disabledReason:mobile && params.get('gpu') !== 'on' ? 'mobile-canvas' : null, textureCount: textures.size, budget,
       allocatedBytes:arrayTexture ? layerCount * LAYER_BYTES : 0, backend: active() ? 'webgl2' : 'canvas2d' }) });
   root.NRTS?.events?.on?.('game:reset', clear);
 })(window);

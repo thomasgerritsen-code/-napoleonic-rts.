@@ -18,7 +18,14 @@ per beeldframe. Ontbrekende blokken gebruiken tijdelijk Canvas2D. Oude blokken
 worden hergebruikt of verwijderd; een nieuwe slag geeft de GPU-opslag vrij.
 Dit budget is aanvullend op de bestaande afbeeldings- en Canvascaches.
 
-WebGL2 start automatisch als het beschikbaar is. Bekende softwarerenderers zoals
+Op desktop start WebGL2 automatisch als het beschikbaar is. Telefoons gebruiken
+standaard de gecachte Canvas2D-route: kopieën tussen de GPU en Canvas kunnen daar
+de weergave vertragen. Mobiel is de pixelverhouding maximaal 1,5 (voorheen 2):
+bij een scherm met hoge pixeldichtheid worden 44% minder beeldpixels getekend.
+Automatische HD-spritevergroting staat op mobiel uit, zodat tijdens het spelen
+geen extra volledige atlassen worden gedecodeerd (voorheen maximaal 240 MiB).
+De bediening blijft in dezelfde CSS-coördinaten werken en de spelregels veranderen
+niet. Expliciet `hd` of `gpu=on` blijft beschikbaar voor diagnose. Bekende softwarerenderers zoals
 SwiftShader en llvmpipe gebruiken standaard Canvas2D: WebGL betekent daar geen
 toegang tot een echte videokaart. Zonder WebGL of bij een contextfout blijft de
 game werken. Na herstel van de context kunnen textures opnieuw worden geladen.

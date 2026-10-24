@@ -17,6 +17,8 @@
   const PPM = 22.5, SQ = 0.5, SPRITE_PPM = 128 / 3.1, LIFT = 0.866;
   const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
   const HD = params.has('hd');
+  const MOBILE_RENDER = global.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile ??
+    (matchMedia('(pointer:coarse)').matches || Math.min(innerWidth, innerHeight) <= 700);
   const MARCH_STRIDE = 1.5, DIE_FRAME = 0.17, CORPSE_MAX = 320, SMOKE_MAX = 260, BLOOD_SPREAD = 6;
   // Village houses in the game are about a third of real size next to its
   // soldiers; drawn at their footprint they would be shorter than a man. They are
@@ -35,7 +37,7 @@
 
   const assetState = { ready: false, completed: 0, total: 0, background: 0, failed: 0 };
   global.__ISO_ASSETS_READY__ = false;
-  const gpu = global.__ISO_GPU_V1__;
+  const gpu = global.__ISO_GPU_V1__?.active() ? global.__ISO_GPU_V1__ : null;
   function drawImage(image, ...args) {
     if (!gpu?.draw(ctx, image, ...args)) ctx.drawImage(image, ...args);
   }
@@ -126,7 +128,10 @@
   // not drawn magnified for a while (unseen, or seen from far) goes back to half size. All full sheets together would take
   // well over a gigabyte, so a budget keeps the sharp ones to those on screen.
   const SHARP_AT = 1.12, SHARP_IDLE_MS = 20000;
-  const SHARP_BUDGET = (matchMedia?.('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) <= 700 ? 240 : 640) * 2 ** 20;
+  // Phones retain the decoded half-size sheets at every zoom. Automatically
+  // loading HD sheets during play adds decode stalls and up to 240 MiB of RAM.
+  // Explicit ?hd still loads the full-size artwork through the existing loader.
+  const SHARP_BUDGET = (MOBILE_RENDER ? 0 : 640) * 2 ** 20;
   const sharp = { parts: new Set(), bytes: 0, loading: 0, loaded: 0, dropped: 0, sweptAt: 0, now: 0 };
   const bytesOf = part => part.sheet.meta.size.w * part.sheet.meta.size.h * 4;
   function sharpen(part, now) {
@@ -673,7 +678,7 @@
     const src = atlas && atlas.byAnim.get(anim), name = src && src.sheet.animations[anim] && src.sheet.animations[anim][f];
     if (!name) { view.stats.missing++; if (view.missingNames.size < 20) view.missingNames.add((atlas ? '' : 'noatlas:') + anim); return false; }
     const fr = src.sheet.frames[name].frame, p = src.sheet.meta.pivot, s = src.scale || 1;
-    if (src.fullSrc) {
+    if (src.fullSrc && !MOBILE_RENDER) {
       // 'used': last drawn magnified (larger than its half-size image would be sharp).
       const now = sharp.now, magnified = k * (canvas.width / innerWidth) / src.halfScale > SHARP_AT;
       if (magnified) { src.used = now; if (s < 1 && !src.sharpening) sharpen(src, now); }
@@ -2156,7 +2161,7 @@
     // The sprite a unit is drawn with now ([atlas, anim, frame]), and the kinds of tree and bush on the map.
     frameOf: id => { const u = units.find(q => q.id === id), m = view.info.get(id); return u && m ? frameFor(u, m, performance.now() / 1000) : null; },
     plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
-    stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: gpu?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
+    stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: global.__ISO_GPU_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,

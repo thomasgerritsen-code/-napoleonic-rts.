@@ -143,8 +143,8 @@
     facingArrow: OPEN_MAP ? Object.freeze({ dragPx:12, filePitch:18, minFront:40, maxFront:420, fadeMs:1400, colour:'#f2d27a' }) : null,
     // Visibility answered from a per-moment grid of French watchers (open map only): smallest cell in px; sight lines sample woods per losCell px.
     visibilityCache: OPEN_MAP ? Object.freeze({ minCell:200, losCell:12 }) : null,
-    // Sharper drawing for the iso view (open map only): pixel density caps and the desktop pixel budget.
-    render: OPEN_MAP ? Object.freeze({ mobileDprCap:2, desktopDprCap:2, desktopMaxBackingPixels:4200000 }) : null,
+    // Bound phone pixel work; CSS coordinates and desktop sharpness stay unchanged.
+    render: OPEN_MAP ? Object.freeze({ mobileDprCap:1.5, desktopDprCap:2, desktopMaxBackingPixels:4200000 }) : null,
     // Hand grenades (open map only): who throws, reach (px), burst radius and harm, a man's pause between throws (s).
     grenades: OPEN_MAP ? Object.freeze({ kinds:Object.freeze(['grenadier', 'guard']), minRange:45, maxRange:135, spread:16, flightMin:0.7, flightMax:1.2,
       cooldown:16, radius:46, damage:34, shock:24, maxScorches:60 }) : null,
