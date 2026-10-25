@@ -39,6 +39,29 @@ eigenaar, grondstoffen en bouwtijd. Voortgang pauzeert met de wedstrijd en
 blijft behouden bij opnieuw verbinden. Vijanden zien alleen het voltooide
 niveau van torens binnen hun zicht, niet de lopende upgrade.
 
+## Regimentservaring en rangen
+
+Een regiment verdient één overwinning als een vijandelijk regiment door
+gevechtsverliezen uiteenvalt. Het nog bestaande regiment dat de meeste
+manschappen uitschakelde krijgt de overwinning; bij gelijke bijdrage wint
+het laagste regimentnummer. Alleen het laatste schot lossen is dus niet genoeg.
+Losse soldaten en torens verdienen zelf geen regimentservaring.
+
+| Rang | Verslagen regimenten | Extra schade | Minder moraalverlies bij treffers |
+| --- | --- | --- | --- |
+| Recruut | 0 | 0% | 0% |
+| Ervaren | 1 | 5% | 5% |
+| Veteraan | 3 | 10% | 10% |
+| Elite | 6 | 15% | 15% |
+
+Dit geldt voor infanterie, cavalerie en artillerie, inclusief granaten en
+gebiedsschade. De rang staat bij de selectie; de details tonen overwinningen,
+bonussen en de volgende drempel. Aanvullen behoudt de ervaring en nieuwe
+manschappen profiteren direct. Promotie geneest geen verwondingen. Een nieuwe
+slag begint zonder overgenomen ervaring. Online kent uitsluitend de server
+overwinningen toe; opnieuw verbinden behoudt rang en voortgang. Alleen de
+zichtbare rang en overwinningen zijn openbaar, niet de interne verliesregistratie.
+
 ## Lokaal starten
 
 Vereist Node.js 22 of hoger en Chromium. De browser is alleen nodig **op de

@@ -100,7 +100,7 @@
       // From the loopholes on the side facing the enemy.
       const a = Math.atan2(enemy.y - b.y, enemy.x - b.x) + (i - (level.shots - 1) / 2) * 0.5;
       const x = b.x + Math.cos(a) * b.w * 0.4, y = b.y + Math.sin(a) * b.h * 0.4;
-      projectiles.push({ x, y, target: enemy, side: b.side, damage: level.damage, speed: 410, artillery: false, dead: false });
+      projectiles.push({ x, y, target: enemy, side: b.side, source:combatSourceFor(b), damage: level.damage, speed: 410, artillery: false, dead: false });
       if (typeof spawnSmoke === 'function') spawnSmoke(x, y, 3);
       stats.shots++;
     }

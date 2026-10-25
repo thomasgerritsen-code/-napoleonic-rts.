@@ -129,6 +129,12 @@
         Object.freeze({ label:'Veldschans' }),
         Object.freeze({ label:'Bekleed', cost:Object.freeze({ wood:120 }), seconds:10, damage:0.38, shock:0.35 }),
         Object.freeze({ label:'Versterkt', cost:Object.freeze({ wood:160, iron:40 }), seconds:14, damage:0.28, shock:0.25 })]) }) : null,
+    // Combat honours belong to the regiment and survive reinforcement.
+    regimentExperience: OPEN_MAP ? Object.freeze({ ranks:Object.freeze([
+      Object.freeze({ label:'Recruut', victories:0, damage:1, shock:1 }),
+      Object.freeze({ label:'Ervaren', victories:1, damage:1.05, shock:.95 }),
+      Object.freeze({ label:'Veteraan', victories:3, damage:1.10, shock:.90 }),
+      Object.freeze({ label:'Elite', victories:6, damage:1.15, shock:.85 })]) }) : null,
     // Flank/rear blows, shells on the works, tirailleurs, morale shown (open map only).
     battleDepth: OPEN_MAP ? Object.freeze({ flankDamage:1.25, rearDamage:1.5, flankShock:1.5, rearShock:2.0, waverAt:45,
       shellDamage:14, breachedCover:0.8, repairPerSecond:2, towerSplash:44, towerShellDamage:30, maxCraters:80,

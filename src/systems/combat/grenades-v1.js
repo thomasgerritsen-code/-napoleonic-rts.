@@ -27,7 +27,7 @@
     // A grenade thrown at a man lands near him, not on him.
     const a = Math.random() * Math.PI * 2, miss = Math.random() * cfg.spread;
     const x1 = e.x + Math.cos(a) * miss, y1 = e.y + Math.sin(a) * miss, d = Math.hypot(x1 - u.x, y1 - u.y);
-    flying.push({ x0: u.x, y0: u.y, x1, y1, t0: elapsed, flight: cfg.flightMin + d / cfg.maxRange * (cfg.flightMax - cfg.flightMin), side: u.side, by: u.id });
+    flying.push({ x0: u.x, y0: u.y, x1, y1, t0: elapsed, flight: cfg.flightMin + d / cfg.maxRange * (cfg.flightMax - cfg.flightMin), side: u.side, by: u.id, source:combatSourceFor(u) });
     u.grenadeAt = elapsed + cfg.cooldown * (0.8 + Math.random() * 0.4);
     u.threwAt = elapsed;
     stats.thrown++;
@@ -46,7 +46,7 @@
         const d = Math.hypot(v.x - g.x1, v.y - g.y1);
         if (d > cfg.radius) continue;
         const f = 1 - d / cfg.radius * 0.7;
-        applyDamage(v, cfg.damage * f, cfg.shock * f);
+        dealCombatDamage(g.source, v, cfg.damage * f, cfg.shock * f);
         stats.hits++;
       }
     } finally { root.__GRENADE_BLAST__ = false; }

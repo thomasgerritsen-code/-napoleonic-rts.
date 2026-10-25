@@ -272,8 +272,10 @@
       const tactical = selectedRegs.length ? selectionTacticalState(selectedRegs) : null;
       const regSummary = tactical ? selectionRegimentSummaryV144(selectedRegs, tactical) : null;
       if (regSummary) {
-        setHudText(selectionTitleEl, selectedRegs.length === 1 ? selectedRegs[0].name : `${selectedRegs.length} regimenten`);
-        setSelectionDetails(regSummary, tactical.state);
+        const reg = selectedRegs[0], rank = selectedRegs.length === 1 && window.__REGIMENT_EXPERIENCE__?.rankOf(reg);
+        setHudText(selectionTitleEl, selectedRegs.length === 1 ? `${rank ? rank.label + ' · ' : ''}${reg.name}` : `${selectedRegs.length} regimenten`);
+        const honours = rank ? `${window.__REGIMENT_EXPERIENCE__.summary(reg)} · ` : '';
+        setSelectionDetails(honours + regSummary, tactical.state);
       } else {
         const workers = group.filter(u => u.type === 'worker').length;
         const inf = group.filter(u => u.type === 'infantry').length;

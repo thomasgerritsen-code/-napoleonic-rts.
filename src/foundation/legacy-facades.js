@@ -73,7 +73,7 @@ const fogScoutingScript=document.createElement('script');fogScoutingScript.src='
 const moraleCommandScript=document.createElement('script');moraleCommandScript.src='src/systems/morale/command-morale.js?build=mc2';moraleCommandScript.async=false;document.body.appendChild(moraleCommandScript);
 const tacticalTerrainScript=document.createElement('script');tacticalTerrainScript.src='src/systems/terrain/tactical-terrain.js?build=tl2';tacticalTerrainScript.async=false;document.body.appendChild(tacticalTerrainScript);
 const staminaDisciplineScript=document.createElement('script');staminaDisciplineScript.src='src/systems/movement/stamina-discipline.js?build=sd1';staminaDisciplineScript.async=false;document.body.appendChild(staminaDisciplineScript);
-const cavArtScript=document.createElement('script');cavArtScript.src='src/systems/combat/cavalry-artillery.js?build=ca1';cavArtScript.async=false;document.body.appendChild(cavArtScript);
+const cavArtScript=document.createElement('script');cavArtScript.src='src/systems/combat/cavalry-artillery.js?build=147ranks';cavArtScript.async=false;document.body.appendChild(cavArtScript);
 const weatherScript=document.createElement('script');weatherScript.src='src/systems/world/battlefield-weather.js?build=bw1';weatherScript.async=false;document.body.appendChild(weatherScript);
 const objectiveScript=document.createElement('script');objectiveScript.src='src/systems/scenario/objectives.js?build=os1';objectiveScript.async=false;document.body.appendChild(objectiveScript);
 const frameStabilityScript=document.createElement('script');frameStabilityScript.src='src/systems/rendering/frame-stability-v1.js?build=smooth1';frameStabilityScript.async=false;document.body.appendChild(frameStabilityScript);
