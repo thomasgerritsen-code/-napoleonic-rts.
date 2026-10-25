@@ -56,3 +56,12 @@ test('normalization copies untrusted payloads and never accepts client economies
   assert.equal(normalized.unitIds[0],1);assert.equal(normalized.data.x,200);assert.equal(normalized.tick,undefined);
   assert.deepEqual(Object.keys(normalized.data),['x','y']);assert.ok(Object.isFrozen(normalized.unitIds));
 });
+test('fixed-tick remainders survive repeated maximum-size batches without losing simulation time',()=>{
+  const {authority:a,steps}=match();
+  for(let i=0;i<100;i++){a.advance(.24);a.advance(.25);}
+  assert.equal(a.stats().tick,980);
+  assert.ok(Math.abs(steps.reduce((sum,dt)=>sum+dt,0)-49)<1e-8);
+  const slow=create({unit:()=>null,building:()=>null,world:()=>({}),apply:()=>true,step:()=>{},snapshotFor:()=>({})},{hz:1});
+  for(let i=0;i<4;i++)slow.advance(.25);
+  assert.equal(slow.stats().tick,1);
+});

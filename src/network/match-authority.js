@@ -49,7 +49,10 @@
     }
     function advance(seconds) {
       if (!Number.isFinite(seconds) || seconds < 0) return false;
-      accumulator = Math.min(accumulator + seconds, .25);
+      // Bound each new contribution, but retain the unfinished fixed tick.
+      // Capping the sum discarded that remainder whenever a 250 ms batch
+      // arrived, permanently slowing the actual simulation clock.
+      accumulator = Math.min(accumulator + Math.min(seconds, .25), 1);
       let count = 0;
       while (accumulator + 1e-10 >= 1 / hz && count < 8) {step(); accumulator -= 1 / hz; count++;}
       return count;

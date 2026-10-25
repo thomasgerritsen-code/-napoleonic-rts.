@@ -11,6 +11,7 @@
   const LOD_ZOOM_THRESHOLD = 0.82;
   const STATIC_TERRAIN_REFRESH_MS = 1000;
   const combatGrid = { france: new Map(), britain: new Map() };
+  const combatBounds = Object.fromEntries(['france','britain'].map(side=>[side,{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity}]));
   const regimentById = new Map();
   const membersByRegiment = new Map();
   const getRegimentBeforePerformanceV12 = getRegiment;
@@ -42,6 +43,9 @@
   function prepareFrameIndexes() {
     combatGrid.france.clear();
     combatGrid.britain.clear();
+    for(const bounds of Object.values(combatBounds)){
+      bounds.minX=bounds.minY=Infinity;bounds.maxX=bounds.maxY=-Infinity;
+    }
     regimentById.clear();
     membersByRegiment.clear();
     livingUnitCount = 0;
@@ -62,6 +66,9 @@
       const sideGrid = combatGrid[unit.side];
       if (!sideGrid) continue;
       const key = cellKey(unit.x, unit.y);
+      const bounds=combatBounds[unit.side],cx=Math.floor(unit.x/CELL),cy=Math.floor(unit.y/CELL);
+      bounds.minX=Math.min(bounds.minX,cx);bounds.maxX=Math.max(bounds.maxX,cx);
+      bounds.minY=Math.min(bounds.minY,cy);bounds.maxY=Math.max(bounds.maxY,cy);
       let bucket = sideGrid.get(key);
       if (!bucket) sideGrid.set(key, bucket = []);
       bucket.push(unit);
@@ -76,6 +83,9 @@
     combatGrid.france.clear();
     combatGrid.britain.clear();
     livingUnitCount = 0;
+    for(const bounds of Object.values(combatBounds)){
+      bounds.minX=bounds.minY=Infinity;bounds.maxX=bounds.maxY=-Infinity;
+    }
   });
 
   getRegiment = function getRegimentCached(id) {
@@ -103,10 +113,13 @@
     const grid = combatGrid[enemySide];
     let best = null;
     let bestD2 = maxRange * maxRange;
-    const minX = Math.floor((unit.x - maxRange) / CELL);
-    const maxX = Math.floor((unit.x + maxRange) / CELL);
-    const minY = Math.floor((unit.y - maxRange) / CELL);
-    const maxY = Math.floor((unit.y + maxRange) / CELL);
+    // Empty cells outside the enemy index cannot contain a candidate. Clip
+    // only the cell range: candidates and tie-breaking order stay identical.
+    const bounds=combatBounds[enemySide];
+    const minX = Math.max(Math.floor((unit.x - maxRange) / CELL),bounds.minX);
+    const maxX = Math.min(Math.floor((unit.x + maxRange) / CELL),bounds.maxX);
+    const minY = Math.max(Math.floor((unit.y - maxRange) / CELL),bounds.minY);
+    const maxY = Math.min(Math.floor((unit.y + maxRange) / CELL),bounds.maxY);
 
     for (let cy = minY; cy <= maxY; cy++) {
       for (let cx = minX; cx <= maxX; cx++) {

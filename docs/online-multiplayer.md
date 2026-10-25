@@ -75,6 +75,16 @@ het maken van honderd statusparen van circa 133 naar 74 ms en het verwerken
 van duizend netwerkupdates van circa 490 naar 258 ms. Het aantal simulatietikken,
 de frequentie van netwerkupdates en de weergave blijven gelijk.
 
+De klok bewaart nu ook het nog niet uitgevoerde deel van een simulatietik.
+Voorheen ging dat deel verloren wanneer een inhaalbatch de limiet van 250 ms
+bereikte: een gerichte proef voerde daardoor slechts 45 van 49 aangeboden
+seconden uit. Nu worden alle 980 echte tikken uitgevoerd (49 seconden).
+De kamerklok bewaart daarnaast maximaal één seconde tijdelijke achterstand,
+verdeeld over batches van hoogstens 250 ms. Pauzeren en opnieuw verbinden
+zetten die tijdsrekening terug; offline tijd wordt niet gesimuleerd.
+Gevechtszoekopdrachten slaan lege gebieden buiten de vijandelijke index over,
+met dezelfde afstandsgrenzen, doelkeuze en volgorde bij gelijke afstanden.
+
 Render bouwt het bestaande `Dockerfile` vanaf de branch
 `claude/continue-updates-o6whr4`. Laat **Docker Command** leeg, zodat de container
 zelf `node server/index.js` start. Stel `PUBLIC_ORIGIN` in op de bovenstaande

@@ -118,6 +118,37 @@ test('snapshot visibility follows movement and changed sight range without shari
     expect([amount(result.near.france),amount(result.far.france),amount(result.wider.france)]).toEqual([17,99,17]);
   }finally{await context.close();}
 });
+test('indexed combat targeting skips empty map regions while preserving range, tie order, buildings and rebuilt indexes',async({browser})=>{
+  const context=await browser.newContext();
+  try{
+    await context.addInitScript(()=>{window.__NRTS_SERVER__=true;window.__NRTS_HUMAN_BRITAIN__=true;});
+    const page=await context.newPage();
+    // Capture the actual index layer before later terrain/LOS decorators. The
+    // separate battle test below exercises those decorators in the full game.
+    await page.route('**/src/systems/performance/large-army-v1.js*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text())+'\nwindow.__INDEXED_TARGET_TEST__=nearestEnemyEntity;'});
+    });
+    await page.goto(`http://127.0.0.1:${app.address.port}/play.html?view=iso&test=net&gpu=off`);
+    await page.waitForFunction(()=>!!window.__ONLINE_SIM_V1__);
+    const result=await page.evaluate(()=>{
+      units.length=buildings.length=regiments.length=0;
+      const unit=(id,side,x,y,extra={})=>({id,side,kind:'unit',type:'infantry',x,y,dead:false,routing:false,...extra});
+      const query=unit(10,'france',500,500);
+      const south=unit(2,'britain',500,660),east=unit(1,'britain',660,500);
+      units.push(query,south,east,unit(3,'britain',501,500,{type:'worker'}),unit(4,'britain',502,500,{routing:true}),unit(5,'britain',503,500,{dead:true}));
+      buildings.push({id:20,side:'britain',kind:'building',x:700,y:500,complete:true,dead:false},{id:21,side:'britain',kind:'building',x:504,y:500,complete:false,dead:false});
+      const rebuild=()=>__LARGE_ARMY_PERFORMANCE_V1__.prepareFrameIndexes();
+      const target=(q,r)=>window.__INDEXED_TARGET_TEST__(q,r)?.id??null;
+      rebuild();const tie=target(query,250),edge=target(query,160),outside=target(unit(0,'france',-1000,-1000),50),reverse=target(unit(0,'britain',500,510),100);
+      south.dead=east.dead=true;rebuild();const building=target(query,250);
+      east.dead=false;east.x=510;rebuild();const moved=target(query,250);
+      NRTS.events.emit('game:reset');const reset=target(query,250);rebuild();const rebuilt=target(query,250);
+      return {tie,edge,outside,reverse,building,moved,reset,rebuilt};
+    });
+    expect(result).toEqual({tie:1,edge:null,outside:null,reverse:10,building:20,moved:1,reset:20,rebuilt:1});
+  }finally{await context.close();}
+});
 test('real transport rejects foreign origins, invalid sessions, full rooms and protocol mismatch',async({browser})=>{
   const p=await players(browser);
   try{

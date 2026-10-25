@@ -6,6 +6,7 @@ const {randomBytes,randomInt}=require('node:crypto');
 const {WebSocketServer,WebSocket}=require('ws');
 const {createSimulationHost}=require('./simulation-host.js');
 const {createEncoder}=require('./state-delta.js');
+const {createClock}=require('./match-clock.js');
 const protocol=require('../src/network/command-protocol.js');
 const VERSION=require('../package.json').version;
 const ROOT=path.resolve(__dirname,'..');
@@ -61,7 +62,7 @@ async function createServer(options={}){
     room.phase=room.finished?'finished':room.players.france?.ready&&room.players.britain?.ready&&['france','britain'].every(s=>room.players[s]?.ws?.readyState===WebSocket.OPEN)?'playing':room.started?'paused':'waiting';
     // Reconnect time must never be simulated. Between running requests, retain
     // short async delays rather than silently dropping their simulation ticks.
-    if(previous!==room.phase)room.lastAdvanceAt=performance.now();
+    if(previous!==room.phase)room.clock.reset(performance.now());
     if(room.phase==='playing')room.started=true;
     broadcast(room);
   }
@@ -102,7 +103,7 @@ async function createServer(options={}){
           // its bounded browser startup timeout now governs this request.
           clearTimeout(ws.joinTimer);
           pending=true;
-          const room={code:code(),createdAt:Date.now(),players:{},commands:[],busy:false,phase:'waiting',steps:0};
+          const room={code:code(),createdAt:Date.now(),players:{},commands:[],busy:false,phase:'waiting',steps:0,clock:createClock(performance.now())};
           while(rooms.has(room.code))room.code=code();
           rooms.set(room.code,room);
           try{
@@ -155,8 +156,7 @@ async function createServer(options={}){
       const snapshot=!room.lastSnapshotAt||now-room.lastSnapshotAt>=(advance?100:500);
       if(!advance&&!snapshot)continue;
       if(snapshot)room.lastSnapshotAt=now;
-      const at=performance.now(),seconds=advance?Math.min(.25,Math.max(0,(at-(room.lastAdvanceAt??at))/1000)):0;
-      if(advance)room.lastAdvanceAt=at;
+      const seconds=advance?room.clock.take(performance.now()):0;
       room.steps++;
       room.busy=true;
       const commands=room.commands.splice(0,128);
@@ -170,7 +170,7 @@ async function createServer(options={}){
           if(ws.bufferedAmount>512*1024){ws.close(4002,'Connection too slow');continue;}
           send(ws,ws.encoder.encode(result.views[side]));
         }
-      }).catch(e=>{console.error('Match failed:',e.message);void closeRoom(room,'server-error');}).finally(()=>{room.busy=false;});
+      }).catch(e=>{if(!room.closed){console.error('Match failed:',e.message);void closeRoom(room,'server-error');}}).finally(()=>{room.busy=false;});
     }
   },50);
   const heartbeat=setInterval(()=>{
