@@ -38,7 +38,7 @@
     clock+=dt;
     if(clock+1e-9>=cfg.updateSeconds){
       const steps=Math.floor((clock+1e-9)/cfg.updateSeconds),seconds=steps*cfg.updateSeconds;clock=Math.max(0,clock-seconds);
-      model.step(seconds,units,(side,resource,amount)=>{economies[side][resource]+=amount;});latest=model.state();renderUI();
+      model.step(seconds,units,(side,resource,amount)=>{economies[side][resource]+=amount;});latest=model.state();root.__BATTLE__?.territoryStep(seconds,latest);renderUI();
     }
     return result;
   };
@@ -80,7 +80,7 @@
   renderUI=()=>{
     const s=state();set(button,`Gebieden · ${s.points.filter(p=>p.owner==='france').length}–${s.points.filter(p=>p.owner==='britain').length}`);
     for(const p of s.points){const owner=names[p.owner]||'Neutraal',detail=p.contested?'Betwist · geen opbrengst':p.claim?`${names[p.claim]} verovert · ${Math.floor(p.progress*100)}%`:(p.owner?'Opbrengst actief':'Nog niet veroverd');set(cards.get(p.id),`${owner} · ${detail}`);}
-  };renderUI();
+  };renderUI();root.dispatchEvent(new Event('territories-ui-ready'));
   const oldMini=drawMinimap;
   drawMinimap=function drawMinimapWithTerritories(){oldMini();miniCtx.save();for(const p of state().points){const m=miniPoint(p.x,p.y);miniCtx.fillStyle=p.owner==='france'?'#74a4ef':p.owner==='britain'?'#ef8877':'#efd88e';miniCtx.strokeStyle='#191e18';miniCtx.lineWidth=1;miniCtx.beginPath();miniCtx.moveTo(m.x,m.y-4);miniCtx.lineTo(m.x+4,m.y);miniCtx.lineTo(m.x,m.y+4);miniCtx.lineTo(m.x-4,m.y);miniCtx.closePath();miniCtx.fill();miniCtx.stroke();}miniCtx.restore();};
 })(window);

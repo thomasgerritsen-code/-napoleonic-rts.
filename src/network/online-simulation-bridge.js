@@ -33,6 +33,7 @@
     // No simulation tick or asynchronous callback runs inside this scope. Restore
     // every object in finally, including entities created by the command.
     function apply(side,command) {
+      if(gameOver)return false;
       const swap = side === 'britain';
       const sideEntities=()=>[...units,...buildings,...regiments,...(root.__REGIMENT_ORDERS_V1__?.trenches()||[])];
       const before = swap ? sideEntities() : [];
@@ -111,13 +112,14 @@
       const animals=(root.__WILDLIFE_V1__?.animals()||[]).filter(canSee).map(a=>pick(a,['id','kind','x','y','facing','state']));
       const grenades={};
       for(const key of ['flying','bursts','scorches'])grenades[key]=(root.__GRENADES_V1__?.[key]()||[]).filter(g=>key==='flying'?canSee({x:g.x0,y:g.y0,side:g.side})&&canSee({x:g.x1,y:g.y1}):canSee(g)).map(copyScalars);
-      let winner=null;
-      if(gameOver){const alive=s=>buildings.some(b=>!b.dead&&b.side===s&&b.type==='towncenter')||units.some(u=>!u.dead&&u.side===s&&u.type!=='worker');winner=alive('france')?'france':alive('britain')?'britain':'draw';}
+      const battle=root.__BATTLE__?.state();
+      let winner=battle?.result?.winner||null;
+      if(gameOver&&!winner){const alive=s=>buildings.some(b=>!b.dead&&b.side===s&&b.type==='towncenter')||units.some(u=>!u.dead&&u.side===s&&u.type!=='worker');winner=alive('france')?'france':alive('britain')?'britain':'draw';}
       return {elapsed,world:{...WORLD},economy:{...economies[side]},units:unitViews,buildings:buildingViews,groups,
-        resources:resourceViews,projectiles:shots,trenches,wounded,teams,animals,grenades,deaths:[...deaths.values()].filter(d=>canSee(d.u)).map(d=>d.u.id),weather:root.__WEATHER_V1__?.state(),territories:root.__TERRITORIES__?.state(),gameOver,winner};
+        resources:resourceViews,projectiles:shots,trenches,wounded,teams,animals,grenades,deaths:[...deaths.values()].filter(d=>canSee(d.u)).map(d=>d.u.id),weather:root.__WEATHER_V1__?.state(),territories:root.__TERRITORIES__?.state(),battle,gameOver,winner};
     }
     const authority=root.NRTS_MATCH_AUTHORITY.create({unit:id=>units.find(u=>u.id===id),building:id=>buildings.find(b=>b.id===id),world:()=>WORLD,
-      apply,step:dt=>{for(let i=0;i<3;i++)update(dt/3);},snapshotFor},{hz:20});
+      apply,step:dt=>{for(let i=0;i<3&&!gameOver;i++)update(dt/3);},snapshotFor},{hz:20});
     authority.addPlayer('france','france');authority.addPlayer('britain','britain');
     const transport={france:null,britain:null};
     function advance(commands=[],running=true,snapshot=true,seconds=.05){
@@ -183,7 +185,8 @@
     serverElapsed=s.elapsed;receivedAt=now;snapshotTime=Math.min(160,Math.max(50,now-(snapshotTime?root.__ONLINE_MATCH_V1__.lastReceivedAt:now-100)));
     elapsed=s.elapsed;gameOver=s.gameOver;root.__VISION_EPOCH__=(root.__VISION_EPOCH__||0)+1;
     if(initial){const home=buildings.find(b=>b.side==='france'&&b.type==='towncenter');if(home){camera.x=home.x;camera.y=home.y;}selectedUnits.clear();initial=false;}
-    if(s.gameOver)showBattleOutcome(s.winner==='draw'?'GELIJKSPEL':s.winner===view.side?'OVERWINNING!':'NEDERLAAG','De online veldslag is afgelopen.');
+    root.__BATTLE__?.receive(s.battle,view.side);
+    if(s.gameOver&&!s.battle?.result)showBattleOutcome(s.winner==='draw'?'GELIJKSPEL':s.winner===view.side?'OVERWINNING!':'NEDERLAAG','De online veldslag is afgelopen.');
     else messageEl.classList.add('hidden');
     actionSignature='';updateHud(true);
   }

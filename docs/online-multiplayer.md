@@ -59,6 +59,39 @@ pauzeert die met de wedstrijd en bewaart ze bij opnieuw verbinden. Nieuwe
 wedstrijden beginnen weer met neutrale gebieden. De singleplayercomputer
 kiest grondstofgebieden als strategisch doel wanneer zijn basis veilig is.
 
+## Overwinning en eindscherm
+
+Er zijn op de speelbare kaart twee manieren om te winnen:
+
+- Vernietig het vijandelijke hoofdkwartier én schakel alle gevechtstroepen uit.
+  Boeren tellen niet mee; nog levende vluchtende troepen wel. Als beide legers
+  tegelijk zijn uitgeschakeld, wordt het gelijkspel.
+- Beheers alle drie grondstofgebieden 120 seconden onafgebroken en onbetwist.
+  De aftelling begint pas na volledige verovering. Eén vijandelijke gevechtseenheid
+  bij een vlag onderbreekt de controle en zet de aftelling terug op nul, ook
+  voordat het gebied van eigenaar wisselt. Lege eigen gebieden blijven meetellen.
+
+**Gebieden** toont de regels en de resterende tijd voor gebiedsoverwinning.
+De tijd volgt de echte simulatie: tijdens een verbroken verbinding of pauze telt
+hij niet door. Beide online spelers zien dezelfde partij, tijd en uitslag.
+De gebruikelijke uitschakeling krijgt voorrang als beide voorwaarden in dezelfde
+simulatiestap ontstaan. Bestaande gevechten zonder de open kaart behouden hun regels.
+
+Het eindscherm toont de winnaar, reden, speelduur en per partij de getrainde,
+verloren en resterende eenheden, verloren en resterende gebouwen en gebieden in
+bezit. De beginlegers tellen niet als getraind. Verliezen tellen iedere unieke
+eenheid één keer; een medische herleving telt niet als nieuwe training of nogmaals
+als verlies. Daardoor zijn de aantallen geen eenvoudige begin-plus-min-balans.
+De gezamenlijke statistieken worden pas bij de uitslag openbaar; tijdens de slag
+blijven vijandelijke aantallen en voorraden onder het normale zicht vallen.
+
+De uitslag en speelduur worden vastgezet zodra de strijd eindigt. De server
+weigert verdere spelopdrachten. Opnieuw verbinden haalt dezelfde uitslag op zolang
+de kamer nog bestaat. Een singleplayerslag kan via **Nieuwe slag** opnieuw beginnen.
+Online leidt **Hoofdmenu** via het bestaande verlaten-pad terug naar het startmenu;
+maak daar een nieuwe kamer en deel de nieuwe uitnodiging voor een volgende slag.
+Er worden geen ranglijsten of permanente wedstrijdresultaten opgeslagen.
+
 ## Schiettorens versterken
 
 Selecteer een voltooide eigen schiettoren en kies **Upgrade**. Net als een
