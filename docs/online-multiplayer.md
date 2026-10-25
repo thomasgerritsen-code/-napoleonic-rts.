@@ -43,9 +43,28 @@ niet beschikbaar is; de meegeleverde container draait als gebruiker `node`.
 
 ## Openbaar hosten
 
+De huidige testserver staat op
+`https://napoleonic-rts-multiplayer.onrender.com` in Frankfurt. De Vercel-game
+vult `wss://napoleonic-rts-multiplayer.onrender.com/multiplayer` automatisch in.
+Kies **Multiplayer**, maak een kamer en deel de uitnodiging met de tweede speler.
+De gratis server is begrensd op één gelijktijdige kamer en kan na inactiviteit
+in slaap vallen. Dit is een testopstelling; meet de simulatiesnelheid voordat
+je deze hosting voor grotere of langdurige wedstrijden gebruikt.
+De eerste openbare proef met twee spelers slaagde voor verbinden, bewegen en
+productie aan beide kanten, maar haalde slechts 7,5 seconden simulatie in
+37,44 seconden echte tijd. De gratis CPU-capaciteit is daarmee onvoldoende
+voor vloeiende wedstrijden; schaal rekenkracht pas op met een gekozen budget.
+
+Render bouwt het bestaande `Dockerfile` vanaf de branch
+`claude/continue-updates-o6whr4`. Laat **Docker Command** leeg, zodat de container
+zelf `node server/index.js` start. Stel `PUBLIC_ORIGIN` in op de bovenstaande
+HTTPS-oorsprong, `PORT=10000`, `MAX_ROOMS=1` en de hieronder genoemde
+`ALLOWED_ORIGINS`. Gebruik één instantie; meerdere instanties delen geen kamers.
+Voor een HTTP-gezondheidscontrole is `/healthz` beschikbaar.
+
 `Dockerfile` en `railway.json` beschrijven één blijvende Node-server met een
 gezondheidscontrole. Verbind het GitHub-repository en selecteer de branch met
-v1.4.6. Publiceer één replica met een HTTPS-domein. Railway levert hiervoor
+de online spelserver. Publiceer één replica met een HTTPS-domein. Railway levert hiervoor
 `RAILWAY_PUBLIC_DOMAIN`; daarmee kiest de server automatisch zijn WSS-adres.
 Bij andere hosting stel je `PUBLIC_ORIGIN=https://jouw-domein` in.
 
