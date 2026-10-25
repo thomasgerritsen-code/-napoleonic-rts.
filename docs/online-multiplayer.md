@@ -85,6 +85,16 @@ zetten die tijdsrekening terug; offline tijd wordt niet gesimuleerd.
 Gevechtszoekopdrachten slaan lege gebieden buiten de vijandelijke index over,
 met dezelfde afstandsgrenzen, doelkeuze en volgorde bij gelijke afstanden.
 
+De verschillen worden inmiddels al in de simulatie berekend, vóór de overdracht
+naar Node. Beide omgevingen gebruiken dezelfde codec. Daardoor worden vaste
+kaartgegevens en ongewijzigde eenheden niet telkens opnieuw doorgegeven en
+ingelezen. In een lokale proef met honderd updates daalde deze interne
+overdracht van circa 14,3 MB naar 3,0 MB. Dit verandert de netwerkfrequentie en
+de inhoud van de berichten aan spelers niet.
+Elke nieuwe of hervatte verbinding krijgt een nieuw verbindingsnummer en een
+volledig beginbeeld. Een nog onderweg zijnde update voor het oude nummer wordt
+weggegooid. Voor een afwezige speler wordt geen status gecodeerd.
+
 Render bouwt het bestaande `Dockerfile` vanaf de branch
 `claude/continue-updates-o6whr4`. Laat **Docker Command** leeg, zodat de container
 zelf `node server/index.js` start. Stel `PUBLIC_ORIGIN` in op de bovenstaande

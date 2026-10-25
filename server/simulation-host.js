@@ -27,7 +27,9 @@ async function createSimulationHost({baseURL,executablePath=process.env.CHROMIUM
         // Playwright's object bridge recursively wraps every snapshot property.
         // Use the same JSON representation as the network protocol, so its
         // native encoder carries one string across the browser/Node boundary.
-        return {advance:async(commands,advance=true,snapshot=true,seconds=.05)=>JSON.parse(await page.evaluate(({commands,advance,snapshot,seconds})=>JSON.stringify(window.__ONLINE_SIM_V1__.advance(commands,advance,snapshot,seconds)),{commands,advance,snapshot,seconds})),
+        // Encode per-connection deltas before IPC as well. Unchanged map and
+        // entity rows never need to cross this boundary or be parsed by Node.
+        return {advance:async(commands,advance=true,snapshot=true,seconds=.05,epochs={france:1,britain:1})=>JSON.parse(await page.evaluate(({commands,advance,snapshot,seconds,epochs})=>JSON.stringify(window.__ONLINE_SIM_V1__.advanceTransport(commands,advance,snapshot,seconds,epochs)),{commands,advance,snapshot,seconds,epochs})),
           close:()=>context.close()};
       } catch(e){await context.close();throw e;}
     },

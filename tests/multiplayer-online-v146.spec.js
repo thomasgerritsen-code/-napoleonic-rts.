@@ -118,6 +118,30 @@ test('snapshot visibility follows movement and changed sight range without shari
     expect([amount(result.near.france),amount(result.far.france),amount(result.wider.france)]).toEqual([17,99,17]);
   }finally{await context.close();}
 });
+test('simulation transport preserves full views and resets only the resumed connection baseline',async({browser})=>{
+  const context=await browser.newContext();
+  try{
+    await context.addInitScript(()=>{window.__NRTS_SERVER__=true;window.__NRTS_HUMAN_BRITAIN__=true;});
+    const page=await context.newPage();await page.goto(`http://127.0.0.1:${app.address.port}/play.html?view=iso&test=net&gpu=off`);
+    await page.waitForFunction(()=>!!window.__ONLINE_SIM_V1__);
+    const result=await page.evaluate(()=>{
+      const api=__ONLINE_SIM_V1__,codec=NRTS_STATE_DELTA,views={};
+      const same=()=>JSON.stringify(views)===JSON.stringify(api.advance([],false).views);
+      const first=api.advanceTransport([],false,true,0,{france:1,britain:1});
+      for(const side of ['france','britain'])views[side]=codec.merge(null,first.packets[side].packet);
+      const fullSame=same();
+      const next=api.advanceTransport([],true,true,.1,{france:1,britain:1});
+      for(const side of ['france','britain'])views[side]=codec.merge(views[side],next.packets[side].packet);
+      const deltaSame=same();
+      const resume=api.advanceTransport([],false,true,0,{france:2,britain:1});
+      const absent=api.advanceTransport([],false,true,0,{france:2,britain:0});
+      const rejoin=api.advanceTransport([],false,true,0,{france:2,britain:2});
+      return {fullSame,deltaSame,first:Object.values(first.packets).map(p=>p.packet.type),next:Object.values(next.packets).map(p=>p.packet.type),
+        resume:[resume.packets.france.packet.type,resume.packets.britain.packet.type],absent:Object.keys(absent.packets),rejoin:rejoin.packets.britain.packet.type};
+    });
+    expect(result).toEqual({fullSame:true,deltaSame:true,first:['snapshot','snapshot'],next:['delta','delta'],resume:['snapshot','delta'],absent:['france'],rejoin:'snapshot'});
+  }finally{await context.close();}
+});
 test('indexed combat targeting skips empty map regions while preserving range, tie order, buildings and rebuilt indexes',async({browser})=>{
   const context=await browser.newContext();
   try{

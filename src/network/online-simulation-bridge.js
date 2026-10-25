@@ -21,6 +21,7 @@
   const pick = (obj,keys) => Object.fromEntries(keys.filter(k => scalar(obj[k])).map(k => [k,obj[k]]));
 
   if (root.__NRTS_SERVER__) {
+    if(!root.NRTS_STATE_DELTA?.createEncoder)throw Error('Missing state delta codec');
     const deaths=new Map(),deadSeen=new WeakSet();
     root.__NRTS_HUMAN_BRITAIN__ = true;
     // All strategic AI entry points, including building helpers, stay off in PvP.
@@ -118,8 +119,26 @@
     const authority=root.NRTS_MATCH_AUTHORITY.create({unit:id=>units.find(u=>u.id===id),building:id=>buildings.find(b=>b.id===id),world:()=>WORLD,
       apply,step:dt=>{for(let i=0;i<3;i++)update(dt/3);},snapshotFor},{hz:20});
     authority.addPlayer('france','france');authority.addPlayer('britain','britain');
+    const transport={france:null,britain:null};
+    function advance(commands=[],running=true,snapshot=true,seconds=.05){
+      const receipts=commands.map(c=>({side:c.side,...authority.submit(c.side,c.command)}));
+      if(running)authority.advance(seconds);
+      return {receipts,...(snapshot?{views:{france:authority.snapshotFor('france'),britain:authority.snapshotFor('britain')}}:{})};
+    }
     root.__ONLINE_SIM_V1__=Object.freeze({
-      advance(commands=[],advance=true,snapshot=true,seconds=.05){const receipts=commands.map(c=>({side:c.side,...authority.submit(c.side,c.command)}));if(advance)authority.advance(seconds);return {receipts,...(snapshot?{views:{france:authority.snapshotFor('france'),britain:authority.snapshotFor('britain')}}:{})};},
+      advance,
+      advanceTransport(commands=[],running=true,snapshot=true,seconds=.05,epochs={france:1,britain:1}){
+        const result=advance(commands,running,false,seconds);
+        if(!snapshot)return result;
+        const packets={};
+        for(const side of ['france','britain']){
+          const epoch=epochs[side];
+          if(!epoch){transport[side]=null;continue;}
+          if(transport[side]?.epoch!==epoch)transport[side]={epoch,encoder:root.NRTS_STATE_DELTA.createEncoder()};
+          packets[side]={epoch,packet:transport[side].encoder.encode(authority.snapshotFor(side))};
+        }
+        return {...result,packets};
+      },
       stats:()=>authority.stats()
     });
     return;

@@ -79,7 +79,7 @@ async function createServer(options={}){
   function attach(ws,room,side,player){
     clearTimeout(ws.joinTimer);
     if(player.ws&&player.ws!==ws){const old=player.ws;old.session=null;old.close(4001,'Connected elsewhere');}
-    ws.session={room,side,player};player.ws=ws;player.disconnectedAt=null;player.ready=false;ws.encoder=createEncoder();
+    ws.session={room,side,player};player.ws=ws;player.disconnectedAt=null;player.ready=false;player.epoch=(player.epoch||0)+1;ws.encoder=createEncoder();
     send(ws,{type:'welcome',room:room.code,side,token:player.token,seq:player.seq,protocol:1});phase(room);
   }
   wss.on('connection',(ws,req)=>{
@@ -160,15 +160,21 @@ async function createServer(options={}){
       room.steps++;
       room.busy=true;
       const commands=room.commands.splice(0,128);
-      room.sim.advance(commands,advance,snapshot,seconds).then(result=>{
+      const epochs=Object.fromEntries(['france','britain'].map(side=>[side,room.players[side]?.ws?.readyState===WebSocket.OPEN?room.players[side].epoch:0]));
+      room.sim.advance(commands,advance,snapshot,seconds,epochs).then(result=>{
         if(room.closed)return;
         for(const ack of result.receipts){const p=room.players[ack.side];if(ack.ok)p.seq=Math.max(p.seq,ack.seq);if(p.ws)send(p.ws,{type:'receipt',...ack});}
-        if(!result.views)return;
-        if(result.views.france.state.gameOver&&!room.finished){room.finished=true;room.finishedAt=Date.now();phase(room);}
+        if(!result.views&&!result.packets)return;
+        const state=result.views?.france.state||result.packets?.france?.packet.view.state||result.packets?.britain?.packet.view.state;
+        if(state?.gameOver&&!room.finished){room.finished=true;room.finishedAt=Date.now();phase(room);}
         for(const side of ['france','britain']){
           const p=room.players[side],ws=p?.ws;if(!ws||ws.readyState!==WebSocket.OPEN)continue;
           if(ws.bufferedAmount>512*1024){ws.close(4002,'Connection too slow');continue;}
-          send(ws,ws.encoder.encode(result.views[side]));
+          const encoded=result.packets?.[side];
+          // An in-flight reply may still belong to the replaced connection.
+          // Discard it; the next epoch produces a new full baseline.
+          if(encoded){if(encoded.epoch===p.epoch)send(ws,encoded.packet);}
+          else if(result.views)send(ws,ws.encoder.encode(result.views[side]));
         }
       }).catch(e=>{if(!room.closed){console.error('Match failed:',e.message);void closeRoom(room,'server-error');}}).finally(()=>{room.busy=false;});
     }
