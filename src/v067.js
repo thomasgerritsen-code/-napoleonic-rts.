@@ -60,6 +60,12 @@ const RIVER_SMOOTH_POINTS_V296=Object.freeze((()=>{
   const last=knots[knots.length-1];samples.push(Object.freeze({...last}));
   return samples;
 })());
+// Immutable river geometry: reuse segment arithmetic and allocate only the
+// final closest hit, rather than fifteen temporary hits for each water query.
+const riverSegmentsV067=Object.freeze(RIVER_SMOOTH_POINTS_V296.slice(0,-1).map((a,i)=>{
+  const b=RIVER_SMOOTH_POINTS_V296[i+1],vx=b.x-a.x,vy=b.y-a.y;
+  return Object.freeze({x:a.x,y:a.y,vx,vy,len2:vx*vx+vy*vy});
+}));
 function riverHitV067(x,y){
   const points=RIVER_SMOOTH_POINTS_V296;
   // The centerline is strictly increasing in y, so only neighboring
@@ -67,12 +73,15 @@ function riverHitV067(x,y){
   // iterating the entire 5-km river for every unit, formation and house.
   let lo=0,hi=points.length-1;
   while(hi-lo>1){const mid=(hi+lo)>>1;if(points[mid].y<y)lo=mid;else hi=mid;}
-  let best=null;
+  let bestIndex=-1,bestX,bestY,bestT,bestDistance;
   for(let i=Math.max(0,lo-7);i<=Math.min(points.length-2,lo+7);i++){
-    const hit=closestPointOnSegmentV066(x,y,points[i],points[i+1]);
-    if(!best||hit.distance<best.distance)best={...hit,segmentIndex:i};
+    const s=riverSegmentsV067[i];
+    const t=s.len2<=.0001?0:clampV066(((x-s.x)*s.vx+(y-s.y)*s.vy)/s.len2,0,1);
+    const px=s.len2<=.0001?s.x:s.x+s.vx*t,py=s.len2<=.0001?s.y:s.y+s.vy*t;
+    const distance=Math.hypot(x-px,y-py);
+    if(bestIndex<0||distance<bestDistance){bestIndex=i;bestX=px;bestY=py;bestT=t;bestDistance=distance;}
   }
-  return best;
+  return bestIndex<0?null:{x:bestX,y:bestY,t:bestT,distance:bestDistance,segmentIndex:bestIndex};
 }
 function crossingPassageContainsV067(c,x,y){
   const dx=x-c.x,dy=y-c.y,cos=Math.cos(c.angle),sin=Math.sin(c.angle);

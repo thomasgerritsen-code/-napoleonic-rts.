@@ -2,6 +2,7 @@
 // ---------- v0.5 navigation / collision ----------
 const NAV_CELL = 52;
 const navBuckets = new Map();
+const navColumns = new Map();
 let navStats = { buckets: 0, overlapCorrections: 0 };
 
 function navKey(x, y) {
@@ -10,11 +11,15 @@ function navKey(x, y) {
 
 function rebuildSpatialHash() {
   navBuckets.clear();
+  navColumns.clear();
   for (const u of units) {
     if (u.dead) continue;
-    const key = navKey(u.x, u.y);
-    if (!navBuckets.has(key)) navBuckets.set(key, []);
-    navBuckets.get(key).push(u);
+    const cx = Math.floor(u.x / NAV_CELL), cy = Math.floor(u.y / NAV_CELL);
+    let column = navColumns.get(cx);
+    if (!column) { column = new Map(); navColumns.set(cx, column); }
+    let bucket = column.get(cy);
+    if (!bucket) { bucket = []; column.set(cy, bucket); navBuckets.set(`${cx},${cy}`, bucket); }
+    bucket.push(u);
   }
   navStats.buckets = navBuckets.size;
   navStats.overlapCorrections = 0;
@@ -24,8 +29,10 @@ function nearbyNavUnits(u) {
   const cx = Math.floor(u.x / NAV_CELL), cy = Math.floor(u.y / NAV_CELL);
   const result = [];
   for (let ox = -1; ox <= 1; ox++) {
+    const column = navColumns.get(cx + ox);
+    if (!column) continue;
     for (let oy = -1; oy <= 1; oy++) {
-      const bucket = navBuckets.get(`${cx + ox},${cy + oy}`);
+      const bucket = column.get(cy + oy);
       if (bucket) result.push(...bucket);
     }
   }
