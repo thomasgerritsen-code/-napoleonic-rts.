@@ -90,7 +90,7 @@
         return viewSide(v);
       });
       const buildingViews=buildings.filter(b=>!b.dead&&canSee(b)).map(b=>{
-        const own=b.side===side, v=own?copyScalars(b):pick(b,['id','kind','side','type','x','y','w','h','hp','maxHp','complete','construction','dead']);
+        const own=b.side===side, v=own?copyScalars(b):pick(b,['id','kind','side','type','x','y','w','h','hp','maxHp','complete','construction','dead','towerLevel']);
         v.queue=own?b.queue.map(copyScalars):[]; v.production=own?b.production:0;
         return viewSide(v);
       });

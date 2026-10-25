@@ -49,7 +49,7 @@
   assignGather=function(r){return online.active?(r?send(selection('gather',{resourceId:r.id})):false):baseGather(r);};
   const baseRally=finishRallyPlacementV06;
   finishRallyPlacementV06=function(x,y,b=rallyPlacementBuilding){if(!online.active)return baseRally(x,y,b);const ok=send(selection('rally',{x,y},b));if(ok){rallyPlacementBuilding=null;buildHintEl.classList.add('hidden');}return ok;};
-  const remoteActions=new Set(['quick-regiment','quick-regiment-barracks','train-missing','auto-regiment','defend-stance','reinforce-regiment','trench-upgrade','crew-gun','farm-assign','resume-construction','skirmish']);
+  const remoteActions=new Set(['quick-regiment','quick-regiment-barracks','train-missing','auto-regiment','defend-stance','reinforce-regiment','trench-upgrade','tower-upgrade','crew-gun','farm-assign','resume-construction','skirmish']);
   actionsEl.addEventListener('click',e=>{const b=e.target.closest('button[data-action]');if(!online.active||!b||b.disabled||!remoteActions.has(b.dataset.action))return;e.preventDefault();e.stopImmediatePropagation();send(selection('action',{action:b.dataset.action}));},true);
   // Keyboard shortcuts belonging to closure-based tactical modules must also
   // use the command path rather than mutate the local read-only view.

@@ -65,3 +65,13 @@ test('fixed-tick remainders survive repeated maximum-size batches without losing
   for(let i=0;i<4;i++)slow.advance(.25);
   assert.equal(slow.stats().tick,1);
 });
+
+test('tower upgrades require an owned building and ignore client-supplied upgrade stats',()=>{
+  const raw={v:1,seq:1,type:'action',unitIds:[],buildingId:3,data:{action:'tower-upgrade',level:3,seconds:0,hp:999999}};
+  const normalized=protocol.normalize(raw);assert.equal(normalized.ok,true);
+  assert.deepEqual(normalized.command.data,{action:'tower-upgrade'});
+  assert.equal(protocol.normalize({...raw,buildingId:null,unitIds:[1]}).reason,'building-required');
+  const adapter={unit:()=>null,building:()=>({id:3,side:'france'}),world:()=>({})};
+  assert.equal(protocol.ownership(normalized.command,'france',adapter).ok,true);
+  assert.equal(protocol.ownership(normalized.command,'britain',adapter).reason,'building-not-owned');
+});

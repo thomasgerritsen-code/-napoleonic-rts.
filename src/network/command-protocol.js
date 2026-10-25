@@ -25,7 +25,7 @@
     gather: d => id(d.resourceId) ? {resourceId:d.resourceId} : null,
     rally: d => finite(d.x) && finite(d.y) ? {x:d.x,y:d.y} : null,
     action: d => ['quick-regiment','quick-regiment-barracks','train-missing','auto-regiment',
-      'defend-stance','reinforce-regiment','trench-upgrade','crew-gun','farm-assign','resume-construction','skirmish'].includes(d.action) ? {action:d.action} : null
+      'defend-stance','reinforce-regiment','trench-upgrade','tower-upgrade','crew-gun','farm-assign','resume-construction','skirmish'].includes(d.action) ? {action:d.action} : null
   };
   function normalize(raw) {
     if (!raw || raw.v !== VERSION || !id(raw.seq) || typeof raw.type !== 'string' || !Object.hasOwn(schemas, raw.type)) return {ok:false, reason:'invalid-command'};
@@ -38,6 +38,7 @@
     if (raw.type === 'rally' && raw.buildingId === null) return {ok:false, reason:'building-required'};
     if (!['build','train','train-troop','rally','action'].includes(raw.type) && !raw.unitIds.length) return {ok:false, reason:'units-required'};
     if (raw.type === 'action' && !raw.unitIds.length && raw.buildingId === null) return {ok:false, reason:'selection-required'};
+    if (raw.type === 'action' && data.action === 'tower-upgrade' && raw.buildingId === null) return {ok:false, reason:'building-required'};
     return {ok:true, command:Object.freeze({v:VERSION, seq:raw.seq, type:raw.type,
       unitIds:Object.freeze([...raw.unitIds]), buildingId:raw.buildingId, data:Object.freeze(data)})};
   }

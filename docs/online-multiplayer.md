@@ -20,6 +20,25 @@ Dat token staat uitsluitend in `sessionStorage`, nooit in de uitnodigingslink.
 Ook vernieuwen van de pagina hervat de eigen partij. Op een derde toestel geeft
 de uitnodiging geen toegang tot een al bezette partij.
 
+## Schiettorens versterken
+
+Selecteer een voltooide eigen schiettoren en kies **Upgrade**. Net als een
+loopgraaf heeft de toren drie niveaus. Het menu toont de kosten en voortgang;
+de bezetting versterkt de toren terwijl deze blijft schieten.
+
+| Niveau | Versterking | Kosten upgrade | Bouwtijd | HP | Bereik | Salvo |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Basistoren | Bouwprijs: 260 hout | Normale bouw | 1100 | 240 | 2 × 18 |
+| 2 | Houten palissade | 180 hout, 40 ijzer | 20 s | 1600 | 270 | 3 × 18 |
+| 3 | Zandzakken | 260 hout, 90 ijzer | 30 s | 2200 | 300 | 3 × 22 |
+
+Kosten worden eenmalig bij het starten afgeschreven. De nieuwe eigenschappen
+gelden pas na voltooiing; het resterende HP-percentage blijft behouden.
+Een vernietigde toren wordt niet afgebouwd. Online controleert de server de
+eigenaar, grondstoffen en bouwtijd. Voortgang pauzeert met de wedstrijd en
+blijft behouden bij opnieuw verbinden. Vijanden zien alleen het voltooide
+niveau van torens binnen hun zicht, niet de lopende upgrade.
+
 ## Lokaal starten
 
 Vereist Node.js 22 of hoger en Chromium. De browser is alleen nodig **op de

@@ -201,7 +201,13 @@
     actionMenu: OPEN_MAP ? Object.freeze({ version:1 }) : null,
     // Buildable musketry tower (open map only): range and vision in game px.
     towers: OPEN_MAP ? Object.freeze({ cost:Object.freeze({ wood:260 }), hp:1100, range:240, reload:2.6, shots:2, damage:18,
-      vision:420, aiAfter:300, aiMax:2 }) : null,
+      vision:420, aiAfter:300, aiMax:2,
+      levels:Object.freeze([null,
+        Object.freeze({ label:'Basistoren', hp:1100, range:240, reload:2.6, shots:2, damage:18, vision:420 }),
+        Object.freeze({ label:'Versterkte toren', cost:Object.freeze({ wood:180, iron:40 }), seconds:20,
+          hp:1600, range:270, reload:2.4, shots:3, damage:18, vision:450 }),
+        Object.freeze({ label:'Zwaar versterkte toren', cost:Object.freeze({ wood:260, iron:90 }), seconds:30,
+          hp:2200, range:300, reload:2.2, shots:3, damage:22, vision:480 })]) }) : null,
     architecture: Object.freeze({
       version:'2.1', serviceGeneration:21, allowNewVersionPatchFiles:false, legacyBaseline:'0.7.1', legacyBaselineCommit:'29b038d3655d05be968bff6a80cb8f3162f1c8e8', migrationStrategy:'strangler-by-subsystem'
     })

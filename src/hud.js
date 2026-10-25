@@ -261,6 +261,10 @@
       const b = selectedBuilding;
       setHudText(selectionTitleEl, BUILDINGS[b.type].label);
       if (!b.complete) setSelectionDetails(`In aanbouw · ${Math.floor(b.construction * 100)}%`);
+      else if (b.type === 'tower' && window.__WATCHTOWER_V1__) {
+        const level = window.__WATCHTOWER_V1__.levelOf(b);
+        setSelectionDetails(`Niveau ${b.towerLevel || 1}/3 · ${level.label} · ${Math.max(0, Math.floor(b.hp))}/${b.maxHp} HP · bereik ${level.range}${b.towerUpgradeTo ? ` · Upgrade ${Math.floor(b.towerUpgradeProgress * 100)}%` : ''}`);
+      }
       else if (b.queue.length) setSelectionDetails(`Productie: ${b.queue[0].label} · ${Math.floor(b.production * 100)}% · queue ${b.queue.length}`);
       else setSelectionDetails(`${Math.max(0, Math.floor(b.hp))}/${b.maxHp} HP`);
     } else if (selectedUnits.size) {

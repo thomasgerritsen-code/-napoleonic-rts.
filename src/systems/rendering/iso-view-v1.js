@@ -1053,6 +1053,27 @@
   // ---- props for buildings and resources ----
   const BUILDING_PROP = { towncenter: 'barracks', barracks: 'barracks', house: 'cottage', tower: 'tower', hospital: 'hospital' };
   const SIDED_PROPS = new Set(['barracks', 'tower', 'hospital']);
+  // Two tiny cached overlays; upgraded towers still use the GPU sprite batch.
+  const towerWorks = new Map();
+  function towerWorksSprite(level) {
+    if (towerWorks.has(level)) return towerWorks.get(level);
+    const c = document.createElement('canvas'); c.width = 160; c.height = 84;
+    const g = c.getContext('2d');
+    for (let edge = 0; edge < 2; edge++) for (let i = 0; i < 9; i++) {
+      const x = 20 + edge * 60 + i * 7.5, y = 30 + (edge ? 1 - i / 8 : i / 8) * 28;
+      if (level === 2) {
+        g.fillStyle = i % 2 ? '#705034' : '#8a653c';
+        g.fillRect(x - 3, y - 21, 6, 23);
+        g.fillStyle = '#b39462'; g.beginPath(); g.moveTo(x - 3, y - 21); g.lineTo(x, y - 26); g.lineTo(x + 3, y - 21); g.fill();
+      } else {
+        for (let row = 0; row < 2; row++) {
+          g.fillStyle = (i + row) % 2 ? '#a99a75' : '#c0af86'; g.strokeStyle = '#75694e'; g.lineWidth = 1;
+          g.beginPath(); g.ellipse(x, y - row * 7 - 3, 6, 5, edge ? -.35 : .35, 0, Math.PI * 2); g.fill(); g.stroke();
+        }
+      }
+    }
+    towerWorks.set(level, c); return c;
+  }
   function buildingDrawable(b) {
     if (b.dead) return null;
     if (b.side === 'britain' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(b)) return null;
@@ -1068,6 +1089,10 @@
     return { gpu: b.complete !== false, y: b.y + b.h * 0.3, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       if (b.complete === false) { drawConstruction(b, prop, k); view.stats.props++; return; }
       drawScenery(prop.image, sx(b.x) - prop.pivot.x * k, gy(b.x, b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
+      if (b.type === 'tower' && b.towerLevel >= 2) {
+        const w = b.w * z() * 1.8;
+        drawScenery(towerWorksSprite(b.towerLevel), sx(b.x) - w / 2, gy(b.x, b.y) - w * 30 / 160, w, w * 84 / 160);
+      }
       view.stats.props++;
     } };
   }
@@ -1515,7 +1540,7 @@
     const circles = [];
     for (const u of selectedUnits) { const r = rangeOf(u); if (r) circles.push([u.x, u.y, r]); }
     const b = typeof selectedBuilding !== 'undefined' ? selectedBuilding : null;
-    const tower = b && !b.dead && b.type === 'tower' && b.complete !== false ? global.__WATCHTOWER_V1__?.config?.range : 0;
+    const tower = b && !b.dead && b.type === 'tower' && b.complete !== false ? global.__WATCHTOWER_V1__?.levelOf(b)?.range : 0;
     if (tower) circles.push([b.x, b.y, tower]);
     view.stats.rangeRings = circles.length;
     if (!circles.length) { view.stats.inReach = 0; return; }

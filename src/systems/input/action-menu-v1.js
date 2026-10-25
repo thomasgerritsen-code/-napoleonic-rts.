@@ -22,7 +22,7 @@
     'rotate-left': 'formatie', 'rotate-right': 'formatie', skirmish: 'formatie',
     'create-regiment': 'regiment', 'reinforce-regiment': 'regiment', 'select-nearby-infantry': 'regiment', 'add-nearest-regiment': 'regiment',
     'toggle-regiment-tap-selection': 'regiment', 'create-cavalry-regiment': 'regiment', 'create-battery': 'regiment', 'crew-gun': 'regiment',
-    'farm-assign': 'werk', 'resume-construction': 'werk', 'set-rally': 'productie',
+    'farm-assign': 'werk', 'resume-construction': 'werk', 'set-rally': 'productie', 'tower-upgrade': 'productie',
     'quick-regiment': 'regiment', 'quick-regiment-barracks': 'productie', 'train-missing': 'productie', 'auto-regiment': 'productie'
   };
   function groupOf(el) {
