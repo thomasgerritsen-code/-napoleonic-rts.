@@ -50,10 +50,15 @@ Kies **Multiplayer**, maak een kamer en deel de uitnodiging met de tweede speler
 De gratis server is begrensd op één gelijktijdige kamer en kan na inactiviteit
 in slaap vallen. Dit is een testopstelling; meet de simulatiesnelheid voordat
 je deze hosting voor grotere of langdurige wedstrijden gebruikt.
-De eerste openbare proef met twee spelers slaagde voor verbinden, bewegen en
-productie aan beide kanten, maar haalde slechts 7,5 seconden simulatie in
-37,44 seconden echte tijd. De gratis CPU-capaciteit is daarmee onvoldoende
-voor vloeiende wedstrijden; schaal rekenkracht pas op met een gekozen budget.
+De eerste openbare proef met de oude statusoverdracht slaagde functioneel,
+maar haalde slechts 7,5 seconden simulatie in 37,44 seconden echte tijd.
+Daarom gebruikt de server nu de native JSON-encoder voor de overdracht tussen
+Chromium en Node, in plaats van Playwright ieder statusveld apart te laten
+verpakken. Zichtberekeningen worden per speler en moment hergebruikt; beweging,
+zichtbereik en de andere speler krijgen steeds een nieuwe zichtcontrole.
+In een lokale proef daalde de tijd voor honderd statusoverdrachten van circa
+6,4 naar 0,5 seconde. Dit is geen garantie voor alle legers op de gratis server;
+controleer ook de openbare simulatieklok voordat je meer kamers toestaat.
 
 Render bouwt het bestaande `Dockerfile` vanaf de branch
 `claude/continue-updates-o6whr4`. Laat **Docker Command** leeg, zodat de container

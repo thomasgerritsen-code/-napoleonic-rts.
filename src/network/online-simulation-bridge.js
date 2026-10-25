@@ -58,8 +58,18 @@
       for(const u of units){if(u.dead&&!deadSeen.has(u)){deadSeen.add(u);deaths.set(u.id,{u,at:elapsed});}else if(!u.dead){deaths.delete(u.id);deadSeen.delete(u);}}
       for(const [id,d]of deaths)if(elapsed-d.at>30)deaths.delete(id);
       while(deaths.size>512)deaths.delete(deaths.keys().next().value);
-      const watchers=[...units.filter(u=>!u.dead&&u.side===side),...buildings.filter(b=>!b.dead&&b.complete&&b.side===side)];
-      const canSee=e=>e.side===side || watchers.some(w=>{const r=visionRadius(w);return (e.x-w.x)**2+(e.y-w.y)**2<=r*r;});
+      // A snapshot is synchronous: sight ranges and positions do not change
+      // while it is built. Reuse each watcher's range and each entity's result
+      // only within this snapshot; the next side/tick gets fresh visibility.
+      const watchers=[...units.filter(u=>!u.dead&&u.side===side),...buildings.filter(b=>!b.dead&&b.complete&&b.side===side)]
+        .map(w=>({x:w.x,y:w.y,r2:visionRadius(w)**2}));
+      const seen=new Map();
+      const canSee=e=>{
+        if(e.side===side)return true;
+        if(seen.has(e))return seen.get(e);
+        const visible=watchers.some(w=>(e.x-w.x)**2+(e.y-w.y)**2<=w.r2);
+        seen.set(e,visible);return visible;
+      };
       const visibleUnits=units.filter(u=>!u.dead&&canSee(u)), ids=new Set(visibleUnits.map(u=>u.id));
       const viewSide=e=>({...e,nativeSide:e.side,side:side==='britain'?flip(e.side):e.side});
       const unitViews=visibleUnits.map(u=>{

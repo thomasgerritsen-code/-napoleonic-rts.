@@ -24,7 +24,10 @@ async function createSimulationHost({baseURL,executablePath=process.env.CHROMIUM
         await page.goto(`${baseURL}/play.html?view=iso&test=net&gpu=off`,{waitUntil:'load',timeout:30000});
         await page.waitForFunction(()=>!!window.__ONLINE_SIM_V1__,null,{timeout:15000});
         if(bootErrors.length)throw Error(`Incomplete simulation boot: ${bootErrors.join('; ')}`);
-        return {advance:(commands,advance=true,snapshot=true,seconds=.05)=>page.evaluate(({commands,advance,snapshot,seconds})=>window.__ONLINE_SIM_V1__.advance(commands,advance,snapshot,seconds),{commands,advance,snapshot,seconds}),
+        // Playwright's object bridge recursively wraps every snapshot property.
+        // Use the same JSON representation as the network protocol, so its
+        // native encoder carries one string across the browser/Node boundary.
+        return {advance:async(commands,advance=true,snapshot=true,seconds=.05)=>JSON.parse(await page.evaluate(({commands,advance,snapshot,seconds})=>JSON.stringify(window.__ONLINE_SIM_V1__.advance(commands,advance,snapshot,seconds)),{commands,advance,snapshot,seconds})),
           close:()=>context.close()};
       } catch(e){await context.close();throw e;}
     },

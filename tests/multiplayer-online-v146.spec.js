@@ -92,6 +92,32 @@ test('a lost connection pauses both players, resumes the same side and refreshes
 async function request(message,origin='http://127.0.0.1:4173'){
   return new Promise((resolve,reject)=>{const ws=new WebSocket(endpoint,{origin});const timer=setTimeout(()=>{ws.terminate();reject(Error('No server response'));},10000);ws.on('open',()=>ws.send(JSON.stringify(message)));ws.on('message',data=>{clearTimeout(timer);const msg=JSON.parse(data);ws.close();resolve(msg);});ws.on('error',e=>{clearTimeout(timer);reject(e);});});
 }
+test('snapshot visibility follows movement and changed sight range without sharing cached results between sides',async({browser})=>{
+  const context=await browser.newContext();
+  try{
+    await context.addInitScript(()=>{window.__NRTS_SERVER__=true;window.__NRTS_HUMAN_BRITAIN__=true;});
+    const page=await context.newPage();
+    await page.goto(`http://127.0.0.1:${app.address.port}/play.html?view=iso&test=net&gpu=off`);
+    await page.waitForFunction(()=>!!window.__ONLINE_SIM_V1__);
+    const result=await page.evaluate(()=>{
+      for(const u of units){u.x=u.side==='france'?100:900;u.y=100;}
+      for(const b of buildings)b.complete=false;
+      const enemy=units.find(u=>u.side==='britain'),resource=resources[0];
+      enemy.x=190;resource.x=190;resource.y=100;resource.amount=17;resource.maxAmount=99;
+      let radius=100;visionRadius=()=>radius;
+      const read=()=>__ONLINE_SIM_V1__.advance([],false).views;
+      const near=read();enemy.x=210;resource.x=210;const far=read();radius=200;const wider=read();
+      return {id:enemy.id,resourceId:resource.id,near,far,wider};
+    });
+    const visible=view=>view.state.units.some(u=>u.id===result.id);
+    const amount=view=>view.state.resources.find(r=>r.id===result.resourceId).amount;
+    expect(visible(result.near.france)).toBe(true);
+    expect(visible(result.far.france)).toBe(false);
+    expect(visible(result.far.britain)).toBe(true);
+    expect(visible(result.wider.france)).toBe(true);
+    expect([amount(result.near.france),amount(result.far.france),amount(result.wider.france)]).toEqual([17,99,17]);
+  }finally{await context.close();}
+});
 test('real transport rejects foreign origins, invalid sessions, full rooms and protocol mismatch',async({browser})=>{
   const p=await players(browser);
   try{
