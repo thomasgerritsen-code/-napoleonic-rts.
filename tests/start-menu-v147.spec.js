@@ -28,6 +28,8 @@ test('singleplayer starts the live battle without a socket and can return to the
   expect(new URL(page.url()).searchParams.has('server')).toBe(false);
   await page.waitForFunction(()=>window.__ISO_VIEW_V1__?.stats().assets.ready);
   await expect.poll(()=>page.evaluate(()=>elapsed)).toBeGreaterThan(0);
+  await expect(page.locator('#multiplayerButton, #onlineLobby')).toHaveCount(0);
+  expect(await page.evaluate(()=>typeof window.__ONLINE_MATCH_V1__)).toBe('undefined');
   expect(sockets).toEqual([]);await page.getByRole('link',{name:'Hoofdmenu',exact:true}).click();
   await expect(page.locator('#startSingleplayer')).toBeVisible();expect(await page.locator('canvas').count()).toBe(0);expect(errors).toEqual([]);
 });

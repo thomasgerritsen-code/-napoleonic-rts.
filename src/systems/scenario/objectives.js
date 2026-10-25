@@ -61,7 +61,7 @@
     #territoriesPanel{box-sizing:border-box;color:#eee6d4;background:#19231d;border:1px solid #b6a071;border-radius:12px;padding:20px;width:min(440px,calc(100vw - 24px));max-height:88dvh;overflow:auto;font:15px/1.45 system-ui}
     #territoriesPanel::backdrop{background:rgba(0,0,0,.7)}#territoriesPanel h2{margin:0 0 10px}#territoriesPanel p{margin:5px 0}#territoriesPanel article{border-top:1px solid #52604d;padding:12px 0}
     #territoriesPanel button{min-height:44px;font:inherit;padding:7px 12px}#territoriesClose{float:right}#territoriesPanel .territory-status{color:#f2d98f}
-    @media(pointer:coarse),(max-width:860px){#territoriesButton{position:fixed;right:10px;top:158px;z-index:41;min-width:76px;min-height:40px;font-size:12px}}
+    @media(pointer:coarse),(max-width:860px){#territoriesButton{position:fixed;right:10px;top:${root.__NRTS_LOBBY_ONLY__?158:108}px;z-index:41;min-width:76px;min-height:40px;font-size:12px}}
   `;document.head.appendChild(style);
   const button=document.createElement('button');button.type='button';button.id='territoriesButton';button.setAttribute('aria-haspopup','dialog');
   document.querySelector('.topbar').appendChild(button);

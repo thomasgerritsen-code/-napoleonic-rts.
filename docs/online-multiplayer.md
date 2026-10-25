@@ -11,6 +11,9 @@ De strijd begint als beide spelers verbonden zijn en hun afbeeldingen geladen zi
 De spelserver verwerkt beweging, verzamelen, bouwen, productie, regimenten,
 officiertoewijzing, formaties, gevechtsbevelen, verzamelpunten en bijzondere
 acties zoals verdedigen en tirailleurs. Camera, selectie en menu's blijven lokaal.
+Singleplayer heeft geen onlineknop, multiplayerlobby of online sessie. Ga via
+**Hoofdmenu → Multiplayer** naar online spelen; uitnodigingslinks blijven
+rechtstreeks de juiste kamer openen.
 Een nieuwe slag starten tijdens een online wedstrijd opent de lobby; eerst de
 wedstrijd verlaten voorkomt dat één speler onbedoeld alleen zijn spel reset.
 

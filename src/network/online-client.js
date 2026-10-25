@@ -1,7 +1,9 @@
 'use strict';
 (function installOnlineClient(root){
   if(document.readyState!=='complete'){addEventListener('load',()=>installOnlineClient(root),{once:true});return;}
-  if(root.__NRTS_SERVER__||root.__ONLINE_MATCH_V1__)return;
+  // Only the multiplayer entry and invitation links install online controls.
+  // Singleplayer keeps its local inputs and AI without a lobby or session.
+  if(root.__NRTS_SERVER__||root.__ONLINE_MATCH_V1__||!root.__NRTS_LOBBY_ONLY__)return;
   const params=new URLSearchParams(location.search), protocol=root.NRTS_COMMAND_PROTOCOL;
   const storage={get:(kind,key)=>{try{return root[kind].getItem(key);}catch(_){return null;}},set:(kind,key,value)=>{try{root[kind].setItem(key,value);}catch(_){}}};
   const endpointDefault=params.get('server')||root.NRTS_MULTIPLAYER_URL||storage.get('localStorage','nrts-server')||(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)||location.port?`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/multiplayer`:'');
