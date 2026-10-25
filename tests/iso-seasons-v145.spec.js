@@ -69,8 +69,8 @@ test('the compact season label fits phone orientations and resets along with sno
 });
 
 test('palette recolouring preserves alpha, trunks and shadows and stays inside a bounded cache',async({page})=>{
- await page.route('**/*',r=>new URL(r.request().url()).pathname==='/'?r.fulfill({contentType:'text/html',body:'<script>window.NRTS_CONFIG={seasons:{paletteBudgetMiB:1}};</script><script src="/src/systems/rendering/seasonal-props-v1.js"></script>'}):r.continue());
- await page.goto('/');
+ await page.route('**/*',r=>new URL(r.request().url()).pathname==='/play.html'?r.fulfill({contentType:'text/html',body:'<script>window.NRTS_CONFIG={seasons:{paletteBudgetMiB:1}};</script><script src="/src/systems/rendering/seasonal-props-v1.js"></script>'}):r.continue());
+ await page.goto('/play.html');
  const r=await page.evaluate(()=>{
   const api=window.__SEASONAL_PROPS_V1__,image=document.createElement('canvas');image.width=6;image.height=1;const c=image.getContext('2d'),data=c.createImageData(6,1);data.data.set([40,100,30,255,100,60,30,255,0,0,0,80,0,0,0,0,100,100,100,255,220,220,220,255]);c.putImageData(data,0,0);
   const original=[...c.getImageData(0,0,6,1).data];api.beginFrame();const autumn=[...api.source(image,'autumn').getContext('2d').getImageData(0,0,6,1).data];

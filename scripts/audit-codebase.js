@@ -72,19 +72,23 @@ function flattenManifestPaths(manifest) {
 }
 
 function auditIndex(manifest) {
-  const html = read('index.html');
-  const scriptRefs = [...html.matchAll(/<script\s+[^>]*src=["']([^"']+)["'][^>]*><\/script>/g)]
-    .map(match => match[1].split('?')[0]);
+  const allRefs = [];
+  for (const page of ['index.html', 'play.html']) {
+    const html = read(page);
+    const scriptRefs = [...html.matchAll(/<script\s+[^>]*src=["']([^"']+)["'][^>]*><\/script>/g)]
+      .map(match => match[1].split('?')[0]);
 
-  const duplicates = [...new Set(scriptRefs.filter((item, index) => scriptRefs.indexOf(item) !== index))];
-  if (duplicates.length) fail(`dubbele runtime scripts in index.html: ${duplicates.join(', ')}`);
-  scriptRefs.forEach(ref => assertFile(ref, 'index.html'));
+    const duplicates = [...new Set(scriptRefs.filter((item, index) => scriptRefs.indexOf(item) !== index))];
+    if (duplicates.length) fail(`dubbele runtime scripts in ${page}: ${duplicates.join(', ')}`);
+    scriptRefs.forEach(ref => assertFile(ref, page));
 
-  const retired = new Set(manifest.retiredFromRuntime || []);
-  const retiredLoaded = scriptRefs.filter(ref => retired.has(ref));
-  if (retiredLoaded.length) fail(`retired scripts worden opnieuw runtime geladen: ${retiredLoaded.join(', ')}`);
+    const retired = new Set(manifest.retiredFromRuntime || []);
+    const retiredLoaded = scriptRefs.filter(ref => retired.has(ref));
+    if (retiredLoaded.length) fail(`retired scripts worden opnieuw runtime geladen: ${retiredLoaded.join(', ')}`);
 
-  return scriptRefs;
+    allRefs.push(...scriptRefs);
+  }
+  return allRefs;
 }
 
 function auditManifest(manifest, jsFiles) {
@@ -123,6 +127,10 @@ function auditVersion() {
     badge: badgeMatch[1]
   };
   const unique = new Set(Object.values(versions));
+  const game=read('play.html');
+  const gameTitle=game.match(/<title>Napoleonic RTS v([^<]+)<\/title>/),gameBadge=game.match(/class=["']version["']>v([^<]+)</);
+  if(!gameTitle||!gameBadge)fail('spelversie ontbreekt in play.html');
+  unique.add(gameTitle[1]);unique.add(gameBadge[1]);
   if (unique.size !== 1) fail(`versies lopen uiteen: ${JSON.stringify(versions)}`);
   return pkg.version;
 }

@@ -21,7 +21,7 @@ async function createSimulationHost({baseURL,executablePath=process.env.CHROMIUM
       page.on('pageerror',e=>{bootErrors.push(e.message);console.error('Simulation error:',e.message);});
       page.on('response',r=>{if(r.request().resourceType()==='script'&&!r.ok())bootErrors.push(`Script ${new URL(r.url()).pathname}: ${r.status()}`);});
       try {
-        await page.goto(`${baseURL}/?view=iso&test=net&gpu=off`,{waitUntil:'load',timeout:30000});
+        await page.goto(`${baseURL}/play.html?view=iso&test=net&gpu=off`,{waitUntil:'load',timeout:30000});
         await page.waitForFunction(()=>!!window.__ONLINE_SIM_V1__,null,{timeout:15000});
         if(bootErrors.length)throw Error(`Incomplete simulation boot: ${bootErrors.join('; ')}`);
         return {advance:(commands,advance=true,snapshot=true,seconds=.05)=>page.evaluate(({commands,advance,snapshot,seconds})=>window.__ONLINE_SIM_V1__.advance(commands,advance,snapshot,seconds),{commands,advance,snapshot,seconds}),

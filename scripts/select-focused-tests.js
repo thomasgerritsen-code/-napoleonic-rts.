@@ -13,7 +13,7 @@ function selectFocusedTests(files) {
   );
 
   const restorationFiles = new Set([
-    'index.html','src/foundation/config.js','src/systems/world/gameplay-building-scale-v1.js','src/systems/world/ecology-v1.js','src/systems/rendering/map-realism.js','src/systems/rendering/natural-resources-v1.js','src/systems/rendering/characters.js','src/systems/rendering/artillery-topdown-v1.js','src/systems/artillery/crew-approach-v1.js','src/systems/movement/stuck-recovery-v1.js','src/systems/ai/authority-v2.js','src/systems/input/formation-drag-v1.js','tests/restoration-batch-v1.spec.js'
+    'index.html','play.html','src/foundation/config.js','src/systems/world/gameplay-building-scale-v1.js','src/systems/world/ecology-v1.js','src/systems/rendering/map-realism.js','src/systems/rendering/natural-resources-v1.js','src/systems/rendering/characters.js','src/systems/rendering/artillery-topdown-v1.js','src/systems/artillery/crew-approach-v1.js','src/systems/movement/stuck-recovery-v1.js','src/systems/ai/authority-v2.js','src/systems/input/formation-drag-v1.js','tests/restoration-batch-v1.spec.js'
   ]);
 
   const addNavigation = () => {
@@ -49,7 +49,7 @@ function selectFocusedTests(files) {
     if (file === 'src/systems/navigation/bridge-formation-flow-v1.js') addBridgeFollowerSafety();
     if (file === 'src/systems/rendering/map-realism.js' || file === 'src/systems/rendering/map-ambient-motion.js' || file === 'src/systems/performance/large-army-v1.js' || file === 'tests/2d-performance-v132.spec.js') add2DPerformance();
     if (file === 'src/assets/musketeer-sprite-v1.js' || file === 'src/systems/rendering/musketeer-sprites-v1.js' || file === 'tests/musketeer-sprites-v1.spec.js') addMusketeerSprites();
-    if (file === 'index.html' || file === 'style.css') add2DPerformance();
+    if (file === 'index.html' || file === 'play.html' || file === 'style.css') add2DPerformance();
     if (file.startsWith('graphics-lab/')) {
       for (const spec of ['tests/graphics-lab-v319.spec.js', 'tests/graphics-lab-v320.spec.js', 'tests/graphics-lab-v321-atlas.spec.js', 'tests/graphics-lab-iso-v342.spec.js']) {
         if (fs.existsSync(spec)) selected.add(spec);
@@ -59,7 +59,7 @@ function selectFocusedTests(files) {
     if (file.startsWith('src/foundation/') || file === 'tests/foundation-v071.spec.js') selected.add('tests/foundation-v071.spec.js');
     if (file === 'src/foundation/runtime.js' || file === 'src/foundation/config.js' || file === 'src/systems/world/api.js' || file === 'src/systems/navigation/api.js' || file === 'src/systems/movement/api.js' || file === 'tests/architecture-v21.spec.js') addArchitectureV21();
 
-    if (file === 'index.html' || file === 'src/v069-map.js' || file === 'src/systems/world/map-expansion-v7.js' || file === 'src/systems/world/topdown-buildings.js' || file.startsWith('src/systems/world/village-') || file === 'src/systems/world/building-placement.js' || file === 'src/systems/world/gameplay-building-scale-v1.js' || file === 'src/systems/world/ecology-v1.js' || file === 'tests/village-renderer-v2.spec.js') addVillage();
+    if (file === 'index.html' || file === 'play.html' || file === 'src/v069-map.js' || file === 'src/systems/world/map-expansion-v7.js' || file === 'src/systems/world/topdown-buildings.js' || file.startsWith('src/systems/world/village-') || file === 'src/systems/world/building-placement.js' || file === 'src/systems/world/gameplay-building-scale-v1.js' || file === 'src/systems/world/ecology-v1.js' || file === 'tests/village-renderer-v2.spec.js') addVillage();
 
     if (file === 'src/systems/world/map-expansion-v7.js' || file === 'src/systems/world/village-scale-v7.js' || file === 'src/systems/navigation/village-obstacles-v7.js' || file === 'tests/village-navigation-v7.spec.js') selected.add('tests/village-navigation-v7.spec.js');
 

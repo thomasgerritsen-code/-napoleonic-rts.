@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <script>
+    // The game is played in the iso view only: a plain visit goes straight there.
+    // (Automated browsers keep the old 2D page, which much of the test suite drives.)
+    if (!location.search && !navigator.webdriver) location.replace(location.pathname + '?view=iso' + location.hash);
+    const entry = new URLSearchParams(location.search);
+    window.__NRTS_LOBBY_ONLY__ = entry.get('mode') === 'multiplayer' || (entry.has('room') && entry.get('mode') !== 'singleplayer');
+    if (entry.get('view') === 'iso') window.__ISO_ASSETS_READY__ = false;
+  </script>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta name="theme-color" content="#111713" />
+  <title>Napoleonic RTS v1.4.7</title>
+  <link rel="stylesheet" href="style.css?build=147menu" />
+  <link rel="stylesheet" href="v05.css" />
+  <link rel="stylesheet" href="v06.css" />
+  <link rel="stylesheet" href="v062.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="game" aria-label="Napoleonic RTS speelveld"></canvas>
+  <header class="hud topbar">
+    <div class="brand"><strong>NAPOLEONIC RTS</strong><span class="version">v1.4.7</span></div>
+    <div class="resources"><span>🇫🇷 🍞 <strong id="food">0</strong></span><span>🪵 <strong id="wood">0</strong></span><span>⛏️ <strong id="iron">0</strong></span><span>👥 <strong id="population">0/0</strong></span></div>
+    <div id="status">Ontwikkel je leger.</div><button id="resetBtn" type="button">Nieuwe slag</button>
+  </header>
+  <aside class="hud help"><a id="mainMenuButton" class="game-menu-link" href="./">Hoofdmenu</a><strong>Besturing</strong><span>Slepen: selecteren · Shift+slepen: toevoegen</span><span>Klik groepslid: selecteer hele groep</span><span>Rechtsklik: lopen of verzamelen</span><span>1/2/3: linie, colonne of carré</span><span>Tab / Shift+Tab: volgend / vorig regiment</span><span>F: camera centreren op selectie</span><span>Q/E: groep 15° draaien</span><span>F3: test- en debugpaneel</span><span>Minimap: camera verplaatsen</span><span>WASD / pijltjes: camera verplaatsen</span><span>Muiswiel: in-/uitzoomen</span></aside>
+  <aside class="hud objective"><strong>Britse ontwikkeling</strong><span id="aiEconomy">Economie: —</span><span id="aiBuildings">Gebouwen: —</span><span id="aiRegiments">Regimenten: —</span><span id="aiPlan">Plan: opbouwen</span></aside>
+  <section class="hud bottombar">
+    <div class="selection-panel"><span class="label">Selectie</span><strong id="selectionTitle">Niets geselecteerd</strong><span id="selectionDetails">Selecteer troepen of een gebouw.</span></div>
+    <div class="actions" id="actions"><button type="button" data-action="build-barracks">Kazerne<br><small>300 🪵</small></button><button type="button" data-action="build-house">Woning<br><small>120 🪵</small></button><button type="button" data-action="build-farm">Graanakker<br><small>180 🪵</small></button><button type="button" data-formation="line">Linie</button><button type="button" data-formation="column">Colonne</button><button type="button" data-formation="square">Carré</button></div>
+    <div class="army-counts"><span>🇫🇷 <strong id="frenchCount">0</strong></span><span>🇬🇧 <strong id="britishCount">0</strong></span><span>🎖️ <strong id="frenchRegiments">0</strong></span></div>
+  </section>
+  <div id="buildHint" class="build-hint hidden">Klik op het terrein om te bouwen · Esc om te annuleren</div><div id="message" class="message hidden"></div>
+</div>
+<script src="src/foundation/deployment-info.js?build=local"></script>
+<script src="src/foundation/version.js?build=147menu"></script>
+<script src="src/foundation/runtime.js?build=arch21"></script>
+<script src="src/foundation/config.js?build=145seasons"></script>
+<script src="src/foundation/contracts.js"></script>
+<script src="src/foundation/legacy-manifest.js"></script>
+<script src="src/core.js?build=314a"></script>
+<script src="src/systems/performance/mobile-render-budget-v1.js?build=300d"></script>
+<script src="src/economy.js?build=292a"></script>
+<script src="src/regiments.js?build=140a"></script>
+<script src="src/combat-ai.js"></script>
+<script src="src/ai/production.js?build=140a"></script>
+<script src="src/ai/tactics.js?build=285b"></script>
+<script src="src/hud.js?build=140a"></script>
+<script src="src/selection.js"></script>
+<script src="src/systems/input/officer-regiment-mobile-v1.js?build=140a"></script>
+<script src="src/systems/input/mobile-nearby-selection-v1.js?build=nearby1"></script>
+<script src="src/systems/input/mobile-regiment-multiselect-v1.js?build=regmulti3"></script>
+<script src="src/navigation.js"></script>
+<script src="src/visibility.js"></script>
+<script src="src/systems/performance/frame-work-v1.js?build=perf1"></script>
+<script src="src/simulation-render.js?build=perf1"></script>
+<script src="src/systems/ai/proximity-engagement-v1.js?build=146online"></script>
+<script src="src/systems/rendering/order-target-feedback-v1.js?build=1321a"></script>
+<script src="src/v05.js?build=292a"></script>
+<script src="src/v06.js?build=140a"></script>
+<script src="src/v061.js"></script>
+<script src="src/systems/artillery/compound-unit.js?build=a2"></script>
+<script src="src/v063.js?build=292a"></script>
+<script src="src/simulation-api.js?build=mobile160"></script>
+<script src="src/input.js?build=147menu"></script>
+<script src="src/systems/input/playability-controls-v1.js?build=317b"></script>
+<script src="src/v063-fixes.js"></script>
+<script src="src/v064.js"></script>
+<script src="src/v065.js"></script>
+<script src="src/v066.js?build=282a"></script>
+<script src="src/systems/world/map-expansion-v7.js?build=284a"></script>
+<script src="src/systems/navigation/road-index.js?build=a3"></script>
+<script src="src/systems/navigation/route-planner.js?build=122a"></script>
+<script src="src/v067.js?build=140a"></script>
+<script src="src/systems/rendering/river-surface-v297.js?build=318a"></script>
+<script src="src/systems/rendering/river-banks-2d-v298.js?build=298a"></script>
+<script src="src/systems/rendering/river-flow-2d-v299.js?build=308a"></script>
+<script src="src/v068.js?build=250a"></script>
+<script src="src/v069-motion.js"></script>
+<script src="src/v069-combat.js"></script>
+<script src="src/v069-map.js?build=village7b"></script>
+<script src="src/systems/world/village-layout-v6.js?build=village124a"></script>
+<script src="src/systems/world/village-scale-v7.js?build=arch21"></script>
+<script src="src/systems/world/gameplay-building-scale-v1.js?build=restore1"></script>
+<script src="src/systems/world/village-collision-v4.js?build=295a"></script>
+<script src="src/systems/world/open-map-v1.js?build=open1"></script>
+<script src="src/systems/world/building-placement.js?build=295a"></script>
+<script src="src/systems/world/ecology-v1.js?build=313b"></script>
+<script src="src/systems/world/topdown-buildings.js?build=314a"></script>
+<script src="src/systems/world/village-renderer-v2.js?build=village7b"></script>
+<script src="src/systems/world/village-yard-blend-v5.js?build=village123a"></script>
+<script src="src/systems/world/village-landscape-v6.js?build=294a"></script>
+<script src="src/systems/world/village-landscape-v7.js?build=294a"></script>
+<script src="src/v070.js?build=070"></script>
+<script src="src/v070-motion.js?build=070c"></script>
+<script src="src/v070-regression-fixes.js?build=070d"></script>
+<script src="src/systems/world/village-authority-v6.js?build=133a"></script>
+<script src="src/systems/navigation/bridge-corridors.js?build=a2"></script>
+<script src="src/systems/navigation/bridge-route-resolver.js?build=284a"></script>
+<script src="src/systems/navigation/bridge-safety.js?build=a2"></script>
+<script src="src/systems/navigation/crossing-progress-v1.js?build=crossprogress250"></script>
+<script src="src/systems/navigation/bridge-formation-flow-v1.js?build=261a"></script>
+<script src="src/systems/navigation/bridge-follower-safety-v1.js?build=followersafety2"></script>
+<script src="src/systems/navigation/command-role-crossing-v1.js?build=122a"></script>
+<script src="src/systems/navigation/api.js?build=arch21"></script>
+<script src="src/systems/movement/state.js?build=a2"></script>
+<script src="src/systems/formation/followers.js?build=a2"></script>
+<script src="src/systems/movement/fixed-step.js?build=a2"></script>
+<script src="src/systems/movement/speed-model.js?build=a2"></script>
+<script src="src/systems/movement/road-exit-stability.js?build=a2"></script>
+<script src="src/systems/movement/api.js?build=arch21"></script>
+<script src="src/systems/navigation/village-obstacles-v7.js?build=village7b"></script>
+<script src="src/systems/world/api.js?build=arch21"></script>
+<script src="src/systems/rendering/map-realism.js?build=318a"></script>
+<script src="src/systems/rendering/map-ambient-motion.js?build=268a"></script>
+<script src="src/systems/rendering/natural-resources-v1.js?build=294a"></script>
+<script src="src/systems/rendering/characters.js?build=312a"></script>
+<script src="src/systems/rendering/regiment-visual-hierarchy-v1.js?build=150a"></script>
+<script src="src/systems/rendering/artillery-topdown-v1.js?build=275a"></script>
+<script src="src/systems/rendering/combat-animations.js?build=309a"></script>
+<script src="src/systems/audio/topdown-sound-v265.js?build=266a"></script>
+<script src="src/systems/rendering/topdown-march-v262.js?build=266a"></script>
+<script src="src/systems/rendering/topdown-effects-v264.js?build=278a"></script>
+<script src="src/systems/rendering/topdown-wind-control-v267.js?build=268a"></script>
+<script src="src/systems/rendering/topdown-volley-v271.js?build=277a"></script>
+<script src="src/systems/rendering/topdown-casualties-v272.js?build=275a"></script>
+<script src="src/systems/rendering/topdown-gun-crew-v273.js?build=275a"></script>
+<script src="src/systems/rendering/topdown-morale-v274.js?build=290a"></script>
+<script src="src/systems/rendering/topdown-cavalry-v275.js?build=275a"></script>
+<script src="src/foundation/legacy-simulation-adapter.js?build=110a"></script>
+<script src="src/systems/artillery/crew-approach-v1.js?build=restore1"></script>
+<script src="src/systems/movement/stuck-recovery-v1.js?build=perf1"></script>
+<script src="src/systems/navigation/river-crossing-recovery-v1.js?build=riverrecover1"></script>
+<script src="src/systems/movement/formation-traffic-v1.js?build=132a"></script>
+<script src="src/systems/movement/post-crossing-reform-v1322.js?build=1322b"></script>
+<script src="src/systems/movement/road-trail-marching-v1.js?build=248b"></script>
+<script src="src/systems/movement/column-cohesion-v1.js?build=250a"></script>
+<script src="src/systems/ai/authority-v2.js?build=140a"></script>
+<script src="src/systems/ai/topdown-tactics-v266.js?build=266a"></script>
+<script src="src/systems/combat/casualty-morale-v288.js?build=288a"></script>
+<script src="src/systems/morale/orderly-fallback-v289.js?build=290a"></script>
+<script src="src/systems/morale/regroup-v290.js?build=290a"></script>
+<script src="src/systems/ai/regroup-reserve-v291.js?build=291a"></script>
+<script src="src/systems/ai/order-discipline-v1322.js?build=1322a"></script>
+<script src="src/systems/ai/campaign-pressure-v1.js?build=140a"></script>
+<script src="src/systems/combat/regiment-orders-v1.js?build=146online"></script>
+<script src="src/systems/combat/watchtower-v1.js?build=tower2"></script>
+<script src="src/systems/combat/battle-depth-v1.js?build=depth4"></script>
+<script src="src/systems/world/weather-v1.js?build=146online"></script>
+<script src="src/systems/world/seasons-v1.js?build=145seasons"></script>
+<script src="src/systems/world/day-night-v1.js?build=145seasons"></script>
+<script src="src/systems/input/quick-regiment-v1.js?build=146online"></script>
+<script src="src/systems/input/gun-crew-v1.js?build=crew2"></script>
+<script src="src/systems/combat/grenades-v1.js?build=gren1"></script>
+<script src="src/systems/combat/medics-v1.js?build=146online"></script>
+<script src="src/systems/world/wildlife-v1.js?build=wild1"></script>
+<script src="src/systems/input/facing-arrow-v1.js?build=arrow1"></script>
+<script src="src/systems/performance/visibility-cache-v1.js?build=vis1"></script>
+<script src="src/systems/combat/troops-v1.js?build=146online"></script>
+<script src="src/systems/input/formation-drag-v1.js?build=restore1"></script>
+<script src="src/systems/performance/terrain-tiles-v301.js?build=310a"></script>
+<script src="src/systems/performance/large-army-v1.js?build=310b"></script>
+<script src="src/systems/performance/gpu-terrain-v303.js?build=140a"></script>
+<script src="src/systems/movement/regiment-march-v2.js?build=251a"></script>
+<script src="src/systems/performance/gpu-units-v304.js?build=312a"></script>
+<script src="src/systems/performance/gpu-resources-v306.js?build=306a"></script>
+<script src="src/systems/performance/gpu-buildings-v307.js?build=307a"></script>
+<script src="src/systems/performance/gpu-river-flow-v308.js?build=308a"></script>
+<script src="src/systems/performance/gpu-smoke-v309.js?build=140a"></script>
+<script src="src/systems/economy/farming-v314.js?build=314a"></script>
+<script src="src/systems/economy/resume-construction-v315.js?build=316a"></script>
+<script src="src/v05-debug.js?build=292a"></script>
+<script src="src/v06-debug.js"></script>
+<script src="src/v061-debug.js"></script>
+<script src="src/v063-debug.js"></script>
+<script src="src/v064-debug.js"></script>
+<script src="src/v065-debug.js"></script>
+<script src="src/v066-debug.js"></script>
+<script src="src/v067-debug.js"></script>
+<script src="src/v068-debug.js"></script>
+<script src="src/v069-debug.js"></script>
+<script src="src/v070-debug.js?build=070"></script>
+<script src="src/v071-debug.js?build=100b"></script>
+<script src="src/test-lab.js?build=100b"></script>
+<script src="src/systems/diagnostics/game-health-observer-v1.js?build=health1"></script>
+<script src="src/foundation/legacy-facades.js?build=259a"></script>
+<script src="src/systems/rendering/static-sprite-cache-v1.js?build=perf1"></script>
+<script src="src/systems/rendering/iso-gpu-v1.js?build=141mobile"></script>
+<script src="src/systems/rendering/wet-tracks-v1.js?build=143rain"></script>
+<script src="src/systems/rendering/seasonal-props-v1.js?build=145seasons"></script>
+<script src="src/systems/rendering/iso-view-v1.js?build=146online"></script>
+<script src="src/systems/input/action-menu-v1.js?build=140a"></script>
+<script src="src/systems/input/officer-assignment-v1.js?build=officer1"></script>
+<script src="src/network/command-protocol.js?build=146online"></script>
+<script src="src/network/match-authority.js?build=net1"></script>
+<script src="src/network/browser-command-gateway.js?build=146online"></script>
+<script src="src/network/endpoint.js?build=146online"></script>
+<script src="src/network/online-simulation-bridge.js?build=146online"></script>
+<script src="src/network/online-client.js?build=147menu"></script>
+<script>window.RTS_VERSION_INFO?.apply();</script>
+<script type="module" src="src/systems/movement/march-lab-live-v253.mjs?build=261a"></script>
+</body>
+</html>

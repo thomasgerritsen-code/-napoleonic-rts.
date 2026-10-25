@@ -18,7 +18,7 @@ async function players(browser){
   const france=await browser.newContext({viewport:{width:1280,height:900}}),britain=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:3});
   const a=await france.newPage(),b=await britain.newPage();
   const errors=[];for(const p of [a,b])p.on('pageerror',e=>errors.push(e.message));
-  await a.goto('/?view=iso&test=net&gpu=off');await a.click('#multiplayerButton');await a.fill('#onlineServer',endpoint);await a.click('#onlineHost');
+  await a.goto('/?view=iso&gpu=off&server='+encodeURIComponent(endpoint));await a.click('#startMultiplayer');await expect(a.locator('#onlineServer')).toHaveValue(endpoint);await a.click('#onlineHost');
   await poll(a,()=>window.__ONLINE_MATCH_V1__.stats().room);
   const room=await a.inputValue('#onlineRoom');
   await b.goto(`/?view=iso&test=net&gpu=off&server=${encodeURIComponent(endpoint)}&room=${room}`);
@@ -83,6 +83,8 @@ test('a lost connection pauses both players, resumes the same side and refreshes
     await b.evaluate(()=>document.getElementById('resetBtn').click());
     await expect(b.locator('#onlineLobby')).toBeVisible();
     expect(await b.evaluate(()=>__ONLINE_MATCH_V1__.side)).toBe('britain');
+    await b.click('#onlineClose');await b.click('#mobileMenuBtn');await b.click('#mainMenuButton');await expect(b.locator('#startMultiplayer')).toBeVisible();
+    expect(app.rooms.has(room)).toBe(false);
     expect(p.errors).toEqual([]);
   }finally{await p.close();}
 });

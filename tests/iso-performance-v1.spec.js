@@ -2,14 +2,14 @@ const {test,expect}=require('@playwright/test');
 test.describe.configure({timeout:120000});
 async function open(page,query='test=perf&view=iso'){
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('/?'+query);
+ await page.goto('/play.html?'+query);
  await page.waitForFunction(()=>window.__ISO_VIEW_V1__?.stats().assets.ready);
  return errors;
 }
 test('critical images gate the live battle and expose a recoverable loading error',async({page})=>{
  let release;const gate=new Promise(r=>release=r);
  await page.route('**/fr_iso_infantry_atlas_half.webp',async route=>{await gate;await route.continue();});
- await page.goto('/?view=iso',{waitUntil:'domcontentloaded'});
+ await page.goto('/play.html?view=iso',{waitUntil:'domcontentloaded'});
  await expect(page.locator('#isoLoading')).toBeVisible();
  const before=await page.evaluate(()=>elapsed);await page.waitForTimeout(300);
  expect(await page.evaluate(()=>elapsed)).toBe(before);
@@ -19,7 +19,7 @@ test('critical images gate the live battle and expose a recoverable loading erro
 });
 test('missing critical artwork keeps the game paused and offers retry',async({page})=>{
  await page.route('**/fr_iso_infantry_atlas_half.webp',route=>route.abort());
- await page.goto('/?view=iso');
+ await page.goto('/play.html?view=iso');
  await expect(page.getByRole('button',{name:'Opnieuw laden'})).toBeVisible();
  expect(await page.evaluate(()=>elapsed)).toBe(0);
  expect(await page.evaluate(()=>window.__ISO_ASSETS_READY__)).toBe(false);

@@ -1,10 +1,10 @@
 const {test,expect} = require('@playwright/test');
 async function rendererPage(page, query='&gpu=on') {
   await page.route('**/*', route => {
-    if (new URL(route.request().url()).pathname === '/') return route.fulfill({contentType:'text/html',body:'<canvas id="target" width="512" height="256"></canvas><script src="/src/systems/rendering/iso-gpu-v1.js"></script>'});
+    if (new URL(route.request().url()).pathname === '/play.html') return route.fulfill({contentType:'text/html',body:'<canvas id="target" width="512" height="256"></canvas><script src="/src/systems/rendering/iso-gpu-v1.js"></script>'});
     return route.continue();
   });
-  await page.goto('/?view=iso'+query);
+  await page.goto('/play.html?view=iso'+query);
 }
 for (const scale of [1,1.5]) test(`GPU sprites preserve cropping, alpha and painter order at ${scale}x pixel density`, async({page}) => {
   await rendererPage(page);
@@ -69,7 +69,7 @@ test('GPU off or unavailable retains Canvas2D', async({page}) => {
   await rendererPage(page,'&gpu=off');
   expect(await page.evaluate(()=>window.__ISO_GPU_V1__.stats().backend)).toBe('canvas2d');
   await page.addInitScript(() => {const base=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return type==='webgl2'?null:base.call(this,type,...args);};});
-  await page.goto('/?view=iso');
+  await page.goto('/play.html?view=iso');
   expect(await page.evaluate(()=>window.__ISO_GPU_V1__.active())).toBe(false);
 });
 test('a lost graphics context falls back and can be restored', async({page}) => {
@@ -91,7 +91,7 @@ test('a lost graphics context falls back and can be restored', async({page}) => 
 test('the actual isometric battle keeps the GPU active after asset warmup and camera changes', async({page}) => {
   test.setTimeout(120000);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
-  await page.goto('/?test=gpu-battle&view=iso&gpu=on');
+  await page.goto('/play.html?test=gpu-battle&view=iso&gpu=on');
   await page.waitForFunction(()=>window.__ISO_VIEW_V1__?.stats().assets.ready,null,{timeout:90000});
   const stats=await page.evaluate(()=>{
     for(let i=0;i<12;i++)window.renderStableFrameV1(()=>{},performance.now());

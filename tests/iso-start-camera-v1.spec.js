@@ -7,7 +7,7 @@ async function openPhone(browser, viewport, query = 'view=iso') {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/?' + query);
+  await page.goto('/play.html?' + query);
   await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().ground && window.__ISO_VIEW_V1__.stats().workerSprites);
   return { context, page, errors };
 }

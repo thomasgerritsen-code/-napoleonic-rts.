@@ -18,7 +18,10 @@
   document.body.appendChild(dialog);
   const el=id=>document.getElementById(id),status=text=>{el('onlineStatus').textContent=text;};
   el('onlineServer').value=endpointDefault;el('onlineRoom').value=params.get('room')||'';
-  button.onclick=()=>dialog.showModal();el('onlineClose').onclick=()=>dialog.close();
+  button.onclick=()=>dialog.showModal();
+  const lobbyEntry=params.get('mode')==='multiplayer';
+  el('onlineClose').onclick=()=>{if(lobbyEntry&&!online.active)location.assign(new URL('./',location.href).href);else dialog.close();};
+  dialog.addEventListener('cancel',e=>{if(lobbyEntry&&!online.active){e.preventDefault();location.assign(new URL('./',location.href).href);}});
   let socket=null,retry=null,readyTimer=null,generation=0,seq=0,retryDelay=500,ended=false,baseline=null,credentials=null,endpoint='',room='',side=null,lastTick=-1;
   const online={active:false,phase:'offline',view:null,lastReceivedAt:0,side:null,frame:(now,dt)=>root.__ONLINE_VIEW_V1__.frame(now,dt),send,
     stats:()=>({phase:online.phase,side,room,tick:lastTick,seq,connected:socket?.readyState===WebSocket.OPEN})};
@@ -77,7 +80,7 @@
         retryDelay=500;room=msg.room;side=msg.side;seq=msg.seq;online.side=side;credentials={token:msg.token};
         storage.set('sessionStorage',sessionKey(),JSON.stringify(credentials));
         el('onlineRoom').value=room;el('onlineShare').hidden=false;
-        const invite=new URL(location.href);invite.hash='';invite.search='';invite.searchParams.set('view','iso');invite.searchParams.set('v','146');invite.searchParams.set('server',endpoint);invite.searchParams.set('room',room);el('onlineInvite').value=invite.href;
+        const invite=new URL(location.href);invite.hash='';invite.search='';invite.searchParams.set('view','iso');invite.searchParams.set('mode','multiplayer');invite.searchParams.set('v','147');invite.searchParams.set('server',endpoint);invite.searchParams.set('room',room);el('onlineInvite').value=invite.href;
         const current=new URL(location.href);current.searchParams.set('server',endpoint);current.searchParams.set('room',room);history.replaceState(null,'',current.href);
         const flag=document.querySelector('.resources > span');if(flag)flag.firstChild.textContent=side==='france'?'🇫🇷 🍞 ':'🇬🇧 🍞 ';
         const ready=()=>{if(mine!==generation||ws.readyState!==WebSocket.OPEN)return;if(root.__ISO_ASSETS_READY__===false||!baseline){status(root.__ISO_ASSETS_READY__===false?'Kaart en afbeeldingen laden…':'Spelstatus ophalen…');readyTimer=setTimeout(ready,100);return;}ws.send(JSON.stringify({type:'ready'}));};ready();return;
@@ -110,6 +113,9 @@
   }
   el('onlineHost').onclick=()=>begin('create');el('onlineJoin').onclick=()=>begin('join');
   el('onlineCopy').onclick=async()=>{try{await navigator.clipboard.writeText(el('onlineInvite').value);status('Uitnodiging gekopieerd. Deel hem met de andere speler.');}catch(_){el('onlineInvite').focus();el('onlineInvite').select();status('Selecteer en kopieer de uitnodigingslink.');}};
-  el('onlineLeave').onclick=()=>{ended=true;generation++;clearTimeout(retry);clearTimeout(readyTimer);if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'leave'}));socket?.close();const url=new URL(location.href);url.searchParams.delete('room');url.searchParams.delete('server');location.assign(url.href);};
-  if(params.has('room')){dialog.showModal();begin('join');}
+  function leave(){ended=true;generation++;clearTimeout(retry);clearTimeout(readyTimer);if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'leave'}));socket?.close();location.assign(new URL('./',location.href).href);}
+  el('onlineLeave').onclick=leave;
+  el('mainMenuButton')?.addEventListener('click',e=>{if(online.active){e.preventDefault();leave();}});
+  if(params.has('room')&&params.get('mode')!=='singleplayer'){dialog.showModal();begin('join');}
+  else if(lobbyEntry)dialog.showModal();
 })(window);

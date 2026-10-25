@@ -5,7 +5,7 @@ test.describe.configure({ timeout: 90_000 });
 async function openGame(page, query) {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('/?' + query, { waitUntil: 'domcontentloaded' });
+  await page.goto('/play.html?' + query, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__RTS_DEBUG__?.getState));
   return errors;
 }

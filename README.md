@@ -1,6 +1,18 @@
-# Napoleonic RTS — v1.4.6
+# Napoleonic RTS — v1.4.7
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
+
+## v1.4.7 — startmenu
+
+De game opent eerst een licht startscherm met **Singleplayer** en **Multiplayer**.
+De kaart, soldaten en renderer laden pas na je keuze. Singleplayer begint de
+gewone slag tegen de computer; Multiplayer opent de lobby en wacht op een kamer.
+Tijdens die keuze loopt er geen singleplayer-simulatie op de achtergrond.
+**Hoofdmenu** brengt je terug; een actieve online kamer wordt daarbij verlaten.
+Op telefoons staat Hoofdmenu achter de bestaande knop Menu.
+
+`index.html` is het startscherm; `play.html` bevat de bestaande battlefield-bootstrap.
+Bestaande uitnodigingen en expliciete `?test=…`-links blijven werken.
 
 ## v1.4.6 — eerste online multiplayer
 
@@ -12,7 +24,7 @@ opnieuw te verbinden. Singleplayer blijft beschikbaar zonder serververbinding.
 
 Start lokaal met `npm ci`, `npx playwright install --with-deps chromium` en
 `npm run start:server`. Open daarna `http://localhost:8080/?view=iso` en kies
-**Online → Spel hosten**. De uitnodigingslink is voor een tweede speler.
+**Multiplayer → Spel hosten**. De uitnodigingslink is voor een tweede speler.
 Voor internetspel moet deze server publiek op HTTPS/WSS draaien. Een lokaal
 localhost-adres werkt alleen op dezelfde computer. Hosting, grenzen en de
 stapsgewijze servermigratie staan in [de multiplayerhandleiding](docs/online-multiplayer.md).

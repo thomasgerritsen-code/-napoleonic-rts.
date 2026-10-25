@@ -1,10 +1,10 @@
-# Online multiplayer v1.4.6
+# Online multiplayer
 
 ## Spelen
 
 De eerste online versie is een privéwedstrijd voor twee spelers. De host speelt
 Frankrijk, de deelnemer Groot-Brittannië. Op beide toestellen moet dezelfde versie
-van de game draaien. Open **Online**, kies **Spel hosten** en deel de uitnodiging.
+van de game draaien. Kies in het startmenu **Multiplayer** en daarna **Spel hosten** en deel de uitnodiging.
 De tweede speler opent die link op een ander toestel of in een aparte browsersessie.
 De strijd begint als beide spelers verbonden zijn en hun afbeeldingen geladen zijn.
 
@@ -56,7 +56,7 @@ toe aan `ALLOWED_ORIGINS` op de spelserver, bijvoorbeeld:
 ALLOWED_ORIGINS=https://napoleonic-rts-git-claude-continue-upd-c04728-tgerritsen-5-5923.vercel.app
 ```
 
-Open vervolgens de Vercel-game, kies **Online**, vul
+Open vervolgens de Vercel-game, kies **Multiplayer**, vul
 `wss://jouw-serverdomein/multiplayer` in en maak een kamer. Het openbare serveradres
 wordt lokaal onthouden en staat ook in de uitnodiging. Je kunt daarnaast de game
 direct op het serverdomein spelen; die gebruikt automatisch zijn eigen server.

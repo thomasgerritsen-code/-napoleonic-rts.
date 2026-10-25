@@ -148,7 +148,7 @@
     const dt = Math.min(0.033, (now - lastTime) / 1000);
     lastTime = now;
     if (window.__ONLINE_MATCH_V1__?.active) window.__ONLINE_MATCH_V1__.frame(now, dt);
-    else if (!TEST_MANUAL_SIMULATION && window.__ISO_ASSETS_READY__ !== false) update(dt);
+    else if (!window.__NRTS_LOBBY_ONLY__ && !TEST_MANUAL_SIMULATION && window.__ISO_ASSETS_READY__ !== false) update(dt);
     // v312: animation uses the interpolated render clock rather than the
     // 60 Hz simulation clock. Visual-only: no pathing, combat or speed changes.
     const fixedDt = typeof V071_FIXED_DT === 'number' ? V071_FIXED_DT : 1 / 60;
