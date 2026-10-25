@@ -1727,7 +1727,7 @@
     ctx.fillStyle = 'rgba(70,110,230,.38)'; ctx.fill(rings.france);
     ctx.fillStyle = 'rgba(225,60,50,.38)'; ctx.fill(rings.britain);
     list.sort((p, q) => p.y - q.y);
-    const men = list.filter(d => d.unit).map(d => d.unit);
+    const men = list.filter(d => d.unit), covered = new Set();
     st.seeThrough = 0;
     for (const d of list) {
       if (d.gpu) gpu?.begin(ctx); else gpu?.end();
@@ -1735,9 +1735,16 @@
       // Scenery with a soldier behind it (inside its picture) turns see-through.
       const [x0, y0, x1, y1] = d.box, ix = (x1 - x0) * 0.12, iy = (y1 - y0) * 0.08;
       let a = view.overview ? OVERVIEW_ALPHA : 1;
-      for (const p of men) if (p.wy < d.y && p.x > x0 + ix && p.x < x1 - ix && p.y > y0 + iy && p.y < y1 - iy) { a = Math.min(a, COVER_ALPHA); st.seeThrough++; break; }
+      let covering=false;
+      for (const man of men) { const p=man.unit; if (p.wy < d.y && p.x > x0 + ix && p.x < x1 - ix && p.y > y0 + iy && p.y < y1 - iy) { covering=true; covered.add(man); } }
+      if(covering){a=Math.min(a,COVER_ALPHA);st.seeThrough++;}
       ctx.globalAlpha = a; d.draw(); ctx.globalAlpha = 1;
     }
+    // Several faded crowns can still hide a soldier. Reuse only the covered
+    // visible unit drawables in depth order, including their trench clipping.
+    // This adds no textures, world scans or information from outside vision.
+    st.readabilityOverlays=covered.size;
+    for(const man of men)if(covered.has(man)){if(man.gpu)gpu?.begin(ctx);else gpu?.end();man.draw();}
     gpu?.end();
     drawProjectiles();
     drawGrenades();

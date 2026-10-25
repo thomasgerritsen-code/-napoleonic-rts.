@@ -34,6 +34,23 @@ van een bron zoeken ze een nieuwe bron van hetzelfde opgedragen type; als
 die niet meer bestaat, blijven ze staan. De singleplayercomputer blijft
 zelfstandig zijn werk verdelen.
 
+## Vrije startplekken en zichtbaarheid
+
+De startlegers staan als hele opstelling op vrij terrein, met ruimte voor
+soldaten en paarden naast woningen, hoofdkwartieren, grondstofbomen en bosranden.
+De plaatsing houdt rekening met de grotere zichtbare dorpswoningen en met water.
+Ook nieuwe eenheden en hun verzamelpunten worden bij voltooiing van de training
+op een vrije plek gezet. Deze controle loopt alleen bij plaatsing, niet iedere
+simulatiestap. De begincamera richt zich op het eigen leger.
+
+Tijdens het spelen blijven bossen toegankelijk voor verzamelen en dekking.
+Als zichtbare soldaten achter woningen of boomkruinen lopen, worden hun bestaande
+sprites nogmaals boven de bedekkende scenery getekend. Zo kunnen meerdere
+halfdoorzichtige boomkruinen een soldaat niet samen laten verdwijnen. De normale
+mist, dieptevolgorde tussen soldaten en loopgraafclipping blijven van kracht;
+onzichtbare vijanden worden niet getoond. Er worden geen nieuwe afbeeldingsbuffers
+of textures aangemaakt.
+
 ## Grondstofgebieden
 
 Drie neutrale vlaggen liggen op gelijke afstand van beide hoofdkwartieren.

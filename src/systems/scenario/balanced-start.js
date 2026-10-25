@@ -11,23 +11,27 @@
       if (!home) continue;
       Object.assign(economies[side], {food:cfg.food, wood:cfg.wood, iron:cfg.iron});
       const dir = side === 'france' ? 1 : -1;
-      function add(type, dx, dy, mounted = false) {
-        const p = root.__VILLAGE_NAVIGATION_V7__?.nearestOpenPoint({x:home.x + dir * dx, y:home.y + dir * dy}, type) || {x:home.x + dir * dx, y:home.y + dir * dy};
-        const u = createUnit(side, type, p.x, p.y);
-        if (mounted) root.__TROOPS_V1__.applyTroop(u, 'mounted');
-        return u;
+      const layout=[];
+      const add=(type,dx,dy,mounted=false)=>layout.push({type,dx:dir*dx,dy:dir*dy,mounted});
+      for(let i=0;i<cfg.workers;i++)add('worker',105+i%3*24,-70+Math.floor(i/3)*28);
+      for(let i=0;i<cfg.infantry;i++)add('infantry',160+i%6*20,110+Math.floor(i/6)*20);
+      add('officer',210,70);add('drummer',180,70);
+      for(let i=0;i<cfg.cavalry;i++)add('cavalry',110+i*28,230);
+      add('officer',220,200,true);
+      const anchor=root.__UNIT_PLACEMENT__.formation(home,layout);
+      if(!anchor)throw Error('Geen vrije startplek voor '+side);
+      for(const slot of layout){
+        const u=createUnit(side,slot.type,anchor.x+slot.dx,anchor.y+slot.dy);
+        if(slot.mounted)root.__TROOPS_V1__.applyTroop(u,'mounted');
       }
-      for (let i=0;i<cfg.workers;i++) add('worker', 105 + i%3*24, -70 + Math.floor(i/3)*28);
-      for (let i=0;i<cfg.infantry;i++) add('infantry', 160 + i%6*20, 110 + Math.floor(i/6)*20);
-      add('officer', 210, 70); add('drummer', 180, 70);
-      for (let i=0;i<cfg.cavalry;i++) add('cavalry', 110 + i*28, 230);
-      add('officer', 220, 200, true);
       recalcPopCap(side);
     }
     // Online humans both start idle. Singleplayer's opponent chooses its work.
     if (!root.__NRTS_SERVER__ && !root.__NRTS_HUMAN_BRITAIN__) autoAssignAIWorkers();
     root.__VISION_EPOCH__ = (root.__VISION_EPOCH__ || 0) + 1;
     root.__LARGE_ARMY_PERFORMANCE_V1__?.prepareFrameIndexes();
+    const local=units.filter(u=>u.side==='france');
+    if(local.length){const center=centroid(local);camera.x=center.x;camera.y=center.y;clampCamera();}
     actionSignature = ''; updateHud(true);
   }
   const base = resetGame;

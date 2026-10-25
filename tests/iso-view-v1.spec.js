@@ -217,28 +217,47 @@ test('iso view: a right-click on an enemy sends the selection to musket reach fa
   const errors = await openGame(page, 'test=iso-attack&view=iso');
   await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 5, null, { timeout: 60_000 });
   const ids = await page.evaluate(() => {
-    const D = window.__RTS_DEBUG__, base = units.find(u => u.side === 'france' && u.type === 'infantry');
-    for (let i = 0; i < 12; i++) createUnit('france', 'infantry', base.x + i * 3, base.y + 40);
+    // Keep this command/range fixture away from opening cavalry and houses.
+    // Nearby starting troops can intercept the artificial enemy line and make
+    // its survivors scatter before the selected regiment reaches its target.
+    const D = window.__RTS_DEBUG__, base = {x:WORLD.width*.55,y:WORLD.height*.12};
+    for(const u of units)if(u.side==='france'&&u.type!=='worker')u.dead=true;
+    for(let i=0;i<12;i++)createUnit('france','infantry',base.x+i*18,base.y+40);
+    createUnit('france','officer',base.x+90,base.y+12);
+    createUnit('france','drummer',base.x+72,base.y+12);
     const id = D.createRegimentDirect('france'); D.selectRegiment(id);
-    const enemy = [];
-    for (let i = 0; i < 10; i++) enemy.push(createUnit('britain', 'infantry', base.x + 120 + i * 18, base.y + 170).id);
+    aiDevelop=()=>{};aiMilitaryOrder=()=>{};
+    const foe=createUnit('britain','infantry',base.x+420,base.y+170);
+    foe.hp=foe.maxHp=10000;foe.reload=99999;
+    // A stationary practice target isolates the attack command from morale
+    // routing, which is covered by the combat and multiplayer tests.
+    const baseUpdateUnit=updateUnit;
+    updateUnit=function(u,dt){if(u===foe){u.morale=100;u.routing=false;u.reload=99999;return;}return baseUpdateUnit(u,dt);};
+    const enemy=[foe.id],baseFire=fire;window.__attackFixtureShots=0;
+    fire=function(u,target){const count=projectiles.length,value=baseFire(u,target);if(u.regimentId===id&&projectiles.length>count)window.__attackFixtureShots++;return value;};
     camera.x = base.x + 120; camera.y = base.y + 110; camera.zoom = 0.9;
     return { id, enemy };
   });
-  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sprites > 20);
-  const e = await page.evaluate(id => window.__ISO_VIEW_V1__.bodyOf(units.find(u => u.id === id)), ids.enemy[4]);
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sprites >= 15);
+  const e = await page.evaluate(id => window.__ISO_VIEW_V1__.bodyOf(units.find(u => u.id === id)), ids.enemy[0]);
   const before = await page.evaluate(() => window.__ISO_VIEW_V1__.stats().attacks || 0);
   await page.mouse.click(e.x, e.y, { button: 'right' });
   expect(await page.evaluate(() => window.__ISO_VIEW_V1__.stats().attacks || 0)).toBe(before + 1);
-  // The regiment closes on the enemy and ends at about musket reach.
+  const commandReach=await page.evaluate(id=>{
+    const target=units.find(u=>u.id===id),command=__COMMAND_GATEWAY_V1__.history().at(-1).command;
+    return{gap:Math.hypot(command.data.x-target.x,command.data.y-target.y),reach:TYPES.infantry.range*.85};
+  },ids.enemy[0]);
+  expect(commandReach.gap).toBeCloseTo(commandReach.reach,3);
+  // Weapon range is measured between fighting units, not army centroids.
+  // A wide formation can fire while its centroid remains beyond musket reach.
   await page.evaluate(() => window.__RTS_DEBUG__.tick(12));
   const gap = await page.evaluate(([id, enemy]) => {
     const own = regimentMembers(getRegiment(id)).filter(u => !u.dead), foe = units.filter(u => enemy.includes(u.id) && !u.dead);
-    const a = centroid(own), b = centroid(foe);
-    return { gap: Math.hypot(a.x - b.x, a.y - b.y), range: TYPES.infantry.range };
+    return {gap:Math.min(...own.flatMap(a=>foe.map(b=>Math.hypot(a.x-b.x,a.y-b.y)))),range:TYPES.infantry.range,shots:window.__attackFixtureShots};
   }, [ids.id, ids.enemy]);
   // Musket reach is 200 px on the open map: they halt as soon as the enemy is inside it.
-  expect(gap.gap).toBeLessThan(gap.range + 30);
+  expect(gap.gap).toBeLessThan(gap.range + 5);
+  expect(gap.shots).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
 
@@ -1257,11 +1276,20 @@ test('iso view: grenadiers throw grenades that burst among the enemy', async ({ 
   const r = await page.evaluate(() => {
     const X = window.__TROOPS_V1__, G = window.__GRENADES_V1__;
     const mk = (side, troop, x, y) => { const u = createUnit(side, 'infantry', x, y); if (troop) X.applyTroop(u, troop); return u; };
+    // Start this lifecycle fixture with ready grenades and a holding opponent,
+    // so unrelated recruitment and random opening cooldowns cannot end it early.
+    aiDevelop=()=>{};aiMilitaryOrder=()=>{};
+    let seed=12345;Math.random=()=>{seed=seed*16807%2147483647;return(seed-1)/2147483646;};
     const gren = [], line = [], brits = [];
     for (let i = 0; i < 8; i++) gren.push(mk('france', 'grenadier', 2200 + i * 18, 1780));
     for (let i = 0; i < 8; i++) line.push(mk('france', null, 2600 + i * 18, 1780));
     for (let i = 0; i < 16; i++) brits.push(mk('britain', null, 2200 + i * 30, 1680));
+    for(const u of gren)u.grenadeAt=elapsed;
+    for(const u of brits){u.hp=u.maxHp=10000;u.reload=99999;}
     for (let k = 0; k < 40; k++) window.__RTS_DEBUG__.tick(0.5);
+    for(const u of gren)u.grenadeAt=Infinity;
+    window.__RTS_DEBUG__.tick(3); // let final real in-flight grenades land
+
     const s = G.stats();
     return { thrown: s.thrown, burst: s.burst, hits: s.hits, scorches: G.scorches().length,
       byLine: line.filter(u => u.threwAt != null).length, byGren: gren.filter(u => u.threwAt != null).length };

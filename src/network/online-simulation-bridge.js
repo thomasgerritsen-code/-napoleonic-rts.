@@ -184,7 +184,7 @@
     root.__TERRITORIES__?.receive(s.territories);
     serverElapsed=s.elapsed;receivedAt=now;snapshotTime=Math.min(160,Math.max(50,now-(snapshotTime?root.__ONLINE_MATCH_V1__.lastReceivedAt:now-100)));
     elapsed=s.elapsed;gameOver=s.gameOver;root.__VISION_EPOCH__=(root.__VISION_EPOCH__||0)+1;
-    if(initial){const home=buildings.find(b=>b.side==='france'&&b.type==='towncenter');if(home){camera.x=home.x;camera.y=home.y;}selectedUnits.clear();initial=false;}
+    if(initial){const own=units.filter(u=>u.side==='france'),center=own.length?centroid(own):buildings.find(b=>b.side==='france'&&b.type==='towncenter');if(center){camera.x=center.x;camera.y=center.y;}selectedUnits.clear();initial=false;}
     root.__BATTLE__?.receive(s.battle,view.side);
     if(s.gameOver&&!s.battle?.result)showBattleOutcome(s.winner==='draw'?'GELIJKSPEL':s.winner===view.side?'OVERWINNING!':'NEDERLAAG','De online veldslag is afgelopen.');
     else messageEl.classList.add('hidden');
