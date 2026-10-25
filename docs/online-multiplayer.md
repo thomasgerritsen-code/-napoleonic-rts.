@@ -160,9 +160,12 @@ De klok bewaart nu ook het nog niet uitgevoerde deel van een simulatietik.
 Voorheen ging dat deel verloren wanneer een inhaalbatch de limiet van 250 ms
 bereikte: een gerichte proef voerde daardoor slechts 45 van 49 aangeboden
 seconden uit. Nu worden alle 980 echte tikken uitgevoerd (49 seconden).
-De kamerklok bewaart daarnaast maximaal één seconde tijdelijke achterstand,
+De kamerklok bewaart daarnaast maximaal vier seconden tijdelijke achterstand,
 verdeeld over batches van hoogstens 250 ms. Pauzeren en opnieuw verbinden
 zetten die tijdsrekening terug; offline tijd wordt niet gesimuleerd.
+Dit vangt ook de eerste zware marsopdrachten op de gratis server op. Elke
+inhaalbatch blijft hoogstens 250 ms; alle verschuldigde simulatietikken worden
+echt uitgevoerd, zonder de weergaveklok kunstmatig vooruit te zetten.
 Gevechtszoekopdrachten slaan lege gebieden buiten de vijandelijke index over,
 met dezelfde afstandsgrenzen, doelkeuze en volgorde bij gelijke afstanden.
 
