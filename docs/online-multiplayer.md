@@ -57,8 +57,14 @@ Chromium en Node, in plaats van Playwright ieder statusveld apart te laten
 verpakken. Zichtberekeningen worden per speler en moment hergebruikt; beweging,
 zichtbereik en de andere speler krijgen steeds een nieuwe zichtcontrole.
 In een lokale proef daalde de tijd voor honderd statusoverdrachten van circa
-6,4 naar 0,5 seconde. Dit is geen garantie voor alle legers op de gratis server;
-controleer ook de openbare simulatieklok voordat je meer kamers toestaat.
+6,4 naar 0,5 seconde. De openbare herhaling op hetzelfde gratis abonnement
+haalde 7,65 seconden simulatie in 9,13 seconden echte tijd; beide spelers
+konden bewegen en trainen. Dat is ruim vier keer sneller dan de eerste proef.
+Dit is geen garantie voor grotere legers of langdurige wedstrijden; controleer
+ook de openbare simulatieklok voordat je meer kamers toestaat.
+Een geaccepteerd verzoek om een kamer te maken valt onder de begrensde
+simulatiestart (maximaal 60 seconden laden plus 15 seconden initialiseren).
+Ongebruikte verbindingen blijven na 30 seconden vervallen.
 
 Render bouwt het bestaande `Dockerfile` vanaf de branch
 `claude/continue-updates-o6whr4`. Laat **Docker Command** leeg, zodat de container

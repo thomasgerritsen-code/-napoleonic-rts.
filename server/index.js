@@ -19,6 +19,8 @@ async function createServer(options={}){
   const rooms=new Map(),connections=new Set(),limits=new Map();
   const maxRooms=options.maxRooms??Number(process.env.MAX_ROOMS||2);
   if(!Number.isInteger(maxRooms)||maxRooms<1||maxRooms>16)throw Error('MAX_ROOMS must be 1–16');
+  const joinTimeoutMs=options.joinTimeoutMs??30000;
+  if(!Number.isInteger(joinTimeoutMs)||joinTimeoutMs<1||joinTimeoutMs>60000)throw Error('Invalid connection join timeout');
   const origins=new Set((options.allowedOrigins??process.env.ALLOWED_ORIGINS??'').split(',').filter(Boolean).map(v=>new URL(v.trim()).origin));
   const configuredOrigin=options.publicOrigin??process.env.PUBLIC_ORIGIN??(process.env.RAILWAY_PUBLIC_DOMAIN?`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`:null);
   const publicOrigin=configuredOrigin?new URL(configuredOrigin).origin:null;
@@ -81,7 +83,7 @@ async function createServer(options={}){
   }
   wss.on('connection',(ws,req)=>{
     connections.add(ws);ws.alive=true;
-    ws.joinTimer=setTimeout(()=>{if(!ws.session)ws.close(1008,'Join timeout');},30000);
+    ws.joinTimer=setTimeout(()=>{if(!ws.session)ws.close(1008,'Join timeout');},joinTimeoutMs);
     const ip=req.socket.remoteAddress;let pending=false,windowAt=Date.now(),messages=0;
     ws.on('pong',()=>{ws.alive=true;});
     ws.on('error',()=>{});
@@ -95,6 +97,10 @@ async function createServer(options={}){
         if(msg.protocol!==1){fail(ws,'version-mismatch');return;}
         if(msg.type==='create'){
           if(!rate(ip,'create',5)||rooms.size>=maxRooms){fail(ws,'server-full');return;}
+          // This client has joined the protocol. A cold simulation can take
+          // longer than the idle handshake deadline on a small free server;
+          // its bounded browser startup timeout now governs this request.
+          clearTimeout(ws.joinTimer);
           pending=true;
           const room={code:code(),createdAt:Date.now(),players:{},commands:[],busy:false,phase:'waiting',steps:0};
           while(rooms.has(room.code))room.code=code();
