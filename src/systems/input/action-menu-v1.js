@@ -17,7 +17,7 @@
     { id: 'overig', label: '', show: () => true }
   ];
   const ACTION_GROUP = {
-    'assign-officer': 'regiment',
+    'assign-officer': 'regiment', 'quick-cavalry-stable': 'productie', 'train-cavalry-missing': 'productie',
     halt: 'bevel', bayonet: 'bevel', charge: 'bevel', 'artillery-mode': 'bevel', 'defend-stance': 'bevel', 'trench-upgrade': 'bevel',
     'rotate-left': 'formatie', 'rotate-right': 'formatie', skirmish: 'formatie',
     'create-regiment': 'regiment', 'reinforce-regiment': 'regiment', 'select-nearby-infantry': 'regiment', 'add-nearest-regiment': 'regiment',
@@ -36,7 +36,7 @@
   // Order inside a group: the main choices first (formations, training,
   // standing orders), then the finer ones.
   const RANK = { line: 1, column: 2, square: 3, skirmish: 4, 'rotate-left': 6, 'rotate-right': 7, halt: 1, bayonet: 2, charge: 2, 'artillery-mode': 3,
-    'defend-stance': 4, 'trench-upgrade': 5, 'create-regiment': 1, 'quick-regiment': 0, 'reinforce-regiment': 2, 'quick-regiment-barracks': 5, 'train-missing': 6, 'auto-regiment': 7, 'set-rally': 9, 'farm-assign': 1, 'resume-construction': 2,
+    'defend-stance': 4, 'trench-upgrade': 5, 'create-cavalry-regiment': 0, 'quick-cavalry-stable': 0, 'train-cavalry-missing': 1, 'create-regiment': 1, 'quick-regiment': 0, 'reinforce-regiment': 2, 'quick-regiment-barracks': 5, 'train-missing': 6, 'auto-regiment': 7, 'set-rally': 9, 'farm-assign': 1, 'resume-construction': 2,
     'build-house': 1, 'build-farm': 2, 'build-barracks': 3, 'build-tower': 4, 'build-stable': 5, 'build-foundry': 6 };
   const rank = el => 10 + (RANK[el.dataset.formation || el.dataset.action] ?? (el.dataset.action?.startsWith('train-') ? 0 : 8));
   function context() {
@@ -45,6 +45,7 @@
     return {
       workers: sel.some(u => u.type === 'worker'),
       army: sel.some(u => u.type !== 'worker'),
+      cavalryDraft: sel.some(u => !u.regimentId && (u.type === 'cavalry' || (u.type === 'officer' && u.troop === 'mounted'))),
       building: !!(b && !b.dead && b.side === 'france'),
       any: sel.length > 0 || !!(b && !b.dead)
     };
@@ -131,23 +132,27 @@
     if (busy) return;
     busy = true;
     try {
-      const c = context(), shown = new Set(GROUPS.filter(g => g.show(c)).map(g => g.id));
+      const c = context();
+      // Keep the relevant creation button on-screen before the horizontally
+      // scrolling formation controls when selecting ungrouped horsemen.
+      const groups = c.cavalryDraft ? [GROUPS.find(g=>g.id==='regiment'),...GROUPS.filter(g=>g.id!=='regiment')] : GROUPS;
+      const shown = new Set(groups.filter(g => g.show(c)).map(g => g.id));
       const buttons = [...actionsEl.querySelectorAll(':scope > button')];
       const counts = {};
       for (const el of buttons) {
         const g = groupOf(el), visible = shown.has(g);
         el.classList.toggle('menu-hidden', !visible);
         if (el.dataset.menuGroup !== g) el.dataset.menuGroup = g;
-        el.style.order = String(GROUPS.findIndex(q => q.id === g) * 100 + rank(el));
+        el.style.order = String(groups.findIndex(q => q.id === g) * 100 + rank(el));
         if (visible) counts[g] = (counts[g] || 0) + 1;
       }
       // Group headings, before the first button of each shown group.
-      const sig = GROUPS.map(g => g.id + ':' + (counts[g.id] || 0)).join('|') + (c.any ? '' : '|none');
+      const sig = groups.map(g => g.id + ':' + (counts[g.id] || 0)).join('|') + (c.any ? '' : '|none');
       if (sig !== signature) {
         signature = sig;
         actionsEl.querySelectorAll(':scope > .menu-label, :scope > .menu-hint').forEach(el => el.remove());
         let first = true;
-        GROUPS.forEach((g, i) => {
+        groups.forEach((g, i) => {
           if (!counts[g.id] || !g.label) return;
           const lab = document.createElement('span');
           lab.className = 'menu-label' + (first ? ' first' : ''); lab.dataset.menuGroup = g.id; lab.textContent = g.label;

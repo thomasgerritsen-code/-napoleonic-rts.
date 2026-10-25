@@ -188,7 +188,10 @@
     root.__BATTLE__?.receive(s.battle,view.side);
     if(s.gameOver&&!s.battle?.result)showBattleOutcome(s.winner==='draw'?'GELIJKSPEL':s.winner===view.side?'OVERWINNING!':'NEDERLAAG','De online veldslag is afgelopen.');
     else messageEl.classList.add('hidden');
-    actionSignature='';updateHud(true);
+    // Positions arrive many times a second. Rebuilding every action button on
+    // every packet can remove it between pointer-down and pointer-up (mobile in
+    // particular). The HUD signature and subsystem hooks refresh changed actions.
+    updateHud();
   }
   function frame(now,dt){
     const online=root.__ONLINE_MATCH_V1__, t=Math.min(1,(now-receivedAt)/Math.max(50,snapshotTime));

@@ -245,7 +245,7 @@ canvas.addEventListener('contextmenu', e => { if (performance.now() < suppressCo
 const moveTowardV05ForV06 = moveToward;
 moveToward = function moveTowardV06(u, tx, ty, dt, speed = TYPES[u.type].speed) {
   if (u.type === 'artillery' && !canArtilleryOperateV06(u)) return false;
-  const d = Math.hypot(tx-u.x,ty-u.y); if (d <= 5) { u.x=tx; u.y=ty; u.arrivedAtTarget=true; return true; }
+  const d = Math.hypot(tx-u.x,ty-u.y); if (d <= Math.min(5, Math.max(.05, speed * dt))) { u.x=tx; u.y=ty; u.arrivedAtTarget=true; return true; }
   u.arrivedAtTarget=false; return moveTowardV05ForV06(u,tx,ty,dt,speed*terrainSpeedMultiplierV06(u));
 };
 resolveUnitOverlaps = function resolveUnitOverlapsV06() {

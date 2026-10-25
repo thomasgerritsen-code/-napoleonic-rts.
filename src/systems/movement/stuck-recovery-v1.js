@@ -50,13 +50,51 @@
   function toWorld(p,o){const c=Math.cos(o.angle||0),s=Math.sin(o.angle||0);return{x:o.x+p.x*c-p.y*s,y:o.y+p.x*s+p.y*c};}
   function insideExpanded(p,o,pad=clearance){const q=toLocal(p,o);return Math.abs(q.x)<o.w*.5+pad&&Math.abs(q.y)<o.h*.5+pad;}
   function segmentAabbHitLocal(a,b,hw,hh){let t0=0,t1=1;const dx=b.x-a.x,dy=b.y-a.y,tests=[[-dx,a.x+hw],[dx,hw-a.x],[-dy,a.y+hh],[dy,hh-a.y]];for(const[p,q]of tests){if(Math.abs(p)<1e-9){if(q<0)return false;continue;}const r=q/p;if(p<0){if(r>t1)return false;if(r>t0)t0=r;}else{if(r<t0)return false;if(r<t1)t1=r;}}return t0<=t1&&t1>=0&&t0<=1;}
-  function segmentHitsObstacle(a,b,o,pad=clearance){const la=toLocal(a,o),lb=toLocal(b,o),hw=o.w*.5+pad,hh=o.h*.5+pad,startInside=Math.abs(la.x)<hw&&Math.abs(la.y)<hh;if(startInside){const endInside=Math.abs(lb.x)<hw&&Math.abs(lb.y)<hh;if(!endInside){const startNorm=Math.max(Math.abs(la.x)/hw,Math.abs(la.y)/hh),endNorm=Math.max(Math.abs(lb.x)/hw,Math.abs(lb.y)/hh);if(endNorm>startNorm+1e-4)return false;}}return segmentAabbHitLocal(la,lb,hw,hh);}
+  function segmentHitsObstacle(a,b,o,pad=clearance){
+    const la=toLocal(a,o),lb=toLocal(b,o),hw=o.w*.5+pad,hh=o.h*.5+pad;
+    if(Math.abs(la.x)<hw&&Math.abs(la.y)<hh){
+      const startNorm=Math.max(Math.abs(la.x)/hw,Math.abs(la.y)/hh),endNorm=Math.max(Math.abs(lb.x)/hw,Math.abs(lb.y)/hh);
+      // Units spawned in a clearance buffer must be able to leave in small
+      // physical steps; requiring one step to exit the entire box traps them.
+      const outward=la.x*(lb.x-la.x)/(hw*hw)+la.y*(lb.y-la.y)/(hh*hh);
+      if(endNorm>startNorm+1e-7&&outward>=-1e-9)return false;
+    }
+    return segmentAabbHitLocal(la,lb,hw,hh);
+  }
   function firstBlocker(a,b,ignoreId=null,pad=clearance){let best=null,bestD=Infinity;for(const o of obstacles(a,b,pad)){if(o.id===ignoreId)continue;if(!segmentHitsObstacle(a,b,o,pad))continue;const d=Math.hypot(a.x-o.x,a.y-o.y);if(d<bestD){best=o;bestD=d;}}return best;}
   function pointClear(p,ignoreId=null,pad=clearance){if(p.x<10||p.y<10||p.x>WORLD.width-10||p.y>WORLD.height-10)return false;for(const o of obstacles(p,p,pad))if(o.id!==ignoreId&&insideExpanded(p,o,pad))return false;return true;}
   function projectTargetOutside(p,o,pad=clearance){if(!insideExpanded(p,o,pad))return p;const q=toLocal(p,o),hw=o.w*.5+pad,hh=o.h*.5+pad,px=hw-Math.abs(q.x),py=hh-Math.abs(q.y);if(px<py)q.x=(q.x<0?-1:1)*(hw+.5);else q.y=(q.y<0?-1:1)*(hh+.5);return toWorld(q,o);}
-  function sanitizedTarget(target){let p={x:target.x,y:target.y};for(let pass=0;pass<6;pass++){let changed=false;for(const o of obstacles()){if(!insideExpanded(p,o,clearance))continue;p=projectTargetOutside(p,o,clearance);changed=true;}if(!changed)break;}return p;}
-  function cornerCandidates(o){const hw=o.w*.5+clearance+cornerClearance,hh=o.h*.5+clearance+cornerClearance;return[[-hw,-hh],[-hw,hh],[hw,-hh],[hw,hh]].map(([x,y])=>toWorld({x,y},o));}
-  function localWaypoint(a,target,unit){const safeTarget=sanitizedTarget(target),blocker=firstBlocker(a,safeTarget,null,clearance);if(!blocker)return{target:safeTarget,waypoint:null,blocker:null};stats.blockedDirectSteps++;const candidates=cornerCandidates(blocker).filter(p=>pointClear(p,blocker.id,clearance));let best=null,bestCost=Infinity;for(const p of candidates){if(firstBlocker(a,p,blocker.id,clearance))continue;if(firstBlocker(p,safeTarget,null,clearance))continue;const cost=Math.hypot(p.x-a.x,p.y-a.y)+Math.hypot(safeTarget.x-p.x,safeTarget.y-p.y);if(cost<bestCost){best=p;bestCost=cost;}}if(!best){for(const p of candidates){if(firstBlocker(a,p,blocker.id,clearance))continue;const cost=Math.hypot(p.x-a.x,p.y-a.y)+Math.hypot(safeTarget.x-p.x,safeTarget.y-p.y);if(cost<bestCost){best=p;bestCost=cost;}}}return{target:safeTarget,waypoint:best,blocker};}
+  function sanitizedTarget(target,pad=clearance){let p={x:target.x,y:target.y};for(let pass=0;pass<6;pass++){let changed=false;for(const o of obstacles(p,p,pad)){if(!insideExpanded(p,o,pad))continue;p=projectTargetOutside(p,o,pad);changed=true;}if(!changed)break;}return p;}
+  function cornerCandidates(o,pad=clearance){const hw=o.w*.5+pad+cornerClearance,hh=o.h*.5+pad+cornerClearance;return[[-hw,-hh],[-hw,hh],[hw,-hh],[hw,hh]].map(([x,y])=>toWorld({x,y},o));}
+  function localWaypoint(a,target,unit){
+    const pad=Math.max(clearance,(TYPES[unit?.type]?.radius||0)+2);
+    const safeTarget=sanitizedTarget(target,pad),blocker=firstBlocker(a,safeTarget,null,pad);
+    if(!blocker)return{target:safeTarget,waypoint:null,waypoints:[],blocker:null};
+    stats.blockedDirectSteps++;
+    // Every leg must see free space, INCLUDING the obstacle being rounded.
+    // Ignoring that obstacle selected its far corner and sent men through its wall.
+    const relevant=new Map([[blocker.id,blocker]]);
+    for(let attempt=0;attempt<8;attempt++){
+      const nodes=[a,safeTarget,...[...relevant.values()].flatMap(o=>cornerCandidates(o,pad)).filter(p=>pointClear(p,null,pad))];
+      const costs=nodes.map(()=>Infinity),parent=nodes.map(()=>-1),done=new Set(),blocked=new Map();costs[0]=0;
+      for(let step=0;step<nodes.length;step++){
+        let next=-1;for(let i=0;i<nodes.length;i++)if(!done.has(i)&&(next<0||costs[i]<costs[next]))next=i;
+        if(next<0||!Number.isFinite(costs[next]))break;
+        if(next===1){const path=[];for(let at=1;at!==0;at=parent[at])path.unshift(nodes[at]);path.pop();return{target:safeTarget,waypoint:path[0]||null,waypoints:path,blocker};}
+        done.add(next);
+        for(let i=1;i<nodes.length;i++){
+          if(done.has(i))continue;
+          const cost=costs[next]+Math.hypot(nodes[i].x-nodes[next].x,nodes[i].y-nodes[next].y);if(cost>=costs[i])continue;
+          const hit=firstBlocker(nodes[next],nodes[i],null,pad);
+          if(hit){if(!relevant.has(hit.id))blocked.set(hit.id,hit);continue;}
+          costs[i]=cost;parent[i]=next;
+        }
+      }
+      if(!blocked.size)break;
+      for(const [id,o]of blocked){if(relevant.size>=10)break;relevant.set(id,o);}
+    }
+    return{target:safeTarget,waypoint:null,waypoints:[],blocker};
+  }
 
   function groupCenter(reg){const m=regimentMembers(reg);return m.length?centroid(m):null;}
   function crossingOwnsRecovery(reg){const info=reg?.crossingTrafficV068;return!!(info?.forcedColumn&&['queued','waiting','approach','crossing','clearing'].includes(info.state));}
@@ -142,7 +180,40 @@
   }
   function sampleLoose(dt){for(const u of units){if(u.dead||u.routing||u.regimentId||u.task==='gather'||u.task==='return'||u.task==='build'){unitState.delete(u.id);continue;}if(rescueLooseFromRiver(u))continue;const remaining=Math.hypot((u.targetX??u.x)-u.x,(u.targetY??u.y)-u.y);if(remaining<20){unitState.delete(u.id);continue;}let s=unitState.get(u.id);if(!s){s={x:u.x,y:u.y,clock:0,stillSeconds:0,lastRecovery:-Infinity};unitState.set(u.id,s);continue;}s.clock+=dt;if(s.clock<sampleSeconds)continue;const travel=Math.hypot(u.x-s.x,u.y-s.y),sampleDt=s.clock;s.clock=0;s.x=u.x;s.y=u.y;if(travel<Math.max(2,minTravel*.35))s.stillSeconds+=sampleDt;else s.stillSeconds=0;if(s.stillSeconds>=triggerSeconds&&elapsed-s.lastRecovery>=cooldown){nudgeLooseUnit(u);s.lastRecovery=elapsed;s.stillSeconds=0;s.x=u.x;s.y=u.y;}}}
   const previousMoveToward=moveToward;
-  moveToward=function moveTowardWithLocalAvoidanceV2(u,tx,ty,dt,speed=TYPES[u.type].speed){if(!u||u.dead||!(dt>0))return previousMoveToward(u,tx,ty,dt,speed);const finalTarget=sanitizedTarget({x:tx,y:ty});let state=u.localAvoidanceV2||null;if(state){const waypointDistance=Math.hypot(u.x-state.x,u.y-state.y),directClear=!firstBlocker({x:u.x,y:u.y},finalTarget,null,clearance);if(directClear||waypointDistance<=waypointArrival||elapsed-(state.startedAt??elapsed)>maxWaypointSeconds){u.localAvoidanceV2=null;state=null;stats.detourResumes++;}}if(!state){const route=localWaypoint({x:u.x,y:u.y},finalTarget,u);if(route.waypoint){state={x:route.waypoint.x,y:route.waypoint.y,blockerId:route.blocker?.id||null,startedAt:elapsed,finalX:finalTarget.x,finalY:finalTarget.y};u.localAvoidanceV2=state;stats.localDetours++;}}if(state){previousMoveToward(u,state.x,state.y,dt,speed);u.arrivedAtTarget=false;return false;}return previousMoveToward(u,finalTarget.x,finalTarget.y,dt,speed);};
+  moveToward=function moveTowardWithLocalAvoidanceV2(u,tx,ty,dt,speed=TYPES[u.type].speed){
+    if(!u||u.dead||!(dt>0))return previousMoveToward(u,tx,ty,dt,speed);
+    const pad=Math.max(clearance,(TYPES[u.type]?.radius||0)+2),finalTarget=sanitizedTarget({x:tx,y:ty},pad);
+    let state=u.localAvoidanceV2||null;
+    if(state){
+      const changed=Math.hypot(finalTarget.x-state.finalX,finalTarget.y-state.finalY)>60;
+      const directClear=!firstBlocker(u,finalTarget,null,pad+(avoidCfg.directResumeClearance??2));
+      if(Math.hypot(u.x-state.progressX,u.y-state.progressY)>2){state.progressAt=elapsed;state.progressX=u.x;state.progressY=u.y;}
+      const stalled=elapsed-(state.progressAt??elapsed)>maxWaypointSeconds;
+      if(changed||directClear||stalled){u.localAvoidanceV2=null;state=null;stats.detourResumes++;}
+      else if(Math.hypot(u.x-state.x,u.y-state.y)<=Math.min(waypointArrival,4)){
+        state.waypoints.shift();
+        if(state.waypoints.length){Object.assign(state,state.waypoints[0]);}
+        else{u.localAvoidanceV2=null;state=null;stats.detourResumes++;}
+      }
+    }
+    if(!state){
+      const route=localWaypoint(u,finalTarget,u);
+      if(route.waypoint){state={...route.waypoint,waypoints:route.waypoints,blockerId:route.blocker?.id||null,startedAt:elapsed,progressAt:elapsed,progressX:u.x,progressY:u.y,finalX:finalTarget.x,finalY:finalTarget.y};u.localAvoidanceV2=state;stats.localDetours++;}
+    }
+    const before={x:u.x,y:u.y};
+    const arrived=previousMoveToward(u,state?state.x:finalTarget.x,state?state.y:finalTarget.y,dt,speed);
+    // Damped followers carry velocity around corners. Guard the actual swept step
+    // as well as the route; discard wall-directed momentum after a correction.
+    if(firstBlocker(before,u,null,pad)){
+      const dx=u.x-before.x,dy=u.y-before.y;let lo=0,hi=1;
+      for(let i=0;i<8;i++){const mid=(lo+hi)/2;if(firstBlocker(before,{x:before.x+dx*mid,y:before.y+dy*mid},null,pad))hi=mid;else lo=mid;}
+      u.x=before.x+dx*lo;u.y=before.y+dy*lo;
+      if(u.slotFollowerV071){u.slotFollowerV071.vx=0;u.slotFollowerV071.vy=0;}
+      u.arrivedAtTarget=false;return false;
+    }
+    if(state){u.arrivedAtTarget=false;return false;}
+    return arrived;
+  };
   const previousUpdate=update;
   update=function updateWithStuckRecoveryV2(dt){previousUpdate(dt);if(!(dt>0)||gameOver)return;sampleGroups(dt);sampleLoose(dt);};
   const api=Object.freeze({version:'stuck-recovery-v2.2',groupReplanning:true,looseUnitEscape:true,localBuildingAvoidance:true,formationSlotResume:true,crossingRecoveryIsolation:true,formationPhaseIsolation:true,trafficYieldIsolation:true,nearTargetIsolation:true,replanTracing:true,stats:()=>({...stats,trackedGroups:groupState.size,trackedUnits:unitState.size,lastGroupReplans:replanTrace.slice()}),localWaypoint:(a,b)=>localWaypoint(a,b,null),segmentBlocked:(a,b)=>Boolean(firstBlocker(a,b,null,clearance))});

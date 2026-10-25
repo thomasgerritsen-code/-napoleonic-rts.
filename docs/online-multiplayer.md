@@ -350,6 +350,19 @@ zichtfiltering, verbinding en lobby. Hiervoor hoeft de browserclient niet opnieu
 te worden gebouwd. Fysieke iPhone-framerates en grotere online legers moeten op
 echte toestellen en openbare hosting gemeten worden.
 
+## Paardenregimenten
+
+Train een **Officier te paard** in de stal. Selecteer hem en kies
+**Paardenregiment maken**: hij verzamelt maximaal twaalf vrije ruiters binnen
+320 meter, met minstens vier ruiters van hetzelfde type. Er is geen tamboer
+nodig. Expliciet geselecteerde ruiters blijven onderdeel van de keuze; een
+officier te voet kan alleen infanterie leiden.
+
+De stal toont ook de regimentknop en **Train ontbrekende cavalerie**. Die zet
+alleen de ontbrekende ruiters en de officier te paard in de wachtrij; reeds
+ingeplande eenheden tellen mee. Vorm het regiment zodra de opleiding klaar is.
+Deze opdrachten lopen online via de server voor de eigen partij.
+
 ## Verificatie
 
 `npm run test:multiplayer` controleert twee afzonderlijke browsercontexten,

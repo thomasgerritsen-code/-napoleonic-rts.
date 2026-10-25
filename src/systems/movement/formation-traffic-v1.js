@@ -6,6 +6,7 @@
 
   const stats={passingPairs:0,bridgePriorityYields:0,cohesionSlowdowns:0,overlapCorrections:0};
   const PASS_TTL=.72;
+  const passOffsets=new WeakMap();
 
   function regFor(u){return u?.regimentId?getRegiment(u.regimentId):null;}
   function bridgeInfo(reg){
@@ -46,10 +47,15 @@
     const bias=reg?.formationTrafficV132;
     const info=bridgeInfo(reg);
     const bridgeYield=Boolean(bias?.reason==='bridge-yield'&&info&&['queued','waiting','approach'].includes(info.state));
-    if(bias&&(!info||bridgeYield)){
-      centerX+=bias.x;
-      centerY+=bias.y;
-    }
+    const wanted=bias&&(!info||bridgeYield)?bias:null;
+    let offset=passOffsets.get(reg);
+    if(!offset||elapsed<offset.at){offset={x:0,y:0,at:elapsed-1/60};passOffsets.set(reg,offset);}
+    const dt=Math.max(0,Math.min(.1,elapsed-offset.at));offset.at=elapsed;
+    const dx=(wanted?.x||0)-offset.x,dy=(wanted?.y||0)-offset.y,d=Math.hypot(dx,dy);
+    const step=Math.min(1,90*dt/(d||1));offset.x+=dx*step;offset.y+=dy*step;
+    // Enter and leave the passing lane at walking speed. Instantly adding and
+    // removing 58 pixels made all followers brake and reverse at each contact.
+    centerX+=offset.x;centerY+=offset.y;
     return previousApplyFormationTargets(reg,centerX,centerY,offsets,facing,phase);
   };
 

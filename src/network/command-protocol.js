@@ -24,7 +24,7 @@
     bayonet: empty, charge: empty, 'artillery-mode': empty,
     gather: d => id(d.resourceId) ? {resourceId:d.resourceId} : null,
     rally: d => finite(d.x) && finite(d.y) ? {x:d.x,y:d.y} : null,
-    action: d => ['quick-regiment','quick-regiment-barracks','train-missing','auto-regiment',
+    action: d => ['quick-cavalry-stable','train-cavalry-missing','quick-regiment','quick-regiment-barracks','train-missing','auto-regiment',
       'defend-stance','reinforce-regiment','trench-upgrade','tower-upgrade','crew-gun','farm-assign','resume-construction','skirmish'].includes(d.action) ? {action:d.action} : null
   };
   function normalize(raw) {
