@@ -77,7 +77,7 @@
   function settle(reg, type, kind) {
     if (!reg) return reg;
     const m = regimentMembers(reg).filter(u => u.type === type);
-    if (reg.side === 'britain') { kind = rollBritish(type); for (const u of m) setTroop(u, kind); if (kind) stats.british++; }
+    if (reg.side === 'britain' && !root.__NRTS_HUMAN_BRITAIN__) { kind = rollBritish(type); for (const u of m) setTroop(u, kind); if (kind) stats.british++; }
     reg.troop = kind || null;
     if (kind && !reg.customName) reg.name = `${reg.side === 'france' ? 'Franse' : 'Britse'} ${nameOf(kind, reg.side)[1]} ${reg.id}`;
     return reg;
@@ -94,7 +94,7 @@
   }
   function trainTroopNow(key, b) {
     const t = T[key];
-    if (!b || b.dead || !b.complete || b.side !== 'france' || b.type !== buildingFor(key) || !fields(key, 'france')) return false;
+    if (!b || b.dead || !b.complete || b.side !== 'france' || b.type !== buildingFor(key) || !fields(key, root.__NRTS_COMMAND_SIDE__ || root.__ONLINE_MATCH_V1__?.side || 'france')) return false;
     if (t.max && strength('france', key) >= t.max) { statusEl.textContent = `Hooguit ${t.max} ${t.plural}.`; return false; }
     const extra = t.extra || {};
     // The base price is paid by the game's own queue; the kind's extra on top.
@@ -134,7 +134,7 @@
       }
       // British guns and officers come in kinds one by one (regiments get theirs when formed).
       for (const u of fresh) {
-        if (u.side !== 'britain' || u.troop || (u.type !== 'artillery' && u.type !== 'officer')) continue;
+        if (root.__NRTS_HUMAN_BRITAIN__ || u.side !== 'britain' || u.troop || (u.type !== 'artillery' && u.type !== 'officer')) continue;
         const key = rollBritish(u.type); if (key) { applyTroop(u, key); stats.british++; }
       }
     }
@@ -256,7 +256,7 @@
       const plainGun = actionsEl.querySelector('[data-action="train-artillery"]');
       if (plainGun && !plainGun.dataset.renamed) { plainGun.innerHTML = plainGun.innerHTML.replace(/^Artillerie/, '6-ponder'); plainGun.dataset.renamed = '1'; plainGun.title = '6-ponder veldkanon: het standaardstuk.'; }
       for (const [key, t] of Object.entries(T)) {
-        if (buildingFor(key) !== b.type || !fields(key, 'france') || actionsEl.querySelector(`[data-action="train-${key}"]`)) continue;
+        if (buildingFor(key) !== b.type || !fields(key, root.__NRTS_COMMAND_SIDE__ || root.__ONLINE_MATCH_V1__?.side || 'france') || actionsEl.querySelector(`[data-action="train-${key}"]`)) continue;
         const c = costOf(key), btn = makeDynamicButton(`train-${key}`, `${t.label}<br><small>${costText(c)}</small>`, !canAfford('france', c));
         btn.title = `${t.label}: ${t.pro} — maar ${t.con}.`;
         actionsEl.appendChild(btn);

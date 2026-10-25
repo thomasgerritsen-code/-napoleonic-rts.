@@ -42,60 +42,32 @@ Een betere framerate op fysieke videokaarten moet op het doelapparaat worden
 gemeten. Geforceerd WebGL op de software-GPU van een testmachine is veel trager
 en vormt geen bewijs voor versnelling op hardware.
 
-## Multiplayer: opdrachtlaag is aangesloten, online wedstrijden volgen
+## Multiplayer: eerste online privéwedstrijden (v1.4.6)
 
-De game blijft nu singleplayer. Er wordt nog geen netwerkverbinding geopend en
-er is geen online-lobby. Wel gebruiken gewone verplaats-, richt-, formatie-,
-halt-, basisproductie-, bouw-, regiment-, bajonet-, charge- en artillerieknoppen
-al een gedeeld opdrachtformaat. Speciale troepentraining en de nieuwe
-officiertoewijzing gebruiken datzelfde formaat. De huidige Franse bediening
-blijft direct reageren, zonder extra netwerkwachttijd.
+Er is nu een WebSocket-spelserver met kamers voor twee spelers, Frankrijk tegen
+Groot-Brittannië. De server verwerkt de bestaande simulatie en opdrachten; de
+clients ontvangen zichtgefilterde verschillen en tekenen vloeiende beweging.
+Kamerlinks, herverbinden, pauzeren bij uitval en gescheiden economieën zijn
+geïmplementeerd. Singleplayer opent geen netwerkverbinding.
 
-Een opdracht bevat protocolversie, volgnummer, type, geselecteerde eenheden-ID's,
-eventueel een gebouw-ID en alleen de toegestane opdrachtgegevens. Camera,
-HTML-elementen, schermcoördinaten, grondstoffen en levenspunten worden niet
-meegestuurd. Selectie is lokaal; een opdracht met expliciete ID's kan onafhankelijk
-van de huidige selectie worden toegepast. De lokale diagnosegeschiedenis bevat
-hoogstens 64 opdrachten en wordt bij een nieuwe slag gewist.
+De spelserver draait als één blijvende Node-runtime met een tijdelijke,
+non-renderende Chromium-adapter voor de bestaande spelregels. Strategische
+Britse AI staat in PvP uit. De statische Vercel-site kan de client blijven
+leveren, met een WSS-verbinding naar de aparte spelserver. `Dockerfile` en
+`railway.json` staan klaar; openbare hosting vereist een verbonden hostingaccount.
+Het toevoegen van deze bestanden start op zichzelf geen openbare server.
 
-De browser en Node kunnen dezelfde modules gebruiken:
+De oorspronkelijke gedeelde modules blijven de basis:
 
-- `src/network/command-protocol.js`: formaat, toegestane velden, grenzen en eigendom.
-- `src/network/match-authority.js`: één gezaghebbende klok, opdrachtvolgorde,
-  controles bij ontvangst én uitvoering, begrensde wachtrij en bevestigingen.
-- `src/network/browser-command-gateway.js`: koppeling met de bestaande bediening.
+- `src/network/command-protocol.js`: toegestane opdrachten en eigendom.
+- `src/network/match-authority.js`: serverklok, volgorde en uitvoeringscontroles.
+- `src/network/browser-command-gateway.js`: bestaande bediening naar opdrachten.
+- `src/network/online-simulation-bridge.js`: legacyserveradapter en clientbeeld.
+- `src/network/online-client.js`: lobby, verbinding en sessieherstel.
+- `server/`: WebSocketkamers, begrensde levensduur, snapshotverschillen en runtime.
 
-De autoriteitsmodule bindt maximaal twee vertrouwde speler-ID's aan Frankrijk en
-Groot-Brittannië. Een opdracht kan zijn eigen identiteit niet kiezen. Opdrachten
-worden op de volgende servertik uitgevoerd; een client bepaalt geen tiknummer of
-tijdsverloop. De standaardfrequentie is 20 Hz. Er zijn maximaal 40 opdrachten per
-speler per seconde en maximaal 128 wachtende opdrachten. Dubbele of oude
-volgnummers en vijandelijke eenheden worden geweigerd.
-
-Een toekomstige server levert de adapter `unit`, `building`, `world`, `apply`,
-`step` en **`snapshotFor(side)`**. De adapter blijft verantwoordelijk voor de
-echte spelregels, kosten en zichtbaarheid. `snapshotFor` moet mist van oorlog en
-eigen economie toepassen; de bestaande volledige debug-snapshot mag niet aan
-tegenstanders worden verstuurd. De module bouwt geen veilige zichtfilter uit
-een onbegrensde snapshot en maakt de oude simulatie nog niet zelfstandig op
-Node uitvoerbaar.
-
-Voor echt online spelen moeten nog worden aangesloten:
-
-1. De volledige simulatie als serveradapter, zonder afhankelijkheid van DOM,
-   lokale selectie of Franse spelerbediening; AI uit voor een menselijke Britse
-   speler. Ook verzamelen, rallypunten, snelle regimentvorming en de overige
-   bijzondere acties krijgen expliciete opdrachten.
-2. Een verbinding met een blijvende spelserver, authenticatie, sessie-ID's,
-   kamercodes en opnieuw verbinden. De bestaande statische Vercel-site kan de
-   browserclient blijven aanbieden; de spelserver heeft een eigen runtime nodig.
-3. Zichtgefilterde snapshots, verschillen tussen updates, interpolatie op de
-   client en herstel na pakketverlies. Clients sturen uitsluitend opdrachten.
-4. Twee echte browsers met verschillende partijen, langere netwerktests met
-   vertraging, verbrekingen en pogingen om verborgen informatie op te vragen.
-
-Dit fundament kiest bewust geen transport of hostingdienst: WebSocket en een
-dedicated server kunnen op dezelfde opdracht- en autoriteitsmodules aansluiten.
+Zie [Online multiplayer](online-multiplayer.md) voor spelen, starten, hosting,
+veiligheidsgrenzen, tests en de verdere migratie naar een pure Node-simulatie.
 
 ## Verificatie
 

@@ -11,6 +11,7 @@
 (function installIsoViewV1(global) {
   const params = new URLSearchParams(location.search);
   if (params.get('view') !== 'iso') return;
+  if (global.__NRTS_SERVER__) { global.__ISO_ASSETS_READY__ = true; return; }
 
   const ASSETS = 'graphics-lab/assets/';
   // Scale: a line's files stand 18 px apart in the game and 0.8 m apart in the lab.
@@ -823,7 +824,7 @@
   // companies' uniforms (looks 4 and 5); on the open map the line keeps to the
   // three line looks, elsewhere a few men of each company are mixed in.
   const lookOf = u => {
-    const p = u.side === 'france' ? 'fr' : 'br', h = hash(u.id, 7), kinds = !!global.__TROOPS_V1__;
+    const p = (u.nativeSide || u.side) === 'france' ? 'fr' : 'br', h = hash(u.id, 7), kinds = !!global.__TROOPS_V1__;
     const key = u.troop === 'grenadier' ? p + '4' : u.troop === 'voltigeur' ? p + '5'
       : u.troop === 'guard' || u.troop === 'rifle' ? p + '6' : u.troop === 'sapper' ? p + '7'
       : !kinds && h < 0.1 ? p + '4' : !kinds && h < 0.2 ? p + '5' : p + ['', '2', '3'][Math.floor(hash(u.id, 13) * 3)];
@@ -845,7 +846,7 @@
   const mountedKey = (u, p) => u.type === 'officer' && u.troop === 'mounted' && view.atlases[p + 'co'] ? p + 'co' : null;
   // Animation for one live unit: [atlas key, animation, frame].
   function frameFor(u, m, now) {
-    const p = u.side === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
+    const p = (u.nativeSide || u.side) === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
     const since = now - m.firedAt, step = (stride, n) => Math.floor((m.walk % stride) / stride * n) % n;
     if (u.type === 'cavalry' || mountedKey(u, p)) {
       // Period regiments have their own riders (troops-v1); huzaren ride the bays.
@@ -917,7 +918,7 @@
   // Fall: the man's own look and a fall chosen by his id; it plays once and stays.
   // The atlas and fall of a man going down facing d (null for guns and peasants).
   function fallOf(u, d) {
-    const p = u.side === 'france' ? 'fr' : 'br', fall = ['die', 'diefwd', 'dieside'][Math.floor(hash(u.id, 4) * 3)] + '_' + d;
+    const p = (u.nativeSide || u.side) === 'france' ? 'fr' : 'br', fall = ['die', 'diefwd', 'dieside'][Math.floor(hash(u.id, 4) * 3)] + '_' + d;
     if (u.type === 'cavalry') return { key: p + 'c', anim: 'die_' + d };
     if (mountedKey(u, p)) return { key: mountedKey(u, p), anim: 'die_' + d };
     if (u.type === 'artillery' || u.type === 'worker') return null;
@@ -966,7 +967,7 @@
       const carried = tm.state === 'carry' && tm.target, c = Math.cos(tm.facing), sn = Math.sin(tm.facing), half = 0.95 * PPM;
       const ends = [[tm.x - c * half, tm.y - sn * half], [tm.x + c * half, tm.y + sn * half]].sort((a, b) => a[1] - b[1]);
       list.push({ y: tm.y, draw: () => {
-        const p = tm.side === 'france' ? 'fr' : 'br', d = DIRS[dirOf(tm.facing)], atlas = view.atlases[p + 'w'];
+        const p = (tm.nativeSide || tm.side) === 'france' ? 'fr' : 'br', d = DIRS[dirOf(tm.facing)], atlas = view.atlases[p + 'w'];
         const anim = (tm.moving ? 'march_' : 'idle_') + d, f = tm.moving ? Math.floor((t * 4 + tm.id) % 6) : Math.floor(t / 0.7 + tm.id) % 2;
         drawSprite(atlas, anim, f, sx(ends[0][0]), gy(ends[0][0], ends[0][1]), k);
         // The stretcher at the bearers' hands: two poles and the canvas between.
@@ -1056,7 +1057,7 @@
     if (b.dead) return null;
     if (b.side === 'britain' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(b)) return null;
     if (b.type === 'farm') return { y: b.y, draw: () => drawFarm(b) };
-    const base = BUILDING_PROP[b.type] || 'cottage', kind = SIDED_PROPS.has(base) ? base + '_' + (b.side === 'france' ? 'fr' : 'br') : base;
+    const base = BUILDING_PROP[b.type] || 'cottage', kind = SIDED_PROPS.has(base) ? base + '_' + ((b.nativeSide || b.side) === 'france' ? 'fr' : 'br') : base;
     const prop = view.props[kind]; if (!prop) return null;
     // Fit the rendered building to the game's footprint (a little larger: the
     // props carry their eaves and yard beyond the walls).
@@ -1640,10 +1641,10 @@
       const lip = !crest && sunk && view.trenchLips.get(sunk.id);
       const rr = (u.type === 'cavalry' ? 0.95 : u.type === 'artillery' ? 1.1 : 0.42) * PPM * z(), ring = rings[u.side] || rings.britain;
       ring.moveTo(X + rr, Y); ring.ellipse(X, Y, rr, rr * SQ, 0, 0, Math.PI * 2);
-      list.push({ gpu: !crest && !lip && (u.type !== 'worker' || !!view.atlases[(u.side === 'france' ? 'fr' : 'br') + 'w']), y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
+      list.push({ gpu: !crest && !lip && (u.type !== 'worker' || !!view.atlases[((u.nativeSide || u.side) === 'france' ? 'fr' : 'br') + 'w']), y: key, unit: { x: X, y: Y - lift, wy: key }, draw: () => {
         if (crest) { ctx.save(); const dy = CREST_OVERHANG * PPM * LIFT * z(); clipBelowLine(crest.map(q => [q[0], q[1] + dy])); }
         else if (lip) { ctx.save(); clipAboveLip(lip); }
-        if (u.type === 'worker' && !view.atlases[(u.side === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); if (crest || lip) ctx.restore(); return; }
+        if (u.type === 'worker' && !view.atlases[((u.nativeSide || u.side) === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); if (crest || lip) ctx.restore(); return; }
         const [key, anim, f] = frameFor(u, m, t);
         // Until its atlas has loaded a unit is simply not drawn yet.
         if (drawSprite(view.atlases[key], anim, f, X, Y, k)) st.sprites++;
@@ -1654,7 +1655,7 @@
     // Men who fell (or left the list) since the last frame.
     for (const [id, m] of view.info) {
       if (seen.has(id)) continue;
-      if (m.alive && visible(m.u)) addCorpse(m, t);
+      if (m.alive && visible(m.u) && (!global.__ONLINE_MATCH_V1__?.active || m.u.dead)) addCorpse(m, t);
       view.info.delete(id);
     }
     for (const c of view.corpses) {

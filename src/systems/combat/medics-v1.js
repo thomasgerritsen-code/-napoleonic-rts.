@@ -162,7 +162,7 @@
   }
   let aiCheckAt = 0;
   function aiHospital() {
-    if (gameOver || elapsed < cfg.aiAfter || elapsed < aiCheckAt) return;
+    if (root.__NRTS_HUMAN_BRITAIN__ || gameOver || elapsed < cfg.aiAfter || elapsed < aiCheckAt) return;
     aiCheckAt = elapsed + 7;
     if (buildings.some(b => !b.dead && b.side === 'britain' && b.type === 'hospital')) return;
     if (economies.britain.wood < (cfg.hospital.cost.wood || 0) + 100 || economies.britain.food < (cfg.hospital.cost.food || 0) + 100) return;

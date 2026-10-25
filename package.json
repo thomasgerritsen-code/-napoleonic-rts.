@@ -1,6 +1,6 @@
 {
   "name": "napoleonic-rts",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "private": true,
   "description": "Browser Napoleonic RTS with Playwright Chromium regression, stress and soak tests",
   "scripts": {
@@ -14,9 +14,15 @@
     "art:promote": "node scripts/promote-art.mjs",
     "art:atlas:pack": "python3 scripts/build-infantry-atlas.py",
     "art:atlas:validate": "python3 scripts/validate-infantry-atlas.py",
-    "art:review": "python3 scripts/review-infantry-art.py"
+    "art:review": "python3 scripts/review-infantry-art.py",
+    "start:server": "node server/index.js",
+    "test:multiplayer": "playwright test tests/multiplayer-online-v146.spec.js --project=chromium"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1"
+  },
+  "dependencies": {
+    "playwright": "1.62.1",
+    "ws": "8.22.0"
   }
 }

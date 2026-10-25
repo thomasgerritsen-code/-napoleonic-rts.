@@ -282,7 +282,7 @@
   if (baseUpdate) {
     update = function updateWithProximityEngagementV1(dt) {
       const result = baseUpdate(dt);
-      if (!gameOver) {
+      if (!gameOver && !global.__NRTS_HUMAN_BRITAIN__) {
         proximityClock += Math.max(0, Number(dt) || 0);
         if (proximityClock >= PROXIMITY_SCAN_INTERVAL) {
           proximityClock %= PROXIMITY_SCAN_INTERVAL;

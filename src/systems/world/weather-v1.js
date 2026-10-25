@@ -118,6 +118,8 @@
     version: '1.1', config: cfg, kinds: Object.keys(KINDS), set, mix, label: () => KINDS[st.kind].label,
     state: () => ({ kind: st.kind, from: st.from, blend: st.blend, wetness: st.wetness, rain: mix('rain'), fog: mix('fog'), dark: mix('dark'), sight: mix('sight'), until: st.until, nextRainAt: st.nextRainAt }),
     setWetness: w => { st.wetness = Math.max(0, Math.min(1, w)); },
+    // Network viewers never advance weather; they display the server's values.
+    receive: s => { if (!s || !KINDS[s.kind] || !KINDS[s.from]) return; for (const k of ['kind','from','blend','wetness','until','nextRainAt']) st[k]=s[k]; label(); },
     stats: () => ({ misfires: st.misfires, changes: st.changes })
   });
 })(window);

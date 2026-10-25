@@ -94,11 +94,11 @@
   function autoForm() {
     if (elapsed < autoAt) return; autoAt = elapsed + 2;
     for (const b of buildings) {
-      if (b.dead || !b.complete || b.type !== 'barracks' || b.side !== 'france' || !b.autoRegiment) continue;
+      if (b.dead || !b.complete || b.type !== 'barracks' || (b.side !== 'france' && !root.__NRTS_HUMAN_BRITAIN__) || !b.autoRegiment) continue;
       const at = { x: b.rallyX ?? b.x, y: b.rallyY ?? (b.y + b.h) };
-      const p = plan('france', at, [], cfg.barracksReach);
+      const p = plan(b.side, at, [], cfg.barracksReach);
       if (!p.ok) continue;
-      const reg = form('france', p, at);
+      const reg = form(b.side, p, at);
       if (reg) { stats.auto++; statusEl.textContent = `${reg.name} gevormd bij de kazerne (Auto-regiment).`; actionSignature = ''; updateHud(true); }
     }
   }

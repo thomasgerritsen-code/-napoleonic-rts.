@@ -23,6 +23,7 @@
     toggleArtillery: {type:'artillery-mode', data:() => ({})}
   };
   function accept(raw, execute) {
+    if (!executing && root.__ONLINE_MATCH_V1__?.active) return {ok:true,value:root.__ONLINE_MATCH_V1__.send(raw)};
     const normalized = protocol.normalize(raw);
     if (!normalized.ok) return {ok:false, reason:normalized.reason};
     const command = normalized.command;
@@ -79,25 +80,35 @@
       case 'bayonet': return root.bayonetCommand();
       case 'charge': return root.cavalryCharge();
       case 'artillery-mode': return root.toggleArtillery();
+      case 'gather': return assignGather(resources.find(r => r.id === d.resourceId));
+      case 'rally': return finishRallyPlacementV06(d.x,d.y,selectedBuilding);
+      case 'action': {
+        const button = actionsEl.querySelector(`[data-action="${d.action}"]`);
+        if (!button || button.disabled) return false;
+        button.click(); return true;
+      }
       default: return false;
     }
   }
   function dispatch(raw) {
-    return accept(raw, command => {
+    return accept(raw, applyAuthorized);
+  }
+  // Called only after the server authority has authenticated and checked ownership.
+  function applyAuthorized(command) {
       const selected = [...selectedUnits], building = selectedBuilding;
       selectedUnits.clear();
       for (const id of command.unitIds) selectedUnits.add(entityAdapter.unit(id));
       selectedBuilding = command.buildingId ? entityAdapter.building(command.buildingId) : null;
-      try {return execute(command);}
-      finally {selectedUnits.clear(); for (const unit of selected) if (!unit.dead) selectedUnits.add(unit); selectedBuilding = building; actionSignature = ''; updateHud(true);}
-    });
+      executing++;
+      try { actionSignature=''; updateHud(true); return execute(command); }
+      finally {executing--; selectedUnits.clear(); for (const unit of selected) if (!unit.dead) selectedUnits.add(unit); selectedBuilding = building; actionSignature = ''; updateHud(true);}
   }
   installBindings();
   // Late legacy modules can decorate input functions. Marks prevent wrapping an
   // already routed call again; installing once per second allocates no backlog.
   setInterval(installBindings, 1000);
   root.NRTS?.events?.on?.('game:reset', () => {seq=0; history.length=0;});
-  const api = Object.freeze({version:protocol.VERSION, mode:'local', side:'france', dispatch, run,
+  const api = Object.freeze({version:protocol.VERSION, mode:'local', side:'france', dispatch, run, applyAuthorized,
     history:() => history.map(r => ({tick:r.tick, command:JSON.parse(JSON.stringify(r.command))})),
     stats:() => ({seq, retained:history.length, limit:64, routedFunctions:Object.keys(bindings)})});
   root.__COMMAND_GATEWAY_V1__ = api;

@@ -34,7 +34,7 @@
   refreshRegiment = function refreshRegimentWithStance(reg) {
     baseRefresh(reg);
     if (!reg || reg.destroyed) return;
-    if (reg.side === 'britain' && typeof AI_COMMANDER_V1 !== 'undefined') reg.defend = AI_COMMANDER_V1.state === 'DEFEND' || AI_COMMANDER_V1.state === 'REGROUP';
+    if (reg.side === 'britain' && !global.__NRTS_HUMAN_BRITAIN__ && typeof AI_COMMANDER_V1 !== 'undefined') reg.defend = AI_COMMANDER_V1.state === 'DEFEND' || AI_COMMANDER_V1.state === 'REGROUP';
     if (trenches.length) manTrenches(reg);
     if (!reg.defend) { reg.bracedAt = null; return; }
     // Once a second: has the regiment moved, and is it formed to receive?
@@ -108,7 +108,7 @@
   const heldBy = (t, reg) => regiments.find(r => r !== reg && !r.destroyed && r.trenchId === t.id) || null;
   function occupy(reg, t) {
     reg.trenchId = t.id; t.side = reg.side; stats.manned++;
-    if (reg.side === 'france') reg.defend = true;
+    if (reg.side === 'france' || global.__NRTS_HUMAN_BRITAIN__) reg.defend = true;
     reg.formation = 'line';
     if (typeof arrangeFacingRegimentV146 === 'function') arrangeFacingRegimentV146(reg, t.x, t.y, 'line', t.facing);
     // The trench covers them as soon as they stand in it; bracing follows when they halt.
@@ -181,7 +181,7 @@
     if (!t.upgrade) {
       // The British commander improves the works he defends when he can spare it.
       const next = levels[(t.level || 1) + 1];
-      if (reg.side === 'britain' && reg.defend && next && reg.trenchStill >= 3 && canAfford('britain', { wood: (next.cost.wood || 0) + 200, iron: (next.cost.iron || 0) + 40 }))
+      if (reg.side === 'britain' && !global.__NRTS_HUMAN_BRITAIN__ && reg.defend && next && reg.trenchStill >= 3 && canAfford('britain', { wood: (next.cost.wood || 0) + 200, iron: (next.cost.iron || 0) + 40 }))
         upgradeTrench(reg);
       return;
     }
