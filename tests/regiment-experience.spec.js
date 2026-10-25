@@ -1,3 +1,4 @@
+const {readyPlayers}=require('./helpers/online-ready.js');
 const {test,expect}=require('@playwright/test');
 const {createServer}=require('../server/index.js');
 test.use({trace:'off'});
@@ -81,6 +82,7 @@ test('server-earned ranks reach both online sides, reveal no combat ledger and s
   const a=await c1.newPage(),b=await c2.newPage();for(const p of [a,b])p.on('pageerror',e=>errors.push(e.message));
   await a.goto('/?view=iso&gpu=off&server='+encodeURIComponent(endpoint));await a.click('#startMultiplayer');await a.click('#onlineHost');
   await expect.poll(()=>a.inputValue('#onlineRoom'),{timeout:30000}).toMatch(/^[A-Z2-9]{8}$/);await b.goto(await a.inputValue('#onlineInvite'));
+  await readyPlayers(a,b);
   for(const p of [a,b]){await p.waitForFunction(()=>__ONLINE_MATCH_V1__.phase==='playing');await p.click('#onlineClose');}
   const ids=await sim.evaluate(()=>{
    for(const side of ['france','britain'])for(let i=0;i<3;i++)__rankFixture.defeat(__rankArmies[side]);

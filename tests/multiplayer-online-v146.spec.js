@@ -1,3 +1,4 @@
+const {readyPlayers}=require('./helpers/online-ready.js');
 const {test,expect}=require('@playwright/test');
 const {createServer}=require('../server/index.js');
 const WebSocket=require('ws');
@@ -18,10 +19,11 @@ async function players(browser){
   const france=await browser.newContext({viewport:{width:1280,height:900}}),britain=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:3});
   const a=await france.newPage(),b=await britain.newPage();
   const errors=[];for(const p of [a,b])p.on('pageerror',e=>errors.push(e.message));
-  await a.goto('/?view=iso&gpu=off&server='+encodeURIComponent(endpoint));await a.click('#startMultiplayer');await expect(a.locator('#onlineServer')).toHaveValue(endpoint);await a.click('#onlineHost');
+  await a.goto('/?view=iso&gpu=off&server='+encodeURIComponent(endpoint));await a.click('#startMultiplayer');await expect(a.locator('#onlineServer')).toHaveValue(endpoint,{timeout:30000});await a.click('#onlineHost');
   await poll(a,()=>window.__ONLINE_MATCH_V1__.stats().room);
   const room=await a.inputValue('#onlineRoom');
   await b.goto(`/?view=iso&test=net&gpu=off&server=${encodeURIComponent(endpoint)}&room=${room}`);
+  await readyPlayers(a,b);
   await Promise.all([poll(a,()=>window.__ONLINE_MATCH_V1__.phase==='playing'),poll(b,()=>window.__ONLINE_MATCH_V1__.phase==='playing')]);
   await Promise.all([a.click('#onlineClose'),b.click('#onlineClose')]);
   return {a,b,room,errors,close:async()=>{await app.closeRoom(room);await Promise.all([france.close(),britain.close()]);}};

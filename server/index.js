@@ -7,6 +7,7 @@ const {WebSocketServer,WebSocket}=require('ws');
 const {createSimulationHost}=require('./simulation-host.js');
 const {createEncoder}=require('./state-delta.js');
 const {createClock}=require('./match-clock.js');
+const {playerName}=require('./player-name.js');
 const protocol=require('../src/network/command-protocol.js');
 const VERSION=require('../package.json').version;
 const ROOT=path.resolve(__dirname,'..');
@@ -55,11 +56,11 @@ async function createServer(options={}){
     wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,req));
   });
   const fail=(ws,reason)=>send(ws,{type:'error',reason});
-  function roomInfo(room){return {type:'room',room:room.code,phase:room.phase,players:['france','britain'].map(side=>({side,connected:room.players[side]?.ws?.readyState===WebSocket.OPEN,ready:!!room.players[side]?.ready}))};}
+  function roomInfo(room){return {type:'room',room:room.code,round:room.round,started:!!room.started,phase:room.phase,players:['france','britain'].map(side=>({side,name:room.players[side]?.name||null,connected:room.players[side]?.ws?.readyState===WebSocket.OPEN,loaded:!!room.players[side]?.loaded,ready:!!room.players[side]?.ready,rematch:!!room.players[side]?.rematch}))};}
   function broadcast(room){const info=roomInfo(room);for(const p of Object.values(room.players))if(p.ws)send(p.ws,info);}
   function phase(room){
     const previous=room.phase;
-    room.phase=room.finished?'finished':room.players.france?.ready&&room.players.britain?.ready&&['france','britain'].every(s=>room.players[s]?.ws?.readyState===WebSocket.OPEN)?'playing':room.started?'paused':'waiting';
+    room.phase=room.restarting?'restarting':room.finished?'finished':room.players.france?.ready&&room.players.britain?.ready&&['france','britain'].every(s=>room.players[s]?.ws?.readyState===WebSocket.OPEN)?'playing':room.started?'paused':'waiting';
     // Reconnect time must never be simulated. Between running requests, retain
     // short async delays rather than silently dropping their simulation ticks.
     if(previous!==room.phase)room.clock.reset(performance.now());
@@ -70,6 +71,27 @@ async function createServer(options={}){
     if(room.closed)return;room.closed=true;rooms.delete(room.code);
     for(const p of Object.values(room.players))if(p.ws){send(p.ws,{type:'ended',reason});p.ws.close(1000,'Match ended');}
     await room.sim?.close().catch(()=>{});
+    await room.restartTask?.catch(()=>{});
+  }
+  const currentRound=(room,msg)=>msg.round===room.round||(msg.round===undefined&&room.round===1);
+  function restartRoom(room){
+    room.restarting=true;room.commands.length=0;room.clock.reset(performance.now());phase(room);
+    const previous=room.sim;room.sim=null;
+    // Dispose the old simulation before allocating its replacement on the free
+    // server. Retain identities and the room, but never an old tick/baseline.
+    room.restartTask=(async()=>{
+      await room.inFlight?.catch(()=>{});
+      await previous.close();
+      if(room.closed)return;
+      const next=await host.create();
+      if(room.closed){await next.close();return;}
+      room.sim=next;room.round++;room.finished=false;room.finishedAt=null;room.started=false;room.createdAt=Date.now();room.lastSnapshotAt=0;
+      for(const p of Object.values(room.players)){p.ready=false;p.loaded=false;p.confirmed=false;p.rematch=false;p.epoch++;p.ws&&(p.ws.encoder=createEncoder());}
+      room.restarting=false;room.clock.reset(performance.now());
+      for(const p of Object.values(room.players))if(p.ws)send(p.ws,{type:'new-round',round:room.round});
+      phase(room);
+    })();
+    room.restartTask.catch(e=>{if(!room.closed){console.error('Could not restart match:',e.message);void closeRoom(room,'server-error');}});
   }
   function rate(ip,key,max){
     const now=Date.now();let entry=limits.get(ip);
@@ -79,8 +101,8 @@ async function createServer(options={}){
   function attach(ws,room,side,player){
     clearTimeout(ws.joinTimer);
     if(player.ws&&player.ws!==ws){const old=player.ws;old.session=null;old.close(4001,'Connected elsewhere');}
-    ws.session={room,side,player};player.ws=ws;player.disconnectedAt=null;player.ready=false;player.epoch=(player.epoch||0)+1;ws.encoder=createEncoder();
-    send(ws,{type:'welcome',room:room.code,side,token:player.token,seq:player.seq,protocol:1});phase(room);
+    ws.session={room,side,player};player.ws=ws;player.disconnectedAt=null;player.ready=false;player.loaded=false;player.epoch=(player.epoch||0)+1;ws.encoder=createEncoder();
+    send(ws,{type:'welcome',room:room.code,side,token:player.token,seq:player.seq,protocol:1,round:room.round,name:player.name,confirmed:!!player.confirmed,started:!!room.started});phase(room);
   }
   wss.on('connection',(ws,req)=>{
     connections.add(ws);ws.alive=true;
@@ -103,13 +125,13 @@ async function createServer(options={}){
           // its bounded browser startup timeout now governs this request.
           clearTimeout(ws.joinTimer);
           pending=true;
-          const room={code:code(),createdAt:Date.now(),players:{},commands:[],busy:false,phase:'waiting',steps:0,clock:createClock(performance.now())};
+          const room={code:code(),round:1,createdAt:Date.now(),players:{},commands:[],busy:false,phase:'waiting',steps:0,clock:createClock(performance.now())};
           while(rooms.has(room.code))room.code=code();
           rooms.set(room.code,room);
           try{
             room.sim=await host.create();
             if(ws.readyState!==WebSocket.OPEN){await closeRoom(room,'host-left');return;}
-            const player={token:token(),seq:0,ready:false};room.players.france=player;attach(ws,room,'france',player);
+            const player={token:token(),name:playerName(msg.name,'france'),seq:0,ready:false,confirmed:false,loaded:false};room.players.france=player;attach(ws,room,'france',player);
           }catch(e){console.error('Could not create match:',e.message);await closeRoom(room,'server-error');fail(ws,'server-error');}
           finally{pending=false;}
           return;
@@ -123,12 +145,38 @@ async function createServer(options={}){
           attach(ws,room,side,room.players[side]);return;
         }
         if(room.players.britain){fail(ws,'room-full');return;}
-        const player={token:token(),seq:0,ready:false};room.players.britain=player;attach(ws,room,'britain',player);return;
+        const player={token:token(),name:playerName(msg.name,'britain'),seq:0,ready:false,confirmed:false,loaded:false};room.players.britain=player;attach(ws,room,'britain',player);return;
       }
       const {room,side,player}=ws.session;
       if(room.closed)return;
-      if(msg.type==='ready'){player.ready=true;phase(room);return;}
+      if(msg.type==='ping'){
+        if(!Number.isSafeInteger(msg.nonce)||msg.nonce<1){fail(ws,'invalid-message');return;}
+        send(ws,{type:'pong',nonce:msg.nonce});return;
+      }
       if(msg.type==='leave'){await closeRoom(room,'player-left');return;}
+      if(!currentRound(room,msg)){fail(ws,'stale-round');return;}
+      if(msg.type==='profile'){
+        if(room.started||player.confirmed||room.finished||room.restarting){fail(ws,'name-locked');return;}
+        player.name=playerName(msg.name,side);broadcast(room);return;
+      }
+      if(msg.type==='loaded'){
+        if(room.restarting)return;
+        player.loaded=true;if(!room.finished)player.ready=!!player.confirmed;phase(room);return;
+      }
+      if(msg.type==='ready'){
+        if(room.finished||room.restarting)return;
+        if(msg.value!==undefined&&typeof msg.value!=='boolean'){fail(ws,'invalid-message');return;}
+        if(room.started&&msg.value===false){fail(ws,'match-started');return;}
+        // Legacy round-one clients use ready as their loaded signal. New
+        // clients send loaded separately and choose readiness with the button.
+        player.loaded=true;player.confirmed=msg.value!==false;player.ready=player.confirmed;phase(room);return;
+      }
+      if(msg.type==='rematch'){
+        if(msg.round!==room.round||!room.finished||room.restarting||!['france','britain'].every(s=>room.players[s]?.ws?.readyState===WebSocket.OPEN)){fail(ws,'rematch-unavailable');return;}
+        player.rematch=true;broadcast(room);
+        if(['france','britain'].every(s=>room.players[s].rematch))restartRoom(room);
+        return;
+      }
       if(msg.type!=='command'){fail(ws,'invalid-message');return;}
       if(room.phase!=='playing'){fail(ws,'match-paused');return;}
       const normalized=protocol.normalize(msg.command);
@@ -140,7 +188,7 @@ async function createServer(options={}){
     ws.on('close',()=>{
       clearTimeout(ws.joinTimer);
       connections.delete(ws);const session=ws.session;if(!session)return;
-      const {room,player}=session;if(player.ws===ws){player.ws=null;player.ready=false;player.disconnectedAt=Date.now();if(!room.closed)phase(room);}
+      const {room,player}=session;if(player.ws===ws){player.ws=null;player.ready=false;player.loaded=false;player.disconnectedAt=Date.now();if(!room.closed)phase(room);}
     });
   });
   await new Promise(resolve=>server.listen(options.port??Number(process.env.PORT||8080),options.bind??'0.0.0.0',resolve));
@@ -149,7 +197,7 @@ async function createServer(options={}){
   catch(e){server.close();throw e;}
   const clock=setInterval(()=>{
     for(const room of rooms.values()){
-      if(room.closed||room.busy||!room.sim)continue;
+      if(room.closed||room.restarting||room.busy||!room.sim)continue;
       const now=Date.now();
       if(now-room.createdAt>2*60*60*1000||(room.finished&&now-room.finishedAt>300000)||Object.values(room.players).some(p=>p.disconnectedAt&&now-p.disconnectedAt>90000)||(!room.started&&now-room.createdAt>600000)){void closeRoom(room,'expired');continue;}
       const advance=room.phase==='playing';
@@ -161,9 +209,10 @@ async function createServer(options={}){
       room.busy=true;
       const commands=room.commands.splice(0,128);
       const epochs=Object.fromEntries(['france','britain'].map(side=>[side,room.players[side]?.ws?.readyState===WebSocket.OPEN?room.players[side].epoch:0]));
-      room.sim.advance(commands,advance,snapshot,seconds,epochs).then(result=>{
-        if(room.closed)return;
-        for(const ack of result.receipts){const p=room.players[ack.side];if(ack.ok)p.seq=Math.max(p.seq,ack.seq);if(p.ws)send(p.ws,{type:'receipt',...ack});}
+      const round=room.round;
+      room.inFlight=room.sim.advance(commands,advance,snapshot,seconds,epochs).then(result=>{
+        if(room.closed||room.restarting||round!==room.round)return;
+        for(const ack of result.receipts){const p=room.players[ack.side];if(ack.ok)p.seq=Math.max(p.seq,ack.seq);if(p.ws)send(p.ws,{type:'receipt',round,...ack});}
         if(!result.views&&!result.packets)return;
         const state=result.views?.france.state||result.packets?.france?.packet.view.state||result.packets?.britain?.packet.view.state;
         if(state?.gameOver&&!room.finished){room.finished=true;room.finishedAt=Date.now();phase(room);}
@@ -173,8 +222,8 @@ async function createServer(options={}){
           const encoded=result.packets?.[side];
           // An in-flight reply may still belong to the replaced connection.
           // Discard it; the next epoch produces a new full baseline.
-          if(encoded){if(encoded.epoch===p.epoch)send(ws,encoded.packet);}
-          else if(result.views)send(ws,ws.encoder.encode(result.views[side]));
+          if(encoded){if(encoded.epoch===p.epoch)send(ws,{...encoded.packet,round});}
+          else if(result.views)send(ws,{...ws.encoder.encode(result.views[side]),round});
         }
       }).catch(e=>{if(!room.closed){console.error('Match failed:',e.message);void closeRoom(room,'server-error');}}).finally(()=>{room.busy=false;});
     }

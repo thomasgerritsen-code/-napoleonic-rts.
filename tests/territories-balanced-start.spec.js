@@ -1,3 +1,4 @@
+const {readyPlayers}=require('./helpers/online-ready.js');
 const {test,expect}=require('@playwright/test');
 const {createServer}=require('../server/index.js');
 test.use({trace:'off'});
@@ -80,6 +81,7 @@ test('two real online players capture supplies by movement orders, see canonical
   const a=await ca.newPage(),b=await cb.newPage();for(const p of[a,b])p.on('pageerror',e=>errors.push(e.message));
   await a.goto('/?view=iso&gpu=off&server='+encodeURIComponent(endpoint));await a.click('#startMultiplayer');await a.click('#onlineHost');
   await expect.poll(()=>a.inputValue('#onlineRoom'),{timeout:30000}).toMatch(/^[A-Z2-9]{8}$/);await b.goto(await a.inputValue('#onlineInvite'));
+  await readyPlayers(a,b);
   for(const p of[a,b]){await p.waitForFunction(()=>__ONLINE_MATCH_V1__.phase==='playing');await p.click('#onlineClose');}
   const order=(page,index,type)=>page.evaluate(({index,type})=>{
    const p=__ONLINE_MATCH_V1__.view.state.territories.points[index];

@@ -1,3 +1,4 @@
+const {readyPlayers}=require('./helpers/online-ready.js');
 const {test,expect}=require('@playwright/test');
 const {createServer}=require('../server/index.js');
 test.use({trace:'off'});
@@ -104,6 +105,7 @@ test('desktop and mobile upgrade only their own towers over real multiplayer tra
     await a.goto('/?view=iso&gpu=off&server='+encodeURIComponent(endpoint));await a.click('#startMultiplayer');await a.click('#onlineHost');
     await expect.poll(()=>a.inputValue('#onlineRoom'),{timeout:30000}).toMatch(/^[A-Z2-9]{8}$/);
     const invite=await a.inputValue('#onlineInvite');await b.goto(invite);
+    await readyPlayers(a,b);
     for(const p of [a,b]){await p.waitForFunction(()=>__ONLINE_MATCH_V1__.phase==='playing');await p.click('#onlineClose');}
     const select=async p=>p.evaluate(()=>{selectedUnits.clear();selectedBuilding=buildings.find(b=>b.type==='tower'&&b.side==='france');updateHud(true);return selectedBuilding.id;});
     const ownA=await select(a),ownB=await select(b);

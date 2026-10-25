@@ -1,3 +1,4 @@
+const {readyPlayers}=require('./helpers/online-ready.js');
 const {test,expect}=require('@playwright/test');
 const {createServer}=require('../server/index.js');
 test.use({trace:'off'});
@@ -55,6 +56,7 @@ test('real online opponents agree on final outcome, frozen statistics and resume
   app=await createServer({port:0,bind:'127.0.0.1',simulationHost:host,allowedOrigins:'http://127.0.0.1:4173'});const endpoint=`ws://127.0.0.1:${app.address.port}/multiplayer`;
   const ca=await browser.newContext(),cb=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});contexts.push(ca,cb);const a=await ca.newPage(),b=await cb.newPage();for(const p of[a,b])p.on('pageerror',e=>errors.push(e.message));
   await a.goto('/?view=iso&gpu=off&server='+encodeURIComponent(endpoint));await a.click('#startMultiplayer');await a.click('#onlineHost');await expect.poll(()=>a.inputValue('#onlineRoom'),{timeout:30000}).toMatch(/^[A-Z2-9]{8}$/);await b.goto(await a.inputValue('#onlineInvite'));
+  await readyPlayers(a,b);
   for(const p of[a,b]){await p.waitForFunction(()=>__ONLINE_MATCH_V1__.phase==='playing');await p.click('#onlineClose');}
   for(const p of[a,b])expect(await p.evaluate(()=>__ONLINE_MATCH_V1__.view.state.battle)).toEqual({holdSeconds:120,controlSide:null,heldSeconds:0,result:null});
   expect(await b.evaluate(()=>{const tc=buildings.find(b=>b.side==='france'&&b.type==='towncenter');selectedBuilding=tc;return queuePlayerUnit('worker');})).toBe(true);

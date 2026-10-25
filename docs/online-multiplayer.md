@@ -6,7 +6,9 @@ De eerste online versie is een privéwedstrijd voor twee spelers. De host speelt
 Frankrijk, de deelnemer Groot-Brittannië. Op beide toestellen moet dezelfde versie
 van de game draaien. Kies in het startmenu **Multiplayer** en daarna **Spel hosten** en deel de uitnodiging.
 De tweede speler opent die link op een ander toestel of in een aparte browsersessie.
-De strijd begint als beide spelers verbonden zijn en hun afbeeldingen geladen zijn.
+De strijd begint als beide spelers verbonden zijn, hun kaart geladen hebben en
+allebei op **Gereed** hebben gedrukt. Met **Niet gereed** kun je dat vóór de start
+weer intrekken.
 
 De spelserver verwerkt beweging, verzamelen, bouwen, productie, regimenten,
 officiertoewijzing, formaties, gevechtsbevelen, verzamelpunten en bijzondere
@@ -17,10 +19,19 @@ rechtstreeks de juiste kamer openen.
 Een nieuwe slag starten tijdens een online wedstrijd opent de lobby; eerst de
 wedstrijd verlaten voorkomt dat één speler onbedoeld alleen zijn spel reset.
 
+Kies je spelersnaam in de lobby. Ook een uitgenodigde speler kan zijn naam na
+het deelnemen aanpassen, zolang hij nog niet gereed is. De naam wordt bij de
+partij op de server bewaard en blijft behouden bij opnieuw verbinden. De lobby
+toont per speler de verbinding, laadstatus en gereedmelding. De onlineknop en de
+lobby tonen je gemeten ping naar de spelserver, ongeveer iedere vijf seconden.
+Die waarde is de retourtijd van een bericht over de WebSocketverbinding.
+
 Bij een verbroken verbinding pauzeert de simulatie voor beide spelers. Dezelfde
 browser kan met een geheim sessietoken maximaal 90 seconden opnieuw verbinden.
 Dat token staat uitsluitend in `sessionStorage`, nooit in de uitnodigingslink.
-Ook vernieuwen van de pagina hervat de eigen partij. Op een derde toestel geeft
+Ook vernieuwen van de pagina hervat de eigen partij. Een speler die al gereed
+was, hervat na het laden automatisch; een nieuwe slag wacht op een nieuwe
+gereedmelding van beide spelers. Op een derde toestel geeft
 de uitnodiging geen toegang tot een al bezette partij.
 
 ## Gelijke start
@@ -108,8 +119,13 @@ blijven vijandelijke aantallen en voorraden onder het normale zicht vallen.
 De uitslag en speelduur worden vastgezet zodra de strijd eindigt. De server
 weigert verdere spelopdrachten. Opnieuw verbinden haalt dezelfde uitslag op zolang
 de kamer nog bestaat. Een singleplayerslag kan via **Nieuwe slag** opnieuw beginnen.
-Online leidt **Hoofdmenu** via het bestaande verlaten-pad terug naar het startmenu;
-maak daar een nieuwe kamer en deel de nieuwe uitnodiging voor een volgende slag.
+Online kiezen beide verbonden spelers op het eindscherm **Opnieuw spelen**.
+Eén verzoek wacht op instemming van de tegenstander. Daarna sluit de server de
+oude simulatie en maakt hij binnen dezelfde kamer een nieuwe slag. Partijen,
+namen, sessies en uitnodigingslink blijven behouden. Legers, voorraden, rangen,
+gebieden, speelduur en uitslag beginnen opnieuw. Beide spelers kiezen daarna
+opnieuw **Gereed**. **Hoofdmenu** verlaat de kamer en brengt je terug naar het
+startmenu.
 Er worden geen ranglijsten of permanente wedstrijdresultaten opgeslagen.
 
 ## Schiettorens versterken
@@ -283,7 +299,13 @@ Een serverklok draait op 20 tikken per seconde. Elke tik voert de bestaande
 simulatie in drie stappen van 1/60 seconde uit.
 Korte vertragingen over de asynchrone simulatieverbinding worden ingehaald met
 hoogstens vijf tikken (250 ms) per batch; verbindingspauzes worden niet ingehaald.
-De client wacht op zijn eerste volledige spelstatus voordat hij klaar meldt.
+De client wacht op zijn eerste volledige spelstatus en afbeeldingen voordat
+hij geladen meldt. Alleen de expliciete gereedmelding start een nieuwe slag.
+Een hervatte sessie bewaart de eerdere instemming. Opnieuw spelen vereist twee
+verzoeken na afloop. De server vervangt de simulatie zonder twee kamers of
+simulaties tegelijk te laden. Hij nummert de slagen en weigert opdrachten uit
+oude slagen; iedere nieuwe slag of verbinding begint met een volledige status.
+Lopende antwoorden van de vorige simulatie of verbinding worden weggegooid.
 Opdrachten krijgen identiteit en
 volgorde van de verbinding, met controles bij ontvangst én uitvoering. Clients
 kunnen geen partij, spelklok, levenspunten of grondstoffen kiezen. Dubbele oude

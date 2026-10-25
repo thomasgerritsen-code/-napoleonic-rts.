@@ -205,5 +205,14 @@
     clampCamera();
     if(typeof markExploredV06==='function')markExploredV06();
   }
-  root.__ONLINE_VIEW_V1__=Object.freeze({receive,frame});
+  function reset(){
+    initial=true;receivedAt=serverElapsed=snapshotTime=0;
+    positions.clear();targets.clear();remoteWounds.length=remoteTeams.length=0;remoteWoundById.clear();
+    units.length=buildings.length=regiments.length=resources.length=projectiles.length=particles.length=0;
+    selectedUnits.clear();selectedBuilding=null;buildMode=null;keys.clear();elapsed=0;gameOver=false;
+    root.__BATTLE__?.resetRemote();
+    root.NRTS?.events?.emit?.('game:reset',{previousElapsed:0,previousUnitCount:0,previousRegimentCount:0});
+    root.__VISION_EPOCH__=(root.__VISION_EPOCH__||0)+1;
+  }
+  root.__ONLINE_VIEW_V1__=Object.freeze({receive,frame,reset});
 })(window);
