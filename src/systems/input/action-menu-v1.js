@@ -46,6 +46,7 @@
       workers: sel.some(u => u.type === 'worker'),
       army: sel.some(u => u.type !== 'worker'),
       cavalryDraft: sel.some(u => !u.regimentId && (u.type === 'cavalry' || (u.type === 'officer' && u.troop === 'mounted'))),
+      selectionKey: `${b?.id||''}|${sel.map(u=>u.id).sort((a,b)=>a-b).join(',')}`,
       building: !!(b && !b.dead && b.side === 'france'),
       any: sel.length > 0 || !!(b && !b.dead)
     };
@@ -128,6 +129,7 @@
   actionsEl.classList.add('menu-v1');
   let busy = false, signature = '';
   const stats = { organized: 0 };
+  let previousSelection = '';
   function organize() {
     if (busy) return;
     busy = true;
@@ -165,6 +167,10 @@
           hint.style.order = '-1';
           actionsEl.appendChild(hint);
         }
+      }
+      if(c.selectionKey!==previousSelection){
+        previousSelection=c.selectionKey;
+        if(c.cavalryDraft)actionsEl.scrollLeft=0;
       }
       stats.organized++;
     } finally { busy = false; }

@@ -30,6 +30,10 @@ test('desktop France and mobile Britain form mounted regiments through real serv
   await readyPlayers(a,b);for(const p of[a,b]){await p.waitForFunction(()=>__ONLINE_MATCH_V1__.phase==='playing');await p.click('#onlineClose');}
   const fixture=await simulationPage.evaluate(()=>__mountedFixture);
   for(const [p,side]of[[a,'france'],[b,'britain']]){
+   if(side==='britain'){
+    await p.evaluate(()=>{selectedUnits.clear();selectedBuilding=null;units.filter(u=>u.side==='france'&&u.type==='infantry').forEach(u=>selectedUnits.add(u));updateHud(true);});
+    expect(await p.locator('#actions').evaluate(el=>{el.scrollLeft=el.scrollWidth;return el.scrollLeft;})).toBeGreaterThan(0);
+   }
    await p.evaluate(id=>{selectedUnits.clear();selectedBuilding=null;selectedUnits.add(units.find(u=>u.id===id));updateHud(true);},fixture[side].officer);
    const button=p.locator('[data-action="create-cavalry-regiment"]');await expect(button).toBeEnabled();
    if(side==='britain'){
