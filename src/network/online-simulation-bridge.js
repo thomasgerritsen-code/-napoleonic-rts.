@@ -4,8 +4,17 @@
 (function installOnlineSimulationBridge(root) {
   if (document.readyState !== 'complete') { addEventListener('load', () => installOnlineSimulationBridge(root), {once:true}); return; }
   const flip = side => side === 'france' ? 'britain' : side === 'britain' ? 'france' : side;
-  const scalar = value => value === null || ['number','string','boolean'].includes(typeof value);
-  const copyScalars = obj => Object.fromEntries(Object.entries(obj).filter(([,v]) => scalar(v)));
+  const scalar = value => value === null || typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean';
+  function copyScalars(obj) {
+    const result={};
+    for(const key of Object.keys(obj)){
+      const value=obj[key];if(!scalar(value))continue;
+      // Keep Object.fromEntries semantics for a literal data property.
+      if(key==='__proto__')Object.defineProperty(result,key,{value,enumerable:true,writable:true,configurable:true});
+      else result[key]=value;
+    }
+    return result;
+  }
   const point = p => p ? {x:p.x,y:p.y,type:p.type,kind:p.kind,dead:!!p.dead} : null;
   const visibleKeys = ['id','kind','side','type','x','y','facing','hp','maxHp','dead','morale','routing',
     'regimentId','troop','chargeTimer','reload','lastFireAt','firedAt','misfiredAt','attackMode','artilleryMode'];

@@ -5,7 +5,7 @@ const path=require('node:path');
 const {randomBytes,randomInt}=require('node:crypto');
 const {WebSocketServer,WebSocket}=require('ws');
 const {createSimulationHost}=require('./simulation-host.js');
-const {delta}=require('./state-delta.js');
+const {createEncoder}=require('./state-delta.js');
 const protocol=require('../src/network/command-protocol.js');
 const VERSION=require('../package.json').version;
 const ROOT=path.resolve(__dirname,'..');
@@ -78,7 +78,7 @@ async function createServer(options={}){
   function attach(ws,room,side,player){
     clearTimeout(ws.joinTimer);
     if(player.ws&&player.ws!==ws){const old=player.ws;old.session=null;old.close(4001,'Connected elsewhere');}
-    ws.session={room,side,player};player.ws=ws;player.disconnectedAt=null;player.ready=false;ws.baseline=null;
+    ws.session={room,side,player};player.ws=ws;player.disconnectedAt=null;player.ready=false;ws.encoder=createEncoder();
     send(ws,{type:'welcome',room:room.code,side,token:player.token,seq:player.seq,protocol:1});phase(room);
   }
   wss.on('connection',(ws,req)=>{
@@ -168,7 +168,7 @@ async function createServer(options={}){
         for(const side of ['france','britain']){
           const p=room.players[side],ws=p?.ws;if(!ws||ws.readyState!==WebSocket.OPEN)continue;
           if(ws.bufferedAmount>512*1024){ws.close(4002,'Connection too slow');continue;}
-          const view=result.views[side];send(ws,delta(ws.baseline,view));ws.baseline=view;
+          send(ws,ws.encoder.encode(result.views[side]));
         }
       }).catch(e=>{console.error('Match failed:',e.message);void closeRoom(room,'server-error');}).finally(()=>{room.busy=false;});
     }

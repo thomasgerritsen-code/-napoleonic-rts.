@@ -66,6 +66,15 @@ Een geaccepteerd verzoek om een kamer te maken valt onder de begrensde
 simulatiestart (maximaal 60 seconden laden plus 15 seconden initialiseren).
 Ongebruikte verbindingen blijven na 30 seconden vervallen.
 
+Een verdere optimalisatie maakt de statuskopie in één doorgang, met minder
+tijdelijke arrays. Elke verbinding bewaart alleen de laatst verzonden
+vergelijkingswaarden, zodat de vorige status niet opnieuw wordt omgezet.
+De eerste status en iedere hervatte verbinding blijven een volledig beginbeeld
+krijgen; spelers delen geen vergelijkingsgeheugen. In lokale metingen daalde
+het maken van honderd statusparen van circa 133 naar 74 ms en het verwerken
+van duizend netwerkupdates van circa 490 naar 258 ms. Het aantal simulatietikken,
+de frequentie van netwerkupdates en de weergave blijven gelijk.
+
 Render bouwt het bestaande `Dockerfile` vanaf de branch
 `claude/continue-updates-o6whr4`. Laat **Docker Command** leeg, zodat de container
 zelf `node server/index.js` start. Stel `PUBLIC_ORIGIN` in op de bovenstaande
