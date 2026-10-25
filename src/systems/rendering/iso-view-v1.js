@@ -1536,6 +1536,23 @@
     if (u.type === 'artillery') return u.artilleryMode === 'grape' ? 145 : TYPES.artillery?.range || 0;
     return u.type === 'infantry' ? TYPES.infantry?.range || 0 : 0;
   }
+  function drawTerritories() {
+    view.stats.territories = 0;
+    const s = global.__TERRITORIES__?.state();
+    if (!s) return;
+    for (const p of s.points) {
+      const X=sx(p.x),Y=gy(p.x,p.y),r=s.radius*z();
+      if(X+r<0||X-r>innerWidth||Y+r<0||Y-r>innerHeight)continue;
+      const color=p.owner==='france'?'#74a4ef':p.owner==='britain'?'#ef8877':'#efd88e',h=Math.max(20,28*z());
+      ctx.save();ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.globalAlpha=.55;
+      ctx.beginPath();ctx.ellipse(X,Y,r,r*SQ,0,0,Math.PI*2);ctx.stroke();
+      if(p.claim){ctx.globalAlpha=.9;ctx.strokeStyle='#efb24f';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(X,Y,r,r*SQ,0,-Math.PI/2,-Math.PI/2+Math.PI*2*p.progress);ctx.stroke();}
+      ctx.globalAlpha=1;ctx.strokeStyle='#ddd3b8';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X,Y);ctx.lineTo(X,Y-h);ctx.stroke();
+      ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(X,Y-h);ctx.lineTo(X+15,Y-h+3);ctx.lineTo(X+13,Y-h+12);ctx.lineTo(X,Y-h+9);ctx.closePath();ctx.fill();
+      ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='#172019';ctx.strokeText(p.label,X,Y-h-6);ctx.fillStyle='#f7edcf';ctx.fillText(p.label,X,Y-h-6);ctx.restore();
+      view.stats.territories++;
+    }
+  }
   function drawRanges() {
     const circles = [];
     for (const u of selectedUnits) { const r = rangeOf(u); if (r) circles.push([u.x, u.y, r]); }
@@ -1728,6 +1745,7 @@
     if (detailed()) drawChimneySmoke(t);
     drawSmoke(t);
     drawFog();
+    drawTerritories();
     drawWeather(t);
     drawDayNight();
     drawDragBox();

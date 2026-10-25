@@ -20,6 +20,45 @@ Dat token staat uitsluitend in `sessionStorage`, nooit in de uitnodigingslink.
 Ook vernieuwen van de pagina hervat de eigen partij. Op een derde toestel geeft
 de uitnodiging geen toegang tot een al bezette partij.
 
+## Gelijke start
+
+Op de speelbare kaart beginnen beide partijen met 1100 voedsel, 1100 hout,
+100 ijzer en 45 populatieruimte. Elk startleger telt 6 boeren, 12 musketiers,
+4 cavaleristen, een officier te voet, een drummer en een officier te paard.
+Hiermee kunnen beide spelers meteen een infanterie- en cavalerieregiment vormen.
+Beide partijen hebben hetzelfde hoofdkwartier en dezelfde basisgebouwen om te bouwen.
+De kaart heeft verschillende terreinen; de beginvoorraad en legers zijn gelijk.
+
+Online wachten boeren van beide partijen op een opdracht. Na het uitputten
+van een bron zoeken ze een nieuwe bron van hetzelfde opgedragen type; als
+die niet meer bestaat, blijven ze staan. De singleplayercomputer blijft
+zelfstandig zijn werk verdelen.
+
+## Grondstofgebieden
+
+Drie neutrale vlaggen liggen op gelijke afstand van beide hoofdkwartieren.
+Stuur gevechtseenheden naar een vlag en houd die 15 seconden vast:
+
+| Gebied | Opbrengst voor de eigenaar |
+| --- | --- |
+| Landgoed | 3 voedsel per seconde |
+| Houtkamp | 2 hout per seconde |
+| IJzermijn | 1 ijzer per seconde |
+
+Boeren, officieren, drummers, dode en vluchtende eenheden veroveren niet.
+Bij troepen van beide partijen stopt het veroveren én de opbrengst. Als
+alleen de vijand aanwezig is, stopt de oude opbrengst en kan hij het gebied
+in 15 seconden overnemen. Een leeg, veroverd gebied blijft van de eigenaar
+en blijft produceren; onvoltooide verovering vervalt zodra iedereen vertrekt.
+
+Gebruik **Gebieden** om eigenaars, voortgang en opbrengsten te bekijken en
+de camera naar een vlag te verplaatsen. Vlaggen staan ook op de minimap.
+Hun locatie en gebiedsstatus zijn openbaar; vijandelijke eenheden blijven
+onder het normale zicht vallen. De server verwerkt verovering en inkomen,
+pauzeert die met de wedstrijd en bewaart ze bij opnieuw verbinden. Nieuwe
+wedstrijden beginnen weer met neutrale gebieden. De singleplayercomputer
+kiest grondstofgebieden als strategisch doel wanneer zijn basis veilig is.
+
 ## Schiettorens versterken
 
 Selecteer een voltooide eigen schiettoren en kies **Upgrade**. Net als een

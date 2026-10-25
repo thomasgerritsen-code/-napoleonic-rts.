@@ -114,7 +114,7 @@
       let winner=null;
       if(gameOver){const alive=s=>buildings.some(b=>!b.dead&&b.side===s&&b.type==='towncenter')||units.some(u=>!u.dead&&u.side===s&&u.type!=='worker');winner=alive('france')?'france':alive('britain')?'britain':'draw';}
       return {elapsed,world:{...WORLD},economy:{...economies[side]},units:unitViews,buildings:buildingViews,groups,
-        resources:resourceViews,projectiles:shots,trenches,wounded,teams,animals,grenades,deaths:[...deaths.values()].filter(d=>canSee(d.u)).map(d=>d.u.id),weather:root.__WEATHER_V1__?.state(),gameOver,winner};
+        resources:resourceViews,projectiles:shots,trenches,wounded,teams,animals,grenades,deaths:[...deaths.values()].filter(d=>canSee(d.u)).map(d=>d.u.id),weather:root.__WEATHER_V1__?.state(),territories:root.__TERRITORIES__?.state(),gameOver,winner};
     }
     const authority=root.NRTS_MATCH_AUTHORITY.create({unit:id=>units.find(u=>u.id===id),building:id=>buildings.find(b=>b.id===id),world:()=>WORLD,
       apply,step:dt=>{for(let i=0;i<3;i++)update(dt/3);},snapshotFor},{hz:20});
@@ -179,6 +179,7 @@
     Object.assign(WORLD,s.world);Object.assign(economies.france,s.economy);
     economies.britain={food:0,wood:0,iron:0,popCap:0};
     root.__WEATHER_V1__?.receive(s.weather);
+    root.__TERRITORIES__?.receive(s.territories);
     serverElapsed=s.elapsed;receivedAt=now;snapshotTime=Math.min(160,Math.max(50,now-(snapshotTime?root.__ONLINE_MATCH_V1__.lastReceivedAt:now-100)));
     elapsed=s.elapsed;gameOver=s.gameOver;root.__VISION_EPOCH__=(root.__VISION_EPOCH__||0)+1;
     if(initial){const home=buildings.find(b=>b.side==='france'&&b.type==='towncenter');if(home){camera.x=home.x;camera.y=home.y;}selectedUnits.clear();initial=false;}

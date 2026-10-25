@@ -218,7 +218,9 @@ test('the real authoritative simulation forms both armies, applies combat once, 
       const woodAfterOrder=economies.britain.wood;
       Math.random=()=>0; // Without the human-player guard, AI picks a mounted officer.
       const home=buildings.find(b=>b.side==='france'&&b.type==='towncenter');
-      const a=createUnit('france','infantry',home.x+60,home.y+70),b=createUnit('britain','infantry',home.x+120,home.y+70);
+      // Keep the controlled two-shooter battle clear of the starting roster.
+      // Equalised spawn formations can otherwise supply a closer target.
+      const a=createUnit('france','infantry',WORLD.width*.55,WORLD.height*.12),b=createUnit('britain','infantry',WORLD.width*.55+60,WORLD.height*.12);
       a.hp=a.maxHp=b.hp=b.maxHp=10000;a.reload=b.reload=0;
       const hidden=units.find(u=>u.side==='britain'&&u.id!==b.id&&!squads.britain.includes(u.id));
       b.task='private-task';b.resourceTarget=resources[0];
