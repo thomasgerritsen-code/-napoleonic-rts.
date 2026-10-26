@@ -849,6 +849,12 @@
   // Animation for one live unit: [atlas key, animation, frame].
   function frameFor(u, m, now) {
     const p = (u.nativeSide || u.side) === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
+    if (global.__CHARGE_STUMBLE_V1__?.down(u)) {
+      const age = elapsed - u.chargeFallAt, duration = u.chargeFallUntil - u.chargeFallAt;
+      const f = fallOf(u, DIRS[dirOf(u.chargeFallFacing || 0)]);
+      // Fall, briefly lie down, then rise; no corpse, blood or wounded entry.
+      if (f) return [f.key, f.anim, Math.max(0, Math.min(3, Math.floor(age / .55 * 4), Math.floor((duration - age) / .75 * 4)))];
+    }
     const since = now - m.firedAt, step = (stride, n) => Math.floor((m.walk % stride) / stride * n) % n;
     if (u.type === 'cavalry' || mountedKey(u, p)) {
       // Period regiments have their own riders (troops-v1); huzaren ride the bays.

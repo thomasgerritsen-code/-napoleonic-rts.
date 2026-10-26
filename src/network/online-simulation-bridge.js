@@ -17,7 +17,7 @@
   }
   const point = p => p ? {x:p.x,y:p.y,type:p.type,kind:p.kind,dead:!!p.dead} : null;
   const visibleKeys = ['id','kind','side','type','x','y','facing','hp','maxHp','dead','morale','routing',
-    'regimentId','troop','chargeTimer','reload','lastFireAt','firedAt','meleeStrikeAt','misfiredAt','attackMode','artilleryMode'];
+    'regimentId','troop','chargeTimer','reload','lastFireAt','firedAt','meleeStrikeAt','chargeFallAt','chargeFallUntil','chargeFallFacing','misfiredAt','attackMode','artilleryMode'];
   const pick = (obj,keys) => Object.fromEntries(keys.filter(k => scalar(obj[k])).map(k => [k,obj[k]]));
 
   if (root.__NRTS_SERVER__) {

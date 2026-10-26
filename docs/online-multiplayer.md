@@ -382,3 +382,5 @@ Node-tests controleren daarnaast het gedeelde opdrachtprotocol, begrenzingen,
 snapshotverschillen en volledige reconstructie zonder informatie van de vorige
 verbinding. De browsercontrole gebruikt Chromium met een iPhone-achtige viewport;
 dit is geen fysieke Safari- of frameratemeting.
+
+Tijdens een lopende infanterie- of cavaleriecharge kan ongeveer één op twaalf soldaten struikelen. Na 1,9 seconde staat die weer op en vervolgt het bevel; het kost geen gezondheid of regimentlid. De server bepaalt de val eenmalig per charge op basis van echte loopafstand en deelt alleen de zichtbare valtijden/richting. Er wordt niet gestruikeld op bruggen, in water, in een oversteekwachtrij of binnen 45 eenheden van een vijand. De bestaande valbeelden worden gebruikt voor vallen en opstaan, zonder extra beeldbestanden of timers.
