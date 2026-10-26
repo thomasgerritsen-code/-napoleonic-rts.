@@ -6,6 +6,13 @@
   const duration=1.9,stats={falls:0,recovered:0};
   const down=u=>!!u&&!u.dead&&!u.routing&&Number.isFinite(u.chargeFallAt)&&elapsed<u.chargeFallUntil;
   function clear(u){delete u.chargeFallAt;delete u.chargeFallUntil;delete u.chargeFallFacing;}
+  function fall(u,seconds=duration){
+    if(!u||u.dead||u.routing||down(u)||(u.type!=='infantry'&&u.type!=='cavalry'))return false;
+    u.chargeFallAt=elapsed;u.chargeFallUntil=elapsed+Math.max(.8,Math.min(2.5,seconds));
+    u.chargeFallFacing=u.facing||0;u.chargeMomentumV1=0;
+    if(u.slotFollowerV071)u.slotFollowerV071.vx=u.slotFollowerV071.vy=0;
+    stats.falls++;return true;
+  }
   function sample(id,sequence,salt){
     let n=Math.imul(id^Math.imul(sequence,0x9e3779b1)^salt,0x85ebca6b);
     n=Math.imul(n^(n>>>16),0xc2b2ae35);return((n^(n>>>13))>>>0)/4294967296;
@@ -46,10 +53,7 @@
       // Real running distance, never time spent standing, fighting or queuing.
       if(distance/dt>35)s.travel+=distance;
       if(s.chosen&&s.travel>=s.after&&distance/dt>35&&safe(u)){
-        s.used=true;u.chargeFallAt=elapsed;u.chargeFallUntil=elapsed+duration;
-        u.chargeFallFacing=facing;u.chargeMomentumV1=0;
-        if(u.slotFollowerV071)u.slotFollowerV071.vx=u.slotFollowerV071.vy=0;
-        stats.falls++;
+        s.used=true;fall(u);u.chargeFallFacing=facing;
       }
     }
     return result;
@@ -63,5 +67,5 @@
     try{return baseDraw(u);}finally{ctx.restore();}
   };
   root.NRTS.events.on('game:reset',()=>{charges=new WeakMap();stats.falls=stats.recovered=0;});
-  root.__CHARGE_STUMBLE_V1__=Object.freeze({down,duration,stats:()=>({...stats})});
+  root.__CHARGE_STUMBLE_V1__=Object.freeze({down,fall,duration,stats:()=>({...stats})});
 })(window);

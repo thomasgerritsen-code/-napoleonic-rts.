@@ -78,7 +78,9 @@ function fire(unit, enemy) {
   unit.reload = t.reload * (0.9 + Math.random() * 0.25);
   unit.facing = Math.atan2(enemy.y - unit.y, enemy.x - unit.x);
 
-  if (unit.type === 'cavalry' || unit.type === 'worker' || unit.type === 'drummer') {
+  const bayonet = (unit.type === 'infantry' || unit.type === 'officer') && unit.attackMode === 'bayonet';
+  if (unit.type === 'cavalry' || unit.type === 'worker' || unit.type === 'drummer' || bayonet) {
+    if (bayonet) unit.reload = Math.min(unit.reload, 1.15);
     const chargeBonus = unit.type === 'cavalry' && unit.chargeTimer > 0 ? 2 : 1;
     dealCombatDamage(combatSourceFor(unit), enemy, t.damage * chargeBonus * (0.85 + Math.random() * 0.3), unit.chargeTimer > 0 ? 24 : 7);
     spawnImpact(enemy.x, enemy.y, 3);
@@ -145,7 +147,7 @@ function updateUnit(u, dt) {
 
   let range = TYPES[u.type].range;
   if (u.type === 'artillery' && u.artilleryMode === 'grape') range = 145;
-  if (u.type === 'infantry' && u.attackMode === 'bayonet') range = 16;
+  if ((u.type === 'infantry' || u.type === 'officer') && u.attackMode === 'bayonet') range = 16;
 
   const enemy = nearestEnemyEntity(u, range);
   if (enemy && u.reload <= 0) {

@@ -54,7 +54,7 @@
     const troop=root.__TROOPS_V1__?.kinds[u.troop];
     const wet=root.__WEATHER_V1__?.state().wetness||0;
     const mud=1-(root.NRTS_CONFIG.weather?.mudSlow||0)*wet;
-    const cap=Math.min(170,speed*(troop?.speed||1)*terrainSpeedMultiplierV06(u)*mud);
+    const cap=Math.min(170,speed*(troop?.speed||1)*terrainSpeedMultiplierV06(u)*mud)*(elapsed<(s.brakeUntil||0)?.25:1);
     const desired=Math.min(cap,Math.sqrt(2*220*Math.max(0,d-.2)));
     const vx=d>.2?dx/d*desired:0,vy=d>.2?dy/d*desired:0;
     const dvx=vx-s.vx,dvy=vy-s.vy,scale=Math.min(1,240*dt*mud*(troop?.speed||1)/(Math.hypot(dvx,dvy)||1));
@@ -144,5 +144,7 @@
   const baseFire=fire;
   fire=function fireMountedContact(u,e){const result=baseFire(u,e);if(u?.type==='cavalry'){u.meleeStrikeAt=elapsed;stats.strikes++;}return result;};
   root.NRTS.events.on('game:reset',()=>{contacts=new WeakMap();active=null;});
-  root.__CAVALRY_CONTACT_V1__=Object.freeze({strikeRange,engaged,state:u=>{const s=contacts.get(u);return s?{enemyId:s.enemy.id,since:s.at,vx:s.vx,vy:s.vy}:null;},stats:()=>({...stats})});
+  function brake(u){const s=contacts.get(u);if(s){s.brakeUntil=elapsed+.3;s.vx*=.3;s.vy*=.3;}}
+  function seekOpening(u,amount){const s=contacts.get(u);if(s)s.angle+=Math.max(-.45,Math.min(.45,amount));}
+  root.__CAVALRY_CONTACT_V1__=Object.freeze({strikeRange,engaged,brake,seekOpening,state:u=>{const s=contacts.get(u);return s?{enemyId:s.enemy.id,since:s.at,vx:s.vx,vy:s.vy}:null;},stats:()=>({...stats})});
 })(window);

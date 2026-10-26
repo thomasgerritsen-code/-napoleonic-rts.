@@ -811,7 +811,7 @@
   // Muzzle smoke, a little ahead of the man at shoulder height; a cloud for a gun.
   function onShot(u, m, now) {
     const a = u.facing || 0, gun = u.type === 'artillery';
-    if (u.type === 'cavalry' || u.type === 'drummer' || u.type === 'worker') return;
+    if (u.type === 'cavalry' || u.type === 'drummer' || u.type === 'worker' || u.attackMode === 'bayonet') return;
     const reach = gun ? 2.4 : 1.1, height = gun ? 0.9 : 1.45, n = gun ? 5 : 1;
     for (let i = 0; i < n; i++) {
       const s = hash(u.id + i * 7, Math.floor(now * 10));
@@ -855,12 +855,20 @@
       // Fall, briefly lie down, then rise; no corpse, blood or wounded entry.
       if (f) return [f.key, f.anim, Math.max(0, Math.min(3, Math.floor(age / .55 * 4), Math.floor((duration - age) / .75 * 4)))];
     }
+    const action = !u.routing && u.meleeActionUntil > elapsed ? u.meleeAction : null;
+    const actionAge = elapsed - (u.meleeActionAt || 0), actionDir = DIRS[dirOf(u.meleeActionFacing || 0)];
     const since = now - m.firedAt, step = (stride, n) => Math.floor((m.walk % stride) / stride * n) % n;
     if (u.type === 'cavalry' || mountedKey(u, p)) {
       // Period regiments have their own riders (troops-v1); huzaren ride the bays.
       const coat = u.troop === 'cuirassier' ? (view.atlases[p + 'ck'] ? 'k' : '2') : u.troop === 'lancer' ? 'l' : u.troop === 'greys' ? 'g'
         : u.troop === 'hussar' ? '' : (hash(u.id, 5) < 0.5 ? '' : '2');
       const key = mountedKey(u, p) || (view.atlases[p + 'c' + coat] ? p + 'c' + coat : p + 'c');
+      if (action === 'recoil' || action === 'brace') return [key, 'rear_' + actionDir, Math.min(1, Math.floor(actionAge / .2))];
+      if (action === 'parry') return [key, 'slash_' + actionDir, 0];
+      if (action === 'strike') {
+        const f = Math.min(2, Math.floor(actionAge / .18));
+        return [key, 'slash_' + actionDir, u.meleeVariant ? 2 - f : f];
+      }
       // A real sword blow finishes even while the horse takes a small step.
       if (since >= 0 && since < 0.54) return [key, 'slash_' + DIRS[dirOf(u.facing || 0)], Math.min(2, Math.floor(since / 0.18))];
       if (m.moving) {
@@ -906,6 +914,9 @@
     }
     // Musketeers.
     const key = lookOf(u);
+    if (action === 'strike') return [key, 'thrust_' + actionDir, Math.min(2, Math.floor(actionAge / .18))];
+    if (action === 'parry') return [key, 'aim_' + actionDir, 1];
+    if (action === 'recoil') return [key, 'charge_' + actionDir, 0];
     const dk = view.atlases[key + ':dig'] ? key + ':dig' : p + ':dig';
     if (m.digging && !m.moving && !u.routing && view.atlases[dk]) {
       // Each man at his own pace through set, push, lever, lift, throw and back.
@@ -919,6 +930,7 @@
     }
     if (u.routing) return [key, 'rout_' + d, step(1.6, 6)];
     if (m.moving) return [key, (u.chargeTimer > 0 ? 'charge_' : 'march_') + d, step(MARCH_STRIDE, 6)];
+    if (u.attackMode === 'bayonet') return [key, 'aim_' + d, 1];
     if (since < 0.42) return [key, 'fire_' + d, Math.min(2, Math.floor(since / 0.14))];
     if (since < 2.1) return [key, 'reload_' + d, Math.min(3, Math.floor((since - 0.42) / 0.42))];
     if (now - (view.regFire.get(u.regimentId) ?? -99) < 6) return [key, 'aim_' + d, 1];
@@ -1698,7 +1710,13 @@
         if (u.type === 'worker' && !view.atlases[((u.nativeSide || u.side) === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); if (crest || lip) ctx.restore(); return; }
         const [key, anim, f] = frameFor(u, m, t);
         // Until its atlas has loaded a unit is simply not drawn yet.
-        if (drawSprite(view.atlases[key], anim, f, X, Y, k)) st.sprites++;
+        let dx = 0, dy = 0;
+        if (global.__MELEE_REALISM_V1__?.reacting(u)) {
+          const age = elapsed - u.meleeActionAt, life = u.meleeActionUntil - u.meleeActionAt;
+          const amount = -Math.sin(Math.PI * Math.max(0, Math.min(1, age / life))) * (u.meleeAction === 'parry' ? 1.5 : 3) * z();
+          dx = Math.cos(u.meleeActionFacing) * amount; dy = Math.sin(u.meleeActionFacing) * amount * SQ;
+        }
+        if (drawSprite(view.atlases[key], anim, f, X + dx, Y + dy, k)) st.sprites++;
         if (crest || lip) ctx.restore();
       } });
       st.drawn++;
