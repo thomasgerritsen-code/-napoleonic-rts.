@@ -96,7 +96,7 @@
         return viewSide(v);
       });
       const groups=regiments.filter(r=>!r.destroyed&&r.memberIds.some(id=>ids.has(id))).map(r=>{
-        const v=r.side===side?copyScalars(r):pick(r,['id','side','kind','name','formation','facing','morale','troop','destroyed','defend','rank','victories']);
+        const v=r.side===side?copyScalars(r):pick(r,['id','side','kind','name','formation','facing','morale','troop','destroyed','defend','rank','victories','cohesion','cohesionPhase','cohesionSince']);
         v.memberIds=r.memberIds.filter(id=>ids.has(id));
         v.crewIds=(r.crewIds||[]).filter(id=>ids.has(id));
         if(r.side===side){v.officerId=r.officerId;v.drummerId=r.drummerId;}

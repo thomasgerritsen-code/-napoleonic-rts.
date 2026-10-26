@@ -2266,6 +2266,13 @@
       ctx.font = '600 10px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       if (info.routing >= 0.5) { ctx.fillStyle = '#fff'; ctx.fillText('🏳', X, Y - 2); }
       else if (info.wavering) { ctx.fillStyle = (Math.floor(performance.now() / 350) % 2) ? '#ff5a45' : '#ffd0c8'; ctx.font = '800 12px system-ui,sans-serif'; ctx.fillText('!', X, Y - 1); }
+      const cohesionLabel = global.__BATTLE_COHESION_V1__?.label(reg);
+      if (cohesionLabel) {
+        ctx.font = '700 9px system-ui,sans-serif';ctx.fillStyle = reg.cohesionPhase === 'ready' ? '#b8e4a7' : '#ffe0a1';
+        ctx.fillText(cohesionLabel, X, Y - 15);
+        ctx.fillStyle = 'rgba(15,13,10,.75)';ctx.fillRect(X - w / 2, Y + h + 3, w, 3);
+        ctx.fillStyle = '#d7ad64';ctx.fillRect(X - w / 2, Y + h + 3, w * Math.max(0,Math.min(1,(reg.cohesion ?? 100)/100)), 3);
+      }
       ctx.font = '9px system-ui,sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
       ctx.fillText((info.officer ? '⚔' : '') + (info.drummer ? '🥁' : ''), X + w / 2 + 4, Y + h / 2);
       ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
