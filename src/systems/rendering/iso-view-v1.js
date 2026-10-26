@@ -18,6 +18,7 @@
   const PPM = 22.5, SQ = 0.5, SPRITE_PPM = 128 / 3.1, LIFT = 0.866;
   const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
   const presentation = global.__UNIT_PRESENTATION_V1__;
+  const atmosphere = global.__BATTLEFIELD_ATMOSPHERE_V1__;
   const HD = params.has('hd');
   const MOBILE_RENDER = global.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile ??
     (matchMedia('(pointer:coarse)').matches || Math.min(innerWidth, innerHeight) <= 700);
@@ -34,7 +35,7 @@
   // Screen box of a sprite drawn at (X, Y) with its pivot, for the see-through test.
   const box = (X, Y, px, py, w, h, k) => [X - px * k, Y - py * k, X + (w - px) * k, Y + (h - py) * k];
   const view = { on: true, atlases: {}, props: {}, village: null, dressing: null, chimneyAt: new Map(), chimneySmoke: [], info: new Map(), missingNames: new Set(), corpses: [], smoke: [], tiles: new Map(), trenchLips: new Map(), trenchCrests: new Map(), towerFired: new Map(),
-    tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), miniAt: 0, fogAt: 0,
+    tileTick: 0, frames: 0, lastNow: 0, regFire: new Map(), gunFire: new Map(), impacts: [], miniAt: 0, fogAt: 0,
     stats: { renderMs: 0, seeThrough: 0, flags: 0, ground: false, houses: 0, dressing: 0, chimneySmoke: 0, drawn: 0, sprites: 0, workers: 0, props: 0, tilesBaked: 0, tilesDrawn: 0, corpses: 0, smoke: 0, missing: 0 } };
 
   const assetState = { ready: false, completed: 0, total: 0, background: 0, failed: 0 };
@@ -716,6 +717,46 @@
   }
 
   // ---- terrain: the game's static terrain, baked into tiles and laid flat ----
+  const groundDetail = atmosphere.createGroundCache({ mobile: MOBILE_RENDER,
+    makeCanvas: (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; },
+    height: (x, y) => heightPx(x, y) * LIFT,
+    describe: (x, y) => {
+      if (x < 0 || y < 0 || x > WORLD.width || y > WORLD.height || waterAtV067(x, y)) return {kind:'water'};
+      const road = roadNetworkAtV066(x, y);
+      if (road) { const a = road.road.points[road.segmentIndex], b = road.road.points[road.segmentIndex + 1];
+        return {kind:'road', angle:Math.atan2(b.y-a.y,b.x-a.x)}; }
+      const kind = terrainAtV06(x, y);
+      if (kind === 'open' && [[24,0],[-24,0],[0,24],[0,-24]].some(([dx,dy]) => terrainAtV06(x+dx,y+dy) === 'woods')) return {kind:'fringe'};
+      return {kind};
+    }
+  });
+  let detailRelief = null;
+  function drawGroundDetail() {
+    view.stats.groundDetailDraws = 0;
+    if (!assetState.ready || !detailed() || z() < .85) return;
+    if (detailRelief !== view.relief) { groundDetail.reset(); detailRelief = view.relief; }
+    const a = isoScreenToWorld(-40, -40), b = isoScreenToWorld(innerWidth + 40, innerHeight + 40), cell = groundDetail.cell;
+    const want = [], cx = camera.x / cell, cy = camera.y / cell;
+    for (let y = Math.max(0,Math.floor(a.y/cell)); y <= Math.min(Math.ceil(WORLD.height/cell)-1,Math.floor(b.y/cell)); y++)
+      for (let x = Math.max(0,Math.floor(a.x/cell)); x <= Math.min(Math.ceil(WORLD.width/cell)-1,Math.floor(b.x/cell)); x++) want.push([x,y]);
+    want.sort((p,q) => (p[0]-cx)**2+(p[1]-cy)**2-((q[0]-cx)**2+(q[1]-cy)**2));
+    // A very large viewport must not cycle more visible tiles than fit in RAM.
+    // Conservatively bound each tile by the map's full relief range. Keeping
+    // the nearest set stable avoids rebuilding evicted tiles every idle frame.
+    const limits=groundDetail.stats(),maxLift=(view.relief?.maxM||0)*PPM*LIFT;
+    const tileBytes=Math.ceil((cell+44)*.5)*Math.ceil((cell*.5+44+maxLift)*.5)*4;
+    want.length=Math.min(want.length,limits.maxTiles,Math.max(1,Math.floor(limits.maxBytes/tileBytes)));
+    let budget = MOBILE_RENDER ? 2 : 3;
+    ctx.globalAlpha = Math.min(1,(z()-.7)/.3) * (1 - (seasonState()?.snow || 0) * .95);
+    for (const [x,y] of want) {
+      let tile = groundDetail.get(x,y,false);
+      if (!tile && budget > 0) { tile = groundDetail.get(x,y); budget--; }
+      if (!tile) continue;
+      drawImage(tile.canvas,sx(tile.x),sy(tile.y/SQ),tile.width*z(),tile.height*z());
+      view.stats.groundDetailDraws++;
+    }
+    ctx.globalAlpha = 1;
+  }
   const terrainSource = () => global.__MAP_AMBIENT_MOTION_V1__?.baseTerrainDraw || null;
   function tileSetup() {
     const r = z() * Math.min(devicePixelRatio || 1, 2);
@@ -798,12 +839,21 @@
   // ---- per-unit animation memory ----
   function infoOf(u) {
     let m = view.info.get(u.id);
-    if (!m) { m = { walk: 0, x: u.x, y: u.y, dir: dirOf(u.facing || 0), motion: presentation.create(u), firedAt: -99, reload: u.reload, meleeStrikeAt: u.meleeStrikeAt, musketShotAt: u.musketShotAt, misfiredAt: u.misfiredAt, speed: 0, alive: true, u };
+    if (!m) { m = { walk: 0, x: u.x, y: u.y, hp: u.hp, dir: dirOf(u.facing || 0), motion: presentation.create(u), firedAt: -99, reload: u.reload, meleeStrikeAt: u.meleeStrikeAt, musketShotAt: u.musketShotAt, misfiredAt: u.misfiredAt, speed: 0, alive: true, u };
       view.info.set(u.id, m); }
     return m;
   }
   function track(u, m, now, dt, visible) {
     const d = presentation.update(m.motion, u, dt, now, elapsed, visible);
+    // A real observed hit can kick up a little earth at the feet. Hidden units,
+    // healing, close-combat reactions, water and bridge decks produce no dust.
+    if (visible && u.hp < m.hp && u.type !== 'worker' && !(u.meleeActionUntil > elapsed) &&
+      !global.__CHARGE_STUMBLE_V1__?.down(u) && !waterAtV067(u.x,u.y) && !deckAt(u.x,u.y)) {
+      view.impacts.push({x:u.x,y:u.y,born:now,wet:(weather()?.wetness||0)>.4,seed:hash(u.id,Math.floor(elapsed*100))});
+      const max = MOBILE_RENDER ? 48 : 96;
+      if (view.impacts.length > max) view.impacts.splice(0,view.impacts.length-max);
+    }
+    m.hp = u.hp;
     if (d < 80) m.walk += d / PPM;
     m.speed = m.motion.speed; m.moving = m.motion.moving; m.dir = m.motion.dir;
     // A shot resets the reload clock upwards: that is when the man fired.
@@ -824,11 +874,12 @@
   function onShot(u, m, now) {
     const a = u.facing || 0, gun = u.type === 'artillery';
     if (u.type === 'cavalry' || u.type === 'drummer' || u.type === 'worker' || u.attackMode === 'bayonet') return;
+    if (u.side !== 'france' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(u)) return;
     const reach = gun ? 2.4 : 1.1, height = gun ? 0.9 : 1.45, n = gun ? 5 : 1;
     for (let i = 0; i < n; i++) {
       const s = hash(u.id + i * 7, Math.floor(now * 10));
       view.smoke.push({ wx: u.x + Math.cos(a) * (reach + i * 0.6) * PPM, wy: u.y + Math.sin(a) * (reach + i * 0.6) * PPM,
-        h: height, born: now, life: (gun ? 5 : 3) + s * 1.5, size: (gun ? 1.1 : 0.35) + s * (gun ? 0.8 : 0.25), seed: s });
+        h: height, born: now, facing:a, life: (gun ? 5 : 3) + s * 1.5, size: (gun ? 1.1 : 0.35) + s * (gun ? 0.8 : 0.25), seed: s });
     }
     if (gun) view.gunFire.set(u.regimentId || u.id, now);
     if (view.smoke.length > SMOKE_MAX) view.smoke.splice(0, view.smoke.length - SMOKE_MAX);
@@ -1263,20 +1314,43 @@
   function puff(kind) {
     if (PUFFS[kind]) return PUFFS[kind];
     const c = document.createElement('canvas'); c.width = c.height = 64;
-    const g = c.getContext('2d'), grad = g.createRadialGradient(32, 32, 2, 32, 32, 32);
-    grad.addColorStop(0, kind === 'gun' ? 'rgba(232,228,218,.85)' : 'rgba(240,238,230,.8)'); grad.addColorStop(1, 'rgba(225,222,212,0)');
-    g.fillStyle = grad; g.fillRect(0, 0, 64, 64); return (PUFFS[kind] = c);
+    const g = c.getContext('2d'), dust = kind === 'dust' || kind === 'mud';
+    const color = kind === 'mud' ? '77,66,47' : dust ? '163,139,101' : '237,235,225';
+    // A few soft lobes are baked once instead of redrawn for every cloud.
+    for (let i = 0; i < 5; i++) {
+      const x = 20 + hash(i,3)*24, y = 20 + hash(i,8)*24, r = 17 + hash(i,9)*8;
+      const grad = g.createRadialGradient(x,y,1,x,y,r);
+      grad.addColorStop(0,`rgba(${color},${dust ? .42 : .48})`); grad.addColorStop(.5,`rgba(${color},.18)`); grad.addColorStop(1,`rgba(${color},0)`);
+      g.fillStyle=grad;g.fillRect(x-r,y-r,r*2,r*2);
+    }
+    return (PUFFS[kind] = c);
   }
   function drawSmoke(now) {
     view.smoke = view.smoke.filter(s => now - s.born < s.life);
-    const img = puff('m'), wind = 0.35;
+    if(view.smoke.length>SMOKE_MAX)view.smoke.splice(0,view.smoke.length-SMOKE_MAX);
+    const img = puff('m'), wind = global.__MAP_AMBIENT_MOTION_V1__?.currentWind?.() || {x:.72,y:-.28,strength:1};
+    let drawn = 0;
     for (const s of view.smoke) {
+      atmosphere.advanceSmoke(s,now,wind);
       // Smoke stays thin enough to see the men through it (thinner still in Overzicht).
-      const age = (now - s.born) / s.life, r = (s.size + age * 1.2) * PPM * z();
-      const x = sx(s.wx + wind * (now - s.born) * PPM), y = gy(s.wx, s.wy) - (s.h + age * 1.6) * LIFT * PPM * z();
-      ctx.globalAlpha = (1 - age) * (view.overview ? 0.22 : 0.42); ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
+      const p = atmosphere.smokeProfile(s,now), r = p.radius * PPM * z();
+      const x = sx(p.x), y = gy(p.x,p.y) - p.height * LIFT * PPM * z();
+      if(x+r<0||x-r>innerWidth||y+r<0||y-r>innerHeight)continue;
+      ctx.globalAlpha = p.opacity * (view.overview ? .52 : 1); ctx.drawImage(img,x-r*p.stretch,y-r,r*2*p.stretch,r*2); drawn++;
     }
-    ctx.globalAlpha = 1; view.stats.smoke = view.smoke.length;
+    ctx.globalAlpha = 1; view.stats.smoke = view.smoke.length; view.stats.smokeDraws = drawn;
+  }
+  function drawHitDust(now) {
+    view.impacts = view.impacts.filter(p=>now-p.born<(p.wet ? .45 : .65));
+    let drawn = 0;
+    for(const p of view.impacts){
+      const age=(now-p.born)/(p.wet ? .45 : .65),r=(5+age*(p.wet?9:17))*z()*(.9+p.seed*.2);
+      const x=sx(p.x),y=gy(p.x,p.y)-Math.sin(age*Math.PI)*(p.wet?2:6)*z();
+      if(x+r<0||x-r>innerWidth||y+r<0||y-r>innerHeight)continue;
+      ctx.globalAlpha=(1-age)*.65*(view.overview ? .4 : 1);
+      ctx.drawImage(puff(p.wet?'mud':'dust'),x-r,y-r*.65,r*2,r*1.3);drawn++;
+    }
+    ctx.globalAlpha=1;view.stats.hitDust=view.impacts.length;view.stats.hitDustDraws=drawn;
   }
   // Musket balls fly at shoulder height; round shot arcs from the muzzle to
   // its first graze (a shadow under it), then skips on along the ground.
@@ -1661,6 +1735,7 @@
     ensureAttackHook();
     gpu?.begin(ctx);
     drawTerrain();
+    drawGroundDetail();
     gpu?.end();
     view.stats.trenches = 0;
     drawSeasonGround();
@@ -1803,6 +1878,7 @@
     drawStances();
     if (detailed()) drawChimneySmoke(t);
     drawSmoke(t);
+    drawHitDust(t);
     drawFog();
     drawTerritories();
     drawWeather(t);
@@ -2361,12 +2437,13 @@
     // Unit ids restart at one; no animation, corpse or shot may refer to the
     // previous battle. Keep the loaded artwork and static terrain caches.
     for (const map of [view.info, view.regFire, view.gunFire, view.towerFired, view.trenchLips, view.trenchCrests]) map.clear();
-    view.corpses.length = view.smoke.length = 0;
+    view.corpses.length = view.smoke.length = view.impacts.length = 0;
+    groundDetail.reset(); detailRelief = null;
     wetTracks.reset(); clearTrackPaths(); global.__SEASONAL_PROPS_V1__?.reset(); view.stats.tracks = view.stats.rainDrops = view.stats.trackDrawCalls = 0;
     view.attack = view.lastCam = view.fogCam = view.fogPrev = view.cloudCam = null;
     fogGeometry.seen = fogGeometry.sight = null;
     view.lastNow = view.fogAt = 0;
-    view.stats.corpses = view.stats.smoke = 0;
+    view.stats.corpses = view.stats.smoke = view.stats.hitDust = view.stats.hitDustDraws = view.stats.groundDetailDraws = 0;
     queueMicrotask(frameStartingForce);
   });
 
@@ -2380,12 +2457,13 @@
     plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
     stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: global.__ISO_GPU_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
-      wetTracks: wetTracks.stats(), seasonalProps: global.__SEASONAL_PROPS_V1__?.stats(),
+      wetTracks: wetTracks.stats(), groundDetail:groundDetail.stats(), seasonalProps: global.__SEASONAL_PROPS_V1__?.stats(),
       fogGeometryPoints: ((fogGeometry.seen?.points.length || 0) + (fogGeometry.sight?.points.length || 0)) / 3,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
       relief: view.relief ? view.relief.maxM : 0, heightSight: !!view.heightSight, villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
     tracks: () => wetTracks.snapshot(),
+    atmosphere: () => ({ smoke:view.smoke.map(s=>({...s,...atmosphere.smokeProfile(s,performance.now()/1000)})), hits:view.impacts.map(p=>({...p})) }),
     screenOf: (wx, wy) => ({ x: sx(wx), y: gy(wx, wy) }),
     // Door direction of each village house against its gate on the road (for tests).
     doorCheck: () => villageHouses().filter(h => Number.isFinite(h.accessX)).map(h => {

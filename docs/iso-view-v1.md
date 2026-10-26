@@ -3,6 +3,23 @@
 GPU-rendering en de voorbereiding op online multiplayer staan beschreven in
 [gpu-and-multiplayer.md](gpu-and-multiplayer.md).
 
+## Rook, treffers en terrein
+
+Kruitrook vormt zachte, onregelmatige wolken die met de veranderende wind
+meedrijven, stijgen en uitdunnen. Een zichtbare treffer kan kort wat aarde bij
+de voeten opwerpen; op natte grond is dat effect kleiner en donkerder.
+Herstellen, verborgen eenheden, brugdekken en directe melee-reacties maken
+geen stofwolken. De effecten gebruiken de bestaande zichtbare schoten en
+gezondheidsveranderingen, ook in multiplayer, zonder extra netwerkberichten.
+
+Het terrein krijgt subtiele gras-, aarde- en bosranddetails, met krassen langs
+de richting van de wegen. Deze details volgen het bestaande hoogteveld en
+verschijnen niet op water. Ze worden in herbruikbare tegels getekend, met een
+limiet van 4 MiB op mobiel en 12 MiB op desktop. Per beeld worden maximaal twee
+nieuwe tegels op mobiel en drie op desktop gemaakt. Op grote afstand en in
+Overzicht verdwijnt deze fijne laag; sneeuw dempt de zomerse graskleuren.
+Een nieuwe slag wist de tijdelijke rook, stofreacties en detailtegels.
+
 ## Beweging en gevechtshoudingen
 
 Soldaten en paarden draaien via tussenrichtingen en behouden hun pasritme bij
