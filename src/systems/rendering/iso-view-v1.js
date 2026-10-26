@@ -17,6 +17,7 @@
   // Scale: a line's files stand 18 px apart in the game and 0.8 m apart in the lab.
   const PPM = 22.5, SQ = 0.5, SPRITE_PPM = 128 / 3.1, LIFT = 0.866;
   const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
+  const presentation = global.__UNIT_PRESENTATION_V1__;
   const HD = params.has('hd');
   const MOBILE_RENDER = global.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile ??
     (matchMedia('(pointer:coarse)').matches || Math.min(innerWidth, innerHeight) <= 700);
@@ -691,7 +692,7 @@
     };
     try { return fn(); } finally { drawHouseV069 = base; }
   }
-  function drawSprite(atlas, anim, f, x, y, k) {
+  function drawSprite(atlas, anim, f, x, y, k, pose) {
     const src = atlas && atlas.byAnim.get(anim), name = src && src.sheet.animations[anim] && src.sheet.animations[anim][f];
     if (!name) { view.stats.missing++; if (view.missingNames.size < 20) view.missingNames.add((atlas ? '' : 'noatlas:') + anim); return false; }
     const fr = src.sheet.frames[name].frame, p = src.sheet.meta.pivot, s = src.scale || 1;
@@ -700,7 +701,8 @@
       const now = sharp.now, magnified = k * (canvas.width / innerWidth) / src.halfScale > SHARP_AT;
       if (magnified) { src.used = now; if (s < 1 && !src.sharpening) sharpen(src, now); }
     }
-    drawImage(src.image, fr.x * s, fr.y * s, fr.w * s, fr.h * s, x - p.x * k, y - p.y * k, fr.w * k, fr.h * k);
+    const kx = k * (pose?.scaleX || 1), ky = k * (pose?.scaleY || 1);
+    drawImage(src.image, fr.x * s, fr.y * s, fr.w * s, fr.h * s, x - p.x * kx, y - p.y * ky, fr.w * kx, fr.h * ky);
     return true;
   }
   let bandageStamp = null;
@@ -796,16 +798,14 @@
   // ---- per-unit animation memory ----
   function infoOf(u) {
     let m = view.info.get(u.id);
-    if (!m) { m = { walk: 0, x: u.x, y: u.y, dir: dirOf(u.facing || 0), firedAt: -99, reload: u.reload, meleeStrikeAt: u.meleeStrikeAt, musketShotAt: u.musketShotAt, misfiredAt: u.misfiredAt, speed: 0, alive: true, u };
+    if (!m) { m = { walk: 0, x: u.x, y: u.y, dir: dirOf(u.facing || 0), motion: presentation.create(u), firedAt: -99, reload: u.reload, meleeStrikeAt: u.meleeStrikeAt, musketShotAt: u.musketShotAt, misfiredAt: u.misfiredAt, speed: 0, alive: true, u };
       view.info.set(u.id, m); }
     return m;
   }
-  function track(u, m, now, dt) {
-    const d = Math.hypot(u.x - m.x, u.y - m.y);
-    m.speed = dt > 0 ? m.speed * 0.7 + (d / PPM / dt) * 0.3 : m.speed;
-    if (d > 0.05) { m.walk += d / PPM; if (d > 0.4) m.dir = dirOf(Math.atan2(u.y - m.y, u.x - m.x)); }
-    else if (!m.moving) m.dir = dirOf(u.facing || 0);
-    m.moving = m.speed > 0.25;
+  function track(u, m, now, dt, visible) {
+    const d = presentation.update(m.motion, u, dt, now, elapsed, visible);
+    if (d < 80) m.walk += d / PPM;
+    m.speed = m.motion.speed; m.moving = m.motion.moving; m.dir = m.motion.dir;
     // A shot resets the reload clock upwards: that is when the man fired.
     const t = TYPES[u.type];
     const meleeStrike = u.type === 'cavalry' && Number.isFinite(u.meleeStrikeAt) && u.meleeStrikeAt !== m.meleeStrikeAt;
@@ -858,6 +858,11 @@
   // Officers on horseback ride the cavalry officer's horse.
   const gunKey = (u, p) => { const k = p + 'g' + (GUN_MODEL[u.troop] || ''); return view.atlases[k] ? k : p + 'g'; };
   const mountedKey = (u, p) => u.type === 'officer' && u.troop === 'mounted' && view.atlases[p + 'co'] ? p + 'co' : null;
+  function cavalryKey(u, p) {
+    const coat = u.troop === 'cuirassier' ? (view.atlases[p + 'ck'] ? 'k' : '2') : u.troop === 'lancer' ? 'l' : u.troop === 'greys' ? 'g'
+      : u.troop === 'hussar' ? '' : (hash(u.id, 5) < 0.5 ? '' : '2');
+    return mountedKey(u, p) || (view.atlases[p + 'c' + coat] ? p + 'c' + coat : p + 'c');
+  }
   // Animation for one live unit: [atlas key, animation, frame].
   function frameFor(u, m, now) {
     const p = (u.nativeSide || u.side) === 'france' ? 'fr' : 'br', d = DIRS[m.dir];
@@ -865,26 +870,24 @@
       const age = elapsed - u.chargeFallAt, duration = u.chargeFallUntil - u.chargeFallAt;
       const f = fallOf(u, DIRS[dirOf(u.chargeFallFacing || 0)]);
       // Fall, briefly lie down, then rise; no corpse, blood or wounded entry.
-      if (f) return [f.key, f.anim, Math.max(0, Math.min(3, Math.floor(age / .55 * 4), Math.floor((duration - age) / .75 * 4)))];
+      if (f) return [f.key, f.anim, presentation.fallFrame(u.id, age, duration)];
     }
     const action = !u.routing && u.meleeActionUntil > elapsed ? u.meleeAction : null;
     const actionAge = elapsed - (u.meleeActionAt || 0), actionDir = DIRS[dirOf(u.meleeActionFacing || 0)];
-    const since = now - m.firedAt, step = (stride, n) => Math.floor((m.walk % stride) / stride * n) % n;
+    const since = now - m.firedAt, step = (_stride, n) => Math.floor(m.motion.phase * n) % n;
     if (u.type === 'cavalry' || mountedKey(u, p)) {
       // Period regiments have their own riders (troops-v1); huzaren ride the bays.
-      const coat = u.troop === 'cuirassier' ? (view.atlases[p + 'ck'] ? 'k' : '2') : u.troop === 'lancer' ? 'l' : u.troop === 'greys' ? 'g'
-        : u.troop === 'hussar' ? '' : (hash(u.id, 5) < 0.5 ? '' : '2');
-      const key = mountedKey(u, p) || (view.atlases[p + 'c' + coat] ? p + 'c' + coat : p + 'c');
+      const key = cavalryKey(u, p);
       if (action === 'recoil' || action === 'brace') return [key, 'rear_' + actionDir, Math.min(1, Math.floor(actionAge / .2))];
-      if (action === 'parry') return [key, 'slash_' + actionDir, 0];
+      if (action === 'parry') return [key, 'slash_' + actionDir, actionAge < .12 ? 0 : 2];
       if (action === 'strike') {
-        const f = Math.min(2, Math.floor(actionAge / .18));
+        const f = presentation.strikeFrame(u, elapsed);
         return [key, 'slash_' + actionDir, u.meleeVariant ? 2 - f : f];
       }
       // A real sword blow finishes even while the horse takes a small step.
       if (since >= 0 && since < 0.54) return [key, 'slash_' + DIRS[dirOf(u.facing || 0)], Math.min(2, Math.floor(since / 0.18))];
       if (m.moving) {
-        const gait = m.speed > 4.5 || u.chargeTimer > 0 ? 'gallop' : m.speed > 2.4 ? 'trot' : 'walk';
+        const gait = m.motion.gait;
         const stride = gait === 'gallop' ? 3.6 : gait === 'trot' ? 2.8 : 2.4;
         return [key, gait + '_' + d, step(stride, 6)];
       }
@@ -926,9 +929,9 @@
     }
     // Musketeers.
     const key = lookOf(u);
-    if (action === 'strike') return [key, 'thrust_' + actionDir, Math.min(2, Math.floor(actionAge / .18))];
-    if (action === 'parry') return [key, 'aim_' + actionDir, 1];
-    if (action === 'recoil') return [key, 'charge_' + actionDir, 0];
+    if (action === 'strike') return [key, 'thrust_' + actionDir, presentation.strikeFrame(u, elapsed)];
+    if (action === 'parry') return [key, 'aim_' + actionDir, actionAge < .12 ? 0 : 1];
+    if (action === 'recoil') return [key, 'charge_' + actionDir, actionAge < .1 ? 0 : 1];
     const dk = view.atlases[key + ':dig'] ? key + ':dig' : p + ':dig';
     if (m.digging && !m.moving && !u.routing && view.atlases[dk]) {
       // Each man at his own pace through set, push, lever, lift, throw and back.
@@ -961,7 +964,7 @@
   // The atlas and fall of a man going down facing d (null for guns and peasants).
   function fallOf(u, d) {
     const p = (u.nativeSide || u.side) === 'france' ? 'fr' : 'br', fall = ['die', 'diefwd', 'dieside'][Math.floor(hash(u.id, 4) * 3)] + '_' + d;
-    if (u.type === 'cavalry') return { key: p + 'c', anim: 'die_' + d };
+    if (u.type === 'cavalry') return { key: cavalryKey(u, p), anim: 'die_' + d };
     if (mountedKey(u, p)) return { key: mountedKey(u, p), anim: 'die_' + d };
     if (u.type === 'artillery' || u.type === 'worker') return null;
     if (crewIds.has(u.id)) return { key: p + 'a', anim: fall };
@@ -972,10 +975,10 @@
     // A wounded man (medics-v1) lies there alive: he is drawn with the wounded, not as a corpse.
     const w = global.__MEDICS_V1__?.byId?.(m.u.id);
     if (w) { w.iso = { ...f, t0: now }; return; }
-    pushCorpse(m.x, m.y, f, now);
+    pushCorpse(m.x, m.y, f, now, m.u.id);
   }
-  function pushCorpse(x, y, f, t0) {
-    view.corpses.push({ x, y, key: f.key, anim: f.anim, t0 });
+  function pushCorpse(x, y, f, t0, id = 0) {
+    view.corpses.push({ x, y, key: f.key, anim: f.anim, t0, id });
     if (view.corpses.length > CORPSE_MAX) view.corpses.splice(0, view.corpses.length - CORPSE_MAX);
   }
   // ---- the wounded and the stretcher teams (medics-v1) ----
@@ -1680,8 +1683,9 @@
     for (const u of units) {
       if (u.dead) continue;
       seen.add(u.id);
-      const m = infoOf(u); track(u, m, t, dt);
-      if (!visible(u) || sx(u.x) < -80 || sx(u.x) > innerWidth + 80 || gy(u.x, u.y) < -40 || gy(u.x, u.y) > innerHeight + 140) {
+      const onScreen = visible(u) && sx(u.x) >= -80 && sx(u.x) <= innerWidth + 80 && gy(u.x, u.y) >= -40 && gy(u.x, u.y) <= innerHeight + 140;
+      const m = infoOf(u); track(u, m, t, dt, onScreen);
+      if (!onScreen) {
         wetTracks.sample(u, m, trackWetness, elapsed, false); continue;
       }
       const orders = global.__REGIMENT_ORDERS_V1__, deck = deckAt(u.x, u.y);
@@ -1731,17 +1735,12 @@
         if (u.type === 'worker' && !view.atlases[((u.nativeSide || u.side) === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); if (crest || lip) ctx.restore(); return; }
         const [key, anim, f] = frameFor(u, m, t);
         // Until its atlas has loaded a unit is simply not drawn yet.
-        let dx = 0, dy = 0;
-        if (global.__MELEE_REALISM_V1__?.reacting(u)) {
-          const age = elapsed - u.meleeActionAt, life = u.meleeActionUntil - u.meleeActionAt;
-          const amount = -Math.sin(Math.PI * Math.max(0, Math.min(1, age / life))) * (u.meleeAction === 'parry' ? 1.5 : 3) * z();
-          dx = Math.cos(u.meleeActionFacing) * amount; dy = Math.sin(u.meleeActionFacing) * amount * SQ;
-        }
-        if(u.injuryLevel&&m.moving)dy+=Math.sin(m.walk*7)*u.injuryLevel*.55*z();
-        if (drawSprite(view.atlases[key], anim, f, X + dx, Y + dy, k)) st.sprites++;
+        const pose = !anim.startsWith('die') && !m.digging && !m.parapet && u.type !== 'artillery' ? m.motion : null;
+        const dx = (pose?.dx || 0) * z(), dy = (pose?.dy || 0) * z();
+        if (drawSprite(view.atlases[key], anim, f, X + dx, Y + dy, k, pose)) st.sprites++;
         if(u.injuryLevel||(Number.isFinite(u.bandagedAt)&&elapsed-u.bandagedAt<45)){
-          const by=Y-(u.type==='cavalry'?1.9:1.1)*LIFT*PPM*z();
-          drawBandage(X,by,z());
+          const by=Y+dy-(u.type==='cavalry'?1.9:1.1)*LIFT*PPM*z()*(pose?.scaleY || 1);
+          drawBandage(X+dx,by,z());
         }
         if (crest || lip) ctx.restore();
       } });
@@ -1756,7 +1755,7 @@
     for (const c of view.corpses) {
       const X = sx(c.x), Y = gy(c.x, c.y);
       if (X < -60 || X > innerWidth + 60 || Y < -40 || Y > innerHeight + 80) continue;
-      list.push({ y: c.y - 0.5, draw: () => { bloodPool(X, Y, t - c.t0, hash(c.x, c.y)); drawSprite(view.atlases[c.key], c.anim, Math.min(3, Math.floor((t - c.t0) / DIE_FRAME)), X, Y, k); } });
+      list.push({ y: c.y - 0.5, draw: () => { bloodPool(X, Y, t - c.t0, hash(c.x, c.y)); drawSprite(view.atlases[c.key], c.anim, presentation.fallFrame(c.id, t - c.t0), X, Y, k); } });
     }
     st.corpses = view.corpses.length;
     medicsDrawables(list, t, k);
@@ -2377,6 +2376,7 @@
     animsOf: key => [...(view.atlases[key]?.byAnim.keys() || [])],
     // The sprite a unit is drawn with now ([atlas, anim, frame]), and the kinds of tree and bush on the map.
     frameOf: id => { const u = units.find(q => q.id === id), m = view.info.get(id); return u && m ? frameFor(u, m, performance.now() / 1000) : null; },
+    presentationOf: id => { const p = view.info.get(id)?.motion; return p ? { ...p } : null; },
     plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
     stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: global.__ISO_GPU_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,

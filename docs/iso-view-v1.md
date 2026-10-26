@@ -3,6 +3,21 @@
 GPU-rendering en de voorbereiding op online multiplayer staan beschreven in
 [gpu-and-multiplayer.md](gpu-and-multiplayer.md).
 
+## Beweging en gevechtshoudingen
+
+Soldaten en paarden draaien via tussenrichtingen en behouden hun pasritme bij
+een overgang tussen stap, draf en galop. Kleine lichaamsbewegingen maken het
+vertrekken, afremmen en stilstaan minder abrupt. Gewonden lopen met een lagere
+houding; steek- en sabelaanvallen hebben verschillende timings voor inzet,
+uitstrekken en herstel. Afweren en terugdeinzen volgen de echte gevechtsreacties.
+Vallen en opstaan versnellen en vertragen geleidelijk, met kleine verschillen
+per soldaat. Cavalerie behoudt daarbij het eigen paard en uniform.
+
+Deze laag gebruikt de bestaande sprites met één tekening per lichaam. Ze laadt
+geen extra afbeeldingen en verandert geen posities, bevelen, schade of
+netwerkberichten. Onzichtbare eenheden slaan de houdingsberekeningen over en
+een nieuwe slag wist het animatiegeheugen.
+
 ## Officieren aanwijzen
 
 Infanterie krijgt een officier te voet uit de kazerne; cavalerie krijgt een
