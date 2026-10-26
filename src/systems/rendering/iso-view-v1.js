@@ -703,6 +703,15 @@
     drawImage(src.image, fr.x * s, fr.y * s, fr.w * s, fr.h * s, x - p.x * k, y - p.y * k, fr.w * k, fr.h * k);
     return true;
   }
+  let bandageStamp = null;
+  function drawBandage(x,y,k){
+    if(!bandageStamp){
+      bandageStamp=document.createElement('canvas');bandageStamp.width=16;bandageStamp.height=10;
+      const b=bandageStamp.getContext('2d');b.fillStyle='#eee7d7';b.fillRect(0,0,16,10);b.fillStyle='#963e38';b.fillRect(6,0,4,10);
+    }
+    // The same sprite run keeps the dressing above the body on both renderers.
+    drawImage(bandageStamp,x-3*k,y,5*k,2.7*k);
+  }
 
   // ---- terrain: the game's static terrain, baked into tiles and laid flat ----
   const terrainSource = () => global.__MAP_AMBIENT_MOTION_V1__?.baseTerrainDraw || null;
@@ -787,7 +796,7 @@
   // ---- per-unit animation memory ----
   function infoOf(u) {
     let m = view.info.get(u.id);
-    if (!m) { m = { walk: 0, x: u.x, y: u.y, dir: dirOf(u.facing || 0), firedAt: -99, reload: u.reload, meleeStrikeAt: u.meleeStrikeAt, speed: 0, alive: true, u };
+    if (!m) { m = { walk: 0, x: u.x, y: u.y, dir: dirOf(u.facing || 0), firedAt: -99, reload: u.reload, meleeStrikeAt: u.meleeStrikeAt, musketShotAt: u.musketShotAt, misfiredAt: u.misfiredAt, speed: 0, alive: true, u };
       view.info.set(u.id, m); }
     return m;
   }
@@ -800,12 +809,15 @@
     // A shot resets the reload clock upwards: that is when the man fired.
     const t = TYPES[u.type];
     const meleeStrike = u.type === 'cavalry' && Number.isFinite(u.meleeStrikeAt) && u.meleeStrikeAt !== m.meleeStrikeAt;
-    if (meleeStrike || (t && t.reload > 0 && u.reload > m.reload + t.reload * 0.4)) {
+    const musketShot = Number.isFinite(u.musketShotAt) && u.musketShotAt !== m.musketShotAt;
+    const misfire = Number.isFinite(u.misfiredAt) && u.misfiredAt !== m.misfiredAt;
+    if (meleeStrike || musketShot || (!misfire && t && t.reload > 0 && u.reload > m.reload + t.reload * 0.4)) {
       m.firedAt = now; if (!m.moving) m.dir = dirOf(u.facing || 0);
       if (u.regimentId) view.regFire.set(u.regimentId, now);
       onShot(u, m, now);
     }
     m.meleeStrikeAt = u.meleeStrikeAt;
+    m.musketShotAt = u.musketShotAt;m.misfiredAt = u.misfiredAt;
     m.x = u.x; m.y = u.y; m.reload = u.reload; m.u = u;
   }
   // Muzzle smoke, a little ahead of the man at shoulder height; a cloud for a gun.
@@ -931,6 +943,15 @@
     if (u.routing) return [key, 'rout_' + d, step(1.6, 6)];
     if (m.moving) return [key, (u.chargeTimer > 0 ? 'charge_' : 'march_') + d, step(MARCH_STRIDE, 6)];
     if (u.attackMode === 'bayonet') return [key, 'aim_' + d, 1];
+    const kneel = u.volleyRank === 0 && u.volleyRanks > 1;
+    if (Number.isFinite(u.misfiredAt) && elapsed-u.misfiredAt>=0 && elapsed-u.misfiredAt<.42) return [key,'misfire_'+d,Math.min(2,Math.floor((elapsed-u.misfiredAt)/.14))];
+    if (Number.isFinite(u.musketShotAt)) {
+      const age=elapsed-u.musketShotAt;
+      if(age>=0&&age<.42)return[key,(kneel?'kfire_':'fire_')+d,Math.min(2,Math.floor(age/.14))];
+      if(kneel&&age>=.42&&age<.58*(u.volleyRanks-1)+.65)return[key,'kaim_'+d,0];
+    }
+    if(Number.isFinite(u.musketReload)&&u.reload>0){const p=Math.max(0,Math.min(1,1-u.reload/u.musketReload));return[key,'reload_'+d,Math.min(3,Math.floor(p*4))];}
+    if(u.volleyFireAt>=elapsed&&u.volleyFireAt-elapsed<.45)return[key,(kneel?'kaim_':'aim_')+d,1];
     if (since < 0.42) return [key, 'fire_' + d, Math.min(2, Math.floor(since / 0.14))];
     if (since < 2.1) return [key, 'reload_' + d, Math.min(3, Math.floor((since - 0.42) / 0.42))];
     if (now - (view.regFire.get(u.regimentId) ?? -99) < 6) return [key, 'aim_' + d, 1];
@@ -1716,7 +1737,12 @@
           const amount = -Math.sin(Math.PI * Math.max(0, Math.min(1, age / life))) * (u.meleeAction === 'parry' ? 1.5 : 3) * z();
           dx = Math.cos(u.meleeActionFacing) * amount; dy = Math.sin(u.meleeActionFacing) * amount * SQ;
         }
+        if(u.injuryLevel&&m.moving)dy+=Math.sin(m.walk*7)*u.injuryLevel*.55*z();
         if (drawSprite(view.atlases[key], anim, f, X + dx, Y + dy, k)) st.sprites++;
+        if(u.injuryLevel||(Number.isFinite(u.bandagedAt)&&elapsed-u.bandagedAt<45)){
+          const by=Y-(u.type==='cavalry'?1.9:1.1)*LIFT*PPM*z();
+          drawBandage(X,by,z());
+        }
         if (crest || lip) ctx.restore();
       } });
       st.drawn++;

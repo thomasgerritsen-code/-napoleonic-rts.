@@ -148,7 +148,7 @@
   function enqueue(unit){
     // Existing large-army code owns density LOD, culling, selection and
     // marching simulation. This function only replaces its distant draw.
-    if(!active()||!unit||unit.dead||unit.type==='artillery'||root.__CHARGE_STUMBLE_V1__?.down(unit)||root.__MELEE_REALISM_V1__?.reacting(unit)||
+    if(!active()||!unit||unit.dead||unit.type==='artillery'||unit.injuryLevel||root.__CHARGE_STUMBLE_V1__?.down(unit)||root.__MELEE_REALISM_V1__?.reacting(unit)||
        selectedUnits.has(unit)||count>=MAX_UNITS){
       stats.fallbacks++;return false;
     }

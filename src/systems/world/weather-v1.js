@@ -73,7 +73,7 @@
   // Damp powder: muskets misfire in the rain (the man still has to clear and reload).
   const baseFire = fire;
   fire = function fireInWeather(unit, enemy) {
-    if ((unit.type === 'infantry' || unit.type === 'officer') && mix('rain') > 0.3 && powderRandom() < cfg.misfire * mix('rain')) {
+    if ((unit.type === 'infantry' || unit.type === 'officer') && unit.attackMode !== 'bayonet' && mix('rain') > 0.3 && powderRandom() < cfg.misfire * mix('rain')) {
       st.misfires++;
       unit.reload = (TYPES[unit.type]?.reload || 3) * (0.8 + powderRandom() * 0.3);
       unit.misfiredAt = elapsed;

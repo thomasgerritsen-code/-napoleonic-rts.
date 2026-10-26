@@ -29,6 +29,7 @@
     return r;
   };
   function wound(u) {
+    if(byId.has(u.id))return byId.get(u.id);
     const w = { id: u.id, u, x: u.x, y: u.y, side: u.side, type: u.type, troop: u.troop || null, regId: u.regimentId || null,
       at: elapsed, state: 'lying', team: null, until: 0 };
     wounded.push(w); byId.set(u.id, w); stats.wounded++;
@@ -37,29 +38,64 @@
 
   // ---- stretcher teams ----
   function teamsOf(h) {
-    if (!h.medTeams) h.medTeams = Array.from({ length: cfg.teams }, (_, i) => ({ id: h.id * 10 + i, x: h.x, y: h.y + h.h * 0.4, state: 'idle', target: null, facing: 0, moving: false }));
+    if (!h.medTeams) h.medTeams = Array.from({ length: cfg.teams }, (_, i) => ({ id: h.id * 10 + i, x: h.x, y: h.y + h.h / 2 + 18, state: 'idle', target: null, facing: 0, moving: false }));
     return h.medTeams;
   }
+  function route(a,b){
+    const goals=[];
+    if(segmentCrossesBlockedWaterV067(a.x,a.y,b.x,b.y)){
+      const c=nearestCrossingV067(a.x,a.y,b.x,b.y,'infantry'),side=bankSideV067(a.x,a.y)>=0?1:-1;
+      goals.push(crossingPointV068(c,side*(c.length/2+35),0),crossingPointV068(c,0,0),crossingPointV068(c,-side*(c.length/2+35),0));
+    }
+    goals.push(b);const path=[];let previous=a;
+    for(const goal of goals){
+      const local=root.__STUCK_RECOVERY_V2__.localWaypoint(previous,goal);
+      for(const p of [...local.waypoints,local.target]){
+        if(waterAtV067(p.x,p.y)||segmentCrossesBlockedWaterV067(previous.x,previous.y,p.x,p.y)||root.__STUCK_RECOVERY_V2__.segmentBlocked(previous,p))return null;
+        if(Math.hypot(p.x-previous.x,p.y-previous.y)>.1){path.push({x:p.x,y:p.y});previous=p;}
+      }
+    }
+    return path;
+  }
   function step(t, tx, ty, dt) {
-    const dx = tx - t.x, dy = ty - t.y, d = Math.hypot(dx, dy), s = cfg.teamSpeed * dt;
+    if(!t.route||Math.hypot(tx-t.route.tx,ty-t.route.ty)>3){
+      if(t.retryAt>elapsed){t.moving=false;return false;}
+      const path=route(t,{x:tx,y:ty});t.retryAt=elapsed+2;
+      if(!path){t.moving=false;return false;}t.route={tx,ty,path,index:0};
+    }
+    const p=t.route.path[t.route.index]||{x:tx,y:ty};
+    const dx = p.x - t.x, dy = p.y - t.y, d = Math.hypot(dx, dy), s = cfg.teamSpeed * dt;
     t.moving = d > 1; if (d > 0.01) t.facing = Math.atan2(dy, dx);
-    if (d <= s) { t.x = tx; t.y = ty; return true; }
-    t.x += dx / d * s; t.y += dy / d * s; return false;
+    const scale=Math.min(1,s/(d||1)),next={x:t.x+dx*scale,y:t.y+dy*scale};
+    if(waterAtV067(next.x,next.y)||segmentCrossesBlockedWaterV067(t.x,t.y,next.x,next.y)||root.__STUCK_RECOVERY_V2__.segmentBlocked(t,next)){t.route=null;t.moving=false;return false;}
+    t.x=next.x;t.y=next.y;
+    if(d<=s){t.route.index++;if(t.route.index>=t.route.path.length){t.route=null;return true;}}
+    return false;
   }
   function pick(h) {
-    let best = null, bd = cfg.reach;
+    let best = null, score = Infinity;
     for (const w of wounded) {
       if (w.state !== 'lying' || w.team || w.side !== h.side) continue;
       const d = Math.hypot(w.x - h.x, w.y - h.y);
-      if (d < bd) { best = w; bd = d; }
+      if(d>=cfg.reach)continue;
+      const remaining=cfg.bleedOutSeconds-(elapsed-w.at);
+      if(remaining<d/cfg.teamSpeed+1)continue;
+      const urgency=remaining+d/cfg.teamSpeed*.4;
+      if(urgency<score){
+        const start={x:h.x,y:h.y+h.h/2+18},path=route(start,w);
+        if(path){let length=0,p=start;for(const q of path){length+=Math.hypot(q.x-p.x,q.y-p.y);p=q;}
+          if(remaining>length/cfg.teamSpeed+1){const actual=remaining+length/cfg.teamSpeed*.4;if(actual<score){best=w;score=actual;}}
+        }
+      }
     }
     return best;
   }
   function updateTeams(h, dt) {
-    const home = { x: h.x, y: h.y + h.h * 0.4 };
+    const home = { x: h.x, y: h.y + h.h / 2 + 18 };
     for (const t of teamsOf(h)) {
       if (t.state === 'idle') {
-        const w = pick(h);
+        const w = elapsed >= (t.nextPickAt||0) ? pick(h) : null;
+        if(elapsed >= (t.nextPickAt||0))t.nextPickAt=elapsed+.75;
         if (w) { w.team = t.id; t.target = w; t.state = 'out'; }
         else { step(t, home.x, home.y, dt); continue; }
       }
@@ -79,22 +115,24 @@
   function regimentKind(reg) { const m = regimentMembers(reg).find(u => u.type === 'infantry'); return (m && m.troop) || ''; }
   function discharge(w, h) {
     if (typeof populationUsed === 'function' && populationUsed(w.side) + (TYPES[w.type]?.pop || 1) > economies[w.side].popCap) return false;
-    const a = Math.random() * Math.PI * 2;
-    const u = createUnit(w.side, w.type, h.x + Math.cos(a) * h.w * 0.6, h.y + h.h * 0.5 + Math.sin(a) * 10);
+    const exit=root.__UNIT_PLACEMENT__?.nearest({x:h.x,y:h.y+h.h/2+28},w.type,{reserved:true});
+    if(!exit)return false;
+    const u = createUnit(w.side, w.type, exit.x, exit.y);u.bandagedAt=elapsed;
     if (w.troop) root.__TROOPS_V1__?.applyTroop?.(u, w.troop);
     w.state = 'healed'; w.healedAs = u.id; stats.healed++;
     // Back to his own regiment, if it still stands, is of his kind and has room.
     const reg = w.regId != null && typeof getRegiment === 'function' ? getRegiment(w.regId) : null;
     const max = root.NRTS_CONFIG?.regimentOrders?.maxInfantry || 36;
     const room = reg && !reg.destroyed && (w.type !== 'infantry' || (regimentKind(reg) === (w.troop || '') && regimentMembers(reg).filter(m => m.type === 'infantry').length < max));
-    const roleFree = reg && (w.type === 'officer' ? !regimentMembers(reg).some(m => m.type === 'officer') : w.type === 'drummer' ? !regimentMembers(reg).some(m => m.type === 'drummer') : true);
+    const roleFree = reg && (w.type === 'officer' ? officerCanLead(u,groupKindV06(reg))&&!regimentMembers(reg).some(m => m.type === 'officer') : w.type === 'drummer' ? !regimentMembers(reg).some(m => m.type === 'drummer') : true);
     if (room && roleFree) {
+      const existing=regimentMembers(reg),c=centroid(existing);
       reg.memberIds.push(u.id); u.regimentId = reg.id; u.morale = Math.max(u.morale || 0, reg.morale || 70);
-      if (w.type === 'infantry') reg.formedInfantryCount = (reg.formedInfantryCount || 0) + 1;
+      if (w.type === 'infantry') reg.formedInfantryCount = existing.filter(m=>m.type==='infantry').length+1;
       if (w.type === 'officer') reg.officerId = u.id;
       if (w.type === 'drummer') reg.drummerId = u.id;
-      const c = centroid(regimentMembers(reg));
-      if (typeof arrangeFacingRegimentV146 === 'function') arrangeFacingRegimentV146(reg, c.x, c.y, reg.formation || 'line', reg.facing);
+      // Joining one recovered man must not replace the whole regiment's order.
+      u.targetX=c.x;u.targetY=c.y;
       stats.rejoined++;
       if (w.side === 'france' && typeof statusEl !== 'undefined') statusEl.textContent = `Hersteld uit het veldhospitaal: terug naar ${reg.name}.`;
     }
@@ -106,14 +144,14 @@
     const r = baseUpdateBuildings(dt);
     for (const h of hospitals()) updateTeams(h, dt);
     for (const w of wounded) {
-      if (w.state === 'lying' && !w.team && elapsed - w.at > cfg.bleedOutSeconds) { w.state = 'dead'; stats.bledOut++; }
+      if (w.state === 'lying' && elapsed - w.at > cfg.bleedOutSeconds) { w.state = 'dead';w.team=null;stats.bledOut++; }
       else if (w.state === 'carried' || (w.state === 'lying' && w.team)) {
         // A team whose hospital fell: the man is put down where he is.
         const t = w.team != null && hospitals(w.side).flatMap(teamsOf).find(q => q.id === w.team);
         if (!t) { w.state = 'lying'; w.team = null; }
       } else if (w.state === 'healing') {
         const h = buildings.find(b => b.id === w.hospital && !b.dead);
-        if (!h) { w.state = 'dead'; stats.bledOut++; }
+        if (!h) {const old=buildings.find(b=>b.id===w.hospital);if(old){w.x=old.x;w.y=old.y+old.h/2+18;}w.state='lying';w.team=null;w.at=elapsed-cfg.bleedOutSeconds*.4;}
         else if (elapsed >= w.until) discharge(w, h);
       }
     }
@@ -130,7 +168,7 @@
     const b = document.createElement('button');
     b.type = 'button'; b.dataset.action = 'build-hospital';
     b.innerHTML = `Veldhospitaal<br><small>${costText(cfg.hospital.cost)}</small>`;
-    b.title = 'Brancardiers halen gewonden op; in het hospitaal herstellen ze en gaan terug naar hun regiment';
+    b.title = 'Brancardiers halen slachtoffers op. Zet lopende gewonden stil naast het hospitaal; verzorging begint zodra het daar veilig is.';
     const tower = actionsEl.querySelector('[data-action="build-tower"]') || actionsEl.querySelector('[data-action="build-farm"]');
     tower.after(b);
   }
