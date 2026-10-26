@@ -555,7 +555,7 @@
     const reg = enemy.regimentId && typeof getRegiment === 'function' ? getRegiment(enemy.regimentId) : null;
     const foes = reg ? regimentMembers(reg).filter(u => !u.dead) : [enemy];
     const E = centroid(foes), S = centroid(own), d = Math.hypot(S.x - E.x, S.y - E.y) || 1;
-    const foot = own.some(u => u.type === 'infantry' || u.type === 'officer'), guns = own.every(u => u.type === 'artillery');
+    const foot = own.some(u => u.type === 'infantry' || (u.type === 'officer' && u.troop !== 'mounted')), guns = own.every(u => u.type === 'artillery');
     const reach = guns ? TYPES.artillery.range * 0.8 : foot ? TYPES.infantry.range * 0.85 : 0;
     const dest = d <= reach ? S : { x: E.x + (S.x - E.x) / d * reach, y: E.y + (S.y - E.y) / d * reach };
     issueMoveWithFacingV06(dest.x, dest.y, Math.atan2(E.y - dest.y, E.x - dest.x));
@@ -787,7 +787,7 @@
   // ---- per-unit animation memory ----
   function infoOf(u) {
     let m = view.info.get(u.id);
-    if (!m) { m = { walk: 0, x: u.x, y: u.y, dir: dirOf(u.facing || 0), firedAt: -99, reload: u.reload, speed: 0, alive: true, u };
+    if (!m) { m = { walk: 0, x: u.x, y: u.y, dir: dirOf(u.facing || 0), firedAt: -99, reload: u.reload, meleeStrikeAt: u.meleeStrikeAt, speed: 0, alive: true, u };
       view.info.set(u.id, m); }
     return m;
   }
@@ -799,11 +799,13 @@
     m.moving = m.speed > 0.25;
     // A shot resets the reload clock upwards: that is when the man fired.
     const t = TYPES[u.type];
-    if (t && t.reload > 0 && u.reload > m.reload + t.reload * 0.4) {
+    const meleeStrike = u.type === 'cavalry' && Number.isFinite(u.meleeStrikeAt) && u.meleeStrikeAt !== m.meleeStrikeAt;
+    if (meleeStrike || (t && t.reload > 0 && u.reload > m.reload + t.reload * 0.4)) {
       m.firedAt = now; if (!m.moving) m.dir = dirOf(u.facing || 0);
       if (u.regimentId) view.regFire.set(u.regimentId, now);
       onShot(u, m, now);
     }
+    m.meleeStrikeAt = u.meleeStrikeAt;
     m.x = u.x; m.y = u.y; m.reload = u.reload; m.u = u;
   }
   // Muzzle smoke, a little ahead of the man at shoulder height; a cloud for a gun.
@@ -853,12 +855,13 @@
       const coat = u.troop === 'cuirassier' ? (view.atlases[p + 'ck'] ? 'k' : '2') : u.troop === 'lancer' ? 'l' : u.troop === 'greys' ? 'g'
         : u.troop === 'hussar' ? '' : (hash(u.id, 5) < 0.5 ? '' : '2');
       const key = mountedKey(u, p) || (view.atlases[p + 'c' + coat] ? p + 'c' + coat : p + 'c');
+      // A real sword blow finishes even while the horse takes a small step.
+      if (since >= 0 && since < 0.54) return [key, 'slash_' + DIRS[dirOf(u.facing || 0)], Math.min(2, Math.floor(since / 0.18))];
       if (m.moving) {
         const gait = m.speed > 4.5 || u.chargeTimer > 0 ? 'gallop' : m.speed > 2.4 ? 'trot' : 'walk';
         const stride = gait === 'gallop' ? 3.6 : gait === 'trot' ? 2.8 : 2.4;
         return [key, gait + '_' + d, step(stride, 6)];
       }
-      if (since < 0.6 || u.chargeTimer > 0) return [key, 'slash_' + d, Math.floor(now / 0.18) % 3];
       return [key, 'idle_' + d, Math.floor(now / 0.7 + hash(u.id, 3) * 2) % 2];
     }
     if (u.type === 'worker') {

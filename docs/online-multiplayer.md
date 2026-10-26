@@ -363,6 +363,13 @@ alleen de ontbrekende ruiters en de officier te paard in de wachtrij; reeds
 ingeplande eenheden tellen mee. Vorm het regiment zodra de opleiding klaar is.
 Deze opdrachten lopen online via de server voor de eigen partij.
 
+Bij gevechten naderen ruiters hun tegenstander op contactafstand en houden ze
+die vast zolang die leeft, niet vlucht en dichtbij blijft. Hun regiment houdt
+bij de strijd halt; een nieuwe loop- of terugtrekopdracht breekt dit contact.
+De gewone schade, herlaadtijd, moreel- en loopgraafregels blijven gelden.
+Zwaardanimaties volgen echte slagmomenten uit de server, ook wanneer een paard
+een kleine stap zet. Een wachtende charge zwaait niet voortdurend in de lucht.
+
 ## Verificatie
 
 `npm run test:multiplayer` controleert twee afzonderlijke browsercontexten,

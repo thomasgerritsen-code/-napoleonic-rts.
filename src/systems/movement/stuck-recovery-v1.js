@@ -103,7 +103,7 @@
   function formationIsSettling(reg){const phase=movementPhase(reg);return phase==='forming-column'||phase==='deploying';}
   function trafficYieldOwnsRecovery(reg){const bias=reg?.formationTrafficV132;return!!(bias&&bias.reason==='bridge-yield'&&bias.until>elapsed);}
   function nearFinalTarget(reg,center){const target=reg?.finalTarget||((Number.isFinite(reg?.targetX)&&Number.isFinite(reg?.targetY))?{x:reg.targetX,y:reg.targetY}:null);if(!target||!center)return false;return Math.hypot(center.x-target.x,center.y-target.y)<52;}
-  function activeGroupMove(reg){return!!reg&&!reg.destroyed&&Array.isArray(reg.path)&&reg.path.length>0&&!formationIsSettling(reg);}
+  function activeGroupMove(reg){return!!reg&&!reg.destroyed&&Array.isArray(reg.path)&&reg.path.length>0&&!formationIsSettling(reg)&&!global.__CAVALRY_CONTACT_V1__?.engaged(reg);}
   function replanGroup(reg,now){
     if(crossingOwnsRecovery(reg)){stats.crossingReplansSuppressed++;return false;}
     if(formationIsSettling(reg)){stats.formationReplansSuppressed++;return false;}
@@ -178,7 +178,7 @@
     stats.waterRescues++;
     return true;
   }
-  function sampleLoose(dt){for(const u of units){if(u.dead||u.routing||u.regimentId||u.task==='gather'||u.task==='return'||u.task==='build'){unitState.delete(u.id);continue;}if(rescueLooseFromRiver(u))continue;const remaining=Math.hypot((u.targetX??u.x)-u.x,(u.targetY??u.y)-u.y);if(remaining<20){unitState.delete(u.id);continue;}let s=unitState.get(u.id);if(!s){s={x:u.x,y:u.y,clock:0,stillSeconds:0,lastRecovery:-Infinity};unitState.set(u.id,s);continue;}s.clock+=dt;if(s.clock<sampleSeconds)continue;const travel=Math.hypot(u.x-s.x,u.y-s.y),sampleDt=s.clock;s.clock=0;s.x=u.x;s.y=u.y;if(travel<Math.max(2,minTravel*.35))s.stillSeconds+=sampleDt;else s.stillSeconds=0;if(s.stillSeconds>=triggerSeconds&&elapsed-s.lastRecovery>=cooldown){nudgeLooseUnit(u);s.lastRecovery=elapsed;s.stillSeconds=0;s.x=u.x;s.y=u.y;}}}
+  function sampleLoose(dt){for(const u of units){if(u.dead||u.routing||u.regimentId||u.task==='gather'||u.task==='return'||u.task==='build'){unitState.delete(u.id);continue;}if(global.__CAVALRY_CONTACT_V1__?.state(u)){unitState.delete(u.id);continue;}if(rescueLooseFromRiver(u))continue;const remaining=Math.hypot((u.targetX??u.x)-u.x,(u.targetY??u.y)-u.y);if(remaining<20){unitState.delete(u.id);continue;}let s=unitState.get(u.id);if(!s){s={x:u.x,y:u.y,clock:0,stillSeconds:0,lastRecovery:-Infinity};unitState.set(u.id,s);continue;}s.clock+=dt;if(s.clock<sampleSeconds)continue;const travel=Math.hypot(u.x-s.x,u.y-s.y),sampleDt=s.clock;s.clock=0;s.x=u.x;s.y=u.y;if(travel<Math.max(2,minTravel*.35))s.stillSeconds+=sampleDt;else s.stillSeconds=0;if(s.stillSeconds>=triggerSeconds&&elapsed-s.lastRecovery>=cooldown){nudgeLooseUnit(u);s.lastRecovery=elapsed;s.stillSeconds=0;s.x=u.x;s.y=u.y;}}}
   const previousMoveToward=moveToward;
   moveToward=function moveTowardWithLocalAvoidanceV2(u,tx,ty,dt,speed=TYPES[u.type].speed){
     if(!u||u.dead||!(dt>0))return previousMoveToward(u,tx,ty,dt,speed);

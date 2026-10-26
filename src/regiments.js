@@ -103,6 +103,15 @@
 
   function regimentRoleOffsets(reg, mode) {
     const members = regimentMembers(reg);
+    if (reg.kind === 'cavalry') {
+      const riders = members.filter(u => u.type === 'cavalry');
+      const result = new Map();
+      const files = mode === 'column' ? Math.min(3, Math.max(2, riders.length)) : Math.max(2, Math.ceil(riders.length / 2));
+      riders.forEach((u, i) => result.set(u.id, { ox: (i % files - (files - 1) / 2) * 29, oy: Math.floor(i / files) * 31 }));
+      const officer = members.find(u => u.id === reg.officerId);
+      if (officer) result.set(officer.id, { ox: 0, oy: -22 });
+      return result;
+    }
     const infantry = members.filter(u => u.type === 'infantry');
     const officer = members.find(u => u.id === reg.officerId);
     const drummer = members.find(u => u.id === reg.drummerId);
