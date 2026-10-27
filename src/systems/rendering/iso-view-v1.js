@@ -18,6 +18,7 @@
   const PPM = 22.5, SQ = 0.5, SPRITE_PPM = 128 / 3.1, LIFT = 0.866;
   const DIRS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
   const presentation = global.__UNIT_PRESENTATION_V1__;
+  const buildingPresentation = global.__BUILDING_PRESENTATION_V1__;
   const atmosphere = global.__BATTLEFIELD_ATMOSPHERE_V1__;
   const HD = params.has('hd');
   const MOBILE_RENDER = global.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile ??
@@ -947,6 +948,8 @@
     if (u.type === 'worker') {
       const key = p + 'w';
       if (m.moving) return [key, 'march_' + d, step(MARCH_STRIDE, 6)];
+      const builder=buildingPresentation?.worker(u,now);
+      if(u.task==='build'&&buildingPresentation&&!builder)return [key,'idle_'+d,Math.floor(now/.7+hash(u.id,2))%2];
       // At work, facing what he works on, with the tool of the task: the axe on a
       // tree, the pickaxe on iron ore, the hoe on a field or a berry patch, the
       // hammer on a building going up.
@@ -955,7 +958,7 @@
         const job = b ? 'build' : u.task === 'farm' ? 'farm' : r?.type === 'iron' ? 'mine' : r?.type === 'food' ? 'farm' : 'work';
         const at = r || b, wd = at ? DIRS[dirOf(Math.atan2(at.y - u.y, at.x - u.x))] : d;
         const anim = view.atlases[key]?.byAnim.has(job + '_e') ? job : 'work';
-        return [key, anim + '_' + wd, Math.floor(now / (anim === 'build' ? 0.22 : 0.3) + hash(u.id, 3) * 4) % 4];
+        return [key, anim + '_' + wd, anim==='build'&&builder?builder.frame:Math.floor(now / (anim === 'build' ? 0.22 : 0.3) + hash(u.id, 3) * 4) % 4];
       }
       return [key, 'idle_' + d, Math.floor(now / 0.7 + hash(u.id, 2) * 2) % 2];
     }
@@ -1147,7 +1150,7 @@
   }
 
   // ---- props for buildings and resources ----
-  const BUILDING_PROP = { towncenter: 'barracks', barracks: 'barracks', house: 'cottage', tower: 'tower', hospital: 'hospital' };
+  const BUILDING_PROP = { towncenter: 'barracks', barracks: 'barracks', house: 'cottage', stable:'barn', foundry:'barn', tower: 'tower', hospital: 'hospital' };
   const SIDED_PROPS = new Set(['barracks', 'tower', 'hospital']);
   // Two tiny cached overlays; upgraded towers still use the GPU sprite batch.
   const towerWorks = new Map();
@@ -1173,18 +1176,21 @@
   function buildingDrawable(b) {
     if (b.dead) return null;
     if (b.side === 'britain' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(b)) return null;
+    const margin=Math.max(180,b.w*z()*2,b.h*z()*3),cx=sx(b.x),cy=gy(b.x,b.y);
+    if(cx < -margin || cx > innerWidth+margin || cy < -margin || cy > innerHeight+margin)return null;
     if (b.type === 'farm') return { y: b.y, draw: () => drawFarm(b) };
     const siteArt=b.type==='mine'?global.__MINING_ART_V1__:b.type==='lumbercamp'?global.__LUMBER_ART_V1__:null;
     if (siteArt) {
-      const image=siteArt.sprite(b.type,b.nativeSide||b.side),prop={image,w:256,h:224,pivot:{x:128,y:144}},k=b.w*z()*1.5/256;
+      const image=siteArt.sprite(b.type,b.nativeSide||b.side),base={image,w:256,h:224,pivot:{x:128,y:144}},prop=z()>=.85&&!view.overview?buildingPresentation?.decorate(b.type,b.nativeSide||b.side,base)||base:base,k=b.w*z()*1.5/256;
       return {gpu:b.complete!==false,y:b.y+b.h*.3,box:box(sx(b.x),gy(b.x,b.y),128,144,256,224,k),draw:()=>{
         if(b.complete===false)drawConstruction(b,prop,k);
-        else drawScenery(image,sx(b.x)-128*k,gy(b.x,b.y)-144*k,256*k,224*k);
+        else drawScenery(prop.image,sx(b.x)-128*k,gy(b.x,b.y)-144*k,256*k,224*k);
         view.stats.props++;
       }};
     }
     const base = BUILDING_PROP[b.type] || 'cottage', kind = SIDED_PROPS.has(base) ? base + '_' + ((b.nativeSide || b.side) === 'france' ? 'fr' : 'br') : base;
-    const prop = view.props[kind]; if (!prop) return null;
+    let prop = view.props[kind]; if (!prop) return null;
+    if(z()>=.85&&!view.overview)prop=buildingPresentation?.decorate(b.type,b.nativeSide||b.side,prop)||prop;
     // Fit the rendered building to the game's footprint (a little larger: the
     // props carry their eaves and yard beyond the walls).
     // A tower stands tall over the men (a bit over half true size, like a
@@ -1218,6 +1224,7 @@
     return prop.rows;
   }
   function drawConstruction(b, prop, k) {
+    if(buildingPresentation){view.stats.underConstruction=(view.stats.underConstruction||0)+1;buildingPresentation.construction(ctx,b,prop,k,sx(b.x),gy(b.x,b.y),z());return;}
     const p = Math.max(0, Math.min(1, b.construction || 0)), X = sx(b.x), Y = gy(b.x, b.y);
     view.stats.underConstruction = (view.stats.underConstruction || 0) + 1;
     const left = X - prop.pivot.x * k, top = Y - prop.pivot.y * k, w = prop.w * k, h = prop.h * k;
@@ -1745,6 +1752,7 @@
     view.frames++;
     if (view.frames % 30 === 1) refreshCrew();
     const st = view.stats; st.drawn = st.sprites = st.workers = st.props = st.houses = st.dressing = st.bridges = st.onBridge = st.stances = st.digging = st.leaning = st.gabions = st.fascines = st.underConstruction = 0;
+    buildingPresentation?.prepare(units,buildings);
     panFix();
     ensureAttackHook();
     gpu?.begin(ctx);
@@ -1824,9 +1832,11 @@
         if (u.type === 'worker' && !view.atlases[((u.nativeSide || u.side) === 'france' ? 'fr' : 'br') + 'w']) { drawWorker(u, m); if (crest || lip) ctx.restore(); return; }
         const [key, anim, f] = frameFor(u, m, t);
         // Until its atlas has loaded a unit is simply not drawn yet.
-        const pose = !anim.startsWith('die') && !m.digging && !m.parapet && u.type !== 'artillery' ? m.motion : null;
+        const buildPose=u.type==='worker'&&!m.moving?buildingPresentation?.worker(u,t):null;
+        const pose = buildPose||(!anim.startsWith('die') && !m.digging && !m.parapet && u.type !== 'artillery' ? m.motion : null);
         const dx = (pose?.dx || 0) * z(), dy = (pose?.dy || 0) * z();
         if (drawSprite(view.atlases[key], anim, f, X + dx, Y + dy, k, pose)) st.sprites++;
+        if(buildPose?.contact){gpu?.end();buildingPresentation.drawWork(ctx,u,buildPose,X,Y,z());}
         if(u.injuryLevel||(Number.isFinite(u.bandagedAt)&&elapsed-u.bandagedAt<45)){
           const by=Y+dy-(u.type==='cavalry'?1.9:1.1)*LIFT*PPM*z()*(pose?.scaleY || 1);
           drawBandage(X+dx,by,z());
@@ -2471,7 +2481,7 @@
     plantKinds: () => (view.woodTrees || []).reduce((n, tr) => (n[tr.kind] = (n[tr.kind] || 0) + 1, n), {}),
     stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: global.__ISO_GPU_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
-      wetTracks: wetTracks.stats(), groundDetail:groundDetail.stats(), seasonalProps: global.__SEASONAL_PROPS_V1__?.stats(),
+      wetTracks: wetTracks.stats(), groundDetail:groundDetail.stats(), seasonalProps: global.__SEASONAL_PROPS_V1__?.stats(), buildingPresentation:buildingPresentation?.stats(),
       fogGeometryPoints: ((fogGeometry.seen?.points.length || 0) + (fogGeometry.sight?.points.length || 0)) / 3,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
