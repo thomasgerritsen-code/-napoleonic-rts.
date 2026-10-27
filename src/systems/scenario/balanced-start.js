@@ -15,9 +15,9 @@
       const add=(type,dx,dy,mounted=false)=>layout.push({type,dx:dir*dx,dy:dir*dy,mounted});
       for(let i=0;i<cfg.workers;i++)add('worker',105+i%3*24,-70+Math.floor(i/3)*28);
       for(let i=0;i<cfg.infantry;i++)add('infantry',160+i%6*20,110+Math.floor(i/6)*20);
-      add('officer',210,70);add('drummer',180,70);
+      if(cfg.infantry>0){add('officer',210,70);add('drummer',180,70);}
       for(let i=0;i<cfg.cavalry;i++)add('cavalry',110+i*28,230);
-      add('officer',220,200,true);
+      if(cfg.cavalry>0)add('officer',220,200,true);
       const anchor=root.__UNIT_PLACEMENT__.formation(home,layout);
       if(!anchor)throw Error('Geen vrije startplek voor '+side);
       for(const slot of layout){
@@ -39,5 +39,5 @@
   applyStart();
   root.__BALANCED_START__ = Object.freeze({config:cfg});
   root.NRTS?.subsystems?.register?.('balanced-start', root.__BALANCED_START__, {phase:'scenario',legacyBridge:false,
-    responsibility:'equal starting supplies and infantry/cavalry-ready armies on the playable map'});
+    responsibility:'equal civilian openings with workers and supplies; armies are built through normal training'});
 })(window);

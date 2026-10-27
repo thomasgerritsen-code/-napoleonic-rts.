@@ -100,14 +100,16 @@ test('Nieuwe slag clears trenches and wounded installed after the reset button w
 test('Nieuwe slag removes fallen soldiers from the isometric battlefield', async ({ page }) => {
   test.setTimeout(90_000);
   const errors = await openGame(page);
-  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 10);
-  await page.evaluate(() => {
-    const u = units.find(u => !u.dead && u.side === 'france' && u.type === 'infantry');
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().assets.ready);
+  const id=await page.evaluate(() => {const home=buildings.find(b=>b.side==='france'&&b.type==='towncenter');return createUnit('france','infantry',home.x+200,home.y+100).id;});
+  await page.waitForFunction(id=>!!__ISO_VIEW_V1__.frameOf(id),id);
+  await page.evaluate(id => {
+    const u = units.find(u => u.id===id);
     u.hp = 0; u.dead = true;
-  });
+  },id);
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().corpses > 0);
   await page.getByRole('button', { name: 'Nieuwe slag', exact: true }).click();
-  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sprites > 10 && window.__ISO_VIEW_V1__.stats().corpses === 0);
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sprites >= 6 && window.__ISO_VIEW_V1__.stats().corpses === 0);
   expect(await page.evaluate(() => units.every(u => !u.dead))).toBe(true);
   expect(errors).toEqual([]);
 });

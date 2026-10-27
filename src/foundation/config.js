@@ -130,7 +130,7 @@
         Object.freeze({ label:'Bekleed', cost:Object.freeze({ wood:120 }), seconds:10, damage:0.38, shock:0.35 }),
         Object.freeze({ label:'Versterkt', cost:Object.freeze({ wood:160, iron:40 }), seconds:14, damage:0.28, shock:0.25 })]) }) : null,
     balancedStart: OPEN_MAP ? Object.freeze({ food:1100, wood:1100, iron:100,
-      workers:6, infantry:12, cavalry:4 }) : null,
+      workers:6, infantry:0, cavalry:0 }) : null,
     territories: OPEN_MAP ? Object.freeze({ captureSeconds:15, radius:160, updateSeconds:.25, minSeparation:1700, searchRadius:240,
       sites:Object.freeze([
         Object.freeze({id:'estate', label:'Noordelijke graanpost', resource:'food', rate:3}),

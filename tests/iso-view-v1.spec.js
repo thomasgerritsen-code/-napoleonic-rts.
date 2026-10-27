@@ -39,7 +39,7 @@ test('with ?view=iso the game is drawn with the Blender sprites, terrain and pro
   await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().atlases >= 14, null, { timeout: 60_000 });
   // Let a few frames draw (the test page advances the simulation itself).
   // Ground: the Blender battlefield, or the game's own terrain tiles until it has loaded.
-  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sprites > 10 &&
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().sprites >= 6 &&
     (window.__ISO_VIEW_V1__.stats().ground || window.__ISO_VIEW_V1__.stats().tilesDrawn > 0));
   const s = await stats(page);
   expect(s.on).toBe(true);
@@ -60,6 +60,8 @@ test('with ?view=iso the game is drawn with the Blender sprites, terrain and pro
 
 test('iso view: clicking a soldier\'s body selects him, a box selects, right-click orders a move', async ({ page }) => {
   const errors = await openGame(page, 'test=iso-input&view=iso');
+  await page.waitForFunction(() => window.__BALANCED_START__);
+  await page.evaluate(() => { for(let i=0;i<12;i++)createUnit('france','infantry',3900+(i%4)*24,1800+Math.floor(i/4)*24);camera.x=3930;camera.y=1820;camera.zoom=1.2; });
   await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 10, null, { timeout: 60_000 });
   // A French musketeer whose body is on the open canvas (not under a HUD panel).
   const body = await page.evaluate(() => {
@@ -132,8 +134,10 @@ test('iso view: the only view - no 2D map to switch to, and the 2D renderer neve
 
 test('iso view: a fallen soldier stays on the field as a body', async ({ page }) => {
   const errors = await openGame(page, 'test=iso-fall&view=iso');
-  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().sprites > 10, null, { timeout: 60_000 });
-  await page.evaluate(() => { const u = units.find(v => v.side === 'france' && v.type === 'infantry' && !v.dead); u.hp = 0; u.dead = true; });
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().assets.ready);
+  const id=await page.evaluate(() => { const u=createUnit('france','infantry',3900,1800);camera.x=u.x;camera.y=u.y;return u.id; });
+  await page.waitForFunction(id=>!!__ISO_VIEW_V1__.frameOf(id),id);
+  await page.evaluate(id => { const u = units.find(v => v.id===id); u.hp = 0; u.dead = true; },id);
   await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().corpses > 0);
   expect(errors).toEqual([]);
 });
@@ -196,7 +200,7 @@ test('iso view: the battlefield ground, woods and peasants come from Blender', a
   // Poplar avenues along the chaussees.
   expect(s.avenueTrees).toBeGreaterThan(80);
   // Peasants drawn as sprites, not the stand-in figures.
-  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().workers === 0 && window.__ISO_VIEW_V1__.stats().sprites > 10);
+  await page.waitForFunction(() => window.__ISO_VIEW_V1__.stats().workers === 0 && window.__ISO_VIEW_V1__.stats().sprites >= 6);
   // Relief: hills metres high; on a hilltop a man is drawn higher than on flat
   // ground, and a click on the screen finds the ground point it shows.
   expect(s.relief).toBeGreaterThan(5);

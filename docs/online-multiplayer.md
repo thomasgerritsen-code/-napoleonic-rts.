@@ -37,11 +37,12 @@ de uitnodiging geen toegang tot een al bezette partij.
 ## Gelijke start
 
 Op de speelbare kaart beginnen beide partijen met 1100 voedsel, 1100 hout,
-100 ijzer en 45 populatieruimte. Elk startleger telt 6 boeren, 12 musketiers,
-4 cavaleristen, een officier te voet, een drummer en een officier te paard.
-Hiermee kunnen beide spelers meteen een infanterie- en cavalerieregiment vormen.
+100 ijzer en 45 populatieruimte. Beide partijen beginnen met alleen 6 boeren:
+geen soldaten, paarden, officieren, drummers of regimenten. Verzamel grondstoffen,
+bouw een kazerne of stal en train je leger zelf. Dit geldt ook voor een nieuwe
+singleplayerwedstrijd; de computer bouwt zijn leger via de normale productie op.
 Beide partijen hebben hetzelfde hoofdkwartier en dezelfde basisgebouwen om te bouwen.
-De kaart heeft verschillende terreinen; de beginvoorraad en legers zijn gelijk.
+De kaart heeft verschillende terreinen; de beginvoorraad en boeren zijn gelijk.
 
 Online wachten boeren van beide partijen op een opdracht. Na het uitputten
 van een bron zoeken ze een nieuwe bron van hetzelfde opgedragen type; als
@@ -50,12 +51,12 @@ zelfstandig zijn werk verdelen.
 
 ## Vrije startplekken en zichtbaarheid
 
-De startlegers staan als hele opstelling op vrij terrein, met ruimte voor
-soldaten en paarden naast woningen, hoofdkwartieren, grondstofbomen en bosranden.
+De boeren beginnen op vrij terrein naast het hoofdkwartier, buiten woningen,
+grondstofbomen en bosranden. Later getrainde soldaten en paarden krijgen ook ruimte.
 De plaatsing houdt rekening met de grotere zichtbare dorpswoningen en met water.
 Ook nieuwe eenheden en hun verzamelpunten worden bij voltooiing van de training
 op een vrije plek gezet. Deze controle loopt alleen bij plaatsing, niet iedere
-simulatiestap. De begincamera richt zich op het eigen leger.
+simulatiestap. De begincamera richt zich op de eigen boeren.
 
 Tijdens het spelen blijven bossen toegankelijk voor verzamelen en dekking.
 Als zichtbare soldaten achter woningen of boomkruinen lopen, worden hun bestaande
@@ -338,8 +339,8 @@ de andere speler bestuurt.
 
 Dit is een eerste privé-multiplayer, zonder accounts, openbare matchmaking,
 ranglijsten of opgeslagen wedstrijden.
-De startlegers en voorraden volgen voorlopig de bestaande spelopstelling;
-competitieve balans is nog geen onderdeel van deze eerste versie.
+De beginvoorraad en boeren zijn gelijk; verdere competitieve afstemming
+blijft onderdeel van de doorontwikkeling.
 Kamers en de strijd staan in het geheugen
 van één blijvende server. Een serverrestart of nieuwe deployment beëindigt lopende
 wedstrijden. Meerdere replica's of vluchtige Functions vereisen eerst een

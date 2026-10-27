@@ -8,7 +8,8 @@ async function openPhone(browser, viewport, query = 'view=iso') {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/play.html?' + query);
-  await page.waitForFunction(() => window.__ISO_VIEW_V1__?.stats().ground && window.__ISO_VIEW_V1__.stats().workerSprites);
+  await page.waitForFunction(() => window.__BALANCED_START__ && window.__ISO_VIEW_V1__?.stats().assets.ready);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   return { context, page, errors };
 }
 
@@ -32,13 +33,14 @@ async function visibleStart(page) {
 }
 
 for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 640 }, { width: 844, height: 390 }]) {
-  test(`iso mobile start shows the home base, peasants and soldiers at ${viewport.width}x${viewport.height}`, async ({ browser }) => {
+  test(`iso mobile civilian start shows the home base and peasants at ${viewport.width}x${viewport.height}`, async ({ browser }) => {
     const { context, page, errors } = await openPhone(browser, viewport);
     const start = await visibleStart(page);
     expect(start.visible).toBeGreaterThanOrEqual(start.total * 0.8);
     expect(start.workers).toBeGreaterThan(0);
-    expect(start.infantry).toBeGreaterThan(0);
-    expect(start.cavalry).toBeGreaterThan(0);
+    expect(start.total).toBe(6);
+    expect(start.infantry).toBe(0);
+    expect(start.cavalry).toBe(0);
     expect(start.homeVisible).toBe(true);
     expect(errors).toEqual([]);
     await context.close();
@@ -55,7 +57,9 @@ test('iso mobile new battle restores the starting view after exploring', async (
   const start = await visibleStart(page);
   expect(start.visible).toBeGreaterThanOrEqual(start.total * 0.8);
   expect(start.workers).toBeGreaterThan(0);
-  expect(start.infantry).toBeGreaterThan(0);
+  expect(start.total).toBe(6);
+  expect(start.infantry).toBe(0);
+  expect(start.cavalry).toBe(0);
   expect(start.homeVisible).toBe(true);
   expect(errors).toEqual([]);
   await context.close();

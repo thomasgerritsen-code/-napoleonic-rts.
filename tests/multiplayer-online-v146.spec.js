@@ -34,8 +34,8 @@ test('two isolated devices host and join a real server; private sides, movement,
   try{
     const initial=await Promise.all([a.evaluate(()=>({side:__ONLINE_MATCH_V1__.side,s:__ONLINE_MATCH_V1__.view.state})),b.evaluate(()=>({side:__ONLINE_MATCH_V1__.side,s:__ONLINE_MATCH_V1__.view.state}))]);
     expect(initial.map(v=>v.side)).toEqual(['france','britain']);
-    for(const v of initial){expect(v.s.units.every(u=>u.side==='france'&&u.nativeSide===v.side)).toBe(true);expect(v.s.economy.food).toBeGreaterThan(0);expect(v.s.economies).toBeUndefined();}
-    const ownA=initial[0].s.units.find(u=>u.type==='infantry'),ownB=initial[1].s.units.find(u=>u.type==='infantry');
+    for(const v of initial){expect(v.s.units).toHaveLength(6);expect(v.s.units.every(u=>u.side==='france'&&u.nativeSide===v.side&&u.type==='worker')).toBe(true);expect(v.s.economy.food).toBeGreaterThan(0);expect(v.s.economies).toBeUndefined();expect(v.s.groups).toEqual([]);}
+    const ownA=initial[0].s.units.find(u=>u.type==='worker'),ownB=initial[1].s.units.find(u=>u.type==='worker');
     await a.evaluate(id=>{selectedUnits.clear();selectedUnits.add(units.find(u=>u.id===id));issueMove(units.find(u=>u.id===id).x+90,units.find(u=>u.id===id).y+20);},ownA.id);
     await b.evaluate(id=>{selectedUnits.clear();selectedUnits.add(units.find(u=>u.id===id));issueMove(units.find(u=>u.id===id).x-90,units.find(u=>u.id===id).y+20);},ownB.id);
     await expect.poll(()=>a.evaluate(id=>__ONLINE_MATCH_V1__.view.state.units.find(u=>u.id===id)?.x,ownA.id),{timeout:15000}).toBeGreaterThan(ownA.x+8);
@@ -79,7 +79,7 @@ test('a lost connection pauses both players, resumes the same side and refreshes
     expect(await b.evaluate(()=>__ONLINE_MATCH_V1__.view.state.units.map(u=>u.id))).toEqual(ids);
     await b.reload();await poll(b,()=>__ONLINE_MATCH_V1__.phase==='playing');expect(await b.evaluate(()=>__ONLINE_MATCH_V1__.side)).toBe('britain');
     await b.click('#onlineClose');
-    await b.evaluate(()=>{selectedUnits.clear();const u=units.find(u=>u.type==='infantry');selectedUnits.add(u);issueMove(u.x-60,u.y);});
+    await b.evaluate(()=>{selectedUnits.clear();const u=units.find(u=>u.type==='worker');selectedUnits.add(u);issueMove(u.x-60,u.y);});
     await poll(b,()=>__ONLINE_MATCH_V1__.view.acknowledgements.some(a=>a.ok));
     await expect.poll(async()=>{const [ta,tb]=await Promise.all([a.evaluate(()=>__ONLINE_MATCH_V1__.stats().tick),b.evaluate(()=>__ONLINE_MATCH_V1__.stats().tick)]);return Math.abs(ta-tb);}).toBeLessThanOrEqual(2);
     await b.evaluate(()=>document.getElementById('resetBtn').click());

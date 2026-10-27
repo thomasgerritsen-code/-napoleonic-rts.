@@ -17,18 +17,18 @@ test('balanced authoritative starts, fair supply positions, capture and conteste
    const separation=Math.min(...zones.points.flatMap((p,i)=>zones.points.slice(i+1).map(q=>Math.hypot(p.x-q.x,p.y-q.y))));
    const frontSpan=zones.points[2].y-zones.points[0].y;
    const move=(u,p)=>{Object.assign(u,{x:p.x,y:p.y,targetX:p.x,targetY:p.y,reload:99999});};
-   const f=units.find(u=>u.side==='france'&&u.type==='infantry'),b=units.find(u=>u.side==='britain'&&u.type==='infantry');
+   const f=createUnit('france','infantry',zones.points[0].x,zones.points[0].y),b=createUnit('britain','infantry',zones.points[2].x,zones.points[2].y);
    move(f,zones.points[0]);move(b,zones.points[2]);
    const advance=t=>{for(let i=0;i<Math.round(t/.25);i++)api.advance([],true,false,.25);};
    advance(14.75);const before=__TERRITORIES__.state();advance(.25);const captured=read();advance(2);const earned=read();
-   const challenger=units.find(u=>u.side==='britain'&&u.type==='cavalry');move(challenger,zones.points[0]);advance(2);const contested=read();
+   const challenger=createUnit('britain','cavalry',zones.points[0].x,zones.points[0].y);move(challenger,zones.points[0]);advance(2);const contested=read();
    move(f,{x:zones.points[0].x+500,y:zones.points[0].y});advance(15);const recaptured=read();advance(1);const britishIncome=read();
    const pausedBefore=JSON.stringify(read());api.advance([],false,true,.25);const pausedSame=JSON.stringify(read())===pausedBefore;
    resetGame();const reset={zones:__TERRITORIES__.state(),counts:['france','britain'].map(side=>units.filter(u=>u.side===side&&!u.dead).length),economies:JSON.parse(JSON.stringify(economies))};
    return{start,placements,separation,frontSpan,before,captured,earned,contested,recaptured,britishIncome,pausedSame,reset};
   });
   expect(result.start.france).toEqual(result.start.britain);expect(result.start.france.economy).toEqual({food:1100,wood:1100,iron:100,popCap:45});
-  expect(result.start.france.roster).toHaveLength(25);expect(result.start.france.roster.filter(u=>u.type==='officer'&&u.troop==='mounted')).toHaveLength(1);
+  expect(result.start.france.roster).toHaveLength(6);expect(result.start.france.roster.every(u=>u.type==='worker')).toBe(true);
   expect(result.start.france.roster.every(u=>u.task===null)).toBe(true);for(const p of result.placements){expect(p.dry).toBe(true);expect(p.open).toBe(true);expect(p.gap).toBeLessThan(.001);}
   expect(result.separation).toBeGreaterThanOrEqual(1700);expect(result.frontSpan).toBeGreaterThan(3500);
   console.log('SUPPLY_FRONTS',JSON.stringify({placements:result.placements,separation:result.separation,frontSpan:result.frontSpan}));
@@ -40,7 +40,7 @@ test('balanced authoritative starts, fair supply positions, capture and conteste
   expect(result.contested.france.state.territories.points[0].contested).toBe(true);expect(result.contested.france.state.economy.food).toBe(result.earned.france.state.economy.food);
   expect(result.recaptured.france.state.territories.points[0].owner).toBe('britain');
   expect(result.britishIncome.britain.state.economy.food-result.recaptured.britain.state.economy.food).toBeCloseTo(3,5);
-  expect(result.pausedSame).toBe(true);expect(result.reset.counts).toEqual([25,25]);expect(result.reset.zones.points.every(p=>p.owner===null)).toBe(true);
+  expect(result.pausedSame).toBe(true);expect(result.reset.counts).toEqual([6,6]);expect(result.reset.zones.points.every(p=>p.owner===null)).toBe(true);
   expect(result.reset.economies.france).toEqual(result.reset.economies.britain);expect(errors).toEqual([]);
  }finally{await c.close();}
 });
@@ -54,7 +54,7 @@ test('mobile players can find supply flags, capture them and inspect their resou
   await expect(page.locator('#territoriesPanel article')).toHaveCount(3);await page.click('[data-territory="estate"]');await expect(page.locator('#territoriesPanel')).not.toBeVisible();
   await expect.poll(()=>page.evaluate(()=>__ISO_VIEW_V1__.stats().territories)).toBeGreaterThan(0);
   const captured=await page.evaluate(()=>{
-   const p=__TERRITORIES__.state().points[0],u=units.find(u=>u.side==='france'&&u.type==='infantry');
+   const p=__TERRITORIES__.state().points[0],u=createUnit('france','infantry',p.x,p.y);
    Object.assign(u,{x:p.x,y:p.y,targetX:p.x,targetY:p.y,reload:99999});__RTS_DEBUG__.tick(15);
    return __TERRITORIES__.state().points[0].owner;
   });expect(captured).toBe('france');await expect(button).toContainText('1–0');await button.click();
@@ -73,11 +73,11 @@ test('two real online players capture supplies by movement orders, see canonical
   await sim.evaluate(()=>{
    const points=__TERRITORIES__.state().points;
    const move=(u,p,dx)=>Object.assign(u,{x:p.x+dx,y:p.y,targetX:p.x+dx,targetY:p.y,reload:99999});
-   move(units.find(u=>u.type==='infantry'&&u.side==='france'),points[0],230);
-   move(units.find(u=>u.type==='infantry'&&u.side==='britain'),points[2],230);
+   move(createUnit('france','infantry',points[0].x+230,points[0].y),points[0],230);
+   move(createUnit('britain','infantry',points[2].x+230,points[2].y),points[2],230);
    // Stage the challenger on the other side: placing it only 170 units from
    // the first capturer makes that infantry stop to aim before entering the post.
-   move(units.find(u=>u.type==='cavalry'&&u.side==='britain'),points[0],-400);
+   move(createUnit('britain','cavalry',points[0].x-400,points[0].y),points[0],-400);
   });
   return{close:()=>c.close(),advance:(commands,running,snapshot,seconds,epochs)=>sim.evaluate(a=>JSON.parse(JSON.stringify(__ONLINE_SIM_V1__.advanceTransport(a.commands,a.running,a.snapshot,a.seconds,a.epochs))),{commands,running,snapshot,seconds,epochs})};
  }};
