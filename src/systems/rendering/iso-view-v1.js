@@ -1432,9 +1432,9 @@
   // between redraws, so edges glide as men move instead of stepping.
   const fogA = document.createElement('canvas'), fogB = document.createElement('canvas'), fogMix = document.createElement('canvas');
   const mixCtx = fogMix.getContext('2d');
-  // The mask is read back for its billowing rim (getImageData) a few times a
-  // second: kept in memory so the read does not stall the graphics chip.
-  for (const c of [fogA, fogB]) c.getContext('2d', { willReadFrequently: true });
+  // The masks stay on the graphics chip (their blur is cheap there); only the
+  // small copy that shapes the billowing rim is read back (billowEdges).
+  for (const c of [fogA, fogB]) c.getContext('2d');
   let fog = fogA, fogCtx2 = fogA.getContext('2d');
   const seenLayer = document.createElement('canvas'), seenCtx = seenLayer.getContext('2d');
   const sightLayer = document.createElement('canvas'), sightCtx = sightLayer.getContext('2d');
@@ -1596,21 +1596,29 @@
   // and drifts with the cloud deck. Both rims are shaped: cloud to haze over
   // ground seen before, and haze (or cloud) to clear ground in sight.
   const EDGE_SPAN = 1300, EDGE_PUSH = 1.1;
+  // Shaped at half the mask's size (a quarter of its pixels), then laid back
+  // smoothly: the rim is soft and the noise coarse, the look is the same and
+  // each redraw of the mask reads back and walks a quarter of the pixels.
+  const edgeCv = document.createElement('canvas'), edgeCtx = edgeCv.getContext('2d', { willReadFrequently: true });
   function billowEdges(f, w, h, now) {
     const F = view.cloudField; if (!F) return;
+    const bw = Math.ceil(w / 2), bh = Math.ceil(h / 2);
+    if (edgeCv.width !== bw || edgeCv.height !== bh) { edgeCv.width = bw; edgeCv.height = bh; }
+    edgeCtx.globalCompositeOperation = 'copy'; edgeCtx.drawImage(f.canvas, 0, 0, bw, bh);
+    edgeCtx.globalCompositeOperation = 'source-over';
     let img;
-    try { img = f.getImageData(0, 0, w, h); } catch (_) { return; }
+    try { img = edgeCtx.getImageData(0, 0, bw, bh); } catch (_) { return; }
     const d = img.data, N = 256, L = 1 - SEEN_VEIL, zz = z(), drift = (now / 1000 * 9) % EDGE_SPAN;
     // Ground position of each column and row (flat; the noise needs no relief).
-    const us = new Int32Array(w), us2 = new Int32Array(w);
-    for (let x = 0; x < w; x++) {
-      const wx = ((x - FOG_M) * 2 - innerWidth / 2) / zz + camera.x - drift, u = wx / EDGE_SPAN * N;
+    const us = new Int32Array(bw), us2 = new Int32Array(bw);
+    for (let x = 0; x < bw; x++) {
+      const wx = ((x * 2 + 0.5 - FOG_M) * 2 - innerWidth / 2) / zz + camera.x - drift, u = wx / EDGE_SPAN * N;
       us[x] = ((Math.floor(u) % N) + N) % N; us2[x] = ((Math.floor(u * 2.1 + 91) % N) + N) % N;
     }
-    for (let y = 0; y < h; y++) {
-      const wy = ((y - FOG_M) * 2 - innerHeight / 2) / (zz * SQ) + camera.y, v = wy / EDGE_SPAN * N;
+    for (let y = 0; y < bh; y++) {
+      const wy = ((y * 2 + 0.5 - FOG_M) * 2 - innerHeight / 2) / (zz * SQ) + camera.y, v = wy / EDGE_SPAN * N;
       const row = (((Math.floor(v) % N) + N) % N) * N, row2 = (((Math.floor(v * 2.1 + 37) % N) + N) % N) * N;
-      for (let x = 0, i = y * w * 4 + 3; x < w; x++, i += 4) {
+      for (let x = 0, i = y * bw * 4 + 3; x < bw; x++, i += 4) {
         const a = d[i] / 255;
         if (a <= 0.004 || a >= 0.996 || Math.abs(a - L) < 0.004) continue;
         const n = 0.72 * F[row + us[x]] + 0.28 * F[row2 + us2[x]] - 0.5;
@@ -1621,7 +1629,9 @@
         d[i] = (lo + (hi - lo) * e) * 255;
       }
     }
-    f.putImageData(img, 0, 0);
+    edgeCtx.putImageData(img, 0, 0);
+    f.globalCompositeOperation = 'copy'; f.drawImage(edgeCv, 0, 0, w, h);
+    f.globalCompositeOperation = 'source-over';
   }
   // Clouds through the cover mask: a deck and a lighter layer of wisps, each
   // drifting with the wind at its own speed, and their shadow on the ground
@@ -1647,6 +1657,9 @@
     shadeCtx.globalCompositeOperation = 'source-over'; shadeCtx.clearRect(0, 0, w, h);
     shadeCtx.fillStyle = 'rgba(12,18,28,.32)'; shadeCtx.fillRect(0, 0, w, h);
     shadeCtx.globalCompositeOperation = 'destination-in'; shadeCtx.drawImage(fogMix, 0, 0, w, h);
+    // The cloud over its own shadow, in one picture: one full-screen copy a frame, not two.
+    const so = Math.max(3, 14*z()) / 4;
+    shadeCtx.globalCompositeOperation = 'source-over'; shadeCtx.drawImage(cloudCv, -so, -so * 1.6);
     view.cloudCam = { x: camera.x, y: camera.y, zoom: z(), at: now, maskAt: view.fogAt, width: innerWidth, height: innerHeight };
     view.stats.cloudBuilds = (view.stats.cloudBuilds || 0) + 1;
     blitClouds(view.cloudCam);
@@ -1654,7 +1667,6 @@
   function blitClouds(cam) {
     const dx = (cam.x-camera.x)*z(), dy = (cam.y-camera.y)*z()*SQ, so = Math.max(3, 14*z());
     ctx.drawImage(shadeCv, -2*FOG_M+so+dx, -2*FOG_M+so*1.6+dy, shadeCv.width*4, shadeCv.height*4);
-    ctx.drawImage(cloudCv, -2*FOG_M+dx, -2*FOG_M+dy, cloudCv.width*4, cloudCv.height*4);
   }
   // Height gives sight: on high ground a man sees farther (up to half as far
   // again on a hilltop), on the relief of this map (iso view only).

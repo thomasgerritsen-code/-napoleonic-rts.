@@ -42,7 +42,8 @@ test('Architecture v2.1 owns road lookup and route planning without legacy v066 
   expect(nav.config.bridge.columnFormFullClearance).toBe(12);
   expect(nav.retired).toEqual(expect.arrayContaining(['src/v066-road-index.js','src/v066-route-fixes.js']));
 
-  const html=fs.readFileSync(path.join(process.cwd(),'index.html'),'utf8');
+  // The game page (index.html is the v1.4.7 start menu).
+  const html=fs.readFileSync(path.join(process.cwd(),'play.html'),'utf8');
   expect(html).toContain('src/systems/navigation/road-index.js');
   expect(html).toContain('src/systems/navigation/route-planner.js');
   expect(html).toContain('src/systems/navigation/bridge-corridors.js');

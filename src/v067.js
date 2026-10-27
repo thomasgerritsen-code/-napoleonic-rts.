@@ -143,6 +143,11 @@ const WATER_SEGMENT_CACHE_V1=new Map(),WATER_SEGMENT_STATS_V1={queries:0,hits:0,
 function segmentCrossesBlockedWaterV067(ax,ay,bx,by){
   WATER_SEGMENT_STATS_V1.queries++;
   if(![ax,ay,bx,by].every(Number.isFinite))return false;
+  // Exact early answer for the common case, a step far from the river: every point
+  // of the segment lies within half its length of the middle, so when the middle
+  // is farther than that plus the river's half width, no point can be in the water.
+  const half=Math.hypot(bx-ax,by-ay)/2,mid=riverHitV067((ax+bx)/2,(ay+by)/2);
+  if(!mid||mid.distance>RIVER_NAV_HALF_WIDTH_V067+half+1){WATER_SEGMENT_STATS_V1.far=(WATER_SEGMENT_STATS_V1.far||0)+1;return false;}
   const key=`${ax}:${ay}:${bx}:${by}`,cached=WATER_SEGMENT_CACHE_V1.get(key);
   if(cached!==undefined){WATER_SEGMENT_STATS_V1.hits++;return cached;}
   const distance=Math.hypot(bx-ax,by-ay),samples=Math.max(1,Math.ceil(distance/12));
