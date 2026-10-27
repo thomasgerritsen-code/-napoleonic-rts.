@@ -67,6 +67,7 @@ orderGroupPathV06 = function orderGroupPathV069(reg, x, y, formation = reg.forma
   const membersBefore = regimentMembers(reg);
   const start = membersBefore.length ? centroid(membersBefore) : { x:reg.targetX || x, y:reg.targetY || y };
   const oldSpeed = Number.isFinite(reg.marchV063?.speedV064) ? reg.marchV063.speedV064 : 0;
+  const oldAnchor = reg.marchV063 && Number.isFinite(reg.marchV063.anchorX) ? { x:reg.marchV063.anchorX, y:reg.marchV063.anchorY } : null;
   const startHit = roadNetworkAtV066(start.x, start.y);
   const goalHit = roadNetworkAtV066(x, y);
 
@@ -97,8 +98,13 @@ orderGroupPathV06 = function orderGroupPathV069(reg, x, y, formation = reg.forma
   const first = reg.path[0] || {x,y};
   const heading = Math.atan2(first.y - start.y, first.x - start.x);
   const march = reg.marchV063;
-  march.anchorX = start.x;
-  march.anchorY = start.y;
+  // A column already marching keeps its anchor when that lies ahead on the new
+  // heading: restarting from the men's centroid (which trails the anchor) pulled
+  // the whole column a few paces back before it marched on.
+  const ahead = oldAnchor && Math.hypot(oldAnchor.x - start.x, oldAnchor.y - start.y) < 60 &&
+    (oldAnchor.x - start.x) * Math.cos(heading) + (oldAnchor.y - start.y) * Math.sin(heading) >= 0;
+  march.anchorX = ahead ? oldAnchor.x : start.x;
+  march.anchorY = ahead ? oldAnchor.y : start.y;
   march.marchFacing = heading;
   march.slotOffsetsV064 = seedFormationOffsetsV064(reg, march, heading);
   march.speedV064 = Math.max(0, Math.min(oldSpeed, desiredGroupSpeedV064(reg, march, !!startHit)));
