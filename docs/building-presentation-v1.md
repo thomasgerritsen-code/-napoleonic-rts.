@@ -1,13 +1,25 @@
 # Gebouwen en bouwanimatie
 
 De isometrische gebouwen hebben vier zichtbare bouwfasen: fundering, houten
-draagwerk, muren en dak. Materialen verdwijnen geleidelijk uit de voorraadstapels
-op de bouwplaats. Steigers, schoren, dakspanten en een ladder geven de bouw meer
-diepte. De afbeelding groeit in verspringende stroken mee met de werkelijke
-bouwvoortgang; er staat geen volledig doorzichtige eindversie op een lege fundering.
+draagwerk, muren en dak. De bouwplaats staat op de gemeten muurvoet van elke
+afbeelding (hoeken links, voor en rechts, de hoogte van de dakrand en de nok, in
+bronpixels vanaf het draaipunt). Zo staan uitzetpaaltjes, stenen sokkel, stijlen,
+regels, steiger en dakspanten waar de muren en het dak van het gebouw komen. De
+muren rijzen laag voor laag vanaf hun eigen voet tot de dakrand, daarna komt het
+dak; de schaduw en de dakoverstek verschijnen pas met het dak. De steiger staat
+voor de zichtbare gevels, met een werkvloer op de hoogte van de laag die gelegd
+wordt en een ladder ernaartoe. Materialen verdwijnen geleidelijk uit de
+voorraadstapels naast de bouwplaats.
+
+Het veldhospitaal is een tentenkamp: geen steiger, maar tentstokken, nokstokken,
+scheerlijnen en daarna het doek. De mijn krijgt eerst de houten stutten van de
+mijningang. Het houthakkerskamp is een open schuur zonder steiger. Een
+bouwplaats die nog lage muren heeft, wordt niet doorzichtig voor mannen erachter;
+vanaf 60% geldt de gewone doorkijk weer.
 
 Bouwende boeren gebruiken hun bestaande richtingsafhankelijke hamersprites met
-een ritme van heffen, slaan en herstellen. Kleine materiaalpufjes verschijnen bij
+een ritme van heffen (beeld 0), doorzwaaien (2), slaan (1), terugveren (3) en weer
+heffen. Kleine materiaalpufjes verschijnen bij
 de slag. Alleen boeren die werkelijk aan een onvoltooid gebouw werken doen dit;
 lopen, stoppen of voltooien beëindigt het bouwgebaar. De beelden blijven plaatselijk:
 er worden geen bouweenheden verplaatst of extra personen toegevoegd.

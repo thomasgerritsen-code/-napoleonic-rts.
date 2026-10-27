@@ -5,7 +5,7 @@
   if(root.__NRTS_SERVER__||!root.NRTS_CONFIG?.mining||root.__BUILDING_PRESENTATION_V1__)return;
   const clamp=n=>Math.max(0,Math.min(1,n)),lerp=(a,b,t)=>a+(b-a)*t;
   const seed=id=>(Math.imul((Number(id)||0)+37,2654435761)>>>0)/4294967296;
-  const cache=new Map(),active=new Map(),byBuilding=new Map(),poses=new WeakMap(),progress=new WeakMap(),rowCache=new WeakMap();
+  const cache=new Map(),active=new Map(),byBuilding=new Map(),poses=new WeakMap(),progress=new WeakMap();
   const budget=6*2**20;let bytes=0,builds=0,hits=0,evictions=0,draws=0,dustDraws=0,created=0,previous=new Set(),current=new Set();
   function stage(b){const p=clamp(b.construction||0);return b.complete?'complete':p<.18?'foundation':p<.52?'frame':p<.82?'walls':'roof';}
   function prepare(allUnits,allBuildings){
@@ -24,16 +24,17 @@
     if(!active.has(u.id))return null;
     let p=poses.get(u);if(!p){p={};poses.set(u,p);}
     const t=(now/(.92+seed(u.id)*.17)+seed(u.id)*5)%1;
-    // Raise, hold, strike, recover. Workers have separate phases rather than
-    // hammering in lockstep, using their existing four directional tool frames.
-    p.frame=t<.14?0:t<.36?1:t<.47?2:t<.61?3:t<.77?2:0;
-    p.contact=t>=.47&&t<.61;p.scaleX=1+Math.sin(t*Math.PI*2)*.012;
+    // The tool frames are 0 raised, 2 halfway, 1 the blow and 3 its rebound. A
+    // stroke holds the hammer up, swings it through, strikes and comes back up;
+    // workers keep their own phase rather than hammering in lockstep.
+    p.frame=t<.34?0:t<.43?2:t<.52?1:t<.6?3:t<.72?2:0;
+    p.contact=t>=.43&&t<.6;p.scaleX=1+Math.sin(t*Math.PI*2)*.012;
     p.scaleY=1-(p.contact?.025:0);p.dx=0;p.dy=p.contact?.7:0;p.phase=t;return p;
   }
   function drawWork(ctx,u,pose,X,Y,z){
     if(!pose?.contact||dustDraws>=24||z<.8)return;
     const b=active.get(u.id);if(!b)return;
-    const side=Math.sign(b.x-u.x)||1,a=(pose.phase-.47)/.14;
+    const side=Math.sign(b.x-u.x)||1,a=(pose.phase-.43)/.17;
     ctx.save();ctx.fillStyle=`rgba(185,166,127,${(1-a)*.38})`;
     for(let i=0;i<2;i++){ctx.beginPath();ctx.ellipse(X+side*(7+i*3)*z,Y-(3+a*7+i*2)*z,(1.5+a*3)*z,(1+a*1.8)*z,0,0,7);ctx.fill();dustDraws++;}
     ctx.restore();
@@ -150,75 +151,148 @@
     for(let i=0;i<420;i++){g.fillStyle=i%2?'rgba(236,225,188,.08)':'rgba(45,43,30,.08)';g.fillRect((i*97%c.width),(i*59%c.height),1+(i%3),.7);}
     g.restore();g.save();g.scale(c.width/256,c.height/224);details(g,type,side);g.restore();
     const result={...prop,image:c};delete result.rows;
-    if(type==='mine'||type==='lumbercamp')result.constructionBottom=.87;
     cache.set(key,{source:prop.image,prop:result,bytes:cost});bytes+=cost;builds++;return result;
   }
-  function rows(prop){
-    if(prop.rows)return prop.rows;
-    const old=rowCache.get(prop.image);if(old){prop.rows=[old[0],Math.min(old[1],prop.constructionBottom||1)];return prop.rows;}
-    const c=document.createElement('canvas');c.width=48;c.height=64;const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(prop.image,0,0,48,64);
-    const data=g.getImageData(0,0,48,64).data,solid=y=>{for(let x=0;x<48;x++)if(data[(y*48+x)*4+3]>180)return true;return false;};
-    let top=0,bottom=63;while(top<63&&!solid(top))top++;while(bottom>top&&!solid(bottom))bottom--;
-    rowCache.set(prop.image,[top/64,(bottom+1)/64]);prop.rows=[top/64,Math.min((bottom+1)/64,prop.constructionBottom||1)];return prop.rows;
-  }
+  // Where each picture stands: its wall footing (left, front and right corner),
+  // the height of its eaves and its ridge, in source pixels from the pivot,
+  // measured on the artwork. The site is laid out on those walls, so pegs,
+  // timber frame, scaffold and rafters stand where the building will stand.
+  const BUILT={
+    house:{walls:[[-174,8],[-41,80],[174,0]],eave:104,ridge:[[-121,-192],[124,-287]]},
+    barracks:{walls:[[-342,-2],[-187,143],[343,-47]],eave:215,ridge:[[-242,-272],[288,-432]]},
+    stable:{walls:[[-255,-31],[-103,116],[252,-16]],eave:130,ridge:[[-198,-256],[197,-366]]},
+    tower:{walls:[[-132,-52],[-57,63],[133,13]],eave:175,ridge:[[3,-367],[3,-367]]},
+    lumbercamp:{walls:[[-66,-16],[21,8],[69,-12]],eave:48,ridge:[[-31,-106],[89,-72]],pad:[[-117,6],[31,49],[114,13]],scaffold:false},
+    // A mine is dug, not built: the adit's timber portal goes in first.
+    mine:{kind:'portal',pad:[[-115,3],[52,39],[117,3]],posts:[[-43,6,-55],[35,6,-55]]},
+    // Field hospital tents: poles (x, top, foot) and the ridge poles between them.
+    hospital_france:{kind:'tent',poles:[[-102,-79,38],[101,-125,-8],[-104,-137,-79],[31,-167,-110]],ridges:[[0,1],[2,3]]},
+    hospital_britain:{kind:'tent',poles:[[-101,-126,-1],[99,-81,21],[17,-159,-81],[149,-129,-51]],ridges:[[0,1],[2,3]]}
+  };
+  BUILT.towncenter=BUILT.barracks;BUILT.foundry=BUILT.stable;
+  const shapeOf=b=>BUILT[b.type+'_'+(b.nativeSide||b.side)]||BUILT[b.type]||null;
+  const mix=(a,b,t)=>[lerp(a[0],b[0],t),lerp(a[1],b[1],t)],up=(q,d)=>[q[0],q[1]-d];
+  const grow=(quad,c,f)=>quad.map(q=>[c[0]+(q[0]-c[0])*f,c[1]+(q[1]-c[1])*f]);
   function construction(g,b,prop,k,X,Y,z){
     draws++;const actual=clamp(b.construction||0),now=performance.now()/1000;
     let shown=progress.get(b);
     if(!shown||actual<shown.p){shown={p:actual,at:now};progress.set(b,shown);}
     const dt=Math.max(0,Math.min(.1,now-shown.at));shown.p+=(actual-shown.p)*(1-Math.exp(-dt/.075));shown.at=now;
-    const p=shown.p,bounds=rows(prop),fw=b.w*z*.62,fh=fw*.5;
+    const p=shown.p,shape=shapeOf(b),kind=shape?.kind||'frame',S=q=>[X+q[0]*k,Y+q[1]*k],u=k;
     const left=X-prop.pivot.x*k,top=Y-prop.pivot.y*k,w=prop.w*k,h=prop.h*k;
-    // Excavation and a stone plinth: no fully formed ghost building at 15%.
-    poly(g,[[X-fw,Y],[X,Y-fh],[X+fw,Y],[X,Y+fh]],'#83734f','rgba(68,61,41,.65)');
-    const rise=clamp((p-.08)/.16)*5*z;
-    poly(g,[[X-fw,Y],[X,Y+fh],[X+fw,Y],[X+fw,Y-rise],[X,Y+fh-rise],[X-fw,Y-rise]],'#a19b80','#6c6d5a');
-    for(let i=1;i<8;i++){const t=i/8;line(g,[X-fw+fw*t,Y+fh*t-rise],[X-fw+fw*t,Y+fh*t],'#666b5a',Math.max(.6,z*.65));line(g,[X+fw*t,Y+fh*(1-t)-rise],[X+fw*t,Y+fh*(1-t)],'#666b5a',Math.max(.6,z*.65));}
-    for(const [x,y]of[[X-fw,Y],[X,Y-fh],[X+fw,Y],[X,Y+fh]]){line(g,[x,y],[x,y-7*z],'#725335',1.8*z);}
-    // The shrinking stacks and their silhouettes are cheap vector work. They
-    // never create canvases indexed by progress, zoom or building instance.
-    if(p<.94){
-      const remaining=1-p;
-      for(let i=0;i<Math.ceil(5*remaining);i++)line(g,[X+fw*.65+i*2*z,Y+fh*.9-i*3*z],[X+fw*.65+24*z+i*2*z,Y+fh*.9-i*3*z-6*z],i%2?'#a4834f':'#715437',3*z);
-      for(let i=0;i<Math.ceil(7*remaining);i++)poly(g,[[X-fw*.8+i%3*5*z,Y+fh*.72-Math.floor(i/3)*4*z],[X-fw*.8+i%3*5*z+5*z,Y+fh*.72-Math.floor(i/3)*4*z-2*z],[X-fw*.8+i%3*5*z+7*z,Y+fh*.72-Math.floor(i/3)*4*z+1*z]],i%2?'#aaa28a':'#8b8a77');
-    }
-    if(p<.18){g.save();g.setLineDash([5*z,4*z]);line(g,[X-fw,Y-5*z],[X,Y+fh-5*z],'#d0bd8a',.8*z);line(g,[X,Y+fh-5*z],[X+fw,Y-5*z],'#d0bd8a',.8*z);g.restore();return;}
-    const fullHeight=h*(bounds[1]-bounds[0]),frameHeight=Math.min(fullHeight*.75,(p-.18)/.34*fullHeight*.75),frontY=Y+fh*.72;
-    // A timber skeleton is visible before the walls and remains as scaffolding.
-    g.save();g.globalAlpha*=1-clamp((p-.92)/.08);
-    const x0=X-fw*.65,x1=X+fw*.94;
-    for(let i=0;i<5;i++){
-      const x=lerp(x0,x1,i/4),base=frontY-i/4*fh*.75;
-      line(g,[x,base],[x,base-frameHeight],'#66482e',2.5*z);
-      line(g,[x-z*.6,base],[x-z*.6,base-frameHeight],'#b2925b',.7*z);
-      if(i<4){const nx=lerp(x0,x1,(i+1)/4),nb=frontY-(i+1)/4*fh*.75;line(g,[x,base-4*z],[nx,nb-frameHeight+6*z],'#8b6a3e',1.2*z);}
-    }
-    for(let level=1;level<=2;level++){
-      const height=frameHeight*level/2;line(g,[x0-3*z,frontY-height],[x1+3*z,frontY-fh*.75-height],'#ae8d54',3*z);
-    }
-    if(p>.5&&p<.94){
-      for(let i=0;i<4;i++){
-        const x=lerp(x0,x1,i/3),base=frontY-i/3*fh*.75-frameHeight;
-        line(g,[x,base],[x-fw*.25,base-fullHeight*.2],'#af8b51',1.5*z);
-        line(g,[x-fw*.25,base-fullHeight*.2],[x-fw*.6,base-fh*.2],'#755734',1.5*z);
+    // The footing: measured, or a plot centred on the pivot for unknown art.
+    let L,F,R;
+    if(shape?.walls)[L,F,R]=shape.walls.map(S);
+    else{const fw=b.w*z*.62;L=[X-fw,Y];F=[X,Y+fw*.5];R=[X+fw,Y];}
+    if(kind==='tent'){const feet=shape.poles.map(q=>S([q[0],q[2]])),xs=feet.map(q=>q[0]),ys=feet.map(q=>q[1]);
+      L=[Math.min(...xs)-14*u,Math.max(...ys)-10*u];R=[Math.max(...xs)+14*u,Math.min(...ys)+10*u];F=[lerp(L[0],R[0],.4),Math.max(...ys)+34*u];}
+    const B=[L[0]+R[0]-F[0],L[1]+R[1]-F[1]],C=mix(L,R,.5),foot=[L,F,R,B];
+    const pad=shape?.pad?(()=>{const [a,f,r]=shape.pad.map(S);return[a,f,r,[a[0]+r[0]-f[0],a[1]+r[1]-f[1]]];})():grow(foot,C,1.14);
+    const eave=(shape?.eave??Math.min(140,prop.h*.3))*k;
+    const out=(a,b2,d)=>{const m=mix(a,b2,.5),dx=m[0]-C[0],dy=m[1]-C[1],l=Math.hypot(dx,dy)||1;return[dx/l*d,dy/l*d];};
+    // 1. The plot: bared earth, a stone plinth rising on the footing, pegs and lines.
+    if(kind==='tent'){g.fillStyle='rgba(122,111,75,.5)';g.beginPath();g.ellipse(C[0],lerp(C[1],F[1],.35),Math.abs(R[0]-L[0])*.62,Math.abs(R[0]-L[0])*.3,0,0,7);g.fill();}
+    else poly(g,pad,'#83734f','rgba(68,61,41,.6)');
+    if(kind==='frame'&&!shape?.pad){
+      const base=grow(foot,C,1.03),rise=clamp((p-.06)/.12)*9*u,[a,f,r,bk]=base;
+      if(rise>0){
+        poly(g,[a,f,up(f,rise),up(a,rise)],'#8f8a72','#5f604f');poly(g,[f,r,up(r,rise),up(f,rise)],'#a19b80','#5f604f');
+        poly(g,base.map(q=>up(q,rise)),'#b4ad91','#6c6d5a');
+        for(let i=1;i<6;i++){const t=i/6;line(g,up(mix(a,f,t),rise),mix(a,f,t),'#666b5a',Math.max(.5,u*1.2));line(g,up(mix(f,r,t),rise),mix(f,r,t),'#666b5a',Math.max(.5,u*1.2));}
       }
     }
-    // Ladder rungs and a little rope hoist give the site depth and scale.
-    const ladderX=x0-7*z,ladderTop=frontY-frameHeight*.9;
-    line(g,[ladderX,frontY+3*z],[ladderX+9*z,ladderTop],'#b18a50',1.3*z);line(g,[ladderX+6*z,frontY+3*z],[ladderX+15*z,ladderTop],'#b18a50',1.3*z);
-    for(let i=1;i<7;i++){const t=i/7;line(g,[ladderX+9*z*t,lerp(frontY+3*z,ladderTop,t)],[ladderX+6*z+9*z*t,lerp(frontY+3*z,ladderTop,t)],'#80633d',1*z);}
-    g.restore();
-    // Reveal the actual walls and roof in staggered courses. Cropped source
-    // draws avoid allocating a mask or resampling-cache entry every frame.
-    for(let i=0;i<4;i++){
-      const q=clamp((p-.26-i*.018)/(.74-i*.018)),cut=bounds[1]-(bounds[1]-bounds[0])*q;
-      if(q<=0)continue;const iw=prop.image.width,ih=prop.image.height;
-      g.drawImage(prop.image,iw*i/4,ih*cut,iw/4,ih*(bounds[1]-cut),left+w*i/4,top+h*cut,w/4,h*(bounds[1]-cut));
+    if(p<.18&&kind==='tent')for(const q of shape.poles)line(g,S([q[0],q[2]]),S([q[0],q[2]-12]),'#725335',Math.max(1,3*u));
+    else if(p<.18){
+      for(const q of foot)line(g,q,up(q,12*u),'#725335',Math.max(1,3*u));
+      g.save();g.setLineDash([5*z,4*z]);for(let i=0;i<4;i++)line(g,up(foot[i],8*u),up(foot[(i+1)%4],8*u),'#d0bd8a',Math.max(.6,.8*z));g.restore();
     }
-    // The front scaffold is drawn over the rising wall, not buried behind it.
-    if(p<.95){g.save();g.globalAlpha*=1-clamp((p-.88)/.07);const deck=frontY-frameHeight*.63;
-      line(g,[x0-3*z,deck],[x1+3*z,deck-fh*.75],'#b39259',2.6*z);
-      for(let i=0;i<3;i++){const x=lerp(x0,x1,i/2),base=frontY-i/2*fh*.75;line(g,[x,base],[x,base-frameHeight],'#715333',1.8*z);}
-      g.restore();}
+    // Materials stacked beside the site, used up as it rises.
+    if(p<.94){
+      const remaining=1-p,o1=out(F,R,30*u),o2=out(L,F,30*u),tp=mix(F,R,.55),sp=mix(L,F,.4);
+      const tx=tp[0]+o1[0],ty=tp[1]+o1[1],sx2=sp[0]+o2[0],sy2=sp[1]+o2[1],dir=[(R[0]-F[0]),(R[1]-F[1])],dl=Math.hypot(...dir)||1;
+      for(let i=0;i<Math.ceil(5*remaining);i++)line(g,[tx+i*3*u,ty-i*5*u],[tx+dir[0]/dl*48*u+i*3*u,ty+dir[1]/dl*48*u-i*5*u],i%2?'#a4834f':'#715437',6*u);
+      if(kind!=='tent')for(let i=0;i<Math.ceil(7*remaining);i++){const x=sx2+(i%3)*10*u,y=sy2-Math.floor(i/3)*8*u;poly(g,[[x,y],[x+10*u,y-4*u],[x+14*u,y+2*u],[x+4*u,y+5*u]],i%2?'#aaa28a':'#8b8a77','#6a6858');}
+      else{g.fillStyle='#d9cfb4';g.beginPath();g.ellipse(sx2,sy2,16*u,7*u,-.3,0,7);g.fill();}
+    }
+    if(p<.18)return;
+    const raise=(i,n)=>clamp((p-.18-i/n*.06)/.14);
+    // 2. Timber behind the art: tent poles, a portal, or a frame on the footing
+    // with its rafters. Walls and roof are revealed over it from the artwork.
+    if(kind==='tent'){
+      const poles=shape.poles.map(q=>({top:S([q[0],q[1]]),foot:S([q[0],q[2]])}));
+      poles.forEach((q,i)=>{const r=raise(i,poles.length);if(r>0)line(g,q.foot,mix(q.foot,q.top,r),'#5e4129',Math.max(1,5*u));});
+      const rp=clamp((p-.34)/.08);if(rp>0)for(const [a,b2]of shape.ridges)line(g,poles[a].top,mix(poles[a].top,poles[b2].top,rp),'#6d4c2f',Math.max(1,4.5*u));
+      if(p>.3)for(const q of poles){const peg=[q.foot[0]+(q.foot[0]-C[0])*.35,q.foot[1]+20*u];line(g,q.top,peg,'rgba(214,201,160,.7)',Math.max(.5,u*1.2));}
+    }else if(kind==='portal'){
+      const posts=shape.posts.map(q=>({foot:S([q[0],q[1]]),top:S([q[0],q[2]])}));
+      posts.forEach((q,i)=>{const r=raise(i,2);if(r>0)line(g,q.foot,mix(q.foot,q.top,r),'#6d4b2b',Math.max(1,9*u));});
+      const lp=clamp((p-.36)/.06);if(lp>0)line(g,up(posts[0].top,3*u),up(mix(posts[0].top,posts[1].top,lp),3*u),'#8a6236',Math.max(1,10*u));
+    }else{
+      const faces=[[L,F],[F,R],[R,B],[B,L]],plate=q=>up(q,eave);
+      faces.forEach(([a,b2],fi)=>{
+        const n=Math.max(2,Math.round(Math.hypot(b2[0]-a[0],b2[1]-a[1])/(70*u)));
+        for(let i=0;i<n;i++){const q=mix(a,b2,i/n),r=raise(fi*n+i,4*n);if(r>0)line(g,q,up(q,eave*r),'#66482e',Math.max(1,5*u));}
+        const gp=clamp((p-.32)/.08),tp=clamp((p-.38)/.08);
+        if(gp>0)line(g,up(a,eave*.5),up(mix(a,b2,gp),eave*.5),'#8b6a3e',Math.max(1,3.5*u));
+        if(tp>0){line(g,plate(a),plate(mix(a,b2,tp)),'#ae8d54',Math.max(1,5*u));line(g,mix(a,b2,.02),up(mix(a,b2,.4*tp),eave*.92),'#8b6a3e',Math.max(.8,3*u));}
+      });
+      if(shape?.ridge){
+        const [A,Z]=shape.ridge.map(S),rp=t=>clamp((p-.72-t*.06)/.08);
+        // Long sides run under the ridge; the gable ends meet at its ends.
+        const sides=[[F,R,A,Z],[L,B,A,Z]];
+        for(const [a,b2,ra,rz]of sides)for(let i=0;i<=4;i++){const t=i/4,q=plate(mix(a,b2,t)),top2=mix(ra,rz,t),r=rp(t);if(r>0)line(g,q,mix(q,top2,r),'#9a7445',Math.max(.8,3.5*u));}
+        for(const [a,end]of[[L,A],[F,A],[R,Z],[B,Z]]){const r=rp(.5);if(r>0)line(g,plate(a),mix(plate(a),end,r),'#9a7445',Math.max(.8,3.5*u));}
+        const ridgeP=clamp((p-.8)/.04);if(ridgeP>0&&Math.hypot(Z[0]-A[0],Z[1]-A[1])>1)line(g,A,mix(A,Z,ridgeP),'#7a5a35',Math.max(1,5*u));
+      }
+    }
+    // 3. The artwork itself, revealed over its own footing: walls course by
+    // course up to the eaves, then the roof; a tent's canvas is drawn over its
+    // poles. One clip path, no mask canvas.
+    const N=24,baseAt=x=>{const pts=kind==='frame'&&shape?.walls?[L,F,R]:[pad[0],pad[1],pad[2]];
+      if(x<=pts[1][0]){const t=clamp((x-pts[0][0])/((pts[1][0]-pts[0][0])||1));return lerp(pts[0][1],pts[1][1],t);}
+      const t=clamp((x-pts[1][0])/((pts[2][0]-pts[1][0])||1));return lerp(pts[1][1],pts[2][1],t);};
+    const below=kind==='frame'&&shape?.walls&&!shape.pad?4*u:12*u;
+    g.save();g.beginPath();
+    if(kind==='tent'){
+      // Canvas goes over the ridge poles whole, not in courses.
+      const q=clamp((p-.45)/.45);g.restore();if(q<=0)return;
+      g.save();g.globalAlpha*=q;g.drawImage(prop.image,left,top+(1-q)*14*u,w,h);g.restore();return;
+    }else{
+      const wallsUp=clamp((p-.5)/.32),roofUp=clamp((p-.84)/.15),allUp=clamp((p-.45)/.53);
+      const walls=kind==='frame';if(walls?wallsUp<=0:allUp<=0){g.restore();return scaffold();}
+      const cutAt=x=>{const base=baseAt(x);if(!walls)return base-(base-top)*allUp;
+        const eaveY=base-eave;return wallsUp<1?base-eave*wallsUp:eaveY-(eaveY-top)*roofUp;};
+      // Until the roof goes on only the walls rise, not the eaves or the shadow beside them.
+      const x0=walls&&roofUp<=0?Math.max(left,L[0]):left,x1=walls&&roofUp<=0?Math.min(left+w,R[0]):left+w;
+      g.moveTo(x0,cutAt(x0));
+      for(let i=1;i<=N;i++){const x=lerp(x0,x1,i/N);g.lineTo(x,cutAt(x));}
+      for(let i=N;i>=0;i--){const x=lerp(x0,x1,i/N);g.lineTo(x,baseAt(x)+below);}
+      g.closePath();
+    }
+    g.clip();g.drawImage(prop.image,left,top,w,h);g.restore();
+    scaffold();
+    // 4. Scaffold in front of the walls going up: standards, ledgers, the
+    // working deck at the course being laid, braces and a ladder up to it.
+    function scaffold(){
+    if(kind!=='frame'||!shape?.walls||p>=.98)return;
+    g.save();g.globalAlpha*=1-clamp((p-.9)/.08);
+    const wallH=eave*clamp((p-.5)/.32),poleH=eave*1.1*clamp((p-.2)/.16),deckH=Math.max(eave*.18,Math.min(eave*.9,wallH-eave*.12));
+    let ladderAt=null;
+    if(shape.scaffold!==false)for(const [a,b2]of[[L,F],[F,R]]){
+      const o=out(a,b2,14*u),A2=[a[0]+o[0],a[1]+o[1]],B2=[b2[0]+o[0],b2[1]+o[1]];
+      const n=Math.max(2,Math.round(Math.hypot(b2[0]-a[0],b2[1]-a[1])/(80*u)));
+      for(let i=0;i<=n;i++){const q=mix(A2,B2,i/n);line(g,q,up(q,poleH),'#715333',Math.max(.8,3.5*u));}
+      for(let lift=eave*.33;lift<=poleH;lift+=eave*.33)line(g,up(A2,lift),up(B2,lift),'#8e7046',Math.max(.6,2.5*u));
+      if(p>.5)line(g,up(A2,deckH),up(B2,deckH),'#b39259',Math.max(1,6*u));
+      if(poleH>eave*.6)line(g,A2,up(mix(A2,B2,.5),Math.min(poleH,eave)),'#7d5d36',Math.max(.6,2*u));
+      if(!ladderAt){const q=mix(A2,B2,.12),lean=out(a,b2,26*u);ladderAt={foot:[q[0]+lean[0],q[1]+lean[1]],top:up(q,p>.5?deckH:Math.min(poleH,eave*.33))};}
+    }
+    if(!ladderAt){const q=mix(L,F,.5),o=out(L,F,30*u);ladderAt={foot:[q[0]+o[0],q[1]+o[1]],top:up(q,Math.min(eave*.9,Math.max(eave*.4,wallH)))};}
+    if(p>.22){const {foot:a,top:t}=ladderAt,sp=6*u;
+      line(g,a,t,'#b18a50',Math.max(.7,2.5*u));line(g,[a[0]+sp,a[1]],[t[0]+sp,t[1]],'#b18a50',Math.max(.7,2.5*u));
+      for(let i=1;i<7;i++){const q=mix(a,t,i/7);line(g,q,[q[0]+sp,q[1]],'#80633d',Math.max(.5,1.6*u));}}
+    g.restore();
+    }
   }
   root.__BUILDING_PRESENTATION_V1__=Object.freeze({prepare,stage,worker,drawWork,decorate,construction,
     inspect:b=>({stage:stage(b),progress:clamp(b.construction||0),builders:byBuilding.get(b.id)||0}),

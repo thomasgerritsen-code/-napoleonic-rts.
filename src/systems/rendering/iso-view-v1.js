@@ -1182,7 +1182,7 @@
     const siteArt=b.type==='mine'?global.__MINING_ART_V1__:b.type==='lumbercamp'?global.__LUMBER_ART_V1__:null;
     if (siteArt) {
       const image=siteArt.sprite(b.type,b.nativeSide||b.side),base={image,w:256,h:224,pivot:{x:128,y:144}},prop=z()>=.85&&!view.overview?buildingPresentation?.decorate(b.type,b.nativeSide||b.side,base)||base:base,k=b.w*z()*1.5/256;
-      return {gpu:b.complete!==false,y:b.y+b.h*.3,box:box(sx(b.x),gy(b.x,b.y),128,144,256,224,k),draw:()=>{
+      return {gpu:b.complete!==false,y:b.y+b.h*.3,cover:b.complete!==false||(b.construction||0)>=.6,box:box(sx(b.x),gy(b.x,b.y),128,144,256,224,k),draw:()=>{
         if(b.complete===false)drawConstruction(b,prop,k);
         else drawScenery(prop.image,sx(b.x)-128*k,gy(b.x,b.y)-144*k,256*k,224*k);
         view.stats.props++;
@@ -1197,7 +1197,8 @@
     // house's miniature footprint would make it a stump next to them).
     const k = b.type === 'tower' ? spriteK() * 0.55 : b.type === 'hospital' ? spriteK() * 0.7 : b.w * z() * 1.45 / prop.w;
     if (b.type === 'tower') towerSmoke(b, prop, k);
-    return { gpu: b.complete !== false, y: b.y + b.h * 0.3, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
+    // A site whose walls are still low hides no one behind it: no see-through yet.
+    return { gpu: b.complete !== false, y: b.y + b.h * 0.3, cover: b.complete !== false || (b.construction || 0) >= 0.6, box: box(sx(b.x), gy(b.x, b.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       if (b.complete === false) { drawConstruction(b, prop, k); view.stats.props++; return; }
       drawScenery(prop.image, sx(b.x) - prop.pivot.x * k, gy(b.x, b.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       if (b.type === 'tower' && b.towerLevel >= 2) {
@@ -1899,7 +1900,7 @@
       const [x0, y0, x1, y1] = d.box, ix = (x1 - x0) * 0.12, iy = (y1 - y0) * 0.08;
       let a = view.overview ? OVERVIEW_ALPHA : 1;
       let covering=false;
-      for (const man of men) { const p=man.unit; if (p.wy < d.y && p.x > x0 + ix && p.x < x1 - ix && p.y > y0 + iy && p.y < y1 - iy) { covering=true; covered.add(man); } }
+      if (d.cover !== false) for (const man of men) { const p=man.unit; if (p.wy < d.y && p.x > x0 + ix && p.x < x1 - ix && p.y > y0 + iy && p.y < y1 - iy) { covering=true; covered.add(man); } }
       if(covering){a=Math.min(a,COVER_ALPHA);st.seeThrough++;}
       ctx.globalAlpha = a; d.draw(); ctx.globalAlpha = 1;
     }
