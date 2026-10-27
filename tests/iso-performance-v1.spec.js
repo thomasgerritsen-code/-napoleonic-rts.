@@ -49,7 +49,8 @@ test('scenery and cloud caches are bounded, reused and invalidated on new battle
  await page.setViewportSize({width:1100,height:720});
  await expect.poll(()=>page.evaluate(()=>window.__ISO_VIEW_V1__.stats().cloudBuilds)).toBeGreaterThan(clouds);
  await page.getByRole('button',{name:'Nieuwe slag',exact:true}).click();
- await page.waitForFunction(()=>window.__ISO_VIEW_V1__.stats().sprites>10);
+ // Since f71f25a both sides start with six workers; the French six are in view.
+ await page.waitForFunction(()=>window.__ISO_VIEW_V1__.stats().sprites>=6);
  expect(errors).toEqual([]);
 });
 test('normal runtime runs queued AI work without piling up a backlog',async({page})=>{
