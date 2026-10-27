@@ -245,7 +245,10 @@ canvas.addEventListener('contextmenu', e => { if (performance.now() < suppressCo
 const moveTowardV05ForV06 = moveToward;
 moveToward = function moveTowardV06(u, tx, ty, dt, speed = TYPES[u.type].speed) {
   if (u.type === 'artillery' && !canArtilleryOperateV06(u)) return false;
-  const d = Math.hypot(tx-u.x,ty-u.y); if (d <= Math.min(5, Math.max(.05, speed * dt))) { u.x=tx; u.y=ty; u.arrivedAtTarget=true; return true; }
+  // A deployed gun settles within 5 px: collision nudges must not keep it creeping
+  // back to its spot (that holds the battery in its travel stance, never firing).
+  const settle = u.type === 'artillery' ? 5 : Math.min(5, Math.max(.05, speed * dt));
+  const d = Math.hypot(tx-u.x,ty-u.y); if (d <= settle) { u.x=tx; u.y=ty; u.arrivedAtTarget=true; return true; }
   u.arrivedAtTarget=false; return moveTowardV05ForV06(u,tx,ty,dt,speed*terrainSpeedMultiplierV06(u));
 };
 resolveUnitOverlaps = function resolveUnitOverlapsV06() {

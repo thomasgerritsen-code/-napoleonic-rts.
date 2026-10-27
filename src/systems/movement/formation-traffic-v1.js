@@ -7,6 +7,9 @@
   const stats={passingPairs:0,bridgePriorityYields:0,cohesionSlowdowns:0,overlapCorrections:0};
   const PASS_TTL=.72;
   const passOffsets=new WeakMap();
+  // A deployed gun (about a ton and a half) is not shoved aside by passing men:
+  // they step round it. Shoving it kept the battery limbering up, never firing.
+  const anchored=x=>(x.type==='worker'&&x.resourceExhaustedStop)||(x.type==='artillery'&&!x.batteryMovingV061);
 
   function regFor(u){return u?.regimentId?getRegiment(u.regimentId):null;}
   function bridgeInfo(reg){
@@ -150,8 +153,9 @@
             const cross=Math.abs(dirA.x*dirB.y-dirA.y*dirB.x);
             if(dot<.55||cross>.42){
               setPassBias(regA,dirA);setPassBias(regB,dirB);stats.passingPairs++;
-              u.x-=nx*overlap*.08;u.y-=ny*overlap*.08;
-              other.x+=nx*overlap*.08;other.y+=ny*overlap*.08;
+              const fixedU=anchored(u),fixedOther=anchored(other);
+              if(!fixedU){const k=fixedOther?.16:.08;u.x-=nx*overlap*k;u.y-=ny*overlap*k;}
+              if(!fixedOther){const k=fixedU?.16:.08;other.x+=nx*overlap*k;other.y+=ny*overlap*k;}
               stats.overlapCorrections++;
               continue;
             }
@@ -161,8 +165,7 @@
         const softCombat=u.side!==other.side&&!!(regA?.engagementV069||regB?.engagementV069);
         const bothSettled=u.arrivedAtTarget&&other.arrivedAtTarget;
         const correction=overlap*(softCombat ? 0.10 : bothSettled ? 0.12 : 0.24);
-        const stoppedU=u.type==='worker'&&u.resourceExhaustedStop;
-        const stoppedOther=other.type==='worker'&&other.resourceExhaustedStop;
+        const stoppedU=anchored(u),stoppedOther=anchored(other);
         if(stoppedU&&!stoppedOther){
           other.x+=nx*correction*2;other.y+=ny*correction*2;
         }else if(stoppedOther&&!stoppedU){
