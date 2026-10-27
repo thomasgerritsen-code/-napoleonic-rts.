@@ -22,7 +22,7 @@
     'rotate-left': 'formatie', 'rotate-right': 'formatie', skirmish: 'formatie',
     'create-regiment': 'regiment', 'reinforce-regiment': 'regiment', 'select-nearby-infantry': 'regiment', 'add-nearest-regiment': 'regiment',
     'toggle-regiment-tap-selection': 'regiment', 'create-cavalry-regiment': 'regiment', 'create-battery': 'regiment', 'crew-gun': 'regiment',
-    'farm-assign': 'werk', 'resume-construction': 'werk', 'set-rally': 'productie', 'tower-upgrade': 'productie',
+    'farm-assign': 'werk', 'mine-assign': 'werk', 'resume-construction': 'werk', 'set-rally': 'productie', 'tower-upgrade': 'productie',
     'quick-regiment': 'regiment', 'quick-regiment-barracks': 'productie', 'train-missing': 'productie', 'auto-regiment': 'productie'
   };
   function groupOf(el) {
@@ -101,6 +101,7 @@
     .actions.menu-v1 button[data-action="build-hospital"]::before{content:"⛺"}
     .actions.menu-v1 button[data-action="build-stable"]::before{content:"🐎"}
     .actions.menu-v1 button[data-action="build-foundry"]::before{content:"🔥"}
+    .actions.menu-v1 button[data-action="build-mine"]::before,.actions.menu-v1 button[data-action="mine-assign"]::before{content:"⛏"}
     .actions.menu-v1 button[data-action="farm-assign"]::before{content:"🧺"}
     .actions.menu-v1 button[data-action="resume-construction"]::before{content:"🔨"}
     .actions.menu-v1 button[data-action="halt"]::before{content:"✋"}

@@ -951,7 +951,7 @@
       // tree, the pickaxe on iron ore, the hoe on a field or a berry patch, the
       // hammer on a building going up.
       if (u.task && u.task !== 'idle' && u.task !== 'return') {
-        const r = u.task === 'gather' ? u.resourceTarget : null, b = u.task === 'build' ? u.buildingTarget : null;
+        const r = u.task === 'gather' || u.task === 'mine' ? u.resourceTarget : null, b = u.task === 'build' ? u.buildingTarget : null;
         const job = b ? 'build' : u.task === 'farm' ? 'farm' : r?.type === 'iron' ? 'mine' : r?.type === 'food' ? 'farm' : 'work';
         const at = r || b, wd = at ? DIRS[dirOf(Math.atan2(at.y - u.y, at.x - u.x))] : d;
         const anim = view.atlases[key]?.byAnim.has(job + '_e') ? job : 'work';
@@ -1174,6 +1174,14 @@
     if (b.dead) return null;
     if (b.side === 'britain' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(b)) return null;
     if (b.type === 'farm') return { y: b.y, draw: () => drawFarm(b) };
+    if (b.type === 'mine' && global.__MINING_ART_V1__) {
+      const image=global.__MINING_ART_V1__.sprite('mine',b.nativeSide||b.side),prop={image,w:256,h:224,pivot:{x:128,y:144}},k=b.w*z()*1.5/256;
+      return {gpu:b.complete!==false,y:b.y+b.h*.3,box:box(sx(b.x),gy(b.x,b.y),128,144,256,224,k),draw:()=>{
+        if(b.complete===false)drawConstruction(b,prop,k);
+        else drawScenery(image,sx(b.x)-128*k,gy(b.x,b.y)-144*k,256*k,224*k);
+        view.stats.props++;
+      }};
+    }
     const base = BUILDING_PROP[b.type] || 'cottage', kind = SIDED_PROPS.has(base) ? base + '_' + ((b.nativeSide || b.side) === 'france' ? 'fr' : 'br') : base;
     const prop = view.props[kind]; if (!prop) return null;
     // Fit the rendered building to the game's footprint (a little larger: the
@@ -1273,6 +1281,11 @@
     view.stats.props++;
   }
   function resourceDrawable(r) {
+    if(r.deposit&&!r.dead&&global.__MINING_ART_V1__){
+      const image=global.__MINING_ART_V1__.sprite(r.amount>0?'deposit':'empty'),k=r.radius*2*z()/256;
+      const h=buildings.some(b=>!b.dead&&b.type==='mine'&&Math.hypot(b.x-r.x,b.y-r.y)<2)?188:224;
+      return {gpu:true,y:r.y-.01,box:box(sx(r.x),gy(r.x,r.y),128,144,256,h,k),draw:()=>{drawScenery(image,0,0,256,h,sx(r.x)-128*k,gy(r.x,r.y)-144*k,256*k,h*k);view.stats.props++;}};
+    }
     if (r.dead || r.amount <= 0) return null;
     if (r.type === 'wood') {
       const kind=tree(['oak', 'beech', 'birch', 'pine', 'spruce', 'oak', 'poplar'][Math.floor(hash(r.id, 3) * 7)]),prop=view.props[kind]; if (!prop) return null;

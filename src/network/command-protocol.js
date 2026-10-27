@@ -18,7 +18,7 @@
     train: d => ['worker','infantry','officer','drummer','cavalry','artillery'].includes(d.unitType) ? {unitType:d.unitType} : null,
     'train-troop': d => ['grenadier','voltigeur','guard','sapper','rifle','cuirassier','lancer','hussar','greys','heavy12','howitzer','horseart','mounted'].includes(d.troop) ? {troop:d.troop} : null,
     'assign-officer': empty,
-    build: d => ['barracks','house','farm','stable','foundry','tower','hospital'].includes(d.buildingType) && finite(d.x) && finite(d.y)
+    build: d => ['barracks','house','farm','stable','foundry','tower','hospital','mine'].includes(d.buildingType) && finite(d.x) && finite(d.y)
       ? {buildingType:d.buildingType, x:d.x, y:d.y} : null,
     'create-regiment': d => ['infantry','cavalry','artillery'].includes(d.kind) ? {kind:d.kind} : null,
     bayonet: empty, charge: empty, 'artillery-mode': empty,
