@@ -132,6 +132,7 @@
     balancedStart: OPEN_MAP ? Object.freeze({ food:1100, wood:1100, iron:100,
       workers:6, infantry:0, cavalry:0 }) : null,
     mining: OPEN_MAP ? Object.freeze({ wood:250, hp:700, depositRadius:80 }) : null,
+    logging: OPEN_MAP ? Object.freeze({ wood:120, hp:500, radius:420, minTrees:3 }) : null,
     territories: OPEN_MAP ? Object.freeze({ captureSeconds:15, radius:160, updateSeconds:.25, minSeparation:1700, searchRadius:240,
       sites:Object.freeze([
         Object.freeze({id:'estate', label:'Noordelijke graanpost', resource:'food', rate:3}),

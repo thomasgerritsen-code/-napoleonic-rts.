@@ -1174,8 +1174,9 @@
     if (b.dead) return null;
     if (b.side === 'britain' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(b)) return null;
     if (b.type === 'farm') return { y: b.y, draw: () => drawFarm(b) };
-    if (b.type === 'mine' && global.__MINING_ART_V1__) {
-      const image=global.__MINING_ART_V1__.sprite('mine',b.nativeSide||b.side),prop={image,w:256,h:224,pivot:{x:128,y:144}},k=b.w*z()*1.5/256;
+    const siteArt=b.type==='mine'?global.__MINING_ART_V1__:b.type==='lumbercamp'?global.__LUMBER_ART_V1__:null;
+    if (siteArt) {
+      const image=siteArt.sprite(b.type,b.nativeSide||b.side),prop={image,w:256,h:224,pivot:{x:128,y:144}},k=b.w*z()*1.5/256;
       return {gpu:b.complete!==false,y:b.y+b.h*.3,box:box(sx(b.x),gy(b.x,b.y),128,144,256,224,k),draw:()=>{
         if(b.complete===false)drawConstruction(b,prop,k);
         else drawScenery(image,sx(b.x)-128*k,gy(b.x,b.y)-144*k,256*k,224*k);
