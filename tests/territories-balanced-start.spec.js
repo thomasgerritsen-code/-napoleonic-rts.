@@ -13,7 +13,9 @@ test('balanced authoritative starts, fair supply positions, capture and conteste
     roster:initial[side].state.units.map(u=>({type:u.type,troop:u.troop||null,hp:u.hp,maxHp:u.maxHp,task:u.task})).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))),
     building:initial[side].state.buildings.map(b=>({type:b.type,hp:b.hp,maxHp:b.maxHp,complete:b.complete}))}]));
    const zones=__TERRITORIES__.state(),homes=['france','britain'].map(side=>buildings.find(b=>b.type==='towncenter'&&b.side===side));
-   const placements=zones.points.map(p=>({dry:!waterAtV067(p.x,p.y),gap:Math.abs(Math.hypot(p.x-homes[0].x,p.y-homes[0].y)-Math.hypot(p.x-homes[1].x,p.y-homes[1].y))}));
+   const placements=zones.points.map(p=>({dry:!waterAtV067(p.x,p.y),open:__UNIT_PLACEMENT__.clear(p,'cavalry'),gap:Math.abs(Math.hypot(p.x-homes[0].x,p.y-homes[0].y)-Math.hypot(p.x-homes[1].x,p.y-homes[1].y))}));
+   const separation=Math.min(...zones.points.flatMap((p,i)=>zones.points.slice(i+1).map(q=>Math.hypot(p.x-q.x,p.y-q.y))));
+   const frontSpan=zones.points[2].y-zones.points[0].y;
    const move=(u,p)=>{Object.assign(u,{x:p.x,y:p.y,targetX:p.x,targetY:p.y,reload:99999});};
    const f=units.find(u=>u.side==='france'&&u.type==='infantry'),b=units.find(u=>u.side==='britain'&&u.type==='infantry');
    move(f,zones.points[0]);move(b,zones.points[2]);
@@ -23,11 +25,13 @@ test('balanced authoritative starts, fair supply positions, capture and conteste
    move(f,{x:zones.points[0].x+500,y:zones.points[0].y});advance(15);const recaptured=read();advance(1);const britishIncome=read();
    const pausedBefore=JSON.stringify(read());api.advance([],false,true,.25);const pausedSame=JSON.stringify(read())===pausedBefore;
    resetGame();const reset={zones:__TERRITORIES__.state(),counts:['france','britain'].map(side=>units.filter(u=>u.side===side&&!u.dead).length),economies:JSON.parse(JSON.stringify(economies))};
-   return{start,placements,before,captured,earned,contested,recaptured,britishIncome,pausedSame,reset};
+   return{start,placements,separation,frontSpan,before,captured,earned,contested,recaptured,britishIncome,pausedSame,reset};
   });
   expect(result.start.france).toEqual(result.start.britain);expect(result.start.france.economy).toEqual({food:1100,wood:1100,iron:100,popCap:45});
   expect(result.start.france.roster).toHaveLength(25);expect(result.start.france.roster.filter(u=>u.type==='officer'&&u.troop==='mounted')).toHaveLength(1);
-  expect(result.start.france.roster.every(u=>u.task===null)).toBe(true);for(const p of result.placements){expect(p.dry).toBe(true);expect(p.gap).toBeLessThan(.001);}
+  expect(result.start.france.roster.every(u=>u.task===null)).toBe(true);for(const p of result.placements){expect(p.dry).toBe(true);expect(p.open).toBe(true);expect(p.gap).toBeLessThan(.001);}
+  expect(result.separation).toBeGreaterThanOrEqual(1700);expect(result.frontSpan).toBeGreaterThan(3500);
+  console.log('SUPPLY_FRONTS',JSON.stringify({placements:result.placements,separation:result.separation,frontSpan:result.frontSpan}));
   expect(result.before.points.every(p=>p.owner===null)).toBe(true);
   expect(result.captured.france.state.territories.points.map(p=>p.owner)).toEqual(['france',null,'britain']);
   expect(result.captured.france.state.territories).toEqual(result.captured.britain.state.territories);
@@ -71,7 +75,9 @@ test('two real online players capture supplies by movement orders, see canonical
    const move=(u,p,dx)=>Object.assign(u,{x:p.x+dx,y:p.y,targetX:p.x+dx,targetY:p.y,reload:99999});
    move(units.find(u=>u.type==='infantry'&&u.side==='france'),points[0],230);
    move(units.find(u=>u.type==='infantry'&&u.side==='britain'),points[2],230);
-   move(units.find(u=>u.type==='cavalry'&&u.side==='britain'),points[0],400);
+   // Stage the challenger on the other side: placing it only 170 units from
+   // the first capturer makes that infantry stop to aim before entering the post.
+   move(units.find(u=>u.type==='cavalry'&&u.side==='britain'),points[0],-400);
   });
   return{close:()=>c.close(),advance:(commands,running,snapshot,seconds,epochs)=>sim.evaluate(a=>JSON.parse(JSON.stringify(__ONLINE_SIM_V1__.advanceTransport(a.commands,a.running,a.snapshot,a.seconds,a.epochs))),{commands,running,snapshot,seconds,epochs})};
  }};

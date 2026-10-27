@@ -67,14 +67,18 @@ of textures aangemaakt.
 
 ## Grondstofgebieden
 
-Drie neutrale vlaggen liggen op gelijke afstand van beide hoofdkwartieren.
+Drie neutrale bevoorradingsposten liggen verspreid over het noordelijke, centrale
+en zuidelijke front, op gelijke afstand van beide hoofdkwartieren. De plaatsen
+volgen de grootte van de kaart, liggen ten minste 1700 kaarteenheden uit elkaar
+en zoeken vrij, droog terrein bij aanvoerroutes. Het zijn logistieke posten;
+ze hoeven niet naast een echt landgoed, bos of mijn te liggen.
 Stuur gevechtseenheden naar een vlag en houd die 15 seconden vast:
 
 | Gebied | Opbrengst voor de eigenaar |
 | --- | --- |
-| Landgoed | 3 voedsel per seconde |
-| Houtkamp | 2 hout per seconde |
-| IJzermijn | 1 ijzer per seconde |
+| Noordelijke graanpost | 3 voedsel per seconde |
+| Centraal houtdepot | 2 hout per seconde |
+| Zuidelijk ijzerdepot | 1 ijzer per seconde |
 
 Boeren, officieren, drummers, dode en vluchtende eenheden veroveren niet.
 Bij troepen van beide partijen stopt het veroveren én de opbrengst. Als

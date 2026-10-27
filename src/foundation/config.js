@@ -131,11 +131,11 @@
         Object.freeze({ label:'Versterkt', cost:Object.freeze({ wood:160, iron:40 }), seconds:14, damage:0.28, shock:0.25 })]) }) : null,
     balancedStart: OPEN_MAP ? Object.freeze({ food:1100, wood:1100, iron:100,
       workers:6, infantry:12, cavalry:4 }) : null,
-    territories: OPEN_MAP ? Object.freeze({ captureSeconds:15, radius:160, updateSeconds:.25, spacing:900,
+    territories: OPEN_MAP ? Object.freeze({ captureSeconds:15, radius:160, updateSeconds:.25, minSeparation:1700, searchRadius:240,
       sites:Object.freeze([
-        Object.freeze({id:'estate', label:'Landgoed', resource:'food', rate:3, offset:-1}),
-        Object.freeze({id:'lumber', label:'Houtkamp', resource:'wood', rate:2, offset:0}),
-        Object.freeze({id:'mine', label:'IJzermijn', resource:'iron', rate:1, offset:1})]) }) : null,
+        Object.freeze({id:'estate', label:'Noordelijke graanpost', resource:'food', rate:3}),
+        Object.freeze({id:'lumber', label:'Centraal houtdepot', resource:'wood', rate:2}),
+        Object.freeze({id:'mine', label:'Zuidelijk ijzerdepot', resource:'iron', rate:1})]) }) : null,
     // Combat honours belong to the regiment and survive reinforcement.
     regimentExperience: OPEN_MAP ? Object.freeze({ ranks:Object.freeze([
       Object.freeze({ label:'Recruut', victories:0, damage:1, shock:1 }),

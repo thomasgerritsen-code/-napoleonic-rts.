@@ -6,24 +6,16 @@
   let model, latest, remote = null, clock = 0, renderUI = () => {};
   function sites() {
     const a = buildings.find(b=>b.type==='towncenter'&&b.side==='france'), b = buildings.find(b=>b.type==='towncenter'&&b.side==='britain');
-    const mid = {x:(a.x+b.x)/2,y:(a.y+b.y)/2}, dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
-    const placed=[];
-    for (const site of cfg.sites) {
-      let point;
-      // Remain on the perpendicular bisector: each post is equally distant
-      // from both headquarters. Search along that line for dry, open ground.
-      for (let i=0;i<61;i++) {
-        const shift=(i%2?1:-1)*Math.ceil(i/2)*24, t=site.offset*cfg.spacing+shift;
-        const p={x:mid.x-dy/len*t,y:mid.y+dx/len*t};
-        if(p.x<100||p.y<100||p.x>WORLD.width-100||p.y>WORLD.height-100||waterAtV067(p.x,p.y))continue;
-        const open=root.__VILLAGE_NAVIGATION_V7__?.nearestOpenPoint(p,'infantry')||p;
-        if(Math.hypot(open.x-p.x,open.y-p.y)>2||placed.some(q=>Math.hypot(q.x-p.x,q.y-p.y)<cfg.radius*2+80))continue;
-        point={...site,x:p.x,y:p.y};break;
+    return root.NRTS_TERRITORY_PLACEMENT.place({...cfg,homes:[a,b],world:WORLD,
+      isOpen:p=>!crossingAtV067(p.x,p.y)&&[[0,0],[55,0],[-55,0],[0,55],[0,-55]].every(([dx,dy])=>
+        root.__UNIT_PLACEMENT__.clear({x:p.x+dx,y:p.y+dy},'cavalry')),
+      roadDistance:p=>{
+        let nearest=Infinity;
+        for(const road of root.NRTS_ROAD_NETWORK_V7||ROAD_NETWORK_V066)
+          for(let i=1;i<road.points.length;i++)nearest=Math.min(nearest,closestPointOnSegmentV066(p.x,p.y,road.points[i-1],road.points[i]).distance);
+        return Number.isFinite(nearest)?nearest:0;
       }
-      if(!point)throw Error('Geen veilig terrein voor '+site.label);
-      placed.push(point);
-    }
-    return placed;
+    });
   }
   function reset() { model=root.NRTS_TERRITORY_STATE.create(sites(),cfg); latest=model.state(); remote=null;clock=0;renderUI(); }
   const state=()=>root.__ONLINE_MATCH_V1__?.active?(remote||latest):latest;
@@ -66,7 +58,7 @@
   const button=document.createElement('button');button.type='button';button.id='territoriesButton';button.setAttribute('aria-haspopup','dialog');
   document.querySelector('.topbar').appendChild(button);
   const dialog=document.createElement('dialog');dialog.id='territoriesPanel';dialog.setAttribute('aria-labelledby','territoriesTitle');
-  dialog.innerHTML='<button type="button" id="territoriesClose">Sluiten</button><h2 id="territoriesTitle">Gebieden veroveren</h2><p>Stuur soldaten naar een vlag en houd het gebied 15 seconden vast. Alleen gevechtseenheden tellen mee.</p><p>Bij vijandelijke aanwezigheid stopt de opbrengst. Zonder soldaten blijft een veroverd gebied van jou.</p>';
+  dialog.innerHTML='<button type="button" id="territoriesClose">Sluiten</button><h2 id="territoriesTitle">Bevoorradingsposten</h2><p>De drie posten liggen verspreid over het noordelijke, centrale en zuidelijke front. Elke post verzekert de aanvoer van voedsel, hout of ijzer.</p><p>Stuur soldaten naar een vlag en houd het gebied 15 seconden vast. Alleen gevechtseenheden tellen mee.</p><p>Bij vijandelijke aanwezigheid stopt de opbrengst. Zonder soldaten blijft een veroverd gebied van jou.</p>';
   document.body.appendChild(dialog);button.onclick=()=>{renderUI();dialog.showModal();};dialog.querySelector('#territoriesClose').onclick=()=>dialog.close();
   const names={france:'Frankrijk',britain:'Groot-Brittannië'},icons={food:'🍞',wood:'🪵',iron:'⛏️'},cards=new Map();
   for(const p of latest.points){
