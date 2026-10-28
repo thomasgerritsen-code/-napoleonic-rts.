@@ -1380,7 +1380,8 @@ test('iso view: peasants hoe the field, swing a pick at the ore and hammer at a 
     const mk = (x, y) => createUnit('france', 'worker', x, y);
     window.__jobs = {};
     window.__sites = [0.08, 0.5].map((c, i) => { const b = createBuilding('france', 'barracks', x0 + i * 130, y0, false); b.construction = c; b.complete = false; return b; });
-    const builder = mk(x0 - 50, y0 + 10); builder.task = 'build'; builder.buildingTarget = window.__sites[1]; window.__jobs.build = builder.id;
+    // Only a peasant at the site hammers (building-presentation): stand him at its wall.
+    const site = window.__sites[1], builder = mk(site.x - site.w * 0.6, site.y + 10); builder.task = 'build'; builder.buildingTarget = window.__sites[1]; window.__jobs.build = builder.id;
     const farm = createBuilding('france', 'farm', x0 + 60, y0 + 150, true);
     const farmer = mk(farm.x, farm.y); farmer.task = 'farm'; farmer.farmId = farm.id; window.__jobs.farm = farmer.id;
     const miner = mk(x0 + 280, y0 + 160); miner.task = 'gather'; miner.resourceTarget = { type: 'iron', x: x0 + 300, y: y0 + 150 }; window.__jobs.mine = miner.id;
