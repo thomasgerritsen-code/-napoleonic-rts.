@@ -10,6 +10,8 @@ async function open(page,server=false){
 for(const type of ['infantry','cavalry'])test(`${type}: only some running chargers fall, remain alive, recover and resume their order`,async({page})=>{
  const errors=await open(page);
  const r=await page.evaluate(type=>{
+  // Fallers are chosen by unit id; pin the ids so the starting army can't shift them.
+  if(nextId>10000)throw Error('ids already past 10000');nextId=10000;
   const group=Array.from({length:36},(_,i)=>{
    const u=createUnit('france',type,3900,1500+i*25);u.targetX=4700;u.targetY=u.y;u.chargeTimer=7;u.morale=100;return u;
   });
@@ -41,6 +43,8 @@ test('ordinary marching and stationary charges never fall',async({page})=>{
 test('a fallen regiment member keeps its membership and catches up without being pushed while down',async({page})=>{
  const errors=await open(page);
  const r=await page.evaluate(()=>{
+  // Fallers are chosen by unit id; pin the ids so the starting army can't shift them.
+  if(nextId>10000)throw Error('ids already past 10000');nextId=10000;
   const men=Array.from({length:24},()=>createUnit('france','infantry',3900,1800));
   const reg=createRegiment('france',[...men,createUnit('france','officer',3900,1800),createUnit('france','drummer',3900,1800)]);
   arrangeFacingRegimentV146(reg,3900,1800,'line',0);
@@ -59,6 +63,8 @@ test('a fallen regiment member keeps its membership and catches up without being
 test('a fallen charger shows fall and rise frames and cannot attack',async({page})=>{
  const errors=await open(page);
  const r=await page.evaluate(()=>{
+  // Fallers are chosen by unit id; pin the ids so the starting army can't shift them.
+  if(nextId>10000)throw Error('ids already past 10000');nextId=10000;
   const group=Array.from({length:36},(_,i)=>{const u=createUnit('france','cavalry',3900,1500+i*25);u.targetX=4700;u.targetY=u.y;u.chargeTimer=7;return u;});
   let u;
   for(let i=0;i<240&&!u;i++){RTS_SIM.step(1/60);u=group.find(q=>__CHARGE_STUMBLE_V1__.down(q));}
