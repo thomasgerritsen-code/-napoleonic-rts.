@@ -148,6 +148,7 @@
   // ---------- Loop ----------
   // Regression pages advance the simulation explicitly via tick()/RTS_SIM.step().
   // The top-down 2D renderer is the sole active battlefield display.
+  const ISO_VIEW_PENDING = () => /(?:^|[?&])view=iso(?:&|$)/.test(location.search) && !window.__ISO_VIEW_V1__;
   function frame(now) {
     // The dedicated simulation is stepped by its server clock and never draws.
     if (window.__NRTS_SERVER__) return;
@@ -167,7 +168,9 @@
     };
     try {
       if (typeof window.renderStableFrameV1 === 'function') window.renderStableFrameV1(() => draw(), now);
-      else draw();
+      // With ?view=iso the iso view draws everything; until it has loaded, a 2D
+      // frame would only paint canvases it hides (its fog alone is ~150 ms).
+      else if (!ISO_VIEW_PENDING()) draw();
     } finally {
       // Direct draw() calls in deterministic regression tests still read elapsed.
       window.__NRTS_RENDER_CLOCK_V312__ = null;

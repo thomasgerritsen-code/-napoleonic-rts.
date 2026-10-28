@@ -51,6 +51,17 @@
     const qx=ax+t*dx,qy=ay+t*dy,ex=px-qx,ey=py-qy;
     return ex*ex+ey*ey;
   }
+  // Each road's bounding box, kept per points array (rebuilt if its length changes).
+  const roadBoxes=new WeakMap();
+  function roadBox(points){
+    let box=roadBoxes.get(points);
+    if(!box||box.n!==points.length){
+      box={n:points.length,x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity};
+      for(const p of points){box.x0=Math.min(box.x0,p.x);box.y0=Math.min(box.y0,p.y);box.x1=Math.max(box.x1,p.x);box.y1=Math.max(box.y1,p.y);}
+      roadBoxes.set(points,box);
+    }
+    return box;
+  }
   function roadConflictAt(x,y,radius=0,padding=roadPadding){
     const rr=Math.max(0,Number(radius)||0);
     const pad=Math.max(0,Number(padding)||0);
@@ -59,6 +70,8 @@
       const halfWidth=Math.max(9,Number(road?.width)||9)*.5;
       const clearance=halfWidth+rr+pad;
       const clearanceSq=clearance*clearance;
+      // Farther than the clearance from the road's box: no segment of it can be near.
+      if(points.length>1){const box=roadBox(points);if(x<box.x0-clearance||x>box.x1+clearance||y<box.y0-clearance||y>box.y1+clearance)continue;}
       for(let i=1;i<points.length;i++){
         const a=points[i-1],b=points[i];
         if(pointSegmentDistanceSq(x,y,a.x,a.y,b.x,b.y)<=clearanceSq)return true;
@@ -91,10 +104,24 @@
       return Math.abs(x-b.x)<hw && Math.abs(y-b.y)<hh;
     });
   }
+  // Each village's houses' box grown by their largest radius (per houses array).
+  const villageBoxes=new WeakMap();
+  function villageBox(houses){
+    let box=villageBoxes.get(houses);
+    if(!box||box.n!==houses.length){
+      box={n:houses.length,x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity,r:0};
+      for(const h of houses){box.x0=Math.min(box.x0,h.x);box.y0=Math.min(box.y0,h.y);box.x1=Math.max(box.x1,h.x);box.y1=Math.max(box.y1,h.y);box.r=Math.max(box.r,houseRadius(h));}
+      villageBoxes.set(houses,box);
+    }
+    return box;
+  }
   function villageHouseConflict(type,x,y){
     const rr=resourceRadius(type);
     for(const village of villageData()){
-      for(const h of village.houses||[]){
+      const houses=village.houses||[];
+      // A village whose houses are all out of reach is not walked house by house.
+      if(houses.length){const box=villageBox(houses),reach=rr+box.r+villageHousePadding+1;if(x<box.x0-reach||x>box.x1+reach||y<box.y0-reach||y>box.y1+reach)continue;}
+      for(const h of houses){
         if(Math.hypot(x-h.x,y-h.y)<rr+houseRadius(h)+villageHousePadding)return true;
       }
     }
@@ -115,8 +142,53 @@
       return Math.hypot(x-e.x,y-e.y)<=e.radius;
     });
   }
+  // During this module's own bulk placements (normalising, seeding berries) the
+  // resources are kept in a grid of cells, grown as resources are added and
+  // told of every move this module makes; a conflict then looks only at the
+  // cells within reach (the test itself is unchanged). Outside those placements
+  // - other modules may move resources - every resource is checked as before.
+  const RES_CELL=96;
+  let resGrid=new Map(),resIndexed=0,resLast=null,resFirst=null,resMaxRadius=0,gridDepth=0;
+  function withResourceGrid(fn){
+    if(gridDepth++===0){resGrid=new Map();resIndexed=0;resMaxRadius=0;}
+    try{return fn();}finally{gridDepth--;}
+  }
+  function resourceGrid(){
+    if(!gridDepth)return null;
+    if(resources.length<resIndexed||(resIndexed&&(resources[resIndexed-1]!==resLast||resources[0]!==resFirst))){resGrid=new Map();resIndexed=0;resMaxRadius=0;}
+    for(;resIndexed<resources.length;resIndexed++){
+      const r=resources[resIndexed];if(!r||!Number.isFinite(r.x)||!Number.isFinite(r.y)){resGrid=null;break;}
+      const key=Math.floor(r.x/RES_CELL)*100003+Math.floor(r.y/RES_CELL);
+      let cell=resGrid.get(key);if(!cell)resGrid.set(key,cell=[]);cell.push(r);
+      resMaxRadius=Math.max(resMaxRadius,resourceRadius(r.type));
+    }
+    if(!resGrid){resGrid=new Map();resIndexed=0;return null;}
+    resLast=resources[resIndexed-1]||null;resFirst=resources[0]||null;
+    return resGrid;
+  }
+  // A resource moved in place (normalizeExistingResources) changes cell.
+  function resourceMoved(r,oldX,oldY){
+    if(!resGrid||!resIndexed)return;
+    const oldKey=Math.floor(oldX/RES_CELL)*100003+Math.floor(oldY/RES_CELL),cell=resGrid.get(oldKey),i=cell?cell.indexOf(r):-1;
+    if(i<0){resGrid=new Map();resIndexed=0;resMaxRadius=0;return;}
+    cell.splice(i,1);
+    const key=Math.floor(r.x/RES_CELL)*100003+Math.floor(r.y/RES_CELL);
+    let next=resGrid.get(key);if(!next)resGrid.set(key,next=[]);next.push(r);
+  }
   function resourceConflict(type,x,y,ignore=null){
-    const rr=resourceRadius(type);
+    const rr=resourceRadius(type),grid=resourceGrid();
+    if(grid){
+      const reach=rr+resMaxRadius+resourceGap,cx0=Math.floor((x-reach)/RES_CELL),cx1=Math.floor((x+reach)/RES_CELL),cy0=Math.floor((y-reach)/RES_CELL),cy1=Math.floor((y+reach)/RES_CELL);
+      for(let cx=cx0;cx<=cx1;cx++)for(let cy=cy0;cy<=cy1;cy++){
+        const cell=grid.get(cx*100003+cy);if(!cell)continue;
+        for(const r of cell){
+          if(!r||r.dead||r===ignore)continue;
+          const other=resourceRadius(r.type);
+          if(Math.hypot(x-r.x,y-r.y)<rr+other+resourceGap)return true;
+        }
+      }
+      return false;
+    }
     for(const r of resources){
       if(!r||r.dead||r===ignore)continue;
       const other=resourceRadius(r.type);
@@ -195,7 +267,8 @@
   // Initial resources are generated before Architecture-v2 world systems load. Normalize
   // them once and keep the same gameplay resource objects/amounts.
   let relocated=0,removed=0,roadRelocated=0,resetRelocated=0;
-  function normalizeExistingResources(isReset=false){
+  function normalizeExistingResources(isReset=false){return withResourceGrid(()=>normalizeExistingResourcesNow(isReset));}
+  function normalizeExistingResourcesNow(isReset=false){
     let moved=0;
     for(const r of [...resources]){
       if(!r||r.dead)continue;
@@ -206,7 +279,9 @@
         moved++;relocated++;
         if(startedOnRoad)roadRelocated++;
       }
+      const oldX=r.x,oldY=r.y;
       r.x=safe.x;r.y=safe.y;
+      if(oldX!==r.x||oldY!==r.y)resourceMoved(r,oldX,oldY);
       stampResource(r,r.type);
     }
     if(isReset)resetRelocated+=moved;
@@ -271,7 +346,8 @@
   // locations. Search a small ring around each site and reject roads, rivers,
   // village houses, buildings and other resources before creating an object.
   // Generate once per battle; depleted bushes do not respawn mid-battle.
-  function ensureCountrysideBerries(){
+  function ensureCountrysideBerries(){return withResourceGrid(()=>ensureCountrysideBerriesNow());}
+  function ensureCountrysideBerriesNow(){
     if(countrysideSeededEpoch===berrySeedEpoch)return 0;
     let added=0;
     for(let siteIndex=0;siteIndex<countrysideSites.length;siteIndex++){
@@ -310,7 +386,8 @@
         bushes.filter(r=>r.countrysideBerryPatch===i+1).length)
     };
   }
-  function ensureBaseVillageBerries(){
+  function ensureBaseVillageBerries(){return withResourceGrid(()=>ensureBaseVillageBerriesNow());}
+  function ensureBaseVillageBerriesNow(){
     let added=0;
     for(const tc of townCenters()){
       const anchor=nearestVillageForTownCenter(tc);

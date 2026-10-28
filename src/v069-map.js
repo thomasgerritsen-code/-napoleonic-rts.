@@ -15,34 +15,55 @@ function randV069(state) {
   return state.value / 4294967296;
 }
 
+// The segment of this road nearest to (x, y). The same sums as
+// closestPointOnSegmentV066, without an object per segment: map generation asks
+// this hundreds of thousands of times, and the garbage was most of its cost.
 function roadGeometryV069(road, x, y) {
+  const pts = road.points;
+  let bi = -1, bd = 0, bx = 0, by = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], vx = b.x - a.x, vy = b.y - a.y, len2 = vx * vx + vy * vy;
+    let hx, hy, d;
+    if (len2 <= .0001) { hx = a.x; hy = a.y; d = Math.hypot(x - a.x, y - a.y); }
+    else { const t = clampV066(((x - a.x) * vx + (y - a.y) * vy) / len2, 0, 1); hx = a.x + vx * t; hy = a.y + vy * t; d = Math.hypot(x - hx, y - hy); }
+    if (bi < 0 || d < bd) { bi = i; bd = d; bx = hx; by = hy; }
+  }
+  if (bi < 0) return null;
+  const a = pts[bi - 1], b = pts[bi], len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  return { road, segmentIndex:bi - 1, distance:bd, edgeClearance:bd - road.width / 2,
+    tx:(b.x - a.x) / len, ty:(b.y - a.y) / len, px:bx, py:by };
+}
+
+// Each road's bounding box (kept per points array; rebuilt if it changes length).
+const roadBoxesV069 = new WeakMap();
+function roadBoxV069(road) {
+  const pts = road.points;
+  let box = roadBoxesV069.get(pts);
+  if (!box || box.n !== pts.length) {
+    box = { n:pts.length, x0:Infinity, y0:Infinity, x1:-Infinity, y1:-Infinity };
+    for (const p of pts) { box.x0 = Math.min(box.x0, p.x); box.y0 = Math.min(box.y0, p.y); box.x1 = Math.max(box.x1, p.x); box.y1 = Math.max(box.y1, p.y); }
+    roadBoxesV069.set(pts, box);
+  }
+  return box;
+}
+// The road geometry with the least edge clearance among these roads (the first
+// on a tie), as a plain loop over roadGeometryV069 finds it. A road whose box is
+// already farther than the best clearance found cannot win and is not walked.
+function nearestRoadGeometryAmongV069(roads, x, y) {
   let best = null;
-  for (let i = 1; i < road.points.length; i++) {
-    const a = road.points[i - 1], b = road.points[i];
-    const hit = closestPointOnSegmentV066(x, y, a, b);
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    const candidate = {
-      road,
-      segmentIndex:i - 1,
-      distance:hit.distance,
-      edgeClearance:hit.distance - road.width / 2,
-      tx:(b.x - a.x) / len,
-      ty:(b.y - a.y) / len,
-      px:hit.x,
-      py:hit.y
-    };
-    if (!best || candidate.distance < best.distance) best = candidate;
+  for (const road of roads) {
+    if (best) {
+      const box = roadBoxV069(road), dx = Math.max(box.x0 - x, 0, x - box.x1), dy = Math.max(box.y0 - y, 0, y - box.y1);
+      if (Math.hypot(dx, dy) - road.width / 2 > best.edgeClearance + 1e-6) continue;
+    }
+    const geometry = roadGeometryV069(road, x, y);
+    if (geometry && (!best || geometry.edgeClearance < best.edgeClearance)) best = geometry;
   }
   return best;
 }
 
 function nearestRoadGeometryV069(x, y) {
-  let best = null;
-  for (const road of ROAD_NETWORK_V066) {
-    const geometry = roadGeometryV069(road, x, y);
-    if (geometry && (!best || geometry.edgeClearance < best.edgeClearance)) best = geometry;
-  }
-  return best;
+  return nearestRoadGeometryAmongV069(ROAD_NETWORK_V066, x, y);
 }
 
 function roadsAtJunctionV069(h) {
