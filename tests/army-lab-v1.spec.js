@@ -38,6 +38,13 @@ test('start menu opens the test field, which sets up armies of any size', async 
 
   await page.click('[data-action=clear]');
   expect(await page.evaluate(() => units.filter(u => !u.dead).length)).toBe(0);
+  // Fog of war can be switched on to compare: the British are hidden again.
+  await page.click('[data-preset=klein]');
+  await page.click('[data-action=setup]');
+  await page.click('[data-fog]');
+  expect(await page.evaluate(() => units.filter(u => !u.dead && u.side === 'britain').some(u => !isVisibleToFrance(u)))).toBe(true);
+  await page.click('[data-fog]');
+  expect(await page.evaluate(() => units.filter(u => !u.dead && u.side === 'britain').every(u => isVisibleToFrance(u)))).toBe(true);
   await page.click('[data-ai]');
   expect(await page.evaluate(() => v05PeaceMode)).toBe(false);
   expect(errors).toEqual([]);

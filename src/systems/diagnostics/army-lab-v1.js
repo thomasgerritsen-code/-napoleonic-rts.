@@ -13,7 +13,7 @@
   const PRESETS={klein:{infantry:2,cavalry:0,artillery:0},middel:{infantry:6,cavalry:2,artillery:2},
     groot:{infantry:12,cavalry:4,artillery:4},enorm:{infantry:20,cavalry:6,artillery:6}};
   const LIMITS={infantry:24,cavalry:8,artillery:8};
-  const config={france:{...PRESETS.middel},britain:{...PRESETS.middel},men:24,aiBritain:false};
+  const config={france:{...PRESETS.middel},britain:{...PRESETS.middel},men:24,aiBritain:false,fog:false};
   const stats={setups:0,lastPlaced:0};
 
   // Nobody wins or loses here: the field stays open until the player leaves.
@@ -26,9 +26,10 @@
   const SIGHT=Math.hypot(WORLD.width,WORLD.height);
   let explored=false;
   const baseSources=frenchVisionSources,baseRadius=visionRadius;
-  frenchVisionSources=function labVisionSources(){const list=baseSources.apply(this,arguments);if(!explored||!marking)list.unshift(WATCHER);return list;};
+  frenchVisionSources=function labVisionSources(){const list=baseSources.apply(this,arguments);if(!config.fog&&(!explored||!marking))list.unshift(WATCHER);return list;};
   visionRadius=function labVisionRadius(entity){return entity===WATCHER?SIGHT:baseRadius.apply(this,arguments);};
-  isVisibleToFrance=function labAllVisible(){return true;};
+  const baseVisible=isVisibleToFrance;
+  isVisibleToFrance=function labAllVisible(){return config.fog?baseVisible.apply(this,arguments):true;};
   let marking=false;
   if(typeof markExploredV06==='function'){
     const baseMark=markExploredV06;
@@ -104,6 +105,13 @@
     statusEl.textContent='Testveld: de legers rukken op.';
   }
   function setAI(on){config.aiBritain=!!on;v05PeaceMode=!on;render();}
+  // Fog of war as in a match (clouds over what the French have not seen), to
+  // compare its cost; off again lifts it everywhere.
+  function setFog(on){
+    config.fog=!!on;explored=false;
+    if(config.fog&&typeof exploredCells!=='undefined')exploredCells.clear();
+    root.__VISION_EPOCH__=(root.__VISION_EPOCH__||0)+1;render();
+  }
 
   // ---- panel ----
   const style=document.createElement('style');
@@ -151,6 +159,7 @@
     ${KINDS.map(([k,label])=>`<tr><td>${label}</td><td>${stepper('france',k)}</td><td>${stepper('britain',k)}</td></tr>`).join('')}</table>
     <label>Man per regiment<span class="stepper"><button type="button" data-men="-4" aria-label="minder">−</button><output data-men-count></output><button type="button" data-men="4" aria-label="meer">+</button></span></label>
     <label>Britse AI voert bevel<button type="button" data-ai aria-pressed="false">Uit</button></label>
+    <label>Fog of war<button type="button" data-fog aria-pressed="false">Uit</button></label>
     <div class="lab-actions"><button type="button" class="primary" data-action="setup">Plaats legers</button><button type="button" data-action="charge">Ten aanval!</button><button type="button" data-action="clear">Leeg veld</button></div>`;
   toggle.addEventListener('click',()=>{panel.hidden=!panel.hidden;});
   panel.addEventListener('click',e=>{
@@ -159,6 +168,7 @@
     else if(b.dataset.preset){config.france={...PRESETS[b.dataset.preset]};config.britain={...PRESETS[b.dataset.preset]};}
     else if(b.dataset.men)config.men=Math.max(8,Math.min(48,config.men+Number(b.dataset.men)));
     else if('ai' in b.dataset)setAI(!config.aiBritain);
+    else if('fog' in b.dataset)setFog(!config.fog);
     else if(b.dataset.action==='setup')setup();
     else if(b.dataset.action==='charge')charge();
     else if(b.dataset.action==='clear'){clearField();statusEl.textContent='Testveld: het veld is leeg.';}
@@ -171,6 +181,7 @@
     for(const o of panel.querySelectorAll('[data-count]')){const[side,kind]=o.dataset.count.split(':');o.textContent=config[side][kind];}
     panel.querySelector('[data-men-count]').textContent=config.men;
     const ai=panel.querySelector('[data-ai]');ai.setAttribute('aria-pressed',String(config.aiBritain));ai.textContent=config.aiBritain?'Aan':'Uit';
+    const fog=panel.querySelector('[data-fog]');fog.setAttribute('aria-pressed',String(config.fog));fog.textContent=config.fog?'Aan':'Uit';
   }
   // Frame rate measured here, independent of which renderer is drawing.
   let frames=0,since=performance.now(),worst=0,last=since;
@@ -188,5 +199,5 @@
   // A reset (new game from the menu) brings back a normal match; set the field up again.
   root.NRTS?.events?.on?.('game:reset',()=>setTimeout(setup,0));
   setup();
-  root.__ARMY_LAB_V1__=Object.freeze({version:'1.0',config,setup,charge,clear:clearField,setAI,field:FIELD,stats:()=>({...stats})});
+  root.__ARMY_LAB_V1__=Object.freeze({version:'1.0',config,setup,charge,clear:clearField,setAI,setFog,field:FIELD,stats:()=>({...stats})});
 })(window);
