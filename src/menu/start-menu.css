@@ -11,6 +11,7 @@ h1{font:normal clamp(30px,5vw,54px)/1.1 Georgia,serif;letter-spacing:.05em;margi
 .start-modes{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .mode-card{display:flex;flex-direction:column;align-items:flex-start;min-height:238px;padding:28px;border:1px solid #9aab8666;border-radius:12px;background:linear-gradient(140deg,#2c3a2b99,#16241e);color:inherit;text-decoration:none;box-shadow:0 15px 36px #0003;transition:background .15s,border-color .15s}
 .mode-card:hover{border-color:#d1b875;background:#30412e}.mode-card:focus-visible{outline:3px solid #edce7b;outline-offset:5px}
+#startLab{grid-column:1/-1;min-height:0;padding:20px 28px}#startLab .mode-action{padding-top:12px}
 .mode-icon{color:#d1b875;font-size:30px;line-height:1;margin-bottom:18px}
 .mode-title{font:normal 27px Georgia,serif;color:#f4ebd4}.mode-description{font-size:14px;line-height:1.5;color:#bfc9b7;margin-top:10px;max-width:280px}
 .mode-action{display:flex;justify-content:space-between;gap:20px;width:100%;color:#ddc589;margin-top:auto;padding-top:24px;font-size:13px;font-weight:600}
