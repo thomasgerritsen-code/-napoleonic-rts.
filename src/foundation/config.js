@@ -5,10 +5,17 @@
   // The iso view (?view=iso, src/systems/rendering/iso-view-v1.js) plays on an open
   // map: fewer roads and villages. Without it every value below is unchanged.
   const OPEN_MAP = /(?:^|[?&])view=iso(?:&|$)/.test(global.location?.search || '');
+  // Singleplayer (and the test field) simulates 30 steps a second: with large
+  // armies on a phone the simulation, not the drawing, holds the frame rate, and
+  // each step of every man costs the same at 30 as at 60. Everything is timed in
+  // game seconds, so the battle runs at the same pace. Multiplayer keeps 60, as
+  // the server does; ?simhz=60 keeps 60 in singleplayer too.
+  const SEARCH = global.location?.search || '';
+  const SINGLE_30 = /(?:^|[?&])mode=singleplayer(?:&|$)/.test(SEARCH) && !/(?:^|[?&])simhz=60(?:&|$)/.test(SEARCH);
   const config = Object.freeze({
     simulation: Object.freeze({
-      fixedHz: 60,
-      fixedDt: 1 / 60,
+      fixedHz: SINGLE_30 ? 30 : 60,
+      fixedDt: SINGLE_30 ? 1 / 30 : 1 / 60,
       maxFrameDt: 0.05,
       maxCatchUpSteps: 8
     }),
