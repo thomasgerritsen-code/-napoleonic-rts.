@@ -132,6 +132,13 @@
       forceAIThink() { aiDevelop(); aiMilitaryOrder(); updateHud(true); },
       createRegimentDirect(side = 'france') {
         const candidates = [...freeUnits(side, 'infantry').slice(0, 12), ...freeUnits(side, 'officer').slice(0,1), ...freeUnits(side, 'drummer').slice(0,1)];
+        // Armies start with workers only: without free soldiers, raise a fresh
+        // regiment beside the side's own headquarters.
+        if (candidates.length < 14 && window.__RTS_DEBUG__?.createFreshInfantryRegiment) {
+          const hq = buildings.find(b => !b.dead && b.side === side && b.type === 'towncenter');
+          const x = hq ? hq.x + sideDir(side) * (hq.w / 2 + 140) : (side === 'france' ? 900 : WORLD.width - 900);
+          return window.__RTS_DEBUG__.createFreshInfantryRegiment(side, x, hq ? hq.y : WORLD.height / 2);
+        }
         return createRegiment(side, candidates)?.id || null;
       },
       worldToScreen
