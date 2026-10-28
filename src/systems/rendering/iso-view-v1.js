@@ -12,6 +12,10 @@
   const params = new URLSearchParams(location.search);
   if (params.get('view') !== 'iso') return;
   if (global.__NRTS_SERVER__) { global.__ISO_ASSETS_READY__ = true; return; }
+  // The iso view draws through its own ctx: the game canvas, or - with the WebGL
+  // scene (iso-gl-scene-v1) - for a moment its scratch or its effects canvas.
+  const mainCtx = canvas.getContext('2d');
+  let ctx = mainCtx;
 
   const ASSETS = 'graphics-lab/assets/';
   // Scale: a line's files stand 18 px apart in the game and 0.8 m apart in the lab.
@@ -42,12 +46,48 @@
   const assetState = { ready: false, completed: 0, total: 0, background: 0, failed: 0 };
   global.__ISO_ASSETS_READY__ = false;
   const gpu = global.__ISO_GPU_V1__?.active() ? global.__ISO_GPU_V1__ : null;
+  // WebGL scene state for a frame (see render): mode 'scene' while the sorted
+  // scene is drawn, 'fx' for the shots and smoke after it. 'hand' marks a
+  // drawable that is drawn by hand altogether (clipped, procedural); its 2D
+  // drawing, like any 2D drawing in the scene, lands on the scratch canvas
+  // ('dirty'), and that is laid into the WebGL layer before the next sprite.
+  const glFrame = { mode: '', hand: false, dirty: false, scene: null, current: null };
+  function glSprite(image, args) {
+    if (glFrame.dirty) glInsert(glFrame.current);
+    return glFrame.scene.draw(image, args, ctx.globalAlpha);
+  }
+  function glInsert(d) {
+    const S = glFrame.scene, c = S.scratch, k = c.width / Math.max(1, innerWidth);
+    let r;
+    const area = d?.area || d?.box;
+    if (area) { const [x0, y0, x1, y1] = area; r = [x0 - 24, y0 - 24, x1 + 24, y1 + 24]; }
+    else if (d?.unit) { const e = 170 * Math.max(0.5, z()); r = [d.unit.x - e, d.unit.y - e * 1.4, d.unit.x + e, d.unit.y + e * 0.7]; }
+    else r = [0, 0, innerWidth, innerHeight];
+    S.insert(c, r[0] * k, r[1] * k, r[2] * k, r[3] * k);
+    // A clean slate for the next hand drawing.
+    const g = S.scratchCtx; g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height); g.restore();
+    glFrame.dirty = false;
+  }
+  // Any 2D drawing on the scratch canvas marks it for laying in.
+  function watchScratch(g) {
+    if (g.__isoWatched) return; g.__isoWatched = true;
+    for (const name of ['fill', 'stroke', 'fillRect', 'strokeRect', 'drawImage', 'fillText', 'strokeText', 'putImageData']) {
+      const base = g[name];
+      g[name] = function () { glFrame.dirty = true; return base.apply(g, arguments); };
+    }
+  }
   function drawImage(image, ...args) {
+    if (glFrame.mode === 'scene' && !glFrame.hand && glSprite(image, args)) return;
     if (!gpu?.draw(ctx, image, ...args)) ctx.drawImage(image, ...args);
   }
   // Into the game canvas (through the GPU sprite path when it runs), or plainly into another canvas.
   function paint(g, image, ...args) { if (g === ctx) drawImage(image, ...args); else g.drawImage(image, ...args); }
   function drawScenery(image, ...args) {
+    if (glFrame.mode === 'scene' && !glFrame.hand) {
+      // The scaled-down copy the scenery cache keeps (sharp, and a smaller texture).
+      const pick = global.__STATIC_SPRITE_CACHE_V1__?.pick?.(ctx, image, ...args);
+      if (glSprite(pick ? pick.image : image, pick ? pick.args : args)) return;
+    }
     if (gpu?.draw(ctx, image, ...args)) return;
     if (global.__STATIC_SPRITE_CACHE_V1__) global.__STATIC_SPRITE_CACHE_V1__.draw(ctx, image, ...args);
     else ctx.drawImage(image, ...args);
@@ -1305,10 +1345,12 @@
       return { gpu: true, y: r.y, box: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
         drawPlant(prop,kind,r.x,r.y, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
     }
-    if (r.type === 'iron') return { y: r.y, draw: () => drawRock(r) };
+    if (r.type === 'iron') { const x = sx(r.x), y = gy(r.x, r.y), s = 9 * z() + 2; return { y: r.y, area: [x - s * 1.3, y - s * 1.4, x + s * 1.5, y + s * .7], draw: () => drawRock(r) }; }
     // Berry bushes: some hawthorns with their red haws among the bushes.
     const kind=hash(r.id, 9) < 0.5 && view.props.hawthorn ? 'hawthorn' : 'bush',prop=view.props[kind]; if (!prop) return null;
-    return { y: r.y, draw: () => { const k = spriteK() * 0.75;
+    const bk = spriteK() * 0.75;
+    // area: where it is drawn by hand (the WebGL scene lays in only that).
+    return { y: r.y, area: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, bk), draw: () => { const k = spriteK() * 0.75;
       drawPlant(prop,kind,r.x,r.y, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
       ctx.fillStyle = '#8c1f2a'; for (let i = 0; i < 5; i++) { ctx.beginPath();
         ctx.arc(sx(r.x) + (hash(r.id, i) - .5) * 18 * z(), gy(r.x, r.y) - (4 + hash(i, r.id) * 10) * z(), 1.6 * z() + .6, 0, 7); ctx.fill(); }
@@ -2006,7 +2048,7 @@
     for (const c of view.corpses) {
       const X = sx(c.x), Y = gy(c.x, c.y);
       if (X < -60 || X > innerWidth + 60 || Y < -40 || Y > innerHeight + 80) continue;
-      list.push({ y: c.y - 0.5, draw: () => { bloodPool(X, Y, t - c.t0, hash(c.x, c.y)); drawSprite(view.atlases[c.key], c.anim, presentation.fallFrame(c.id, t - c.t0), X, Y, k); } });
+      list.push({ y: c.y - 0.5, area: [X - 90 * Math.max(0.5, z()), Y - 90 * Math.max(0.5, z()), X + 90 * Math.max(0.5, z()), Y + 50 * Math.max(0.5, z())], draw: () => { bloodPool(X, Y, t - c.t0, hash(c.x, c.y)); drawSprite(view.atlases[c.key], c.anim, presentation.fallFrame(c.id, t - c.t0), X, Y, k); } });
     }
     st.corpses = view.corpses.length;
     medicsDrawables(list, t, k);
@@ -2032,9 +2074,13 @@
     list.sort((p, q) => p.y - q.y);
     const men = list.filter(d => d.unit), covered = new Set();
     st.seeThrough = 0;
-    for (const d of list) {
-      if (d.gpu) gpu?.begin(ctx); else gpu?.end();
-      if (!d.box) { d.draw(); continue; }
+    // The WebGL scene layer, when it runs: sprites to the graphics chip, hand
+    // drawing through the scratch canvas, in the same painter's order.
+    const S = global.__ISO_GL_SCENE_V1__, glOn = !!S?.active() && S.beginFrame(innerWidth, innerHeight, canvas.width / Math.max(1, innerWidth), performance.now());
+    S?.show(glOn); view.stats.glScene = glOn;
+    if (glOn) { glFrame.scene = S; glFrame.mode = 'scene'; ctx = S.scratchCtx; watchScratch(ctx); }
+    const drawOne = d => {
+      if (!d.box) { d.draw(); return; }
       // Scenery with a soldier behind it (inside its picture) turns see-through.
       const [x0, y0, x1, y1] = d.box, ix = (x1 - x0) * 0.12, iy = (y1 - y0) * 0.08;
       let a = view.overview ? OVERVIEW_ALPHA : 1;
@@ -2042,19 +2088,28 @@
       if (d.cover !== false) for (const man of men) { const p=man.unit; if (p.wy < d.y && p.x > x0 + ix && p.x < x1 - ix && p.y > y0 + iy && p.y < y1 - iy) { covering=true; covered.add(man); } }
       if(covering){a=Math.min(a,COVER_ALPHA);st.seeThrough++;}
       ctx.globalAlpha = a; d.draw(); ctx.globalAlpha = 1;
-    }
+    };
+    const drawInOrder = d => {
+      if (!glOn) { if (d.gpu) gpu?.begin(ctx); else gpu?.end(); drawOne(d); return; }
+      glFrame.current = d; glFrame.hand = !d.gpu;
+      try { drawOne(d); } finally { glFrame.hand = false; }
+      if (glFrame.dirty) glInsert(d);
+    };
+    for (const d of list) drawInOrder(d);
     // Several faded crowns can still hide a soldier. Reuse only the covered
     // visible unit drawables in depth order, including their trench clipping.
     // This adds no textures, world scans or information from outside vision.
     st.readabilityOverlays=covered.size;
-    for(const man of men)if(covered.has(man)){if(man.gpu)gpu?.begin(ctx);else gpu?.end();man.draw();}
-    gpu?.end();
+    for(const man of men)if(covered.has(man)){if(!glOn){if(man.gpu)gpu?.begin(ctx);else gpu?.end();man.draw();}else{glFrame.current=man;glFrame.hand=!man.gpu;try{man.draw();}finally{glFrame.hand=false;}if(glFrame.dirty)glInsert(man);}}
+    if (glOn) { S.flush(); glFrame.mode = 'fx'; ctx = S.fxCtx; } else gpu?.end();
     drawProjectiles();
     drawGrenades();
     drawStances();
     if (detailed()) drawChimneySmoke(t);
     drawSmoke(t);
     drawHitDust(t);
+    // Back to the game canvas for what lies over the scene.
+    glFrame.mode = ''; ctx = mainCtx;
     drawFog();
     // Over the fog layer: territory flags, rain and snow, the night (desktop).
     const top = topLayer.begin();
@@ -2072,7 +2127,7 @@
   let inner = global.renderStableFrameV1;
   function stableFrame(drawGame, now) {
     if (!assetState.ready) return;
-    if (!view.on) { grade.hide(); hideFog(); topLayer.hide(); return typeof inner === 'function' ? inner(drawGame, now) : drawGame(); }
+    if (!view.on) { grade.hide(); hideFog(); topLayer.hide(); global.__ISO_GL_SCENE_V1__?.show(false); return typeof inner === 'function' ? inner(drawGame, now) : drawGame(); }
     // The game is drawn in the iso view only: the 2D renderer does not run at all
     // (its effect lists are capped where they are filled; exploring is simulation).
     const t0 = performance.now();
@@ -2080,6 +2135,7 @@
     frameWidth = innerWidth; frameHeight = innerHeight;
     try { render(now); view.stats.renderMs = Math.round((view.stats.renderMs * 0.9 + (performance.now() - t0) * 0.1) * 10) / 10; }
     finally {
+      glFrame.mode = ''; glFrame.hand = false; ctx = mainCtx;
       gpu?.end(); const dpr = canvas.width / Math.max(1, frameWidth); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       frameWidth = oldWidth; frameHeight = oldHeight;
     }

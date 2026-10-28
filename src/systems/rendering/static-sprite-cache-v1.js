@@ -12,25 +12,28 @@
   const MIN_CREATE = 2, CREATE_MS = 3;
   let nextId = 0, bytes = 0, createdThisFrame = 0, createMs = 0;
   const stats = { hits: 0, misses: 0, created: 0, evicted: 0, direct: 0 };
-  function draw(ctx, image, ...args) {
+  // The picture to draw for these drawImage arguments (the cached level, or the
+  // picture itself): { image, args }. Used by draw, and by the WebGL scene,
+  // which draws the cached level as a texture.
+  function pick(ctx, image, ...args) {
     let sx=0, sy=0, sw=image.width, sh=image.height, dx, dy, dw, dh;
     if (args.length === 4) [dx,dy,dw,dh] = args;
     else if (args.length === 8) [sx,sy,sw,sh,dx,dy,dw,dh] = args;
-    else { ctx.drawImage(image,...args); return; }
+    else return { image, args };
     const m=ctx.getTransform(), rx=Math.hypot(m.a,m.b), ry=Math.hypot(m.c,m.d);
     const scale=Math.max(dw*rx/sw, dh*ry/sh);
     // Near full size (or larger) the picture itself is drawn: nothing to save.
-    if (!(scale>0) || scale>=0.84) { stats.direct++; ctx.drawImage(image,...args); return; }
+    if (!(scale>0) || scale>=0.84) { stats.direct++; return { image, args }; }
     const level=Math.ceil(Math.log2(scale)*4), s=2**(level/4);
     const w=Math.ceil(sw*s), h=Math.ceil(sh*s), cost=w*h*4;
-    if (!(w>0&&h>0) || w>4096 || h>4096 || cost>budget/4) { ctx.drawImage(image,...args); return; }
+    if (!(w>0&&h>0) || w>4096 || h>4096 || cost>budget/4) return { image, args };
     if (!ids.has(image)) ids.set(image,++nextId);
     const key=ids.get(image)+':'+sx+':'+sy+':'+sw+':'+sh+':'+level+':'+ctx.imageSmoothingEnabled+':'+ctx.imageSmoothingQuality;
     let entry=entries.get(key);
     if (entry) { entries.delete(key); entries.set(key,entry); stats.hits++; }
     else {
       stats.misses++;
-      if (createdThisFrame>=MIN_CREATE && createMs>CREATE_MS) { ctx.drawImage(image,...args); return; }
+      if (createdThisFrame>=MIN_CREATE && createMs>CREATE_MS) return { image, args };
       createdThisFrame++; const t0=performance.now();
       while(bytes+cost>budget && entries.size) {
         const oldest=entries.keys().next().value, old=entries.get(oldest);
@@ -41,8 +44,9 @@
       c.imageSmoothingQuality=ctx.imageSmoothingQuality;c.drawImage(image,sx,sy,sw,sh,0,0,w,h);
       entry={canvas,cost,w,h};entries.set(key,entry);bytes+=cost;stats.created++;createMs+=performance.now()-t0;
     }
-    ctx.drawImage(entry.canvas,0,0,entry.w,entry.h,dx,dy,dw,dh);
+    return { image: entry.canvas, args: [0,0,entry.w,entry.h,dx,dy,dw,dh] };
   }
-  root.__STATIC_SPRITE_CACHE_V1__=Object.freeze({ draw, beginFrame:()=>{createdThisFrame=0;createMs=0;},
+  function draw(ctx, image, ...args) { const p = pick(ctx, image, ...args); ctx.drawImage(p.image, ...p.args); }
+  root.__STATIC_SPRITE_CACHE_V1__=Object.freeze({ draw, pick, beginFrame:()=>{createdThisFrame=0;createMs=0;},
     stats:()=>({...stats,bytes,budget,entries:entries.size}) });
 })(window);
