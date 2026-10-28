@@ -58,14 +58,16 @@
   }
 
   // Draws the day/night grade with light. Returns false to let the caller fall
-  // back to its plain tint (no light state, nothing to add).
-  function draw(ctx, light, view) {
+  // back to its plain tint (no light state, nothing to add). part: 'sun' draws
+  // only the low-sun grade (it blends with the picture under it), 'night' only
+  // the darkness and its lights (it may go on a layer of its own); both by default.
+  function draw(ctx, light, view, part) {
     if (!light) return false;
     const { W, H } = view, now = view.now;
-    stats.frames++;
+    if (part !== 'sun') stats.frames++;
     // Low sun: warm from the sun's side, cool on the far side.
     const low = light.warmth * light.daylight;
-    if (low > .02) {
+    if (low > .02 && part !== 'night') {
       const morning = light.hour < 12, g = ctx.createLinearGradient(morning ? W : 0, 0, morning ? 0 : W, H * .35);
       g.addColorStop(0, `rgba(255,186,104,${.42 * low})`);
       g.addColorStop(.55, `rgba(255,214,170,${.06 * low})`);
@@ -73,7 +75,7 @@
       ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
       stats.sunDraws++;
     }
-    if (!light.tint) return true;
+    if (part === 'sun' || !light.tint) return true;
     // Lights only show once the evening has dimmed the field.
     const dusk = clamp((light.night - .15) / .5);
     const lights = dusk > 0 ? sources(view, now) : [];

@@ -55,26 +55,31 @@ test('explored membership changes invalidate the mask even when the set size sta
  expect(r.after.fogSightBuilds).toBe(r.before.fogSightBuilds);
 });
 
-test('panning, zoom, orientation and reset refresh fog geometry and keep input projection current',async()=>{
+test('panning, zoom and orientation move the fog layer without rebuilding its geometry, and keep input projection current',async()=>{
+ // The fog is kept on the ground (the lifted plane), not on the screen: the
+ // camera only moves and scales its page layer.
  const r=await page.evaluate(()=>{
-  const before=renderFrames(2);
+  const fogTransform=()=>document.getElementById('iso-fog').style.transform;
+  const before={...renderFrames(2),t:fogTransform()};
   for(let i=0;i<6;i++){camera.x+=10;renderFrames();}
-  const panning=window.__ISO_VIEW_V1__.stats(),stopped=renderFrames(3);
-  camera.zoom+=.1;const zoom=renderFrames(3);return{before,panning,stopped,zoom};
+  const panning={...window.__ISO_VIEW_V1__.stats(),t:fogTransform()},stopped=renderFrames(3);
+  camera.zoom+=.1;const zoom={...renderFrames(3),t:fogTransform()};return{before,panning,stopped,zoom};
  });
- expect(r.panning.fogSeenBuilds).toBe(r.before.fogSeenBuilds+6);
- expect(r.panning.fogSightBuilds).toBe(r.before.fogSightBuilds+6);
+ expect(r.panning.t).not.toBe(r.before.t);
+ expect(r.panning.fogSeenBuilds).toBe(r.before.fogSeenBuilds);
+ expect(r.panning.fogSightBuilds).toBe(r.before.fogSightBuilds);
  expect(r.stopped.fogSeenBuilds).toBe(r.panning.fogSeenBuilds);
  expect(r.stopped.fogSightBuilds).toBe(r.panning.fogSightBuilds);
- expect(r.zoom.fogSeenBuilds).toBe(r.stopped.fogSeenBuilds+1);
- expect(r.zoom.fogSightBuilds).toBe(r.stopped.fogSightBuilds+1);
+ expect(r.zoom.t).not.toBe(r.panning.t);
+ expect(r.zoom.fogSeenBuilds).toBe(r.stopped.fogSeenBuilds);
+ expect(r.zoom.fogSightBuilds).toBe(r.stopped.fogSightBuilds);
  let before=r.zoom;
  for(const viewport of [{width:390,height:844},{width:391,height:844},{width:844,height:390}]){
   await page.setViewportSize(viewport);
   const resized=await page.evaluate(()=>{const p=screenToWorld(150,300),s=worldToScreen(p.x,p.y);return{...renderFrames(3),error:Math.hypot(s.x-150,s.y-300)};});
   expect(resized.error).toBeLessThan(.5);
-  expect(resized.fogSeenBuilds).toBe(before.fogSeenBuilds+1);
-  expect(resized.fogSightBuilds).toBe(before.fogSightBuilds+1);
+  expect(resized.fogSeenBuilds).toBe(before.fogSeenBuilds);
+  expect(resized.fogSightBuilds).toBe(before.fogSightBuilds);
   expect(resized.fogGeometryPoints).toBe(resized.fogCells+resized.fogSources);
   before=resized;
  }

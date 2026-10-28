@@ -17,7 +17,11 @@ test('desktop night lifts the dark around lamps and flashes; broad day stays unt
   const day=frame(0),dusk=frame(275),night=frame(400);
   // A flash lights the dark for a moment, then is gone.
   const canvas=document.getElementById('game'),g=canvas.getContext('2d'),m=men[0],p=__ISO_VIEW_V1__.screenOf(m.x,m.y),k=canvas.width/innerWidth;
-  const lum=()=>{const d=g.getImageData(Math.round(p.x*k)-6,Math.round(p.y*k)-30,12,12).data;let s=0;for(let i=0;i<d.length;i+=4)s+=d[i]+d[i+1]+d[i+2];return s;};
+  // What the eye sees there: the canvas with the layer above the fog (the night and its lights) over it.
+  const top=document.getElementById('iso-top'),c=document.createElement('canvas');c.width=12;c.height=12;const cg=c.getContext('2d');
+  const lum=()=>{const x=Math.round(p.x*k)-6,y=Math.round(p.y*k)-30;cg.clearRect(0,0,12,12);cg.drawImage(canvas,x,y,12,12,0,0,12,12);
+   if(top&&getComputedStyle(top).display!=='none')cg.drawImage(top,x,y,12,12,0,0,12,12);
+   const d=cg.getImageData(0,0,12,12).data;let s=0;for(let i=0;i<d.length;i+=4)s+=d[i]+d[i+1]+d[i+2];return s;};
   const dark=lum();__LIGHTING_V1__.flash(m.x,m.y,'infantry',lightClock/1000);const lit=frame(400),bright=lum();
   for(let i=0;i<20;i++)frame(400);const after=lum();
   return{day,dusk,night,lit,dark,bright,after,unchanged:before===JSON.stringify({units:units.map(u=>[u.id,u.x,u.y,u.hp]),elapsed:0})};

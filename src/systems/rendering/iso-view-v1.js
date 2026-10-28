@@ -1428,20 +1428,33 @@
   // ---- fog of war, in three shades as in the classic RTS games ----
   // Never seen: under drifting clouds. Seen before (the game's explored cells):
   // a thin haze - ground, roads and villages show, men do not. In sight: clear.
-  // Edges are round and soft (explored cells as overlapping discs, blurred),
-  // every shape lies on the relief, and redraws are blended into each other.
-  // Two mist canvases: the newest and the one before, blended over the time
-  // between redraws, so edges glide as men move instead of stepping.
-  const fogA = document.createElement('canvas'), fogB = document.createElement('canvas'), fogMix = document.createElement('canvas');
-  const mixCtx = fogMix.getContext('2d');
-  // The masks stay on the graphics chip (their blur is cheap there); only the
-  // small copy that shapes the billowing rim is read back (billowEdges).
-  for (const c of [fogA, fogB]) c.getContext('2d');
-  let fog = fogA, fogCtx2 = fogA.getContext('2d');
+  // Edges are round and soft (explored cells as overlapping discs, blurred) and
+  // every shape lies on the relief.
+  // The fog is one picture of the whole map, kept in the lifted ground plane
+  // (game x across, y * SQ less the relief's lift down: the screen at zoom 1
+  // without the camera) at one pixel per FOG_K game px. It is rebuilt only a few
+  // times a second, and only what changed (sight, explored ground) is redrawn
+  // into it; the clouds drift through it on those rebuilds. It is a page layer
+  // straight above the canvas: following the camera and the zoom is a CSS
+  // transform the browser applies on the graphics chip, so panning and zooming
+  // cost nothing and the canvas is never covered by it.
+  const SEEN_VEIL = 0.76;   // share of the cloud lifted over ground seen before (a thin haze stays)
+  const FOG_K = MOBILE_RENDER ? 8 : 6, FOG_PAD = 16;          // game px per fog px; fog px beyond the map
+  const FOG_REBUILD = MOBILE_RENDER ? 330 : 220;              // ms between rebuilds (sight, clouds)
+  const fogEl = document.createElement('canvas'), fogCtx2 = fogEl.getContext('2d');
+  fogEl.id = 'iso-fog'; fogEl.setAttribute('aria-hidden', 'true'); fogEl.dataset.overlay = 'iso';
+  // Beyond the map nothing was ever seen: the layer's shadow spreads its cloud there.
+  fogEl.style.cssText = 'position:fixed;left:0;top:0;z-index:3;pointer-events:none;display:none;transform-origin:0 0;' +
+    'will-change:transform';
+  canvas.insertAdjacentElement('afterend', fogEl);
+  const maskCv = document.createElement('canvas'), maskCtx = maskCv.getContext('2d');
+  const cloudCv = document.createElement('canvas'), cloudCtx = cloudCv.getContext('2d');
   const seenLayer = document.createElement('canvas'), seenCtx = seenLayer.getContext('2d');
   const sightLayer = document.createElement('canvas'), sightCtx = sightLayer.getContext('2d');
-  const FOG_SOFT = 'filter' in fogCtx2;
-  const SEEN_VEIL = 0.76;   // share of the cloud lifted over ground seen before (a thin haze stays)
+  const mixCtx = cloudCtx;   // pattern source for the cloud tiles
+  const FOG_SOFT = 'filter' in maskCtx;
+  const fogGeometry = { seen: null, sight: null };
+  const fogField = { x0: 0, y0: 0, w: 0, h: 0, relief: undefined };
   // Cloud textures: tiling fractal noise (five octaves), lit from the upper left
   // like the props - bright tops, blue-grey undersides - and thicker where the
   // noise is high. 'base' is the deck of cloud, 'wisp' a lighter, finer layer
@@ -1484,163 +1497,174 @@
     view.clouds = { base: make(0, true), wisp: make(5003, false) };
     return view.clouds;
   }
-  // The fog canvas reaches FOG_M (half-size px) past each screen edge, so while
-  // the camera pans it is shifted and only redrawn every 60 ms.
-  const FOG_M = 64;
-  // These are the exact rasterized polygons from the previous mask update.
-  // Wind, cloud-edge noise and crossfades still update on their original clocks.
-  const fogGeometry = { seen: null, sight: null };
-  function sameFogGeometry(cache, points, w, h) {
-    if (!cache || cache.x !== camera.x || cache.y !== camera.y || cache.zoom !== z() ||
-        cache.w !== w || cache.h !== h || cache.relief !== view.relief || cache.points.length !== points.length) return false;
-    for (let i = 0; i < points.length; i++) if (points[i] !== cache.points[i]) return false;
-    return true;
-  }
-  function drawFogGeometry(name, c, points, segments, w, h) {
-    if (sameFogGeometry(fogGeometry[name], points, w, h)) {
-      view.stats.fogGeometryReuses = (view.stats.fogGeometryReuses || 0) + 1;
-      return;
-    }
-    c.clearRect(0, 0, w, h); c.fillStyle = '#000'; c.beginPath();
-    for (let i = 0; i < points.length; i += 3) groundPath(c, disc(points[i], points[i + 1], points[i + 2], segments));
-    c.fill();
-    fogGeometry[name] = { x: camera.x, y: camera.y, zoom: z(), w, h, relief: view.relief, points };
-    const counter = name === 'seen' ? 'fogSeenBuilds' : 'fogSightBuilds';
-    view.stats[counter] = (view.stats[counter] || 0) + 1;
-  }
-  // Redraws of the mask (ms): it is cross-faded, so a few a second look smooth.
-  const FOG_REDRAW_MOVING = 180, FOG_REDRAW_STILL = 320;
-  const disc = (x, y, r, n) => Array.from({ length: n }, (_, i) => [x + Math.cos(i / n * Math.PI * 2) * r, y + Math.sin(i / n * Math.PI * 2) * r]);
-  // A ground shape (game px) lifted onto the relief, at half size.
-  function groundPath(c, pts) {
-    c.moveTo(sx(pts[0][0]) / 2 + FOG_M, gy(pts[0][0], pts[0][1]) / 2 + FOG_M);
-    for (let i = 1; i < pts.length; i++) c.lineTo(sx(pts[i][0]) / 2 + FOG_M, gy(pts[i][0], pts[i][1]) / 2 + FOG_M);
-    c.closePath();
-  }
   // Phone: a soft edge without a blur filter (which a phone runs on the main
   // processor): the layer halved step by step (each step averages, so the shape
   // stays round) to about the blur's reach, then laid back smoothly.
   const softSteps = [];
-  function softDraw(f, layer, alpha, soft) {
-    let src = layer, sw = layer.width, sh = layer.height, k = 1;
+  // win: the part of the layer to soften and lay back (all of it by default).
+  function softDraw(f, layer, alpha, soft, win = { x: 0, y: 0, w: layer.width, h: layer.height }) {
+    let src = layer, sx0 = win.x, sy0 = win.y, sw = win.w, sh = win.h, k = 1;
     for (let i = 0; k * 2 <= Math.max(2, soft); i++) {
       const c = softSteps[i] || (softSteps[i] = document.createElement('canvas')), w = Math.ceil(sw / 2), h = Math.ceil(sh / 2);
-      if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+      if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); }
       const g = c.getContext('2d'); g.globalCompositeOperation = 'copy'; g.imageSmoothingEnabled = true;
-      g.drawImage(src, 0, 0, sw, sh, 0, 0, w, h);
-      src = c; sw = w; sh = h; k *= 2;
+      g.drawImage(src, sx0, sy0, sw, sh, 0, 0, w, h);
+      src = c; sx0 = sy0 = 0; sw = w; sh = h; k *= 2;
     }
-    f.imageSmoothingEnabled = true; f.globalAlpha = alpha; f.drawImage(src, 0, 0, sw, sh, 0, 0, sw * k, sh * k);
+    f.imageSmoothingEnabled = true; f.globalAlpha = alpha; f.drawImage(src, sx0, sy0, sw, sh, win.x, win.y, sw * k, sh * k);
   }
-  function drawFog() {
-    if (typeof frenchVisionSources !== 'function' || typeof visionRadius !== 'function') return;
-    const w = Math.ceil(innerWidth / 2) + 2 * FOG_M, h = Math.ceil(innerHeight / 2) + 2 * FOG_M, now = performance.now();
-    for (const c of [fogA, fogB, fogMix, seenLayer, sightLayer]) if (c.width !== w || c.height !== h) {
-      c.width = w; c.height = h; view.fogCam = null; view.fogPrev = null;
-      fogGeometry.seen = fogGeometry.sight = null;
+  // The fog field: the whole map in the lifted plane, padded; resized (and all
+  // geometry dropped) when the map or its relief changes.
+  function fogFieldFor() {
+    const lift = (view.relief ? view.relief.maxM : 0) * PPM * LIFT;
+    const w = Math.ceil(WORLD.width / FOG_K) + 2 * FOG_PAD, h = Math.ceil((WORLD.height * SQ + lift) / FOG_K) + 2 * FOG_PAD;
+    if (fogField.w !== w || fogField.h !== h || fogField.relief !== view.relief) {
+      Object.assign(fogField, { x0: 0, y0: -lift, w, h, relief: view.relief });
+      for (const c of [fogEl, maskCv, cloudCv, seenLayer, sightLayer]) { c.width = w; c.height = h; }
+      // One CSS px per fog px before the transform (page styles size canvases to the screen).
+      Object.assign(fogEl.style, { width: `${w}px`, height: `${h}px`, maxWidth: 'none', maxHeight: 'none' });
+      fogGeometry.seen = fogGeometry.sight = null; view.fogAt = 0; view.fogWin = view.fogMaskWin = null;
     }
-    // Shift since the last redraw (screen px); redraw when zoomed, shifted far, or stale.
-    const F = view.fogCam, dx = F ? (F.x - camera.x) * z() : 0, dy = F ? (F.y - camera.y) * z() * SQ : 0;
-    const moved = !F || F.zoom !== camera.zoom || dx !== 0 || dy !== 0;
-    if (!F || F.zoom !== camera.zoom || Math.abs(dx) > FOG_M || Math.abs(dy) > FOG_M || now - view.fogAt > (moved ? FOG_REDRAW_MOVING : FOG_REDRAW_STILL)) {
-      // The newest becomes the one before; draw into the other canvas.
-      view.fogPrev = F && F.zoom === camera.zoom ? { canvas: fog, cam: F } : null;
-      view.fogFade = Math.min(400, Math.max(50, now - view.fogAt));
-      fog = fog === fogA ? fogB : fogA; fogCtx2 = fog.getContext('2d');
-      view.fogCam = { x: camera.x, y: camera.y, zoom: camera.zoom }; view.fogAt = now;
-      const pad = 2 * FOG_M + 2 * PPM * z(), a = isoScreenToWorld(-pad, -pad), b = flatScreenToWorld(innerWidth + pad, innerHeight + pad);
-      // The cover mask: full where never seen, part where seen before, none in sight.
-      const f = fogCtx2;
-      f.globalCompositeOperation = 'source-over'; f.globalAlpha = 1; f.filter = 'none'; f.clearRect(0, 0, w, h);
-      f.fillStyle = '#fff'; f.fillRect(0, 0, w, h);
-      // Ground seen before: a disc on every explored cell on screen (they overlap
-      // into a rounded outline), lifted onto the relief.
-      const seenPoints = [];
-      if (typeof exploredCells !== 'undefined' && typeof EXPLORE_CELL === 'number') {
-        const C = EXPLORE_CELL, gx0 = Math.floor(Math.min(a.x, b.x) / C) - 1, gx1 = Math.ceil(Math.max(a.x, b.x) / C) + 1;
-        const gy0 = Math.floor(Math.min(a.y, b.y) / C) - 1, gy1 = Math.ceil(Math.max(a.y, b.y) / C) + 1 + Math.ceil((view.relief ? view.relief.maxM : 0) * PPM / C * 2);
-        for (let cy = gy0; cy <= gy1; cy++) for (let cx = gx0; cx <= gx1; cx++) {
-          if (!exploredCells.has(`${cx},${cy}`)) continue;
-          seenPoints.push((cx + 0.5) * C, (cy + 0.5) * C, C * 0.8);
-        }
-      }
-      drawFogGeometry('seen', seenCtx, seenPoints, 14, w, h);
-      // In sight now: each source's circle, its rim lying on the relief.
-      const sightPoints = [];
-      for (const src of frenchVisionSources()) {
-        const r = visionRadius(src);
-        if (src.x + r < a.x || src.x - r > b.x || src.y + r < a.y || src.y - r > b.y + (view.relief ? view.relief.maxM * PPM * 2 : 0)) continue;
-        // On a 6 px grid: men shuffling in their ranks leave the (blurred) rim
-        // as it was, so its geometry is reused instead of rebuilt.
-        sightPoints.push(Math.round(src.x / 6) * 6, Math.round(src.y / 6) * 6, Math.round(r / 6) * 6);
-      }
-      drawFogGeometry('sight', sightCtx, sightPoints, MOBILE_RENDER ? 28 : 48, w, h);
-      // Cut both out of the mist, blurred so the edges are soft.
-      const soft = Math.max(3, 30 * z());
+    return fogField;
+  }
+  // A game point (on the relief) in fog px.
+  const fogX = wx => (wx - fogField.x0) / FOG_K + FOG_PAD;
+  const fogY = (wx, wy) => (wy * SQ - heightPx(wx, wy) * LIFT - fogField.y0) / FOG_K + FOG_PAD;
+  function fogDisc(c, x, y, r, n) {
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2, wx = x + Math.cos(a) * r, wy = y + Math.sin(a) * r;
+      if (i) c.lineTo(fogX(wx), fogY(wx, wy)); else c.moveTo(fogX(wx), fogY(wx, wy));
+    }
+    c.closePath();
+  }
+  // Ground seen before: a disc on every explored cell. Explored ground only
+  // grows, so new cells are added to what is drawn; a cell that is gone (a new
+  // battle, or the cells replaced) redraws the layer.
+  function updateSeen() {
+    if (typeof exploredCells === 'undefined' || typeof EXPLORE_CELL !== 'number') return false;
+    let g = fogGeometry.seen;
+    if (g) for (const key of g.cells) if (!exploredCells.has(key)) { g = null; break; }
+    const fresh = !g;
+    if (fresh) { g = fogGeometry.seen = { cells: new Set() }; seenCtx.clearRect(0, 0, fogField.w, fogField.h); }
+    const C = EXPLORE_CELL; let added = 0;
+    seenCtx.fillStyle = '#000'; seenCtx.beginPath();
+    for (const key of exploredCells) {
+      if (g.cells.has(key)) continue;
+      const comma = key.indexOf(','), cx = +key.slice(0, comma), cy = +key.slice(comma + 1);
+      fogDisc(seenCtx, (cx + 0.5) * C, (cy + 0.5) * C, C * 0.8, 14); g.cells.add(key); added++;
+    }
+    if (added) seenCtx.fill();
+    if (fresh || added) { view.stats.fogSeenBuilds = (view.stats.fogSeenBuilds || 0) + 1; return true; }
+    view.stats.fogGeometryReuses = (view.stats.fogGeometryReuses || 0) + 1; return false;
+  }
+  // In sight now: each source's circle, its rim lying on the relief. On a 6 px
+  // grid: men shuffling in their ranks leave the (blurred) rim as it was.
+  function updateSight() {
+    const points = [];
+    for (const src of frenchVisionSources()) {
+      const r = visionRadius(src);
+      if (!Number.isFinite(src.x) || !Number.isFinite(src.y) || !(r > 0)) continue;
+      points.push(Math.round(src.x / 6) * 6, Math.round(src.y / 6) * 6, Math.round(r / 6) * 6);
+    }
+    const old = fogGeometry.sight?.points;
+    if (old && old.length === points.length && old.every((v, i) => v === points[i])) {
+      view.stats.fogGeometryReuses = (view.stats.fogGeometryReuses || 0) + 1; return false;
+    }
+    sightCtx.clearRect(0, 0, fogField.w, fogField.h); sightCtx.fillStyle = '#000'; sightCtx.beginPath();
+    for (let i = 0; i < points.length; i += 3) fogDisc(sightCtx, points[i], points[i + 1], points[i + 2], MOBILE_RENDER ? 28 : 48);
+    sightCtx.fill();
+    fogGeometry.sight = { points };
+    view.stats.fogSightBuilds = (view.stats.fogSightBuilds || 0) + 1; return true;
+  }
+  // The cover mask (white: cloud) from both layers, soft-edged; then the clouds
+  // through it over their own shadow, into the page layer.
+  // Only the window around the view is rebuilt (win, fog px): the view and half
+  // its size again on every side, so panning that far needs no rebuild at all.
+  function rebuildFog(now, win) {
+    const changed = updateSeen() | updateSight();
+    if (changed || view.fogMaskWin !== win) {
+      const f = maskCtx, soft = Math.max(2, 60 / FOG_K), { x, y, w, h } = win;
+      f.globalCompositeOperation = 'source-over'; f.globalAlpha = 1; f.filter = 'none';
+      f.fillStyle = '#fff'; f.fillRect(x, y, w, h);
       f.globalCompositeOperation = 'destination-out';
-      if (MOBILE_RENDER) { softDraw(f, seenLayer, SEEN_VEIL, soft); softDraw(f, sightLayer, 1, soft); }
+      if (MOBILE_RENDER) { softDraw(f, seenLayer, SEEN_VEIL, soft, win); softDraw(f, sightLayer, 1, soft, win); }
       else {
         if (FOG_SOFT) f.filter = `blur(${soft}px)`;
-        f.globalAlpha = SEEN_VEIL; f.drawImage(seenLayer, 0, 0);
+        f.globalAlpha = SEEN_VEIL; f.drawImage(seenLayer, x, y, w, h, x, y, w, h);
         if (FOG_SOFT) f.filter = `blur(${soft}px)`;
-        f.globalAlpha = 1; f.drawImage(sightLayer, 0, 0);
+        f.globalAlpha = 1; f.drawImage(sightLayer, x, y, w, h, x, y, w, h);
       }
       f.filter = 'none'; f.globalAlpha = 1; f.globalCompositeOperation = 'source-over';
-      // The billowing rim reads the mask back from the graphics chip: on a phone
-      // that stalls the frame, so there the rim stays a soft blur.
-      if (!MOBILE_RENDER) billowEdges(f, w, h, now);
-      view.stats.fogCells = seenPoints.length / 3; view.stats.fogSources = sightPoints.length / 3;
+      view.fogMaskWin = win;
     }
-    const cached = view.cloudCam;
-    if (cached && cached.zoom === z() && cached.maskAt === view.fogAt &&
-        now - cached.at < 1000 / (MOBILE_RENDER ? 8 : 15) && Math.abs((cached.x-camera.x)*z()) < 96 && Math.abs((cached.y-camera.y)*z()*SQ) < 96 &&
-        cached.width === innerWidth && cached.height === innerHeight) {
-      view.stats.cloudReuses = (view.stats.cloudReuses || 0) + 1; blitClouds(cached); return;
-    }
-    // Blend the one before into the newest (additive mix of the two at weights
-    // 1-t and t is an exact cross-fade), each shifted for the camera since.
-    const off = cam => [(cam.x - camera.x) * z() / 2, (cam.y - camera.y) * z() * SQ / 2];
-    const t = view.fogPrev ? Math.min(1, (now - view.fogAt) / view.fogFade) : 1;
-    const [ox, oy] = off(view.fogCam);
-    mixCtx.globalCompositeOperation = 'source-over'; mixCtx.globalAlpha = 1; mixCtx.clearRect(0, 0, w, h);
-    if (t >= 1) mixCtx.drawImage(fog, ox, oy);
-    else {
-      const [px, py] = off(view.fogPrev.cam);
-      mixCtx.globalCompositeOperation = 'lighter';
-      mixCtx.globalAlpha = 1 - t; mixCtx.drawImage(view.fogPrev.canvas, px, py);
-      mixCtx.globalAlpha = t; mixCtx.drawImage(fog, ox, oy);
-      mixCtx.globalCompositeOperation = 'source-over'; mixCtx.globalAlpha = 1;
-    }
-    drawClouds(now, w, h);
+    // The billowing rim reads the mask back from the graphics chip: on a phone
+    // that stalls the frame, so there the rim stays a soft blur. It drifts with
+    // the clouds, so it is shaped afresh on every rebuild (from the clean mask).
+    let mask = maskCv;
+    if (!MOBILE_RENDER) mask = billowEdges(now, win) || maskCv;
+    drawClouds(now, mask, win);
+    view.stats.fogCells = fogGeometry.seen ? fogGeometry.seen.cells.size : 0;
+    view.stats.fogSources = fogGeometry.sight ? fogGeometry.sight.points.length / 3 : 0;
+  }
+  function placeFog() {
+    const k = FOG_K * z(), W = frameWidth || innerWidth, H = frameHeight || innerHeight;
+    const tx = (fogField.x0 - FOG_PAD * FOG_K - camera.x) * z() + W / 2, ty = (fogField.y0 - FOG_PAD * FOG_K - camera.y * SQ) * z() + H / 2;
+    const t = `translate(${tx.toFixed(2)}px,${ty.toFixed(2)}px) scale(${k.toFixed(5)})`;
+    if (fogEl.style.transform !== t) fogEl.style.transform = t;
+    if (fogEl.style.display !== 'block') fogEl.style.display = 'block';
+  }
+  function hideFog() { if (fogEl.style.display !== 'none') fogEl.style.display = 'none'; }
+  // The view in fog px, clamped to the field.
+  function viewInFog() {
+    const W = frameWidth || innerWidth, H = frameHeight || innerHeight, hw = W / 2 / z(), hh = H / 2 / z();
+    const fx = X => Math.max(0, Math.min(fogField.w, (X - fogField.x0) / FOG_K + FOG_PAD));
+    const fy = Y => Math.max(0, Math.min(fogField.h, (Y - fogField.y0) / FOG_K + FOG_PAD));
+    return { x0: fx(camera.x - hw), x1: fx(camera.x + hw), y0: fy(camera.y * SQ - hh), y1: fy(camera.y * SQ + hh) };
+  }
+  function fogWindow(v) {
+    // Half the view again on each side, and room for the soft edge.
+    const mx = (v.x1 - v.x0) / 2 + 12, my = (v.y1 - v.y0) / 2 + 12;
+    const x = Math.max(0, Math.floor(v.x0 - mx)), y = Math.max(0, Math.floor(v.y0 - my));
+    return { x, y, w: Math.min(fogField.w, Math.ceil(v.x1 + mx)) - x, h: Math.min(fogField.h, Math.ceil(v.y1 + my)) - y };
+  }
+  const fogCovers = (win, v) => !!win && v.x0 >= win.x && v.x1 <= win.x + win.w && v.y0 >= win.y && v.y1 <= win.y + win.h;
+  function drawFog() {
+    if (typeof frenchVisionSources !== 'function' || typeof visionRadius !== 'function') { hideFog(); return; }
+    fogFieldFor();
+    const now = performance.now(), v = viewInFog(), away = !fogCovers(view.fogWin, v);
+    if (away || !view.fogAt || now - view.fogAt >= FOG_REBUILD) {
+      if (away) view.fogWin = fogWindow(v);
+      view.fogAt = now; rebuildFog(now, view.fogWin);
+    } else view.stats.cloudReuses = (view.stats.cloudReuses || 0) + 1;
+    placeFog();
   }
   // Cloud edges: the soft ramp of the mask is pushed in or out by the cloud
   // noise (where the cloud is thick it reaches farther), then sharpened - so
-  // the rim billows like a cloud instead of fading like an airbrush. Done on each
-  // redraw of the mask (3-5 times a second); the noise is fixed to the ground
-  // and drifts with the cloud deck. Both rims are shaped: cloud to haze over
-  // ground seen before, and haze (or cloud) to clear ground in sight.
+  // the rim billows like a cloud instead of fading like an airbrush. The noise
+  // is fixed to the ground and drifts with the cloud deck. Both rims are shaped:
+  // cloud to haze over ground seen before, and haze (or cloud) to clear ground in sight.
   const EDGE_SPAN = 1300, EDGE_PUSH = 1.1;
-  // Shaped at half the mask's size (a quarter of its pixels), then laid back
-  // smoothly: the rim is soft and the noise coarse, the look is the same and
-  // each redraw of the mask reads back and walks a quarter of the pixels.
+  // Shaped at half the mask's size (a quarter of its pixels), then laid back smoothly.
   const edgeCv = document.createElement('canvas'), edgeCtx = edgeCv.getContext('2d', { willReadFrequently: true });
-  function billowEdges(f, w, h, now) {
-    const F = view.cloudField; if (!F) return;
-    const bw = Math.ceil(w / 2), bh = Math.ceil(h / 2);
-    if (edgeCv.width !== bw || edgeCv.height !== bh) { edgeCv.width = bw; edgeCv.height = bh; }
-    edgeCtx.globalCompositeOperation = 'copy'; edgeCtx.drawImage(f.canvas, 0, 0, bw, bh);
+  const billowCv = document.createElement('canvas'), billowCtx = billowCv.getContext('2d');
+  function billowEdges(now, win) {
+    const F = view.cloudField; if (!F) return null;
+    const { w, h } = fogField, bw = Math.ceil(win.w / 2), bh = Math.ceil(win.h / 2);
+    if (edgeCv.width < bw || edgeCv.height < bh) { edgeCv.width = Math.max(edgeCv.width, bw); edgeCv.height = Math.max(edgeCv.height, bh); }
+    if (billowCv.width !== w || billowCv.height !== h) { billowCv.width = w; billowCv.height = h; }
+    edgeCtx.globalCompositeOperation = 'copy'; edgeCtx.drawImage(maskCv, win.x, win.y, win.w, win.h, 0, 0, bw, bh);
     edgeCtx.globalCompositeOperation = 'source-over';
     let img;
-    try { img = edgeCtx.getImageData(0, 0, bw, bh); } catch (_) { return; }
-    const d = img.data, N = 256, L = 1 - SEEN_VEIL, zz = z(), drift = (now / 1000 * 9) % EDGE_SPAN;
+    try { img = edgeCtx.getImageData(0, 0, bw, bh); } catch (_) { return null; }
+    const d = img.data, N = 256, L = 1 - SEEN_VEIL, drift = (now / 1000 * 9) % EDGE_SPAN, step = FOG_K * 2;
     // Ground position of each column and row (flat; the noise needs no relief).
     const us = new Int32Array(bw), us2 = new Int32Array(bw);
     for (let x = 0; x < bw; x++) {
-      const wx = ((x * 2 + 0.5 - FOG_M) * 2 - innerWidth / 2) / zz + camera.x - drift, u = wx / EDGE_SPAN * N;
+      const wx = (x + 0.25) * step + (win.x - FOG_PAD) * FOG_K + fogField.x0 - drift, u = wx / EDGE_SPAN * N;
       us[x] = ((Math.floor(u) % N) + N) % N; us2[x] = ((Math.floor(u * 2.1 + 91) % N) + N) % N;
     }
     for (let y = 0; y < bh; y++) {
-      const wy = ((y * 2 + 0.5 - FOG_M) * 2 - innerHeight / 2) / (zz * SQ) + camera.y, v = wy / EDGE_SPAN * N;
+      const wy = ((y + 0.25) * step + (win.y - FOG_PAD) * FOG_K + fogField.y0) / SQ, v = wy / EDGE_SPAN * N;
       const row = (((Math.floor(v) % N) + N) % N) * N, row2 = (((Math.floor(v * 2.1 + 37) % N) + N) % N) * N;
       for (let x = 0, i = y * bw * 4 + 3; x < bw; x++, i += 4) {
         const a = d[i] / 255;
@@ -1654,43 +1678,34 @@
       }
     }
     edgeCtx.putImageData(img, 0, 0);
-    f.globalCompositeOperation = 'copy'; f.drawImage(edgeCv, 0, 0, w, h);
-    f.globalCompositeOperation = 'source-over';
+    billowCtx.globalCompositeOperation = 'copy'; billowCtx.imageSmoothingEnabled = true;
+    billowCtx.drawImage(edgeCv, 0, 0, bw, bh, win.x, win.y, win.w, win.h);
+    billowCtx.globalCompositeOperation = 'source-over';
+    return billowCv;
   }
   // Clouds through the cover mask: a deck and a lighter layer of wisps, each
-  // drifting with the wind at its own speed, and their shadow on the ground
+  // drifting with the wind at its own speed, over their shadow on the ground
   // just below and to the right (the sun is upper left).
-  const cloudCv = document.createElement('canvas'), cloudCtx = cloudCv.getContext('2d');
-  const shadeCv = document.createElement('canvas'), shadeCtx = shadeCv.getContext('2d');
-  // Drawn at a quarter of the screen size (half the mask's): clouds are soft anyway.
-  function drawClouds(now, mw, mh) {
-    const w = Math.ceil(mw / 2), h = Math.ceil(mh / 2), M = FOG_M / 2;
-    for (const c of [cloudCv, shadeCv]) if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  function drawClouds(now, mask, win) {
+    const { x, y, w, h } = win;
     const T = cloudTiles(), sec = now / 1000, ok = T.base && T.base.setTransform && typeof DOMMatrix === 'function';
     const layer = (pat, span, vx, vy) => {
-      const k = span * z() / 4 / 256, dx = (sec * vx) % span, dy = (sec * vy) % span;
-      pat.setTransform(new DOMMatrix().translate(sx(dx) / 4 + M, sy(dy) / 4 + M).scale(k, k * SQ));
-      cloudCtx.fillStyle = pat; cloudCtx.fillRect(0, 0, w, h);
+      const k = span / FOG_K / 256, dx = (sec * vx) % span, dy = (sec * vy) % span;
+      pat.setTransform(new DOMMatrix().translate((dx - fogField.x0) / FOG_K + FOG_PAD, (dy * SQ - fogField.y0) / FOG_K + FOG_PAD).scale(k, k * SQ));
+      cloudCtx.fillStyle = pat; cloudCtx.fillRect(x, y, w, h);
     };
-    cloudCtx.globalCompositeOperation = 'source-over'; cloudCtx.globalAlpha = 1; cloudCtx.clearRect(0, 0, w, h);
+    cloudCtx.globalCompositeOperation = 'source-over'; cloudCtx.globalAlpha = 1; cloudCtx.clearRect(x, y, w, h);
     if (ok) { layer(T.base, 2600, 9, 2); cloudCtx.globalAlpha = 0.8; layer(T.wisp, 1000, 16, -3); cloudCtx.globalAlpha = 1; }
-    else { cloudCtx.fillStyle = '#c9cfd6'; cloudCtx.fillRect(0, 0, w, h); }
-    cloudCtx.globalCompositeOperation = 'destination-in'; cloudCtx.drawImage(fogMix, 0, 0, w, h);
+    else { cloudCtx.fillStyle = '#c9cfd6'; cloudCtx.fillRect(x, y, w, h); }
+    cloudCtx.globalCompositeOperation = 'destination-in'; cloudCtx.drawImage(mask, x, y, w, h, x, y, w, h);
     cloudCtx.globalCompositeOperation = 'source-over';
-    // Shadow: the cover, dark and faint, offset down-right.
-    shadeCtx.globalCompositeOperation = 'source-over'; shadeCtx.clearRect(0, 0, w, h);
-    shadeCtx.fillStyle = 'rgba(12,18,28,.32)'; shadeCtx.fillRect(0, 0, w, h);
-    shadeCtx.globalCompositeOperation = 'destination-in'; shadeCtx.drawImage(fogMix, 0, 0, w, h);
-    // The cloud over its own shadow, in one picture: one full-screen copy a frame, not two.
-    const so = Math.max(3, 14*z()) / 4;
-    shadeCtx.globalCompositeOperation = 'source-over'; shadeCtx.drawImage(cloudCv, -so, -so * 1.6);
-    view.cloudCam = { x: camera.x, y: camera.y, zoom: z(), at: now, maskAt: view.fogAt, width: innerWidth, height: innerHeight };
+    // Shadow: the cover, dark and faint, then the cloud over it offset up-left.
+    const g = fogCtx2, so = 14 / FOG_K;
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(x, y, w, h);
+    g.fillStyle = 'rgba(12,18,28,.32)'; g.fillRect(x, y, w, h);
+    g.globalCompositeOperation = 'destination-in'; g.drawImage(mask, x, y, w, h, x, y, w, h);
+    g.globalCompositeOperation = 'source-over'; g.drawImage(cloudCv, x, y, w, h, x - so, y - so * 1.6, w, h);
     view.stats.cloudBuilds = (view.stats.cloudBuilds || 0) + 1;
-    blitClouds(view.cloudCam);
-  }
-  function blitClouds(cam) {
-    const dx = (cam.x-camera.x)*z(), dy = (cam.y-camera.y)*z()*SQ, so = Math.max(3, 14*z());
-    ctx.drawImage(shadeCv, -2*FOG_M+so+dx, -2*FOG_M+so*1.6+dy, shadeCv.width*4, shadeCv.height*4);
   }
   // Height gives sight: on high ground a man sees farther (up to half as far
   // again on a hilltop), on the relief of this map (iso view only).
@@ -1712,7 +1727,7 @@
     if (u.type === 'artillery') return u.artilleryMode === 'grape' ? 145 : TYPES.artillery?.range || 0;
     return u.type === 'infantry' ? TYPES.infantry?.range || 0 : 0;
   }
-  function drawTerritories() {
+  function drawTerritories(g = ctx) {
     view.stats.territories = 0;
     const s = global.__TERRITORIES__?.state();
     if (!s) return;
@@ -1720,12 +1735,12 @@
       const X=sx(p.x),Y=gy(p.x,p.y),r=s.radius*z();
       if(X+r<0||X-r>innerWidth||Y+r<0||Y-r>innerHeight)continue;
       const color=p.owner==='france'?'#74a4ef':p.owner==='britain'?'#ef8877':'#efd88e',h=Math.max(20,28*z());
-      ctx.save();ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.globalAlpha=.55;
-      ctx.beginPath();ctx.ellipse(X,Y,r,r*SQ,0,0,Math.PI*2);ctx.stroke();
-      if(p.claim){ctx.globalAlpha=.9;ctx.strokeStyle='#efb24f';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(X,Y,r,r*SQ,0,-Math.PI/2,-Math.PI/2+Math.PI*2*p.progress);ctx.stroke();}
-      ctx.globalAlpha=1;ctx.strokeStyle='#ddd3b8';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X,Y);ctx.lineTo(X,Y-h);ctx.stroke();
-      ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(X,Y-h);ctx.lineTo(X+15,Y-h+3);ctx.lineTo(X+13,Y-h+12);ctx.lineTo(X,Y-h+9);ctx.closePath();ctx.fill();
-      ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='#172019';ctx.strokeText(p.label,X,Y-h-6);ctx.fillStyle='#f7edcf';ctx.fillText(p.label,X,Y-h-6);ctx.restore();
+      g.save();g.strokeStyle=color;g.lineWidth=1.5;g.globalAlpha=.55;
+      g.beginPath();g.ellipse(X,Y,r,r*SQ,0,0,Math.PI*2);g.stroke();
+      if(p.claim){g.globalAlpha=.9;g.strokeStyle='#efb24f';g.lineWidth=3;g.beginPath();g.ellipse(X,Y,r,r*SQ,0,-Math.PI/2,-Math.PI/2+Math.PI*2*p.progress);g.stroke();}
+      g.globalAlpha=1;g.strokeStyle='#ddd3b8';g.lineWidth=2;g.beginPath();g.moveTo(X,Y);g.lineTo(X,Y-h);g.stroke();
+      g.fillStyle=color;g.beginPath();g.moveTo(X,Y-h);g.lineTo(X+15,Y-h+3);g.lineTo(X+13,Y-h+12);g.lineTo(X,Y-h+9);g.closePath();g.fill();
+      g.font='bold 11px system-ui';g.textAlign='center';g.lineWidth=3;g.strokeStyle='#172019';g.strokeText(p.label,X,Y-h-6);g.fillStyle='#f7edcf';g.fillText(p.label,X,Y-h-6);g.restore();
       view.stats.territories++;
     }
   }
@@ -1794,8 +1809,9 @@
     const layers = { dark: make('iso-grade-weather'), haze: make('iso-grade-haze'), night: make('iso-grade-night'), box: make('iso-drag-box') };
     layers.box.style.cssText = 'position:fixed;z-index:3;pointer-events:none;display:none;box-sizing:border-box;' +
       'border:1px solid rgba(245,220,112,.9);background:rgba(245,220,112,.12)';
-    // Stacked in painting order straight above the game canvas.
-    let anchor = canvas; for (const el of Object.values(layers)) { anchor.insertAdjacentElement('afterend', el); anchor = el; }
+    // Stacked in painting order above the game canvas and its fog (and the
+    // layer over the fog, which goes in straight after the fog).
+    let anchor = fogEl; for (const el of Object.values(layers)) { anchor.insertAdjacentElement('afterend', el); anchor = el; }
     const shown = new Map();
     function set(el, background) {
       if (shown.get(el) === background) return; shown.set(el, background);
@@ -1804,6 +1820,38 @@
     const round = text => text.replace(/\d*\.\d+/g, n => String(+(+n).toFixed(3)));
     return { layers, set, round, hide() { for (const el of [layers.dark, layers.haze, layers.night]) set(el, ''); layers.box.style.display = 'none'; },
       state: () => ({ weather: shown.get(layers.dark) || '', haze: shown.get(layers.haze) || '', night: shown.get(layers.night) || '' }) };
+  })();
+
+  // ---- above the fog: one more page layer ----
+  // What shows over the clouds - territory flags, rain and snow, and on the
+  // desktop the night's darkness and its lights - is drawn on a transparent
+  // canvas straight above the fog layer. It is cleared only after it was drawn
+  // on, and hidden while there is nothing on it.
+  const topLayer = (() => {
+    const el = document.createElement('canvas'), g = el.getContext('2d');
+    el.id = 'iso-top'; el.setAttribute('aria-hidden', 'true'); el.dataset.overlay = 'iso';
+    el.style.cssText = 'position:fixed;left:0;top:0;z-index:3;pointer-events:none;display:none';
+    fogEl.insertAdjacentElement('afterend', el);
+    let used = false;
+    return {
+      el,
+      begin() {
+        const dpr = canvas.width / Math.max(1, innerWidth);
+        if (el.width !== canvas.width || el.height !== canvas.height) { el.width = canvas.width; el.height = canvas.height; used = false; }
+        const w = `${innerWidth}px`, h = `${innerHeight}px`;
+        if (el.style.width !== w) el.style.width = w;
+        if (el.style.height !== h) el.style.height = h;
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        if (used) g.clearRect(0, 0, el.width, el.height);
+        g.setTransform(dpr, 0, 0, dpr, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+        return g;
+      },
+      end(drawn) {
+        used = !!drawn; const display = used ? 'block' : 'none';
+        if (el.style.display !== display) el.style.display = display;
+      },
+      hide() { if (el.style.display !== 'none') el.style.display = 'none'; }
+    };
   })();
 
   // ---- the frame ----
@@ -1968,9 +2016,12 @@
     drawSmoke(t);
     drawHitDust(t);
     drawFog();
-    drawTerritories();
-    drawWeather(t);
-    drawDayNight();
+    // Over the fog layer: territory flags, rain and snow, the night (desktop).
+    const top = topLayer.begin();
+    drawTerritories(top);
+    drawWeather(t, top);
+    drawDayNight(top);
+    topLayer.end(view.stats.territories > 0 || view.stats.precipitationParticles > 0 || view.stats.nightLayer);
     drawDragBox();
     drawFacingArrow();
     soundTick(t);
@@ -1981,7 +2032,7 @@
   let inner = global.renderStableFrameV1;
   function stableFrame(drawGame, now) {
     if (!assetState.ready) return;
-    if (!view.on) { grade.hide(); return typeof inner === 'function' ? inner(drawGame, now) : drawGame(); }
+    if (!view.on) { grade.hide(); hideFog(); topLayer.hide(); return typeof inner === 'function' ? inner(drawGame, now) : drawGame(); }
     // The game is drawn in the iso view only: the 2D renderer does not run at all
     // (its effect lists are capped where they are filled; exploring is simulation).
     const t0 = performance.now();
@@ -2166,13 +2217,17 @@
     ctx.globalAlpha = 1; view.stats.tracks = n; view.stats.trackDrawCalls = draws;
   }
 
-  function drawDayNight() {
+  function drawDayNight(top = ctx) {
     const light = global.__DAY_NIGHT_V1__?.state();
-    view.stats.dayNight = light || null; view.stats.dayNightDraws = 0;
+    view.stats.dayNight = light || null; view.stats.dayNightDraws = 0; view.stats.nightLayer = false;
     // Desktop: light and shade (low sun, lit windows, lanterns, muzzle flashes).
     // The phone renderer keeps its single night-colour layer.
+    // The low sun blends with the battlefield in the canvas; the night's
+    // darkness and its lights lie over the fog, on the layer above it (top).
     const lighting = !MOBILE_RENDER && global.__LIGHTING_V1__;
-    if (lighting && light && lighting.draw(ctx, light, { sx, gy, z: z(), W: frameWidth || innerWidth, H: frameHeight || innerHeight, now: view.lastNow || performance.now() / 1000 })) {
+    const lit = { sx, gy, z: z(), W: frameWidth || innerWidth, H: frameHeight || innerHeight, now: view.lastNow || performance.now() / 1000 };
+    if (lighting && light && lighting.draw(ctx, light, lit, 'sun')) {
+      if (light.tint) { lighting.draw(top, light, lit, 'night'); view.stats.nightLayer = true; }
       grade.set(grade.layers.night, ''); view.stats.dayNightDraws = light.tint ? 1 : 0; return;
     }
     // Grade the battlefield, fog and weather together: one colour layer over the
@@ -2180,7 +2235,7 @@
     grade.set(grade.layers.night, light?.tint ? grade.round(light.tint) : '');
     view.stats.dayNightDraws = light?.tint ? 1 : 0;
   }
-  function drawWeather(now) {
+  function drawWeather(now, g = ctx) {
     const w = weather();
     if (!w) { grade.set(grade.layers.dark, ''); grade.set(grade.layers.haze, ''); return; }
     const W = innerWidth, H = innerHeight;
@@ -2192,20 +2247,20 @@
       const wind = global.__MAP_AMBIENT_MOTION_V1__?.currentWind?.() || { x: 0.4, y: 0 };
       const vx = Math.max(-1, Math.min(1, wind.x)) * 160, vy = 620, len = 16, nx = vx / Math.hypot(vx, vy), ny = vy / Math.hypot(vx, vy);
       const n = Math.round((W * H / 3600) * w.rain),snow=seasonState()?.snow||0,flakes=Math.round(n*snow),drops=n-flakes;
-      ctx.strokeStyle = 'rgba(205,214,228,.38)'; ctx.lineWidth = 1; ctx.beginPath();
+      g.strokeStyle = 'rgba(205,214,228,.38)'; g.lineWidth = 1; g.beginPath();
       for (let i = 0; i < drops; i++) {
         const x = ((hash(i, 1) * (W + 200) + now * vx * (0.8 + hash(i, 2) * 0.4)) % (W + 200) + (W + 200)) % (W + 200) - 100;
         const y = ((hash(i, 3) * (H + 100) + now * vy * (0.8 + hash(i, 4) * 0.4)) % (H + 100)) - 50;
-        ctx.moveTo(x, y); ctx.lineTo(x - nx * len, y - ny * len);
+        g.moveTo(x, y); g.lineTo(x - nx * len, y - ny * len);
       }
-      if(drops)ctx.stroke();
+      if(drops)g.stroke();
       if(flakes){
-        ctx.fillStyle='rgba(244,248,252,.82)';ctx.beginPath();
+        g.fillStyle='rgba(244,248,252,.82)';g.beginPath();
         for(let i=0;i<flakes;i++){
           const x=((hash(i,21)*(W+100)+now*vx*.25+Math.sin(now*.7+i)*9)%(W+100)+(W+100))%(W+100)-50;
           const y=(hash(i,23)*(H+40)+now*(45+hash(i,24)*35))%(H+40)-20,r=1+hash(i,25)*1.2;
-          ctx.moveTo(x+r,y);ctx.arc(x,y,r,0,Math.PI*2);
-        }ctx.fill();
+          g.moveTo(x+r,y);g.arc(x,y,r,0,Math.PI*2);
+        }g.fill();
       }
       view.stats.rainDrops = drops;view.stats.snowFlakes=flakes;view.stats.precipitationParticles=n;
     } else view.stats.rainDrops = view.stats.snowFlakes = view.stats.precipitationParticles = 0;
@@ -2530,9 +2585,9 @@
     view.corpses.length = view.smoke.length = view.impacts.length = 0;
     groundDetail.reset(); detailRelief = null;
     wetTracks.reset(); clearTrackPaths(); global.__SEASONAL_PROPS_V1__?.reset(); view.stats.tracks = view.stats.rainDrops = view.stats.trackDrawCalls = 0;
-    view.attack = view.lastCam = view.fogCam = view.fogPrev = view.cloudCam = null;
+    view.attack = view.lastCam = null;
     fogGeometry.seen = fogGeometry.sight = null;
-    view.lastNow = view.fogAt = 0;
+    view.lastNow = view.fogAt = 0; view.fogWin = view.fogMaskWin = null;
     view.stats.corpses = view.stats.smoke = view.stats.hitDust = view.stats.hitDustDraws = view.stats.groundDetailDraws = 0;
     queueMicrotask(frameStartingForce);
   });
@@ -2550,7 +2605,7 @@
     stats: () => ({ ...view.stats, assets: { ...assetState }, sceneryCache: global.__STATIC_SPRITE_CACHE_V1__?.stats(), gpu: global.__ISO_GPU_V1__?.stats(), on: view.on, atlases: Object.keys(view.atlases).length, props: Object.keys(view.props).length,
       tiles: view.tiles.size, info: view.info.size, woodTrees: view.woodTrees ? view.woodTrees.length : 0,
       wetTracks: wetTracks.stats(), groundDetail:groundDetail.stats(), seasonalProps: global.__SEASONAL_PROPS_V1__?.stats(), buildingPresentation:buildingPresentation?.stats(),
-      fogGeometryPoints: ((fogGeometry.seen?.points.length || 0) + (fogGeometry.sight?.points.length || 0)) / 3,
+      fogGeometryPoints: (fogGeometry.seen?.cells.size || 0) + (fogGeometry.sight?.points.length || 0) / 3,
       sharpSheets: sharp.parts.size, sharpMB: Math.round(sharp.bytes / 2 ** 20), sharpBudgetMB: SHARP_BUDGET / 2 ** 20, sharpLoading: sharp.loading,
       workerSprites: !!view.atlases.frw, digSprites: !!view.atlases['fr:dig'] && !!view.atlases['br:dig'], labAudio: !!labAudio.ctl, overview: !!view.overview, detailed: detailed(), villageKinds: view.village ? Object.keys(view.village.kinds).length : 0,
       relief: view.relief ? view.relief.maxM : 0, heightSight: !!view.heightSight, villageHouses: villageHouses().length, openMap: global.__OPEN_MAP_V1__?.after || null, dressingItems: view.dressing ? view.dressing.length : 0, ppm: PPM, zoom: camera.zoom, missingNames: [...view.missingNames] }),
