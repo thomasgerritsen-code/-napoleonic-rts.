@@ -131,8 +131,10 @@
     const members = regimentMembers(reg).filter(u => !u.dead && !u.routing);
     if (!members.length) return { moving: false, distance: 0 };
     const c = centroid(members);
-    const dx = (reg.targetX ?? c.x) - c.x;
-    const dy = (reg.targetY ?? c.y) - c.y;
+    // Marching orders keep their destination in finalTarget (targetX is not set by them).
+    const goal = reg.finalTarget && Number.isFinite(reg.finalTarget.x) ? reg.finalTarget : { x: reg.targetX, y: reg.targetY };
+    const dx = (goal.x ?? c.x) - c.x;
+    const dy = (goal.y ?? c.y) - c.y;
     const distance = Math.hypot(dx, dy);
     return { moving: distance > 42, distance };
   }
