@@ -33,6 +33,9 @@ test('the real front rank fires before the rear rank on a regiment clock, with v
 test('walking wounds slow real motion, and a safe hospital treats the most injured first',async({page})=>{
  const errors=await open(page);
  const r=await page.evaluate(()=>{
+  // Reload has a per-man individuality by id (id % 11, up to 12%); pin the ids
+  // (11000, 11001) so the two men compare on their wounds, not their ids.
+  if(nextId>11000)throw Error('ids already past 11000');nextId=11000;
   const healthy=createUnit('france','infantry',3900,1500),hurt=createUnit('france','infantry',3900,1700);for(const u of[healthy,hurt]){u.hp=u.maxHp=100;u.targetX=4100;u.targetY=u.y;}
   applyDamage(hurt,60,0);RTS_SIM.step(1);
   const motion={healthy:healthy.x-3900,hurt:hurt.x-3900,level:hurt.injuryLevel};
