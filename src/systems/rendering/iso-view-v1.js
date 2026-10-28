@@ -876,6 +876,7 @@
     const a = u.facing || 0, gun = u.type === 'artillery';
     if (u.type === 'cavalry' || u.type === 'drummer' || u.type === 'worker' || u.attackMode === 'bayonet') return;
     if (u.side !== 'france' && typeof isVisibleToFrance === 'function' && !isVisibleToFrance(u)) return;
+    global.__LIGHTING_V1__?.flash(u.x, u.y, u.type, now);
     const reach = gun ? 2.4 : 1.1, height = gun ? 0.9 : 1.45, n = gun ? 5 : 1;
     for (let i = 0; i < n; i++) {
       const s = hash(u.id + i * 7, Math.floor(now * 10));
@@ -2118,6 +2119,12 @@
   function drawDayNight() {
     const light = global.__DAY_NIGHT_V1__?.state();
     view.stats.dayNight = light || null; view.stats.dayNightDraws = 0;
+    // Desktop: light and shade (low sun, lit windows, lanterns, muzzle flashes).
+    // The phone renderer keeps its single night-colour layer.
+    const lighting = !MOBILE_RENDER && global.__LIGHTING_V1__;
+    if (lighting && light && lighting.draw(ctx, light, { sx, gy, z: z(), W: frameWidth || innerWidth, H: frameHeight || innerHeight, now: view.lastNow || performance.now() / 1000 })) {
+      view.stats.dayNightDraws = light.tint ? 1 : 0; return;
+    }
     if (!light?.tint) return;
     // Grade the battlefield, fog and weather together. The DOM HUD and the
     // drag/facing feedback drawn afterwards retain their original brightness.
