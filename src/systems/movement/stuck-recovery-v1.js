@@ -27,7 +27,18 @@
     });
     return villageRects;
   }
-  function gameplayObstacles(){return buildings.filter(b=>!b.dead).map(b=>({id:`g:${b.id}`,x:b.x,y:b.y,w:b.w,h:b.h,angle:0,kind:'gameplay'}));}
+  // Buildings stand square (angle 0), so with a point or segment only those whose
+  // box, grown by the pad, overlaps the segment's box can block it.
+  function gameplayObstacles(a=null,b=a,pad=clearance){
+    const out=[],bounded=a&&b&&[a.x,a.y,b.x,b.y,pad].every(Number.isFinite);
+    const minX=bounded?Math.min(a.x,b.x)-pad:0,maxX=bounded?Math.max(a.x,b.x)+pad:0,minY=bounded?Math.min(a.y,b.y)-pad:0,maxY=bounded?Math.max(a.y,b.y)+pad:0;
+    for(const g of buildings){
+      if(g.dead)continue;
+      if(bounded&&(g.x+g.w*.5<minX||g.x-g.w*.5>maxX||g.y+g.h*.5<minY||g.y-g.h*.5>maxY))continue;
+      out.push({id:`g:${g.id}`,x:g.x,y:g.y,w:g.w,h:g.h,angle:0,kind:'gameplay'});
+    }
+    return out;
+  }
   function obstacles(a=null,b=a,pad=clearance){
     const all=villageObstacles();let nearby=all;
     // Invalid/very long segments use the original full scan. Apart from being
@@ -43,7 +54,7 @@
     }
     stats.obstacleQueries=(stats.obstacleQueries||0)+1;stats.obstacleCandidates=(stats.obstacleCandidates||0)+nearby.length;
     // Player buildings stay live: placing, moving or destroying one is visible immediately.
-    return nearby.concat(gameplayObstacles());
+    return nearby.concat(gameplayObstacles(a,b,pad));
   }
   nrts.events.on('game:reset',()=>{villageSource=null;});
   function toLocal(p,o){const c=Math.cos(o.angle||0),s=Math.sin(o.angle||0),dx=p.x-o.x,dy=p.y-o.y;return{x:dx*c+dy*s,y:-dx*s+dy*c};}
