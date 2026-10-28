@@ -18,6 +18,10 @@
 
   let applications = 0;
   let last = null;
+  // Share of the budget actually drawn (1 = full). The adaptive resolution
+  // governor lowers it when frames run long and raises it again with headroom.
+  let scale = 1;
+  const MIN_RENDER_DPR = 0.6;
 
   function mobileTarget() {
     const shortEdge = Math.min(innerWidth || 0, innerHeight || 0);
@@ -39,7 +43,7 @@
   }
 
   function apply(reason = 'manual') {
-    const dpr = desiredDpr();
+    const full = desiredDpr(), dpr = scale < 1 ? Math.max(Math.min(full, MIN_RENDER_DPR), Math.round(full * scale * 100) / 100) : full;
     const cssWidth = Math.max(1, Math.floor(innerWidth));
     const cssHeight = Math.max(1, Math.floor(innerHeight));
     const width = Math.max(1, Math.floor(cssWidth * dpr));
@@ -60,6 +64,8 @@
       mobile: mobileTarget(),
       nativeDpr: Math.max(1, Number(root.devicePixelRatio) || 1),
       renderDpr: dpr,
+      fullDpr: full,
+      scale,
       cssWidth,
       cssHeight,
       backingWidth: canvas.width,
@@ -84,6 +90,14 @@
     contract: CONTRACT,
     desiredDpr,
     apply,
+    // Draw at this share of the budget (clamped to 0.4..1); returns the new state.
+    setScale(k, reason = 'scale') {
+      const next = Math.max(0.4, Math.min(1, Number(k) || 1));
+      if (next === scale) return last;
+      scale = next; return apply(reason);
+    },
+    scale: () => scale,
+    minRenderDpr: MIN_RENDER_DPR,
     state: () => last
   });
 })(window);

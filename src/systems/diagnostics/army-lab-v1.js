@@ -131,7 +131,7 @@
   }
   .army-lab[hidden]{display:none}
   .army-lab h2{margin:0 0 8px;font-size:15px;letter-spacing:.04em}
-  .army-lab .lab-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:10px}
+  .army-lab .lab-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px}
   .army-lab .lab-metrics span{background:#0006;border-radius:6px;padding:4px 6px;text-align:center}
   .army-lab .lab-metrics b{display:block;font-size:16px}
   .army-lab .lab-presets,.army-lab .lab-actions{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
@@ -153,7 +153,7 @@
   const KINDS=[['infantry','Infanterie'],['cavalry','Cavalerie'],['artillery','Kanonnen']];
   const stepper=(side,kind)=>`<span class="stepper"><button type="button" data-step="${side}:${kind}:-1" aria-label="minder">−</button><output data-count="${side}:${kind}"></output><button type="button" data-step="${side}:${kind}:1" aria-label="meer">+</button></span>`;
   panel.innerHTML=`<h2>TESTVELD</h2>
-    <div class="lab-metrics"><span>FPS<b data-metric="fps">–</b></span><span>Frame<b data-metric="frame">–</b></span><span>Soldaten<b data-metric="units">–</b></span></div>
+    <div class="lab-metrics"><span>FPS<b data-metric="fps">–</b></span><span>Frame<b data-metric="frame">–</b></span><span>Soldaten<b data-metric="units">–</b></span><span>Scherpte<b data-metric="res">–</b></span></div>
     <div class="lab-presets">${Object.keys(PRESETS).map(k=>`<button type="button" data-preset="${k}">${k[0].toUpperCase()+k.slice(1)}</button>`).join('')}</div>
     <table><tr><th></th><th>Frankrijk</th><th>Brittannië</th></tr>
     ${KINDS.map(([k,label])=>`<tr><td>${label}</td><td>${stepper('france',k)}</td><td>${stepper('britain',k)}</td></tr>`).join('')}</table>
@@ -185,12 +185,14 @@
   }
   // Frame rate measured here, independent of which renderer is drawing.
   let frames=0,since=performance.now(),worst=0,last=since;
-  const fpsEl=panel.querySelector('[data-metric=fps]'),frameEl=panel.querySelector('[data-metric=frame]'),unitsEl=panel.querySelector('[data-metric=units]');
+  const fpsEl=panel.querySelector('[data-metric=fps]'),frameEl=panel.querySelector('[data-metric=frame]'),unitsEl=panel.querySelector('[data-metric=units]'),resEl=panel.querySelector('[data-metric=res]');
   (function tick(now){
     frames++;worst=Math.max(worst,now-last);last=now;
     if(now-since>=500){
       if(!panel.hidden){fpsEl.textContent=Math.round(frames*1000/(now-since));frameEl.textContent=`${Math.round(worst)} ms`;
-        unitsEl.textContent=units.reduce((n,u)=>n+(u.dead?0:1),0);}
+        unitsEl.textContent=units.reduce((n,u)=>n+(u.dead?0:1),0);
+        // Drawing resolution: the adaptive governor's share of the full budget.
+        const k=root.__MOBILE_RENDER_BUDGET_V1__?.scale?.()??1;resEl.textContent=`${Math.round(k*100)}%`;}
       frames=0;since=now;worst=0;
     }
     requestAnimationFrame(tick);
