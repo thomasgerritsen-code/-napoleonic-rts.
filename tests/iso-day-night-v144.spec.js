@@ -27,7 +27,7 @@ test('mobile night is exactly one readable colour layer; dawn/day return without
    const canvas=document.getElementById('game'),api=window.__DAY_NIGHT_V1__;
    const battle=()=>JSON.stringify({men:units.map(u=>[u.id,u.type,u.x,u.y,u.hp,u.dead,u.targetX,u.targetY]),buildings:buildings.map(b=>[b.id,b.x,b.y,b.hp,b.dead])});
    const before=battle(),weather=JSON.stringify(window.__WEATHER_V1__.state());
-   const probe=units.find(u=>u.side==='france'&&u.type==='infantry'),sight=visionRadius(probe);
+   const probe=units.find(u=>u.side==='france'&&!u.dead),sight=visionRadius(probe);
    const hud=()=>({color:getComputedStyle(document.querySelector('.topbar')).color,background:getComputedStyle(document.querySelector('.topbar')).backgroundColor});
    const hudBefore=hud(),day=lightFrame(0),dayPNG=canvas.toDataURL();
    const dusk=lightFrame(262.5),duskPNG=canvas.toDataURL();
@@ -91,7 +91,8 @@ test('desktop clock follows simulation time, stays still between ticks and reset
 test('soldiers can be selected and ordered to march at night',async({browser})=>{
  const {context,page,errors}=await open(browser);
  try{
-  await page.evaluate(()=>lightFrame(400));
+  // Armies start with workers only: raise a few soldiers in view first.
+  await page.evaluate(()=>{for(let i=0;i<4;i++)createUnit('france','infantry',camera.x-40+i*26,camera.y);lightFrame(400);});
   const body=await page.evaluate(()=>{for(const u of units){if(u.dead||u.side!=='france'||u.type!=='infantry')continue;const p=window.__ISO_VIEW_V1__.bodyOf(u);if(document.elementFromPoint(p.x,p.y)?.id==='game')return{...p,id:u.id};}return null;});
   expect(body).not.toBeNull();await page.mouse.click(body.x,body.y);
   const r=await page.evaluate(id=>{
