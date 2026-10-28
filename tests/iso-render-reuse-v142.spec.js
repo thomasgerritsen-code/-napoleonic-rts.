@@ -30,7 +30,9 @@ test('idle fog geometry is reused while animated clouds keep updating',async()=>
 
 test('moving sources, changed sight radius and source removal invalidate only current sight',async()=>{
  const r=await page.evaluate(()=>{
-  const man=units.find(u=>!u.dead&&u.side==='france'&&u.type==='infantry');
+  // Armies start with workers only: post a soldier at the French headquarters if needed.
+  const hq=buildings.find(b=>!b.dead&&b.side==='france'&&b.type==='towncenter');
+  const man=units.find(u=>!u.dead&&u.side==='france'&&u.type==='infantry')||createUnit('france','infantry',hq.x+hq.w/2+60,hq.y);
   camera.x=man.x;camera.y=man.y;const before=renderFrames(2);
   man.x+=7;const moved=renderFrames();
   man.type='cavalry';window.__VISION_EPOCH__=(window.__VISION_EPOCH__||0)+1;const radius=renderFrames();
