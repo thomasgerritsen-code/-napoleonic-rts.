@@ -45,6 +45,8 @@
   function drawImage(image, ...args) {
     if (!gpu?.draw(ctx, image, ...args)) ctx.drawImage(image, ...args);
   }
+  // Into the game canvas (through the GPU sprite path when it runs), or plainly into another canvas.
+  function paint(g, image, ...args) { if (g === ctx) drawImage(image, ...args); else g.drawImage(image, ...args); }
   function drawScenery(image, ...args) {
     if (gpu?.draw(ctx, image, ...args)) return;
     if (global.__STATIC_SPRITE_CACHE_V1__) global.__STATIC_SPRITE_CACHE_V1__.draw(ctx, image, ...args);
@@ -57,11 +59,11 @@
     const image = global.__SEASONAL_PROPS_V1__?.source(prop.image,palette) || prop.image;
     drawScenery(image,...args);
   }
-  function drawSeasonGround() {
+  function drawSeasonGround(g = ctx) {
     const season=seasonState();view.stats.seasons=season||null;view.stats.seasonGroundDraws=0;
     if(!season?.groundTint)return;
-    ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle=season.groundTint;
-    ctx.fillRect(0,0,frameWidth||innerWidth,frameHeight||innerHeight);ctx.restore();view.stats.seasonGroundDraws=1;
+    g.save();g.globalAlpha=1;g.globalCompositeOperation='source-over';g.fillStyle=season.groundTint;
+    g.fillRect(0,0,frameWidth||innerWidth,frameHeight||innerHeight);g.restore();view.stats.seasonGroundDraws=1;
   }
 
   const hash = (a, b) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177) >>> 0; h ^= h >>> 13;
@@ -93,7 +95,7 @@
   // Flat inverse (the ground image itself), and the inverse onto the relief: the
   // ground point whose lifted screen position is (px, py). Raised ground shows
   // higher, so that point lies south of the flat one; found by bisection.
-  const flatScreenToWorld = (px, py) => ({ x: (px - innerWidth / 2) / camera.zoom + camera.x, y: (py - innerHeight / 2) / (camera.zoom * SQ) + camera.y });
+  const flatScreenToWorld = (px, py) => ({ x: (px - (frameWidth || innerWidth) / 2) / camera.zoom + camera.x, y: (py - (frameHeight || innerHeight) / 2) / (camera.zoom * SQ) + camera.y });
   function isoScreenToWorld(px, py) {
     const p = flatScreenToWorld(px, py);
     if (!view.relief) return p;
@@ -732,11 +734,11 @@
     }
   });
   let detailRelief = null;
-  function drawGroundDetail() {
+  function drawGroundDetail(g = ctx) {
     view.stats.groundDetailDraws = 0;
     if (!assetState.ready || !detailed() || z() < .85) return;
     if (detailRelief !== view.relief) { groundDetail.reset(); detailRelief = view.relief; }
-    const a = isoScreenToWorld(-40, -40), b = isoScreenToWorld(innerWidth + 40, innerHeight + 40), cell = groundDetail.cell;
+    const a = isoScreenToWorld(-40, -40), b = isoScreenToWorld((frameWidth || innerWidth) + 40, (frameHeight || innerHeight) + 40), cell = groundDetail.cell;
     const want = [], cx = camera.x / cell, cy = camera.y / cell;
     for (let y = Math.max(0,Math.floor(a.y/cell)); y <= Math.min(Math.ceil(WORLD.height/cell)-1,Math.floor(b.y/cell)); y++)
       for (let x = Math.max(0,Math.floor(a.x/cell)); x <= Math.min(Math.ceil(WORLD.width/cell)-1,Math.floor(b.x/cell)); x++) want.push([x,y]);
@@ -748,15 +750,15 @@
     const tileBytes=Math.ceil((cell+44)*.5)*Math.ceil((cell*.5+44+maxLift)*.5)*4;
     want.length=Math.min(want.length,limits.maxTiles,Math.max(1,Math.floor(limits.maxBytes/tileBytes)));
     let budget = MOBILE_RENDER ? 2 : 3;
-    ctx.globalAlpha = Math.min(1,(z()-.7)/.3) * (1 - (seasonState()?.snow || 0) * .95);
+    g.globalAlpha = Math.min(1,(z()-.7)/.3) * (1 - (seasonState()?.snow || 0) * .95);
     for (const [x,y] of want) {
       let tile = groundDetail.get(x,y,false);
       if (!tile && budget > 0) { tile = groundDetail.get(x,y); budget--; }
-      if (!tile) continue;
-      drawImage(tile.canvas,sx(tile.x),sy(tile.y/SQ),tile.width*z(),tile.height*z());
+      if (!tile) { view.groundIncomplete = true; continue; }
+      paint(g, tile.canvas,sx(tile.x),sy(tile.y/SQ),tile.width*z(),tile.height*z());
       view.stats.groundDetailDraws++;
     }
-    ctx.globalAlpha = 1;
+    g.globalAlpha = 1;
   }
   const terrainSource = () => global.__MAP_AMBIENT_MOTION_V1__?.baseTerrainDraw || null;
   function tileSetup() {
@@ -785,24 +787,24 @@
     view.stats.tilesBaked++;
     return tile;
   }
-  function drawGround() {
+  function drawGround(g = ctx) {
     const G = view.ground, dpr = canvas.width / Math.max(1, innerWidth);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#31402a'; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = '#31402a'; g.fillRect(0, 0, (frameWidth || innerWidth), (frameHeight || innerHeight));
     // Only the part on screen is copied: image pixels per game pixel are k across and
     // k/2 down; game (0, 0) at height 0 sits on image row pad (room above for the
     // raised northern edge). The image already shows the relief.
-    const a = flatScreenToWorld(0, 0), b = flatScreenToWorld(innerWidth, innerHeight), k = G.k, h = k / 2;
+    const a = flatScreenToWorld(0, 0), b = flatScreenToWorld((frameWidth || innerWidth), (frameHeight || innerHeight)), k = G.k, h = k / 2;
     const c0 = Math.max(0, a.x * k), c1 = Math.min(G.img.width, b.x * k);
     const r0 = Math.max(0, G.pad + a.y * h), r1 = Math.min(G.img.height, G.pad + b.y * h);
     if (c1 <= c0 || r1 <= r0) return;
-    ctx.imageSmoothingEnabled = true;
-    drawImage(G.img, c0, r0, c1 - c0, r1 - r0, sx(c0 / k), sy((r0 - G.pad) / h), (c1 - c0) / k * z(), (r1 - r0) / h * z() * SQ);
+    g.imageSmoothingEnabled = true;
+    paint(g, G.img, c0, r0, c1 - c0, r1 - r0, sx(c0 / k), sy((r0 - G.pad) / h), (c1 - c0) / k * z(), (r1 - r0) / h * z() * SQ);
   }
-  function drawTerrain() {
-    if (view.ground) { drawGround(); view.stats.ground = true; return; }
+  function drawTerrain(g = ctx) {
+    if (view.ground) { drawGround(g); view.stats.ground = true; return; }
     view.stats.ground = false;
-    const T = tileSetup(), a = isoScreenToWorld(0, 0), b = isoScreenToWorld(innerWidth, innerHeight);
+    const T = tileSetup(), a = isoScreenToWorld(0, 0), b = isoScreenToWorld(frameWidth || innerWidth, frameHeight || innerHeight);
     const x0 = Math.max(0, Math.floor(a.x / T.world)), x1 = Math.min(Math.ceil(WORLD.width / T.world) - 1, Math.floor(b.x / T.world));
     const y0 = Math.max(0, Math.floor(a.y / T.world)), y1 = Math.min(Math.ceil(WORLD.height / T.world) - 1, Math.floor(b.y / T.world));
     let budget = 3; view.stats.tilesDrawn = 0; view.tileTick++;
@@ -819,16 +821,16 @@
       tiles.push([tx, ty, t]);
     }
     const dpr = canvas.width / Math.max(1, innerWidth);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#31402a'; ctx.fillRect(0, 0, innerWidth, innerHeight);
-    ctx.fillStyle = '#5f7448';
-    ctx.fillRect(sx(0), sy(0), WORLD.width * z(), WORLD.height * z() * SQ);
-    ctx.imageSmoothingEnabled = true;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = '#31402a'; g.fillRect(0, 0, frameWidth || innerWidth, frameHeight || innerHeight);
+    g.fillStyle = '#5f7448';
+    g.fillRect(sx(0), sy(0), WORLD.width * z(), WORLD.height * z() * SQ);
+    g.imageSmoothingEnabled = true;
     for (const [tx, ty, t] of tiles) {
-      if (!t) continue;
+      if (!t) { view.groundIncomplete = true; continue; }
       t.used = view.tileTick;
       const X = sx(tx * T.world), Y = sy(ty * T.world), W = T.world * z(), H = T.world * z() * SQ;
-      drawImage(t.c, Math.floor(X), Math.floor(Y), Math.ceil(W + 1), Math.ceil(H + 1));
+      paint(g, t.c, Math.floor(X), Math.floor(Y), Math.ceil(W + 1), Math.ceil(H + 1));
       view.stats.tilesDrawn++;
     }
     // Keep at most 96 tiles (about 100 MB at 512 px): drop the least recently used.
@@ -1854,6 +1856,48 @@
     };
   })();
 
+  // ---- the ground, baked ----
+  // The ground under everything - the terrain, its grass and stones, the
+  // season's colour and soaked earth with its puddles - only changes when the
+  // camera moves far, the zoom or the screen changes, or the season or the
+  // wetness moves on. It is drawn once into a picture GROUND_M css px larger
+  // than the screen on every side, and each frame copies that picture into the
+  // canvas, shifted by however far the camera has panned since (to whole device
+  // pixels, so it is copied, not resampled): one copy instead of five layers.
+  // While its tiles are still being made it is redrawn every frame until whole.
+  const GROUND_M = 160;
+  const groundCv = document.createElement('canvas'), groundG = groundCv.getContext('2d');
+  const groundIds = new WeakMap(); let groundIdNext = 1;
+  const idOf = o => o ? (groundIds.get(o) || (groundIds.set(o, groundIdNext), groundIdNext++)) : 0;
+  let groundBake = null;
+  function groundKey(dpr) {
+    const w = weather(), season = seasonState(), snow = season?.snow || 0, surfaceWet = w ? w.wetness * (1 - snow) : 0;
+    const wet = surfaceWet > 0.02 ? Math.round(surfaceWet * 200) / 200 : 0;
+    return [dpr, innerWidth, innerHeight, camera.zoom, idOf(view.ground), idOf(view.relief), view.village ? 1 : 0, detailed() ? 1 : 0,
+      assetState.ready ? 1 : 0, season?.groundTint ? grade.round(season.groundTint) : '', Math.round(snow * 50), wet].join('|');
+  }
+  function drawBakedGround() {
+    const dpr = canvas.width / Math.max(1, innerWidth), key = groundKey(dpr), B = groundBake;
+    const dx = B ? (B.x - camera.x) * z() : 0, dy = B ? (B.y - camera.y) * z() * SQ : 0;
+    if (!B || B.key !== key || B.incomplete || Math.abs(dx) > GROUND_M || Math.abs(dy) > GROUND_M) {
+      const W = innerWidth + 2 * GROUND_M, H = innerHeight + 2 * GROUND_M, bw = Math.round(W * dpr), bh = Math.round(H * dpr);
+      if (groundCv.width !== bw || groundCv.height !== bh) { groundCv.width = bw; groundCv.height = bh; }
+      // The ground functions draw for a frame of this (larger) size, centred on the camera.
+      const oldW = frameWidth, oldH = frameHeight; frameWidth = W; frameHeight = H; view.groundIncomplete = false;
+      try {
+        groundG.setTransform(dpr, 0, 0, dpr, 0, 0); groundG.globalAlpha = 1; groundG.globalCompositeOperation = 'source-over';
+        drawTerrain(groundG); groundG.setTransform(dpr, 0, 0, dpr, 0, 0);
+        drawGroundDetail(groundG); drawSeasonGround(groundG); drawWetTint(groundG);
+      } finally { frameWidth = oldW; frameHeight = oldH; }
+      groundBake = { key, x: camera.x, y: camera.y, incomplete: view.groundIncomplete };
+      view.stats.groundBakes = (view.stats.groundBakes || 0) + 1;
+    } else view.stats.groundReuses = (view.stats.groundReuses || 0) + 1;
+    const ox = Math.round(((groundBake.x - camera.x) * z() - GROUND_M) * dpr), oy = Math.round(((groundBake.y - camera.y) * z() * SQ - GROUND_M) * dpr);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(groundCv, ox, oy);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
   // ---- the frame ----
   function render(now) {
     global.__STATIC_SPRITE_CACHE_V1__?.beginFrame();
@@ -1867,12 +1911,8 @@
     buildingPresentation?.prepare(units,buildings);
     panFix();
     ensureAttackHook();
-    gpu?.begin(ctx);
-    drawTerrain();
-    drawGroundDetail();
-    gpu?.end();
+    drawBakedGround();
     view.stats.trenches = 0;
-    drawSeasonGround();
     drawWetGround(t);
     drawTrenchBeds(t);
     drawCraters();
@@ -2150,26 +2190,32 @@
     trackCache = null;
     for (const batch of trackBatches) { batch.path = null; batch.count = 0; }
   }
-  function drawWetGround(now) {
+  // Soaked ground: the colour of wet earth and grass, and puddles in low spots.
+  // Static for a given wetness, so it is baked into the ground picture.
+  function drawWetTint(g = ctx) {
     const w = weather(); if (!w) return;
-    const snow=seasonState()?.snow||0,wet=Math.max(w.wetness,snow*.8),surfaceWet=w.wetness*(1-snow);
+    const snow=seasonState()?.snow||0,surfaceWet=w.wetness*(1-snow);
     if (surfaceWet > 0.02) {
       // Soaked earth and grass: darker, a little cooler.
-      ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(150,158,170,${0.55 * surfaceWet})`; ctx.fillRect(0, 0, innerWidth, innerHeight);
-      ctx.globalCompositeOperation = 'source-over';
+      g.globalCompositeOperation = 'multiply'; g.fillStyle = `rgba(150,158,170,${0.55 * surfaceWet})`; g.fillRect(0, 0, (frameWidth || innerWidth), (frameHeight || innerHeight));
+      g.globalCompositeOperation = 'source-over';
       // Puddles in low spots (a fixed scatter over the map), reflecting the sky.
       if (surfaceWet > 0.35) {
-        const cell = 150, x0 = flatScreenToWorld(-60, -60), x1 = flatScreenToWorld(innerWidth + 60, innerHeight + 60);
+        const cell = 150, x0 = flatScreenToWorld(-60, -60), x1 = flatScreenToWorld((frameWidth || innerWidth) + 60, (frameHeight || innerHeight) + 60);
         for (let gx = Math.floor(x0.x / cell); gx <= Math.ceil(x1.x / cell); gx++) for (let gyy = Math.floor(x0.y / cell); gyy <= Math.ceil(x1.y / cell); gyy++) {
           if (hash(gx * 92821 + gyy, 7) > 0.22) continue;
           const wx = (gx + hash(gx, gyy)) * cell, wy = (gyy + hash(gyy, gx + 3)) * cell, r = (8 + hash(gx + 5, gyy) * 16) * z() * Math.min(1, (surfaceWet - 0.35) * 2.5);
           const X = sx(wx), Y = gy(wx, wy);
-          const g = ctx.createRadialGradient(X, Y, 0, X, Y, r);
-          g.addColorStop(0, 'rgba(112,126,138,.42)'); g.addColorStop(0.6, 'rgba(84,92,98,.34)'); g.addColorStop(0.85, 'rgba(58,50,40,.25)'); g.addColorStop(1, 'rgba(58,50,40,0)');
-          ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(X, Y, r * 1.4, r * SQ, hash(gx, gyy + 9) * 0.6, 0, 7); ctx.fill();
+          const grad = g.createRadialGradient(X, Y, 0, X, Y, r);
+          grad.addColorStop(0, 'rgba(112,126,138,.42)'); grad.addColorStop(0.6, 'rgba(84,92,98,.34)'); grad.addColorStop(0.85, 'rgba(58,50,40,.25)'); grad.addColorStop(1, 'rgba(58,50,40,0)');
+          g.fillStyle = grad; g.beginPath(); g.ellipse(X, Y, r * 1.4, r * SQ, hash(gx, gyy + 9) * 0.6, 0, 7); g.fill();
         }
       }
     }
+  }
+  function drawWetGround(now) {
+    const w = weather(); if (!w) return;
+    const snow=seasonState()?.snow||0,wet=Math.max(w.wetness,snow*.8);
     // One bounded ring, pruned even when no new unit crosses it. The existing
     // fog is drawn later and still covers unknown ground and enemy trails.
     wetTracks.prune(elapsed, wet);
@@ -2587,7 +2633,7 @@
     wetTracks.reset(); clearTrackPaths(); global.__SEASONAL_PROPS_V1__?.reset(); view.stats.tracks = view.stats.rainDrops = view.stats.trackDrawCalls = 0;
     view.attack = view.lastCam = null;
     fogGeometry.seen = fogGeometry.sight = null;
-    view.lastNow = view.fogAt = 0; view.fogWin = view.fogMaskWin = null;
+    view.lastNow = view.fogAt = 0; view.fogWin = view.fogMaskWin = null; groundBake = null;
     view.stats.corpses = view.stats.smoke = view.stats.hitDust = view.stats.hitDustDraws = view.stats.groundDetailDraws = 0;
     queueMicrotask(frameStartingForce);
   });

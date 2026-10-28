@@ -26,7 +26,9 @@ for(const mobile of[true,false])test(`cached ground dressing reuses tiles and st
    return{warm,reused,readonly};
   });
   expect(r.warm.groundDetailDraws).toBeGreaterThan(0);expect(r.warm.groundDetail.patches).toBeGreaterThan(0);
-  expect(r.reused.groundDetail.builds).toBe(r.warm.groundDetail.builds);expect(r.reused.groundDetail.hits).toBeGreaterThan(r.warm.groundDetail.hits);expect(r.readonly).toBe(true);
+  expect(r.reused.groundDetail.builds).toBe(r.warm.groundDetail.builds);
+  // Reused: the dressing tiles are not rebuilt, and the ground picture they are baked into is copied again.
+  expect(r.reused.groundReuses).toBeGreaterThan(r.warm.groundReuses||0);expect(r.readonly).toBe(true);
   await page.screenshot({path:test.info().outputPath(mobile?'ground-detail-mobile.png':'ground-detail-desktop.png')});
   const rest=await page.evaluate(()=>{
    for(let i=0;i<50;i++){camera.x=300+(i*437)%7500;camera.y=300+(i*281)%4000;atmoFrame();}
