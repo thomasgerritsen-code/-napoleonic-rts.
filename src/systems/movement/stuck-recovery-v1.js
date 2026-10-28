@@ -204,7 +204,24 @@
     const arrived=previousMoveToward(u,state?state.x:finalTarget.x,state?state.y:finalTarget.y,dt,speed);
     // Damped followers carry velocity around corners. Guard the actual swept step
     // as well as the route; discard wall-directed momentum after a correction.
-    if(firstBlocker(before,u,null,pad)){
+    const hit=firstBlocker(before,u,null,pad);
+    // A unit that stands on (or inside) an obstacle's margin - stopped beside a
+    // wall, or pushed there by a crowd - slides along the wall instead: the part
+    // of its step that goes towards the wall is dropped, the part along it kept.
+    // Reverting the whole step left it rooted to the spot for good.
+    let slid=false;
+    if(hit){
+      const qB=toLocal(before,hit),qU=toLocal(u,hit),gx=Math.abs(qB.x)-hit.w*.5,gy=Math.abs(qB.y)-hit.h*.5;
+      if(Math.max(gx,gy)<=pad+.5){
+        const axis=gx>=gy?'x':'y';
+        if(Math.abs(qU[axis])<Math.abs(qB[axis]))qU[axis]=qB[axis];
+        const p=toWorld(qU,hit);
+        if(Math.hypot(p.x-before.x,p.y-before.y)>.01&&!insideExpanded(p,hit,(TYPES[u.type]?.radius||0))&&!firstBlocker(before,p,hit.id,pad)){
+          u.x=p.x;u.y=p.y;slid=true;stats.wallSlides=(stats.wallSlides||0)+1;
+        }
+      }
+    }
+    if(hit&&!slid){
       const dx=u.x-before.x,dy=u.y-before.y;let lo=0,hi=1;
       for(let i=0;i<8;i++){const mid=(lo+hi)/2;if(firstBlocker(before,{x:before.x+dx*mid,y:before.y+dy*mid},null,pad))hi=mid;else lo=mid;}
       u.x=before.x+dx*lo;u.y=before.y+dy*lo;
