@@ -14,6 +14,10 @@
   const combatBounds = Object.fromEntries(['france','britain'].map(side=>[side,{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity}]));
   const regimentById = new Map();
   const membersByRegiment = new Map();
+  // Where each unit stands in units this step (dead ones too: units are never
+  // removed during a battle), and each regiment's living members as last found.
+  const unitSlot = new Map();
+  let memberMemo = new WeakMap(), frameNo = 0;
   const getRegimentBeforePerformanceV12 = getRegiment;
   const regimentMembersBeforePerformanceV12 = regimentMembers;
   const renderStats = {
@@ -49,6 +53,8 @@
     regimentById.clear();
     membersByRegiment.clear();
     livingUnitCount = 0;
+    unitSlot.clear(); frameNo++;
+    for (let i = 0; i < units.length; i++) unitSlot.set(units[i].id, i);
 
     for (const reg of regiments) {
       if (!reg.destroyed) regimentById.set(reg.id, reg);
@@ -80,6 +86,7 @@
   nrts.events.on('game:reset', () => {
     regimentById.clear();
     membersByRegiment.clear();
+    unitSlot.clear(); memberMemo = new WeakMap();
     combatGrid.france.clear();
     combatGrid.britain.clear();
     livingUnitCount = 0;
@@ -95,17 +102,33 @@
     return getRegimentBeforePerformanceV12(id);
   };
 
+  // The living units whose ids are in the regiment's memberIds, in units order -
+  // exactly what core's regimentMembers returns. memberIds keeps the ids of the
+  // fallen, so the old check (as many living members as ids) failed for every
+  // regiment that had lost a man, and each call then walked all units. Now the
+  // members are looked up by id and kept for the step until one of them falls
+  // or memberIds changes; a unit created during the step falls back to the walk.
   regimentMembers = function regimentMembersCached(reg) {
     if (!reg || reg.destroyed) return [];
     // Frame indexes are snapshots, never authoritative for a newly formed or
     // modified group. Fall back to live units until the next frame rebuild.
     if (regimentById.get(reg.id) !== reg) return regimentMembersBeforePerformanceV12(reg);
-    const members = membersByRegiment.get(reg.id);
-    if (!members || members.length !== reg.memberIds.length ||
-        members.some(unit => unit.dead || unit.regimentId !== reg.id || !reg.memberIds.includes(unit.id))) {
-      return regimentMembersBeforePerformanceV12(reg);
+    const ids = reg.memberIds, memo = memberMemo.get(reg);
+    if (memo && memo.frame === frameNo && memo.ids === ids && memo.length === ids.length && memo.list.every(u => !u.dead)) return memo.list;
+    const slots = [];
+    for (const id of ids) {
+      const i = unitSlot.get(id);
+      if (i === undefined || units[i]?.id !== id) return regimentMembersBeforePerformanceV12(reg);
+      slots.push(i);
     }
-    return members;
+    slots.sort((a, b) => a - b);
+    const list = [];
+    for (let k = 0; k < slots.length; k++) {
+      if (k && slots[k] === slots[k - 1]) continue;
+      const u = units[slots[k]]; if (!u.dead) list.push(u);
+    }
+    memberMemo.set(reg, { frame: frameNo, ids, length: ids.length, list });
+    return list;
   };
 
   nearestEnemyEntity = function nearestEnemyEntitySpatial(unit, maxRange) {

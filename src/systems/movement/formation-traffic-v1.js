@@ -115,7 +115,9 @@
       if(!u||u.dead)continue;
       for(const other of nearbyNavUnits(u)){
         if(!other||other.dead||other===u)continue;
-        const pair=u.id<other.id?`${u.id}:${other.id}`:`${other.id}:${u.id}`;
+        // One number per pair (ids stay far below 2^26): the same pairs as the
+        // 'low:high' strings, without building a string for every neighbour.
+        const pair=u.id<other.id?u.id*67108864+other.id:other.id*67108864+u.id;
         if(visited.has(pair))continue;
         visited.add(pair);
         let dx=other.x-u.x,dy=other.y-u.y;
