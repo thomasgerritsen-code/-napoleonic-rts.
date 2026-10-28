@@ -31,21 +31,30 @@ test('mobile night is exactly one readable colour layer; dawn/day return without
    const hud=()=>({color:getComputedStyle(document.querySelector('.topbar')).color,background:getComputedStyle(document.querySelector('.topbar')).backgroundColor});
    const hudBefore=hud(),day=lightFrame(0),dayPNG=canvas.toDataURL();
    const dusk=lightFrame(262.5),duskPNG=canvas.toDataURL();
-   const night=lightFrame(400),nightPNG=canvas.toDataURL(),nightState=api.state();
-   const dawn=lightFrame(562.5),returnDay=lightFrame(600),returnPNG=canvas.toDataURL();
+   const night=lightFrame(400),nightPNG=canvas.toDataURL(),nightState=api.state(),nightGrade=window.__ISO_VIEW_V1__.grade().night;
+   const dayGrade=(lightFrame(0),window.__ISO_VIEW_V1__.grade().night);
+   const dawn=lightFrame(562.5),returnDay=lightFrame(600),returnPNG=canvas.toDataURL(),returnGrade=window.__ISO_VIEW_V1__.grade().night;
    async function pixels(image){const im=new Image();im.src=image;await im.decode();const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const ctx=c.getContext('2d');ctx.drawImage(im,0,0);return{c,ctx};}
    const a=await pixels(dayPNG),b=await pixels(nightPNG),c=await pixels(returnPNG);
-   a.ctx.fillStyle=nightState.tint;a.ctx.fillRect(0,0,a.c.width,a.c.height);
+   // The night is one colour layer over the canvas: the canvas itself is the
+   // day's, and canvas + layer is the day with the night tint over it.
+   const nightCanvas=b.ctx.getImageData(0,0,b.c.width,b.c.height).data,dayCanvas=a.ctx.getImageData(0,0,a.c.width,a.c.height).data;
+   let canvasChanged=0;for(let i=0;i<dayCanvas.length;i++)if(dayCanvas[i]!==nightCanvas[i])canvasChanged++;
+   const nums=t=>(t.match(/[\d.]+/g)||[]).map(Number),tintNums=nums(nightState.tint),gradeNums=nums(nightGrade);
+   const sameColour=tintNums.length===gradeNums.length&&tintNums.every((v,i)=>Math.abs(v-gradeNums[i])<=.0005);
+   a.ctx.fillStyle=nightGrade;a.ctx.fillRect(0,0,a.c.width,a.c.height);
+   b.ctx.fillStyle=nightGrade;b.ctx.fillRect(0,0,b.c.width,b.c.height);
    const expected=a.ctx.getImageData(0,0,a.c.width,a.c.height).data,actual=b.ctx.getImageData(0,0,b.c.width,b.c.height).data;
    let changed=0,max=0;for(let i=0;i<expected.length;i++){const d=Math.abs(expected[i]-actual[i]);if(d)changed++;max=Math.max(max,d);}
    const original=await pixels(dayPNG),p=original.ctx.getImageData(0,0,original.c.width,original.c.height).data,q=c.ctx.getImageData(0,0,c.c.width,c.c.height).data;
    let returnedChanges=0,dayLight=0,nightLight=0;
    for(let i=0;i<p.length;i+=4){if(p[i]!==q[i]||p[i+1]!==q[i+1]||p[i+2]!==q[i+2])returnedChanges++;dayLight+=p[i]+p[i+1]+p[i+2];nightLight+=actual[i]+actual[i+1]+actual[i+2];}
-   return{day,dusk,night,dawn,returnDay,dayPNG,duskPNG,nightPNG,changed,max,returnedChanges,brightness:nightLight/dayLight,
+   return{day,dusk,night,dawn,returnDay,dayPNG,duskPNG,nightPNG,changed,max,returnedChanges,canvasChanged,sameColour,dayGrade,returnGrade,brightness:nightLight/dayLight,
     sameBattle:before===battle(),sameWeather:weather===JSON.stringify(window.__WEATHER_V1__.state()),sameSight:sight===visionRadius(probe),hudBefore,hudAfter:hud()};
   });
   for(const [name,png] of [['dag',r.dayPNG],['avond',r.duskPNG],['nacht',r.nightPNG]])await attach(name,png);
   expect(r.changed).toBe(0);expect(r.max).toBe(0);expect(r.returnedChanges).toBe(0);
+  expect(r.canvasChanged).toBe(0);expect(r.sameColour).toBe(true);expect(r.dayGrade).toBe('');expect(r.returnGrade).toBe('');
   expect(r.day.dayNightDraws).toBe(0);expect(r.dusk.dayNightDraws).toBe(1);expect(r.night.dayNightDraws).toBe(1);expect(r.dawn.dayNightDraws).toBe(1);expect(r.returnDay.dayNightDraws).toBe(0);
   expect(r.brightness).toBeGreaterThan(.6);expect(r.brightness).toBeLessThan(.9);
   expect(r.sameBattle).toBe(true);expect(r.sameWeather).toBe(true);expect(r.sameSight).toBe(true);expect(r.hudAfter).toEqual(r.hudBefore);expect(errors).toEqual([]);

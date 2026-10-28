@@ -1772,11 +1772,39 @@
     const b = typeof selectedBuilding !== 'undefined' ? selectedBuilding : null;
     if (b && !b.dead) { ctx.strokeRect(sx(b.x - b.w / 2), sy(b.y - b.h / 2) - liftAt(b.x, b.y), b.w * z(), b.h * z() * SQ); }
   }
+  // The drag box is a page layer above the colour grading (it keeps its
+  // brightness at night), placed in CSS pixels as it was drawn.
   function drawDragBox() {
-    if (!drag.active || !drag.moved || buildMode) return;
+    const box = grade.layers.box;
+    if (!drag.active || !drag.moved || buildMode) { if (box.style.display !== 'none') box.style.display = 'none'; return; }
     const x = Math.min(drag.startX, drag.x), y = Math.min(drag.startY, drag.y), w = Math.abs(drag.x - drag.startX), h = Math.abs(drag.y - drag.startY);
-    ctx.strokeStyle = 'rgba(245,220,112,.9)'; ctx.fillStyle = 'rgba(245,220,112,.12)'; ctx.fillRect(x, y, w, h); ctx.strokeRect(x, y, w, h);
+    Object.assign(box.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px`, display: 'block' });
   }
+
+  // ---- colour grading on page layers ----
+  // The weather's darkening and haze and the night colour cover the whole
+  // battlefield evenly. Painted into the canvas they filled every pixel once
+  // more on every frame; now they are plain coloured layers over the canvas,
+  // which the browser blends on the graphics chip, and the canvas is not
+  // touched. A layer is only written when its colour changes (rounded to
+  // 3 decimals), so a still evening costs nothing at all.
+  const grade = (() => {
+    const make = id => { const el = document.createElement('div'); el.id = id; el.setAttribute('aria-hidden', 'true');
+      el.style.cssText = 'position:fixed;inset:0;z-index:3;pointer-events:none;display:none'; return el; };
+    const layers = { dark: make('iso-grade-weather'), haze: make('iso-grade-haze'), night: make('iso-grade-night'), box: make('iso-drag-box') };
+    layers.box.style.cssText = 'position:fixed;z-index:3;pointer-events:none;display:none;box-sizing:border-box;' +
+      'border:1px solid rgba(245,220,112,.9);background:rgba(245,220,112,.12)';
+    // Stacked in painting order straight above the game canvas.
+    let anchor = canvas; for (const el of Object.values(layers)) { anchor.insertAdjacentElement('afterend', el); anchor = el; }
+    const shown = new Map();
+    function set(el, background) {
+      if (shown.get(el) === background) return; shown.set(el, background);
+      if (background) { el.style.background = background; el.style.display = 'block'; } else el.style.display = 'none';
+    }
+    const round = text => text.replace(/\d*\.\d+/g, n => String(+(+n).toFixed(3)));
+    return { layers, set, round, hide() { for (const el of [layers.dark, layers.haze, layers.night]) set(el, ''); layers.box.style.display = 'none'; },
+      state: () => ({ weather: shown.get(layers.dark) || '', haze: shown.get(layers.haze) || '', night: shown.get(layers.night) || '' }) };
+  })();
 
   // ---- the frame ----
   function render(now) {
@@ -1953,7 +1981,7 @@
   let inner = global.renderStableFrameV1;
   function stableFrame(drawGame, now) {
     if (!assetState.ready) return;
-    if (!view.on) return typeof inner === 'function' ? inner(drawGame, now) : drawGame();
+    if (!view.on) { grade.hide(); return typeof inner === 'function' ? inner(drawGame, now) : drawGame(); }
     // The game is drawn in the iso view only: the 2D renderer does not run at all
     // (its effect lists are capped where they are filled; exploring is simulation).
     const t0 = performance.now();
@@ -2145,24 +2173,20 @@
     // The phone renderer keeps its single night-colour layer.
     const lighting = !MOBILE_RENDER && global.__LIGHTING_V1__;
     if (lighting && light && lighting.draw(ctx, light, { sx, gy, z: z(), W: frameWidth || innerWidth, H: frameHeight || innerHeight, now: view.lastNow || performance.now() / 1000 })) {
-      view.stats.dayNightDraws = light.tint ? 1 : 0; return;
+      grade.set(grade.layers.night, ''); view.stats.dayNightDraws = light.tint ? 1 : 0; return;
     }
-    if (!light?.tint) return;
-    // Grade the battlefield, fog and weather together. The DOM HUD and the
-    // drag/facing feedback drawn afterwards retain their original brightness.
-    ctx.save(); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.filter = 'none';
-    ctx.fillStyle = light.tint; ctx.fillRect(0, 0, frameWidth || innerWidth, frameHeight || innerHeight); ctx.restore();
-    view.stats.dayNightDraws = 1;
+    // Grade the battlefield, fog and weather together: one colour layer over the
+    // canvas. The DOM HUD and the drag/facing feedback above it keep their brightness.
+    grade.set(grade.layers.night, light?.tint ? grade.round(light.tint) : '');
+    view.stats.dayNightDraws = light?.tint ? 1 : 0;
   }
   function drawWeather(now) {
-    const w = weather(); if (!w) return;
+    const w = weather();
+    if (!w) { grade.set(grade.layers.dark, ''); grade.set(grade.layers.haze, ''); return; }
     const W = innerWidth, H = innerHeight;
-    if (w.dark > 0.01) { ctx.fillStyle = `rgba(28,34,46,${0.5 * w.dark})`; ctx.fillRect(0, 0, W, H); }
-    if (w.fog > 0.01) {
-      const g = ctx.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, `rgba(214,219,224,${0.6 * w.fog})`); g.addColorStop(0.55, `rgba(214,219,224,${0.4 * w.fog})`); g.addColorStop(1, `rgba(214,219,224,${0.28 * w.fog})`);
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    }
+    // Overcast darkening and ground haze: page layers over the canvas (see grade).
+    grade.set(grade.layers.dark, w.dark > 0.01 ? grade.round(`rgba(28,34,46,${0.5 * w.dark})`) : '');
+    grade.set(grade.layers.haze, w.fog > 0.01 ? grade.round(`linear-gradient(rgba(214,219,224,${0.6 * w.fog}) 0%, rgba(214,219,224,${0.4 * w.fog}) 55%, rgba(214,219,224,${0.28 * w.fog}) 100%)`) : '');
     if (w.rain > 0.02) {
       // Streaks slanting with the wind, a fixed set wrapped over the screen.
       const wind = global.__MAP_AMBIENT_MOTION_V1__?.currentWind?.() || { x: 0.4, y: 0 };
@@ -2516,6 +2540,8 @@
   global.__ISO_VIEW_V1__ = Object.freeze({
     version: 'iso-view-v1', optIn: 'view=iso',
     isOn: () => view.on, setOn, setOverview, atlasKeys: () => Object.keys(view.atlases), lookOf,
+    // The colour grading layers over the canvas (CSS backgrounds; '' when off).
+    grade: () => grade.state(),
     animsOf: key => [...(view.atlases[key]?.byAnim.keys() || [])],
     // The sprite a unit is drawn with now ([atlas, anim, frame]), and the kinds of tree and bush on the map.
     frameOf: id => { const u = units.find(q => q.id === id), m = view.info.get(id); return u && m ? frameFor(u, m, performance.now() / 1000) : null; },
