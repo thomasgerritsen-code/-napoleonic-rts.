@@ -1517,6 +1517,21 @@
     for (let i = 1; i < pts.length; i++) c.lineTo(sx(pts[i][0]) / 2 + FOG_M, gy(pts[i][0], pts[i][1]) / 2 + FOG_M);
     c.closePath();
   }
+  // Phone: a soft edge without a blur filter (which a phone runs on the main
+  // processor): the layer halved step by step (each step averages, so the shape
+  // stays round) to about the blur's reach, then laid back smoothly.
+  const softSteps = [];
+  function softDraw(f, layer, alpha, soft) {
+    let src = layer, sw = layer.width, sh = layer.height, k = 1;
+    for (let i = 0; k * 2 <= Math.max(2, soft); i++) {
+      const c = softSteps[i] || (softSteps[i] = document.createElement('canvas')), w = Math.ceil(sw / 2), h = Math.ceil(sh / 2);
+      if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+      const g = c.getContext('2d'); g.globalCompositeOperation = 'copy'; g.imageSmoothingEnabled = true;
+      g.drawImage(src, 0, 0, sw, sh, 0, 0, w, h);
+      src = c; sw = w; sh = h; k *= 2;
+    }
+    f.imageSmoothingEnabled = true; f.globalAlpha = alpha; f.drawImage(src, 0, 0, sw, sh, 0, 0, sw * k, sh * k);
+  }
   function drawFog() {
     if (typeof frenchVisionSources !== 'function' || typeof visionRadius !== 'function') return;
     const w = Math.ceil(innerWidth / 2) + 2 * FOG_M, h = Math.ceil(innerHeight / 2) + 2 * FOG_M, now = performance.now();
@@ -1555,23 +1570,30 @@
       for (const src of frenchVisionSources()) {
         const r = visionRadius(src);
         if (src.x + r < a.x || src.x - r > b.x || src.y + r < a.y || src.y - r > b.y + (view.relief ? view.relief.maxM * PPM * 2 : 0)) continue;
-        sightPoints.push(src.x, src.y, r);
+        // On a 6 px grid: men shuffling in their ranks leave the (blurred) rim
+        // as it was, so its geometry is reused instead of rebuilt.
+        sightPoints.push(Math.round(src.x / 6) * 6, Math.round(src.y / 6) * 6, Math.round(r / 6) * 6);
       }
-      drawFogGeometry('sight', sightCtx, sightPoints, 48, w, h);
+      drawFogGeometry('sight', sightCtx, sightPoints, MOBILE_RENDER ? 28 : 48, w, h);
       // Cut both out of the mist, blurred so the edges are soft.
       const soft = Math.max(3, 30 * z());
       f.globalCompositeOperation = 'destination-out';
-      if (FOG_SOFT) f.filter = `blur(${soft}px)`;
-      f.globalAlpha = SEEN_VEIL; f.drawImage(seenLayer, 0, 0);
-      if (FOG_SOFT) f.filter = `blur(${soft}px)`;
-      f.globalAlpha = 1; f.drawImage(sightLayer, 0, 0);
-      f.filter = 'none'; f.globalCompositeOperation = 'source-over';
-      billowEdges(f, w, h, now);
+      if (MOBILE_RENDER) { softDraw(f, seenLayer, SEEN_VEIL, soft); softDraw(f, sightLayer, 1, soft); }
+      else {
+        if (FOG_SOFT) f.filter = `blur(${soft}px)`;
+        f.globalAlpha = SEEN_VEIL; f.drawImage(seenLayer, 0, 0);
+        if (FOG_SOFT) f.filter = `blur(${soft}px)`;
+        f.globalAlpha = 1; f.drawImage(sightLayer, 0, 0);
+      }
+      f.filter = 'none'; f.globalAlpha = 1; f.globalCompositeOperation = 'source-over';
+      // The billowing rim reads the mask back from the graphics chip: on a phone
+      // that stalls the frame, so there the rim stays a soft blur.
+      if (!MOBILE_RENDER) billowEdges(f, w, h, now);
       view.stats.fogCells = seenPoints.length / 3; view.stats.fogSources = sightPoints.length / 3;
     }
     const cached = view.cloudCam;
     if (cached && cached.zoom === z() && cached.maskAt === view.fogAt &&
-        now - cached.at < 1000 / 15 && Math.abs((cached.x-camera.x)*z()) < 96 && Math.abs((cached.y-camera.y)*z()*SQ) < 96 &&
+        now - cached.at < 1000 / (MOBILE_RENDER ? 8 : 15) && Math.abs((cached.x-camera.x)*z()) < 96 && Math.abs((cached.y-camera.y)*z()*SQ) < 96 &&
         cached.width === innerWidth && cached.height === innerHeight) {
       view.stats.cloudReuses = (view.stats.cloudReuses || 0) + 1; blitClouds(cached); return;
     }
