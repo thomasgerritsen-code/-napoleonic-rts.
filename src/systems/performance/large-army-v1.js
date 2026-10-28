@@ -16,7 +16,7 @@
   const membersByRegiment = new Map();
   // Where each unit stands in units this step (dead ones too: units are never
   // removed during a battle), and each regiment's living members as last found.
-  const unitSlot = new Map();
+  const unitSlot = new Map(), regimentSlot = new Map();
   let memberMemo = new WeakMap(), frameNo = 0;
   const getRegimentBeforePerformanceV12 = getRegiment;
   const regimentMembersBeforePerformanceV12 = regimentMembers;
@@ -56,7 +56,10 @@
     unitSlot.clear(); frameNo++;
     for (let i = 0; i < units.length; i++) unitSlot.set(units[i].id, i);
 
-    for (const reg of regiments) {
+    regimentSlot.clear();
+    for (let i = 0; i < regiments.length; i++) {
+      const reg = regiments[i];
+      regimentSlot.set(reg, i);
       if (!reg.destroyed) regimentById.set(reg.id, reg);
     }
 
@@ -86,7 +89,7 @@
   nrts.events.on('game:reset', () => {
     regimentById.clear();
     membersByRegiment.clear();
-    unitSlot.clear(); memberMemo = new WeakMap();
+    unitSlot.clear(); regimentSlot.clear(); memberMemo = new WeakMap();
     combatGrid.france.clear();
     combatGrid.britain.clear();
     livingUnitCount = 0;
@@ -98,7 +101,8 @@
   getRegiment = function getRegimentCached(id) {
     const reg = regimentById.get(id);
     // Guard commands executed between two simulation ticks after a reset.
-    if (reg && !reg.destroyed && regiments.includes(reg)) return reg;
+    // Still in the list where this step found it (else look it up as before).
+    if (reg && !reg.destroyed && (regiments[regimentSlot.get(reg)] === reg || regiments.includes(reg))) return reg;
     return getRegimentBeforePerformanceV12(id);
   };
 

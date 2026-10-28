@@ -26,18 +26,25 @@ function rebuildSpatialHash() {
 }
 
 function nearbyNavUnits(u) {
+  return nearbyNavUnitsInto(u, []);
+}
+
+// The same neighbours in the same order, written into an array the caller
+// keeps and reuses: the hot loops ask this for every man every step.
+function nearbyNavUnitsInto(u, result) {
+  result.length = 0;
   const cx = Math.floor(u.x / NAV_CELL), cy = Math.floor(u.y / NAV_CELL);
-  const result = [];
   for (let ox = -1; ox <= 1; ox++) {
     const column = navColumns.get(cx + ox);
     if (!column) continue;
     for (let oy = -1; oy <= 1; oy++) {
       const bucket = column.get(cy + oy);
-      if (bucket) result.push(...bucket);
+      if (bucket) for (let i = 0; i < bucket.length; i++) result.push(bucket[i]);
     }
   }
   return result;
 }
+const NAV_VECTOR_NEAR = [];
 
 function navigationVector(u, tx, ty) {
   let dx = tx - u.x, dy = ty - u.y;
@@ -46,7 +53,7 @@ function navigationVector(u, tx, ty) {
 
   // Local separation: prevents large groups from collapsing into a single point.
   let sx = 0, sy = 0;
-  for (const other of nearbyNavUnits(u)) {
+  for (const other of nearbyNavUnitsInto(u, NAV_VECTOR_NEAR)) {
     if (other === u || other.dead) continue;
     const ox = u.x - other.x, oy = u.y - other.y;
     const od = Math.hypot(ox, oy);

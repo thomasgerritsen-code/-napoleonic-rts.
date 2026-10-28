@@ -11,7 +11,9 @@
   const stats={groupReplans:0,unitNudges:0,unsafeNudgesRejected:0,alternativeNudges:0,waterRescues:0,samples:0,localDetours:0,detourResumes:0,blockedDirectSteps:0,crossingReplansSuppressed:0,crossingChangedReplans:0,formationReplansSuppressed:0,trafficYieldReplansSuppressed:0,nearTargetReplansSuppressed:0,phaseResets:0};
 
   const obstacleCell=256,emptyVillages=[];
-  let villageSource=null,villageRects=[],villageGrid=new Map();
+  let villageSource=null,villageRects=[],villageGrid=new Map(),villageCellRects=new Map();
+  // Numeric cell keys (cells stay far inside ±2^15 on any map) instead of 'x:y' strings.
+  const cellKey=(x,y)=>(x+32768)*65536+(y+32768);
   function villageObstacles(){
     const villages=global.VILLAGE_SCENERY_V4||global.__VILLAGE_SCENERY_V4_DATA__||emptyVillages;
     if(villages===villageSource)return villageRects;
@@ -22,9 +24,13 @@
       const ex=(o.w*c+o.h*s)/2,ey=(o.w*s+o.h*c)/2;
       for(let y=Math.floor((o.y-ey)/obstacleCell);y<=Math.floor((o.y+ey)/obstacleCell);y++)
         for(let x=Math.floor((o.x-ex)/obstacleCell);x<=Math.floor((o.x+ex)/obstacleCell);x++){
-          const key=`${x}:${y}`;if(!villageGrid.has(key))villageGrid.set(key,[]);villageGrid.get(key).push(i);
+          const key=cellKey(x,y);if(!villageGrid.has(key))villageGrid.set(key,[]);villageGrid.get(key).push(i);
         }
     });
+    // Each cell's ids are already ascending (houses are visited in order), so a
+    // query that stays in one cell can hand out that cell's houses as they are.
+    villageCellRects=new Map();
+    for(const[key,ids]of villageGrid)villageCellRects.set(key,ids.map(i=>villageRects[i]));
     return villageRects;
   }
   // Buildings stand square (angle 0), so with a point or segment only those whose
@@ -43,14 +49,19 @@
     const all=villageObstacles();let nearby=all;
     // Invalid/very long segments use the original full scan. Apart from being
     // cheaper than visiting empty cells, this prevents unbounded grid loops.
-    const finite=a&&b&&[a.x,a.y,b.x,b.y,pad].every(Number.isFinite);
+    const finite=!!(a&&b)&&Number.isFinite(a.x)&&Number.isFinite(a.y)&&Number.isFinite(b.x)&&Number.isFinite(b.y)&&Number.isFinite(pad);
     const cellCount=finite?(Math.ceil((Math.abs(a.x-b.x)+pad*3)/obstacleCell)+2)*(Math.ceil((Math.abs(a.y-b.y)+pad*3)/obstacleCell)+2):Infinity;
     if(finite&&cellCount<=Math.max(16,all.length*2)){
-      const ids=new Set(),margin=pad*Math.SQRT2;
-      for(let y=Math.floor((Math.min(a.y,b.y)-margin)/obstacleCell);y<=Math.floor((Math.max(a.y,b.y)+margin)/obstacleCell);y++)
-        for(let x=Math.floor((Math.min(a.x,b.x)-margin)/obstacleCell);x<=Math.floor((Math.max(a.x,b.x)+margin)/obstacleCell);x++)
-          for(const id of villageGrid.get(`${x}:${y}`)||[])ids.add(id);
-      nearby=[...ids].sort((a,b)=>a-b).map(i=>all[i]);
+      const margin=pad*Math.SQRT2;
+      const x0=Math.floor((Math.min(a.x,b.x)-margin)/obstacleCell),x1=Math.floor((Math.max(a.x,b.x)+margin)/obstacleCell);
+      const y0=Math.floor((Math.min(a.y,b.y)-margin)/obstacleCell),y1=Math.floor((Math.max(a.y,b.y)+margin)/obstacleCell);
+      if(x0===x1&&y0===y1)nearby=villageCellRects.get(cellKey(x0,y0))||emptyVillages;
+      else{
+        const ids=new Set();
+        for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)
+          for(const id of villageGrid.get(cellKey(x,y))||emptyVillages)ids.add(id);
+        nearby=[...ids].sort((a,b)=>a-b).map(i=>all[i]);
+      }
     }
     stats.obstacleQueries=(stats.obstacleQueries||0)+1;stats.obstacleCandidates=(stats.obstacleCandidates||0)+nearby.length;
     // Player buildings stay live: placing, moving or destroying one is visible immediately.

@@ -110,10 +110,10 @@
   }
 
   resolveUnitOverlaps=function resolveUnitOverlapsFormationTrafficV132(){
-    const visited=new Set();
+    const visited=new Set(),near=[];
     for(const u of units){
       if(!u||u.dead)continue;
-      for(const other of nearbyNavUnits(u)){
+      for(const other of (typeof nearbyNavUnitsInto==='function'?nearbyNavUnitsInto(u,near):nearbyNavUnits(u))){
         if(!other||other.dead||other===u)continue;
         // One number per pair (ids stay far below 2^26): the same pairs as the
         // 'low:high' strings, without building a string for every neighbour.
