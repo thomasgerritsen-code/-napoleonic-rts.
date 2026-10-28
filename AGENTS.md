@@ -31,6 +31,11 @@ de een heel als de ander pusht.
 - Verander je een script, verhoog dan zijn `?build=`-parameter in `play.html`
   (of in `src/foundation/legacy-facades.js` voor de scripts die daar laden), anders
   ziet de browser de oude versie.
+- Online (Vercel en GitHub Pages) voegt `scripts/bundle-play.js` de scripts van
+  `play.html` samen tot een paar bundels; in de repository en de tests blijven ze
+  los. Een script dat een naam van een later script noemt (ook in `typeof`)
+  begint vanzelf een nieuwe bundel, dus de laadvolgorde blijft zoals in `play.html`.
+  Houd scripts strict (`'use strict'` bovenaan), anders laadt het los.
 
 ## Testen voor een push
 

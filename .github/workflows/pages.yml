@@ -374,6 +374,9 @@ jobs:
       - name: Stamp unique published build version
         run: node scripts/stamp-deployment.js
 
+      - name: Bundle play.html scripts
+        run: node scripts/bundle-play.js
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
         with:
