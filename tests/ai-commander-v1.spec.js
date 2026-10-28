@@ -232,8 +232,11 @@ test('AI attack stops an active artillery order inside support range and stages 
     }
 
     const target=window.__AI_COMMANDER_V1__.strategicTarget();
-    const near=livingUnits('britain').find(u=>u.type==='artillery');
-    near.x=target.x+300; near.y=target.y;
+    // Armies start with workers only: bring a British gun if none is on the field.
+    const near=livingUnits('britain').find(u=>u.type==='artillery')||createUnit('britain','artillery',target.x+280,target.y);
+    // At the gun's contact stand-off (proximity-engagement keeps AI guns 280 px
+    // from the enemy), so holding here is what both layers ask for.
+    near.x=target.x+280; near.y=target.y;
     near.targetX=target.x; near.targetY=target.y;
 
     const far=createUnit('britain','artillery',target.x+700,target.y);
