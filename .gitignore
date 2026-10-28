@@ -7,3 +7,4 @@ art/frames/
 __pycache__/
 .bvenv/
 bundle/
+public/

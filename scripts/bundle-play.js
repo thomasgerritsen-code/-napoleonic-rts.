@@ -101,12 +101,28 @@ function bundlePlay(root, { page = 'play.html', outDir = 'bundle' } = {}) {
   return chunks.map(chunk => ({ file: chunk.file || chunk.items[0].file, scripts: chunk.items.length, reason: chunk.reason }));
 }
 
+// Copies the site into outDir (Vercel serves a build's output folder), leaving
+// out what is never served.
+const NOT_SERVED = new Set(['.git', 'node_modules', 'public', '.vercel', 'playwright-report', 'test-results']);
+function copySite(root, outDir) {
+  const out = path.resolve(root, outDir);
+  fs.rmSync(out, { recursive: true, force: true });
+  fs.mkdirSync(out, { recursive: true });
+  for (const entry of fs.readdirSync(root)) {
+    if (NOT_SERVED.has(entry)) continue;
+    fs.cpSync(path.join(root, entry), path.join(out, entry), { recursive: true });
+  }
+  return out;
+}
+
 if (require.main === module) {
-  const root = path.resolve(__dirname, '..');
+  const at = process.argv.indexOf('--out');
+  const repo = path.resolve(__dirname, '..');
+  const root = at > 0 ? copySite(repo, process.argv[at + 1]) : repo;
   const result = bundlePlay(root);
   const scripts = result.reduce((sum, chunk) => sum + chunk.scripts, 0);
   console.log(`Bundled ${scripts} scripts into ${result.length} files`);
   for (const chunk of result) console.log(`  ${chunk.file}: ${chunk.scripts} scripts (${chunk.reason})`);
 }
 
-module.exports = { bundlePlay, planBundles, topLevelNames, isStrict };
+module.exports = { bundlePlay, planBundles, topLevelNames, isStrict, copySite };

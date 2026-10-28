@@ -1,5 +1,6 @@
 {
-  "buildCommand": "node scripts/bundle-play.js",
+  "buildCommand": "node scripts/bundle-play.js --out public",
+  "outputDirectory": "public",
   "headers": [
     {
       "source": "/bundle/(.*)",
