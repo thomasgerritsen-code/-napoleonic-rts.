@@ -83,17 +83,39 @@ function riverHitV067(x,y){
   }
   return bestIndex<0?null:{x:bestX,y:bestY,t:bestT,distance:bestDistance,segmentIndex:bestIndex};
 }
+// Exact quick answer for points far from the river. riverHitV067 only measures
+// the segments around the binary-search index; every one of their points has an
+// x within that window's [min,max], so a point farther than `reach` outside it
+// horizontally is farther than `reach` from all of them. Most units, houses and
+// route samples are far from the water, and most river queries end here.
+const riverWindowV067=(()=>{
+  const points=RIVER_SMOOTH_POINTS_V296,n=points.length,min=new Float64Array(n),max=new Float64Array(n);
+  for(let lo=0;lo<n;lo++){
+    let a=Infinity,b=-Infinity;
+    for(let i=Math.max(0,lo-7);i<=Math.min(n-1,lo+8);i++){a=Math.min(a,points[i].x);b=Math.max(b,points[i].x);}
+    min[lo]=a;max[lo]=b;
+  }
+  return {min,max};
+})();
+function riverFarV067(x,y,reach){
+  const points=RIVER_SMOOTH_POINTS_V296;
+  let lo=0,hi=points.length-1;
+  while(hi-lo>1){const mid=(hi+lo)>>1;if(points[mid].y<y)lo=mid;else hi=mid;}
+  return x<riverWindowV067.min[lo]-reach||x>riverWindowV067.max[lo]+reach;
+}
 function crossingPassageContainsV067(c,x,y){
   const dx=x-c.x,dy=y-c.y,cos=Math.cos(c.angle),sin=Math.sin(c.angle);
   const along=dx*cos+dy*sin,perp=-dx*sin+dy*cos;
   return Math.abs(along)<=c.length/2&&Math.abs(perp)<=c.width/2;
 }
 function crossingAtV067(x,y){
+  if(riverFarV067(x,y,RIVER_NAV_HALF_WIDTH_V067+28))return null;
   const raw=riverHitV067(x,y);
   if(!raw||raw.distance>RIVER_NAV_HALF_WIDTH_V067+28)return null;
   return WATER_CROSSINGS_V067.find(c=>crossingPassageContainsV067(c,x,y))||null;
 }
 function waterAtV067(x,y){
+  if(riverFarV067(x,y,RIVER_NAV_HALF_WIDTH_V067))return false;
   const hit=riverHitV067(x,y);
   if(!hit||hit.distance>RIVER_NAV_HALF_WIDTH_V067)return false;
   return !WATER_CROSSINGS_V067.some(c=>crossingPassageContainsV067(c,x,y));
@@ -129,7 +151,9 @@ function segmentWaterCrossingV067(ax,ay,bx,by){
   const distance=Math.hypot(bx-ax,by-ay),samples=Math.max(1,Math.ceil(distance/12));
   let touchesRiver=false,crossing=null,blocked=false;
   for(let i=0;i<=samples;i++){
-    const t=i/samples,x=ax+(bx-ax)*t,y=ay+(by-ay)*t,raw=riverHitV067(x,y);
+    const t=i/samples,x=ax+(bx-ax)*t,y=ay+(by-ay)*t;
+    if(riverFarV067(x,y,RIVER_NAV_HALF_WIDTH_V067))continue;
+    const raw=riverHitV067(x,y);
     if(!raw||raw.distance>RIVER_NAV_HALF_WIDTH_V067)continue;
     touchesRiver=true;
     const c=WATER_CROSSINGS_V067.find(item=>crossingPassageContainsV067(item,x,y));
@@ -146,7 +170,9 @@ function segmentCrossesBlockedWaterV067(ax,ay,bx,by){
   // Exact early answer for the common case, a step far from the river: every point
   // of the segment lies within half its length of the middle, so when the middle
   // is farther than that plus the river's half width, no point can be in the water.
-  const half=Math.hypot(bx-ax,by-ay)/2,mid=riverHitV067((ax+bx)/2,(ay+by)/2);
+  const half=Math.hypot(bx-ax,by-ay)/2;
+  if(riverFarV067((ax+bx)/2,(ay+by)/2,RIVER_NAV_HALF_WIDTH_V067+half+1)){WATER_SEGMENT_STATS_V1.far=(WATER_SEGMENT_STATS_V1.far||0)+1;return false;}
+  const mid=riverHitV067((ax+bx)/2,(ay+by)/2);
   if(!mid||mid.distance>RIVER_NAV_HALF_WIDTH_V067+half+1){WATER_SEGMENT_STATS_V1.far=(WATER_SEGMENT_STATS_V1.far||0)+1;return false;}
   const key=`${ax}:${ay}:${bx}:${by}`,cached=WATER_SEGMENT_CACHE_V1.get(key);
   if(cached!==undefined){WATER_SEGMENT_STATS_V1.hits++;return cached;}
