@@ -160,6 +160,7 @@
     <label>Man per regiment<span class="stepper"><button type="button" data-men="-4" aria-label="minder">−</button><output data-men-count></output><button type="button" data-men="4" aria-label="meer">+</button></span></label>
     <label>Britse AI voert bevel<button type="button" data-ai aria-pressed="false">Uit</button></label>
     <label>Fog of war<button type="button" data-fog aria-pressed="false">Uit</button></label>
+    <label>Tekenen met<button type="button" data-renderer>Canvas</button></label>
     <div class="lab-actions"><button type="button" class="primary" data-action="setup">Plaats legers</button><button type="button" data-action="charge">Ten aanval!</button><button type="button" data-action="clear">Leeg veld</button></div>`;
   toggle.addEventListener('click',()=>{panel.hidden=!panel.hidden;});
   panel.addEventListener('click',e=>{
@@ -169,6 +170,8 @@
     else if(b.dataset.men)config.men=Math.max(8,Math.min(48,config.men+Number(b.dataset.men)));
     else if('ai' in b.dataset)setAI(!config.aiBritain);
     else if('fog' in b.dataset)setFog(!config.fog);
+    // The WebGL scene is chosen when the page loads: reload with the other one.
+    else if('renderer' in b.dataset){const url=new URL(location.href);url.searchParams.set('gl',root.__ISO_GL_SCENE_V1__?.active()?'0':'1');location.replace(url.href);return;}
     else if(b.dataset.action==='setup')setup();
     else if(b.dataset.action==='charge')charge();
     else if(b.dataset.action==='clear'){clearField();statusEl.textContent='Testveld: het veld is leeg.';}
@@ -181,6 +184,7 @@
     for(const o of panel.querySelectorAll('[data-count]')){const[side,kind]=o.dataset.count.split(':');o.textContent=config[side][kind];}
     panel.querySelector('[data-men-count]').textContent=config.men;
     const ai=panel.querySelector('[data-ai]');ai.setAttribute('aria-pressed',String(config.aiBritain));ai.textContent=config.aiBritain?'Aan':'Uit';
+    const gl=panel.querySelector('[data-renderer]');gl.textContent=root.__ISO_GL_SCENE_V1__?.active()?'WebGL':'Canvas';
     const fog=panel.querySelector('[data-fog]');fog.setAttribute('aria-pressed',String(config.fog));fog.textContent=config.fog?'Aan':'Uit';
   }
   // Frame rate measured here, independent of which renderer is drawing.

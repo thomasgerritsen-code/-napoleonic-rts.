@@ -1185,9 +1185,41 @@
     }
   }
   // Blood seeping out under a fallen man: a dark pool that spreads over a few seconds.
+  // ---- small hand-drawn pieces as sprites, for the WebGL scene ----
+  // A pool of blood (two turned ovals), a berry and a rock, drawn once on one
+  // sheet - the ovals at 16 turns - and laid by the graphics chip at any size
+  // and opacity. Only the WebGL scene uses them; the canvas keeps its paths.
+  const handSheet = (() => {
+    const N = 16, S = 64, c = document.createElement('canvas'); c.width = S * N; c.height = S * 3;
+    const g = c.getContext('2d');
+    for (let i = 0; i < N; i++) {
+      const a = i / N * Math.PI;
+      g.fillStyle = 'rgb(92,10,8)'; g.beginPath(); g.ellipse(S * i + S / 2, S / 2, 30, 30 * SQ * 0.9, a, 0, 7); g.fill();
+      g.fillStyle = 'rgb(55,4,4)'; g.beginPath(); g.ellipse(S * i + S / 2, S * 1.5, 30, 30 * SQ, a, 0, 7); g.fill();
+    }
+    g.fillStyle = '#8c1f2a'; g.beginPath(); g.arc(S / 2, S * 2.5, 30, 0, 7); g.fill();
+    // A rock at s = 24 (drawRock's shapes), its foot at (S + 28, 2S + 36).
+    const x = S + 28, y = S * 2 + 36, r = 24;
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x + r * .2, y + r * .1, r * 1.2, r * .45, 0, 0, 7); g.fill();
+    g.fillStyle = '#7c7a73'; g.beginPath(); g.moveTo(x - r, y); g.lineTo(x - r * .5, y - r * 1.1); g.lineTo(x + r * .4, y - r * 1.3);
+    g.lineTo(x + r, y - r * .3); g.lineTo(x + r * .6, y + r * .2); g.closePath(); g.fill();
+    g.fillStyle = '#9a978d'; g.beginPath(); g.moveTo(x - r * .5, y - r * 1.1); g.lineTo(x + r * .4, y - r * 1.3); g.lineTo(x + r * .1, y - r * .5); g.closePath(); g.fill();
+    return { canvas: c, N, S };
+  })();
+  const glHand = () => glFrame.mode === 'scene';
+  // These pieces go to the chip as sprites when the WebGL scene runs this frame.
+  const glScene = () => !!global.__ISO_GL_SCENE_V1__?.active();
+  // An oval of the sheet (row 0 or 1) at (cx, cy), long radius r, turned a, at this opacity.
+  function sheetOval(row, cx, cy, r, a, alpha) {
+    const { canvas: c, N, S } = handSheet, turn = ((a % Math.PI) + Math.PI) % Math.PI, i = Math.round(turn / Math.PI * N) % N, k = r / 30;
+    const old = ctx.globalAlpha; ctx.globalAlpha = old * alpha;
+    drawImage(c, S * i, S * row, S, S, cx - S / 2 * k, cy - S / 2 * k, S * k, S * k);
+    ctx.globalAlpha = old;
+  }
   function bloodPool(X, Y, age, seed) {
     const g = Math.min(1, Math.max(0, age) / BLOOD_SPREAD), r = (0.25 + 0.4 * g) * PPM * z() * (0.85 + seed * 0.3);
     const ox = (seed - 0.5) * 0.5 * PPM * z();
+    if (glHand()) { sheetOval(0, X + ox, Y, r, seed * 2, 0.55 + 0.25 * g); if (g > 0) sheetOval(1, X + ox * 0.8, Y, r * 0.55, seed * 2, 0.5 * g); return; }
     ctx.fillStyle = `rgba(92,10,8,${0.55 + 0.25 * g})`; ctx.beginPath(); ctx.ellipse(X + ox, Y, r, r * SQ * 0.9, seed * 2, 0, 7); ctx.fill();
     ctx.fillStyle = `rgba(55,4,4,${0.5 * g})`; ctx.beginPath(); ctx.ellipse(X + ox * 0.8, Y, r * 0.55, r * 0.55 * SQ, seed * 2, 0, 7); ctx.fill();
   }
@@ -1345,19 +1377,22 @@
       return { gpu: true, y: r.y, box: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
         drawPlant(prop,kind,r.x,r.y, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
     }
-    if (r.type === 'iron') { const x = sx(r.x), y = gy(r.x, r.y), s = 9 * z() + 2; return { y: r.y, area: [x - s * 1.3, y - s * 1.4, x + s * 1.5, y + s * .7], draw: () => drawRock(r) }; }
+    if (r.type === 'iron') { const x = sx(r.x), y = gy(r.x, r.y), s = 9 * z() + 2; return { gpu: glScene(), y: r.y, area: [x - s * 1.3, y - s * 1.4, x + s * 1.5, y + s * .7], draw: () => drawRock(r) }; }
     // Berry bushes: some hawthorns with their red haws among the bushes.
     const kind=hash(r.id, 9) < 0.5 && view.props.hawthorn ? 'hawthorn' : 'bush',prop=view.props[kind]; if (!prop) return null;
     const bk = spriteK() * 0.75;
     // area: where it is drawn by hand (the WebGL scene lays in only that).
-    return { y: r.y, area: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, bk), draw: () => { const k = spriteK() * 0.75;
+    return { gpu: glScene(), y: r.y, area: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, bk), draw: () => { const k = spriteK() * 0.75;
       drawPlant(prop,kind,r.x,r.y, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k);
-      ctx.fillStyle = '#8c1f2a'; for (let i = 0; i < 5; i++) { ctx.beginPath();
-        ctx.arc(sx(r.x) + (hash(r.id, i) - .5) * 18 * z(), gy(r.x, r.y) - (4 + hash(i, r.id) * 10) * z(), 1.6 * z() + .6, 0, 7); ctx.fill(); }
+      if (glHand()) { const { canvas: c, S } = handSheet; for (let i = 0; i < 5; i++) { const br = 1.6 * z() + .6, bx = sx(r.x) + (hash(r.id, i) - .5) * 18 * z(), by = gy(r.x, r.y) - (4 + hash(i, r.id) * 10) * z(), q = br / 30;
+        drawImage(c, 0, S * 2, S, S, bx - S / 2 * q, by - S / 2 * q, S * q, S * q); } }
+      else { ctx.fillStyle = '#8c1f2a'; for (let i = 0; i < 5; i++) { ctx.beginPath();
+        ctx.arc(sx(r.x) + (hash(r.id, i) - .5) * 18 * z(), gy(r.x, r.y) - (4 + hash(i, r.id) * 10) * z(), 1.6 * z() + .6, 0, 7); ctx.fill(); } }
       view.stats.props++; } };
   }
   function drawRock(r) {
     const x = sx(r.x), y = gy(r.x, r.y), s = 9 * z() + 2;
+    if (glHand()) { const { canvas: c, S } = handSheet, k = s / 24; drawImage(c, S, S * 2, S, S, x - 28 * k, y - 36 * k, S * k, S * k); view.stats.props++; return; }
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x + s * .2, y + s * .1, s * 1.2, s * .45, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#7c7a73'; ctx.beginPath(); ctx.moveTo(x - s, y); ctx.lineTo(x - s * .5, y - s * 1.1); ctx.lineTo(x + s * .4, y - s * 1.3);
     ctx.lineTo(x + s, y - s * .3); ctx.lineTo(x + s * .6, y + s * .2); ctx.closePath(); ctx.fill();
@@ -2048,7 +2083,7 @@
     for (const c of view.corpses) {
       const X = sx(c.x), Y = gy(c.x, c.y);
       if (X < -60 || X > innerWidth + 60 || Y < -40 || Y > innerHeight + 80) continue;
-      list.push({ y: c.y - 0.5, area: [X - 90 * Math.max(0.5, z()), Y - 90 * Math.max(0.5, z()), X + 90 * Math.max(0.5, z()), Y + 50 * Math.max(0.5, z())], draw: () => { bloodPool(X, Y, t - c.t0, hash(c.x, c.y)); drawSprite(view.atlases[c.key], c.anim, presentation.fallFrame(c.id, t - c.t0), X, Y, k); } });
+      list.push({ gpu: glScene(), y: c.y - 0.5, area: [X - 90 * Math.max(0.5, z()), Y - 90 * Math.max(0.5, z()), X + 90 * Math.max(0.5, z()), Y + 50 * Math.max(0.5, z())], draw: () => { bloodPool(X, Y, t - c.t0, hash(c.x, c.y)); drawSprite(view.atlases[c.key], c.anim, presentation.fallFrame(c.id, t - c.t0), X, Y, k); } });
     }
     st.corpses = view.corpses.length;
     medicsDrawables(list, t, k);

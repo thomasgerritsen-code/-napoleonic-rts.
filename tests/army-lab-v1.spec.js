@@ -45,6 +45,8 @@ test('start menu opens the test field, which sets up armies of any size', async 
   expect(await page.evaluate(() => units.filter(u => !u.dead && u.side === 'britain').some(u => !isVisibleToFrance(u)))).toBe(true);
   await page.click('[data-fog]');
   expect(await page.evaluate(() => units.filter(u => !u.dead && u.side === 'britain').every(u => isVisibleToFrance(u)))).toBe(true);
+  // The renderer button names the one in use (the canvas, without ?gl=1).
+  expect(await page.textContent('[data-renderer]')).toBe('Canvas');
   await page.click('[data-ai]');
   expect(await page.evaluate(() => v05PeaceMode)).toBe(false);
   expect(errors).toEqual([]);
