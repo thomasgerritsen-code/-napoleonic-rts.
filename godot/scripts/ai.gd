@@ -231,7 +231,7 @@ func _command() -> void:
 			mine.append(r)
 	if mine.is_empty():
 		return
-	var threat := _threat()
+	var threat: Variant = _threat()
 	var attacking := mine.size() >= ATTACK_WITH or battle.clock > ATTACK_ANYWAY_AFTER
 	var goal: Variant = threat
 	if goal == null and attacking:

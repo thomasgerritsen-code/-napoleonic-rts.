@@ -51,7 +51,7 @@ static func raise(units: Array[Unit]) -> Regiment:
 		return null
 	var side_: String = units[0].side
 	_numbers[side_] += 1
-	var title := ("%de Ligne" if side_ == "france" else "%dth Foot") % _numbers[side_]
+	var title: String = ("%de Ligne" if side_ == "france" else "%dth Foot") % _numbers[side_]
 	var r := Regiment.new(title, side_)
 	var officer := false
 	var drummer := false

@@ -122,7 +122,7 @@ func _describe() -> String:
 		if r.charging != null:
 			state = "chargeert"
 		lines.append("%s: %d man in %s, %s" % [r.name, r.strength(), "colonne" if r.formation == "column" else "linie", state])
-	var workers := count.get("worker", 0)
+	var workers: int = count.get("worker", 0)
 	if workers > 0:
 		lines.append("Boeren: rechtsklik op struiken, bomen bij een kamp, ijzer bij een mijn, of een akker.")
 	return "\n".join(lines)
