@@ -73,7 +73,7 @@ func setup(battle_: Battle, side_: String, type_: String, at: Vector2, troop_ :=
 	_sprite.centered = false
 	_sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE
 	add_child(_sprite)
-	_wear(_look())
+	_wear(_coats())
 	if type == "artillery":
 		_man_the_gun()
 	position = Iso.to_screen(world)
@@ -104,7 +104,7 @@ func reload_time() -> float:
 ## The atlases this man wears, as the web iso view picks them: the line in
 ## three company coats, grenadiers, voltigeurs, guard or riflemen, sappers;
 ## horse by regiment; heavy guns, howitzers and horse guns.
-func _look() -> Array:
+func _coats() -> Array:
 	var p := _prefix
 	match type:
 		"infantry":
