@@ -131,3 +131,17 @@ static func cost_text(cost: Dictionary) -> String:
 static func logging_radius() -> float:
 	var logging: Variant = start().get("logging")
 	return float(logging["radius"]) if logging is Dictionary else 420.0
+
+
+## A tower's level (1 to 3) as the web game's towers config has it: health,
+## reach, reload, shots, damage, sight and, from level 2, cost and time.
+static func tower_level(level: int) -> Dictionary:
+	var t: Variant = start().get("towers")
+	if t is Dictionary and t["levels"] is Array and level >= 1 and level < t["levels"].size():
+		return t["levels"][level]
+	return {} if level != 1 else {"label": "Basistoren", "hp": 1100, "range": 240, "reload": 2.6, "shots": 2, "damage": 18, "vision": 420}
+
+
+static func tower_ai() -> Dictionary:
+	var t: Variant = start().get("towers")
+	return {"after": float(t.get("aiAfter", 300)), "max": int(t.get("aiMax", 2))} if t is Dictionary else {"after": 300.0, "max": 2}

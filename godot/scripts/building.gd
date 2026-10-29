@@ -23,6 +23,9 @@ var progress := 1.0          # share built
 var queue: Array[String] = []
 var production := 0.0        # share of the first in the queue done
 var crop := 0.0              # grain standing on a field
+var tower_level := 1
+var upgrade_to := 0          # the level a tower is being strengthened to
+var upgrade_progress := 0.0
 var selected := false:
 	set(value):
 		selected = value
@@ -111,10 +114,6 @@ func hit(damage: float) -> void:
 		fade.tween_callback(hide)
 
 
-const TOWER_RANGE := 240.0
-const TOWER_RELOAD := 2.6
-const TOWER_SHOTS := 2
-const TOWER_DAMAGE := 18.0
 const HOSPITAL_REACH := 160.0
 const HEAL_SHARE := 0.025    # of a man's health a second
 
@@ -125,6 +124,7 @@ func step(delta: float) -> void:
 	if not standing() or not complete:
 		return
 	if type == "tower":
+		_strengthen(delta)
 		_guard(delta)
 	elif type == "hospital":
 		battle.heal_near(world, side, HOSPITAL_REACH, HEAL_SHARE * delta)
@@ -147,17 +147,51 @@ func step(delta: float) -> void:
 	battle.spawn_trained(self, item)
 
 
-## A musketry tower fires two shots at the nearest enemy in reach.
+## A musketry tower fires its garrison's shots at the nearest enemy in reach;
+## each level reaches further, fires more often and harder.
 func _guard(delta: float) -> void:
 	_reload -= delta
 	if _reload > 0.0:
 		return
-	var foe := battle.nearest_foe(world, side, TOWER_RANGE)
+	var level := Rules.tower_level(tower_level)
+	var foe := battle.nearest_foe(world, side, float(level["range"]))
 	if not foe is Unit:
-		_reload = 0.5
+		_reload = 0.4
 		return
-	_reload = TOWER_RELOAD * randf_range(0.9, 1.1)
-	battle.tower_fires(self, foe as Unit, TOWER_SHOTS, TOWER_DAMAGE)
+	_reload = float(level["reload"]) * randf_range(0.9, 1.1)
+	battle.tower_fires(self, foe as Unit, int(level["shots"]), float(level["damage"]))
+
+
+## Start strengthening a finished tower to its next level (paid by the caller).
+func can_upgrade() -> bool:
+	return type == "tower" and complete and standing() and upgrade_to == 0 and not Rules.tower_level(tower_level + 1).is_empty()
+
+
+func start_upgrade() -> void:
+	upgrade_to = tower_level + 1
+	upgrade_progress = 0.0
+
+
+## The garrison builds while it keeps firing; the damage share stays (an
+## upgrade is not a free repair).
+func _strengthen(delta: float) -> void:
+	if upgrade_to == 0:
+		return
+	var next := Rules.tower_level(upgrade_to)
+	upgrade_progress = minf(1.0, upgrade_progress + delta / float(next.get("seconds", 20)))
+	queue_redraw()
+	if upgrade_progress < 1.0:
+		return
+	hp = hp / max_hp * float(next["hp"])
+	max_hp = float(next["hp"])
+	tower_level = upgrade_to
+	upgrade_to = 0
+	upgrade_progress = 0.0
+	if _sprite != null:
+		_sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE * (0.55 + 0.04 * (tower_level - 1))
+	battle.refresh_hud()
+	if side == "france":
+		battle.say("%s gereed · niveau %d/3." % [next["label"], tower_level])
 
 
 func _show_progress() -> void:
@@ -180,6 +214,10 @@ func _draw() -> void:
 		var share := progress if not complete else hp / max_hp
 		var colour := Color(0.95, 0.8, 0.35) if not complete else Color(0.85, 0.2, 0.15).lerp(Color(0.35, 0.8, 0.3), share)
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * share, bar.size.y)), colour)
+	if upgrade_to != 0:
+		var bar := Rect2(Vector2(-24.0, ground.position.y - 49.0), Vector2(48.0, 3.0))
+		draw_rect(bar, Color(0, 0, 0, 0.5))
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * upgrade_progress, bar.size.y)), Color(0.95, 0.8, 0.35))
 	if complete and not queue.is_empty():
 		var bar := Rect2(Vector2(-24.0, ground.position.y - 49.0), Vector2(48.0, 3.0))
 		draw_rect(bar, Color(0, 0, 0, 0.5))

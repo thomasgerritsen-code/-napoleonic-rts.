@@ -142,6 +142,9 @@ func _build() -> void:
 		_lay_out("stable", _near_home(400.0))
 	elif battle.clock > 420.0 and _count("foundry") == 0 and stock["wood"] >= 420.0 and stock["iron"] >= 90.0:
 		_lay_out("foundry", _near_home(420.0))
+	elif battle.clock > Rules.tower_ai()["after"] and _count("tower") < Rules.tower_ai()["max"] and _count("tower") == _count("tower", true) \
+			and stock["wood"] >= Rules.cost_of("tower").get("wood", 260) + 120.0:
+		_lay_out("tower", _towards_france(250.0 + 60.0 * _count("tower")))
 
 
 func _lay_out(type: String, near: Variant) -> void:
@@ -164,6 +167,12 @@ func _lay_out(type: String, near: Variant) -> void:
 
 func _near_home(distance: float) -> Vector2:
 	var angle := randf_range(-PI, PI)
+	return _home + Vector2.from_angle(angle) * distance
+
+
+## In front of the town centre, towards the French, a little to either side.
+func _towards_france(distance: float) -> Vector2:
+	var angle := (Iso.WORLD / 2.0 - _home).angle() + randf_range(-0.6, 0.6)
 	return _home + Vector2.from_angle(angle) * distance
 
 

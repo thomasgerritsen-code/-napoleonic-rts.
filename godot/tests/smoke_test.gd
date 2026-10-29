@@ -129,6 +129,16 @@ func _initialize() -> void:
 		and Rules.trained_at("stable", "france").has("officer:mounted"), "the barracks and stable offer each side its own troop kinds")
 	_check(Rules.item_cost("infantry:grenadier").get("food", 0) == 140.0, "a grenadier costs the musketeer's price and his extra")
 
+	# A tower strengthened to level 2: more health, further reach, and it sees further.
+	var tower := battle.add_building("france", "tower", home + Vector2(-200, 380), true)
+	battle.economy["france"]["wood"] += 400.0
+	battle.economy["france"]["iron"] += 100.0
+	var sight := battle.fog.vision(tower) if battle.fog != null else 420.0
+	_check(battle.upgrade_tower(tower) and not battle.upgrade_tower(tower), "a tower starts its upgrade once")
+	_run(battle, 21.0)
+	_check(tower.tower_level == 2 and is_equal_approx(tower.max_hp, 1600.0) and tower.upgrade_to == 0, "the tower is strengthened to level 2 (%d hp)" % tower.max_hp)
+	_check(battle.fog == null or battle.fog.vision(tower) > sight, "and sees further from it")
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0

@@ -924,6 +924,29 @@ func train(type: String) -> void:
 		_hud.refresh()
 
 
+## Strengthen a finished tower to its next level, as the web game: the cost
+## now, the garrison keeps firing while it builds.
+func upgrade_tower(b: Building) -> bool:
+	if b == null or not b.can_upgrade() or result != "":
+		return false
+	var next := Rules.tower_level(b.tower_level + 1)
+	if not can_afford(b.side, next["cost"]):
+		if b.side == "france":
+			say("Te weinig grondstoffen voor %s." % String(next["label"]).to_lower())
+		return false
+	pay(b.side, next["cost"])
+	b.start_upgrade()
+	if b.side == "france":
+		say("%s wordt gebouwd (%d s)." % [next["label"], next["seconds"]])
+	refresh_hud()
+	return true
+
+
+func refresh_hud() -> void:
+	if _hud != null:
+		_hud.refresh()
+
+
 func queue_unit(b: Building, type: String) -> bool:
 	if b == null or not b.complete or not b.standing() or Rules.item_building(type) != b.type:
 		return false

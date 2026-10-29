@@ -115,6 +115,11 @@ func _describe() -> String:
 			for q in b.queue:
 				names.append(Rules.label(q))
 			lines.append("Opleiding: %s (%d%%)" % [", ".join(names), int(b.production * 100)])
+		if b.type == "tower" and b.complete:
+			var level := Rules.tower_level(b.tower_level)
+			lines.append("%s · niveau %d/3 · bereik %d · %d schoten van %d" % [level["label"], b.tower_level, level["range"], level["shots"], level["damage"]])
+			if b.upgrade_to != 0:
+				lines.append("Versterken… niveau %d/3 · %d%%" % [b.upgrade_to, int(b.upgrade_progress * 100)])
 		if b.type == "farm":
 			lines.append("Graan: %d  ·  %d boeren" % [b.crop, battle.farmers_on(b)])
 		return "\n".join(lines)
@@ -148,6 +153,14 @@ func _rebuild() -> void:
 		if b.complete and b.side == "france":
 			for item in Rules.trained_at(b.type, "france"):
 				_button("%s\n%s" % [Rules.label(item), Rules.cost_text(Rules.item_cost(item))], battle.train.bind(item))
+			if b.type == "tower":
+				var next := Rules.tower_level(b.tower_level + 1)
+				if b.upgrade_to != 0:
+					_button("Versterken…\nniveau %d/3" % b.upgrade_to, func() -> void: pass).disabled = true
+				elif next.is_empty():
+					_button("Zwaar versterkte toren\nniveau 3/3 · maximaal", func() -> void: pass).disabled = true
+				else:
+					_button("Upgrade → niveau %d/3\n%s · %d s" % [b.tower_level + 1, Rules.cost_text(next["cost"]), next["seconds"]], battle.upgrade_tower.bind(b))
 		return
 	var has_workers := false
 	var has_free_soldiers := false
@@ -168,7 +181,7 @@ func _rebuild() -> void:
 		_button("Charge (C)", battle.charge)
 
 
-func _button(text: String, action: Callable) -> void:
+func _button(text: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.custom_minimum_size = Vector2(132, 46)
@@ -176,3 +189,4 @@ func _button(text: String, action: Callable) -> void:
 	button.focus_mode = Control.FOCUS_NONE
 	button.pressed.connect(action)
 	_buttons.add_child(button)
+	return button
