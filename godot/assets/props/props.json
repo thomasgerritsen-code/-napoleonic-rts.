@@ -1,0 +1,89 @@
+{
+ "props": {
+  "oak": {
+   "footprint": {
+    "d": 5.99,
+    "w": 7.11
+   },
+   "h": 443,
+   "heightM": 8.23,
+   "image": "oak.webp",
+   "pivot": {
+    "x": 173,
+    "y": 308
+   },
+   "w": 465
+  },
+  "beech": {
+   "footprint": {
+    "d": 6.6,
+    "w": 7.08
+   },
+   "h": 439,
+   "heightM": 8.13,
+   "image": "beech.webp",
+   "pivot": {
+    "x": 171,
+    "y": 298
+   },
+   "w": 462
+  },
+  "pine": {
+   "footprint": {
+    "d": 4.16,
+    "w": 4.84
+   },
+   "h": 455,
+   "heightM": 8.98,
+   "image": "pine.webp",
+   "pivot": {
+    "x": 126,
+    "y": 332
+   },
+   "w": 383
+  },
+  "spruce": {
+   "footprint": {
+    "d": 4.2,
+    "w": 4.09
+   },
+   "h": 426,
+   "heightM": 8.5,
+   "image": "spruce.webp",
+   "pivot": {
+    "x": 111,
+    "y": 307
+   },
+   "w": 345
+  },
+  "birch": {
+   "footprint": {
+    "d": 2.82,
+    "w": 3.41
+   },
+   "h": 383,
+   "heightM": 7.79,
+   "image": "birch.webp",
+   "pivot": {
+    "x": 98,
+    "y": 285
+   },
+   "w": 306
+  },
+  "bush": {
+   "footprint": {
+    "d": 1.92,
+    "w": 2.83
+   },
+   "h": 109,
+   "heightM": 1.59,
+   "image": "bush.webp",
+   "pivot": {
+    "x": 83,
+    "y": 64
+   },
+   "w": 194
+  }
+ },
+ "pxPerM": 41.2903
+}

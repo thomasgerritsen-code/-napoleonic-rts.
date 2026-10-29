@@ -1,0 +1,74 @@
+name: Godot
+
+# The Godot version of the game (godot/): imports the project, runs the
+# headless battle check, and exports a Windows .exe kept with the run.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths: ["godot/**", ".github/workflows/godot.yml"]
+  pull_request:
+    paths: ["godot/**", ".github/workflows/godot.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: godot-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.1
+
+jobs:
+  godot:
+    name: Godot check and Windows export
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download Godot
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$RUNNER_TEMP/godot"
+          rm godot.zip
+          "$RUNNER_TEMP/godot" --version
+
+      - name: Import the project
+        run: |
+          "$RUNNER_TEMP/godot" --headless --path godot --import 2>&1 | tee import.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" import.log; then exit 1; fi
+
+      - name: Headless battle check
+        run: |
+          set -o pipefail
+          "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/smoke_test.gd 2>&1 | tee smoke.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" smoke.log; then exit 1; fi
+          grep -q "GODOT_SMOKE" smoke.log
+
+      - name: Install export templates
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -sSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dir"
+          unzip -q -j templates.tpz "templates/windows_release_x86_64.exe" "templates/version.txt" -d "$dir"
+          rm templates.tpz
+
+      - name: Export Windows .exe
+        run: |
+          mkdir -p godot/build
+          "$RUNNER_TEMP/godot" --headless --path godot --export-release "Windows Desktop" build/NapoleonicRTS.exe 2>&1 | tee export.log
+          ls -la godot/build
+          test -s godot/build/NapoleonicRTS.exe
+
+      - name: Keep the .exe with this run
+        uses: actions/upload-artifact@v5
+        with:
+          name: Napoleonic-RTS-Godot-Windows
+          path: godot/build/NapoleonicRTS.exe
+          if-no-files-found: error
+          retention-days: 30
