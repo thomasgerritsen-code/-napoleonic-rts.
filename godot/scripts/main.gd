@@ -47,7 +47,12 @@ var ai: BritishCommand
 var fog: Fog
 var woods := Woods.new()
 var weather: Weather
+var sounds: Sounds
 var _woods_clock := 0.0
+var _drum_clock := 0.0
+const WALL_CELL := 80.0
+var _walls := {}
+var _walls_dirty := true
 var _units_layer: Node2D
 var _effects: Node2D
 var _overlay: Overlay
@@ -95,6 +100,8 @@ func _ready() -> void:
 	camera.focus(Iso.to_screen(home.world + Vector2(260, 60)) if home != null else Iso.to_screen(Iso.WORLD / 2.0))
 	if mode == "lab":
 		camera.focus(Iso.to_screen(Vector2(4900, 3100)))
+	sounds = Sounds.new()
+	add_child(sounds)
 	weather = Weather.new()
 	weather.battle = self
 	add_child(weather)
@@ -117,6 +124,7 @@ func _process(delta: float) -> void:
 	for b in buildings:
 		b.step(delta)
 	_hold_territories(delta)
+	_beat_drums(delta)
 	_woods_clock -= delta
 	if _woods_clock <= 0.0:
 		_woods_clock = 0.5
@@ -154,6 +162,52 @@ func _keep_apart() -> void:
 					var push := gap / d * (PACE - d) * 0.5
 					u.world -= push
 					other.world += push
+	_keep_out_of_walls()
+
+
+## Nobody walks through a house or a building: a man inside one's walls is
+## put back outside the nearest wall.
+func _keep_out_of_walls() -> void:
+	if _walls.is_empty() or _walls_dirty:
+		_build_walls()
+	for u in units:
+		if not u.alive():
+			continue
+		var cell := Vector2i(floori(u.world.x / WALL_CELL), floori(u.world.y / WALL_CELL))
+		for wall: Rect2 in _walls.get(cell, []):
+			if wall.has_point(u.world):
+				var left := u.world.x - wall.position.x
+				var right := wall.end.x - u.world.x
+				var top := u.world.y - wall.position.y
+				var bottom := wall.end.y - u.world.y
+				var least := minf(minf(left, right), minf(top, bottom))
+				if least == left:
+					u.world.x = wall.position.x - 0.5
+				elif least == right:
+					u.world.x = wall.end.x + 0.5
+				elif least == top:
+					u.world.y = wall.position.y - 0.5
+				else:
+					u.world.y = wall.end.y + 0.5
+
+
+func _build_walls() -> void:
+	_walls_dirty = false
+	_walls.clear()
+	var rects: Array[Rect2] = []
+	for h in houses:
+		var size := Vector2(float(h["w"]), float(h["w"])) * 0.62
+		rects.append(Rect2(Vector2(h["x"], h["y"]) - size / 2.0, size))
+	for b in buildings:
+		if b.standing() and b.type != "farm":
+			rects.append(Rect2(b.world - b.size * 0.42, b.size * 0.84))
+	for r in rects:
+		for x in range(floori(r.position.x / WALL_CELL), floori(r.end.x / WALL_CELL) + 1):
+			for y in range(floori(r.position.y / WALL_CELL), floori(r.end.y / WALL_CELL) + 1):
+				var cell := Vector2i(x, y)
+				if not _walls.has(cell):
+					_walls[cell] = []
+				_walls[cell].append(r)
 
 
 # ---- the opening ----
@@ -277,6 +331,7 @@ func add_building(side: String, type: String, at: Vector2, built: bool) -> Build
 	b.setup(self, side, type, at, built)
 	buildings.append(b)
 	_units_layer.add_child(b)
+	_walls_dirty = true
 	return b
 
 
@@ -476,6 +531,7 @@ func on_death(u: Unit) -> void:
 
 
 func on_destroyed(b: Building) -> void:
+	_walls_dirty = true
 	if selected_building == b:
 		selected_building = null
 	if b.side == "france":
@@ -547,10 +603,32 @@ func heal_near(at: Vector2, side: String, reach: float, share: float) -> void:
 
 func tower_fires(tower: Building, foe: Unit, shots: int, damage: float) -> void:
 	var top := tower.world + Vector2(0, -6)
+	sounds.play("musket", top)
 	for i in shots:
 		_puff(top + Vector2(randf_range(-8, 8), 0), 0.5, 2.2)
 		if randf() < 0.6:
 			foe.hit(damage * randf_range(0.8, 1.4))
+
+
+## A marching battalion's drummer beats the step: the one nearest the
+## camera is heard.
+func _beat_drums(delta: float) -> void:
+	_drum_clock -= delta
+	if _drum_clock > 0.0 or camera == null:
+		return
+	_drum_clock = 0.55
+	var view := Iso.to_world(camera.position)
+	var best: Regiment = null
+	var best_d := 1400.0
+	for r in regiments:
+		if r.routing or r.destroyed() or not r.moving():
+			continue
+		var d := r.centroid().distance_to(view)
+		if d < best_d and r.living().any(func(u: Unit) -> bool: return u.type == "drummer"):
+			best_d = d
+			best = r
+	if best != null:
+		sounds.play("drum", best.centroid())
 
 
 ## The season's colour on every tree and bush.
@@ -569,6 +647,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 		_puff(u.muzzle(), 0.25, 1.2)
 		return
 	if u.type != "cavalry":
+		sounds.play("cannon" if u.type == "artillery" else "musket", u.world)
 		_puff(u.muzzle(), 1.3 if u.type == "artillery" else 0.55, 3.2 if u.type == "artillery" else 2.6)
 	if not is_foe(target, u.side):
 		return
@@ -905,6 +984,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				charge()
 			KEY_F:
 				form_regiment()
+			KEY_M:
+				sounds.enabled = not sounds.enabled
+				say("Geluid %s." % ("aan" if sounds.enabled else "uit"))
 			KEY_V:
 				fog.enabled = not fog.enabled
 				fog.refresh()

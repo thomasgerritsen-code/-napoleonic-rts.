@@ -45,6 +45,7 @@ var selected := false:
 			queue_redraw()
 
 var _sprite: AnimatedSprite2D
+var _crew: Array[AnimatedSprite2D] = []
 var _path: Array[Vector2] = []
 var _goal := Vector2(INF, INF)
 var _prefix := "fr"
@@ -70,6 +71,8 @@ func setup(battle_: Battle, side_: String, type_: String, at: Vector2) -> void:
 	_sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE
 	add_child(_sprite)
 	_wear(SETS.get(type, SETS["infantry"]))
+	if type == "artillery":
+		_man_the_gun()
 	position = Iso.to_screen(world)
 	_play("idle")
 
@@ -220,7 +223,7 @@ func _fire_cycle(foe: Node2D) -> void:
 			if _clock <= 0.0:
 				state = State.RELOAD
 				_clock = reload * randf_range(1.4, 2.1)
-				_play("idle" if type == "artillery" else "reload", true)
+				_play("reload", true)
 		State.RELOAD:
 			if _clock <= 0.0:
 				state = State.AIM
@@ -393,7 +396,44 @@ func _wear(names: Array) -> void:
 	_anim = ""
 
 
+## Three gunners stand behind a gun: they haul it on the march, ram and
+## load between shots, and one touches off the charge.
+func _man_the_gun() -> void:
+	var look := AtlasLibrary.get_set(["%sa_iso_gunner" % _prefix])
+	for i in 3:
+		var man := AnimatedSprite2D.new()
+		man.sprite_frames = look["frames"]
+		man.centered = false
+		man.offset = -Vector2(look["pivot"])
+		man.scale = Vector2.ONE * Iso.SPRITE_SCALE
+		add_child(man)
+		_crew.append(man)
+
+
+func _crew_play(state_name: String) -> void:
+	if _crew.is_empty():
+		return
+	var forward := Vector2.from_angle(facing)
+	var right := forward.orthogonal()
+	var dir := Iso.direction(facing)
+	for i in _crew.size():
+		var man := _crew[i]
+		var place := -forward * (20.0 + (i % 2) * 9.0) + right * (float(i) - 1.0) * 14.0
+		man.position = Vector2(place.x, place.y * Iso.SQ)
+		var job := state_name
+		if state_name == "fire":
+			job = "touch" if i == 0 else "ready"
+		elif state_name == "reload":
+			job = ["ram", "load", "ready"][i]
+		elif state_name == "roll":
+			job = "haul"
+		var anim := "%s_%s" % [job, dir]
+		if man.sprite_frames.has_animation(anim) and man.animation != anim:
+			man.play(anim)
+
+
 func _play(state_name: String, restart := false) -> void:
+	_crew_play(state_name)
 	var anim := "%s_%s" % [state_name, Iso.direction(facing)]
 	if not _sprite.sprite_frames.has_animation(anim):
 		anim = "idle_" + Iso.direction(facing)
