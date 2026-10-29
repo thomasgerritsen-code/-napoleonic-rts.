@@ -26,6 +26,8 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	if battle != null:
+		for p in battle.territories:
+			_draw_post(p)
 		for r in battle.regiments:
 			if not r.destroyed():
 				_draw_colour(r)
@@ -75,3 +77,25 @@ func _draw_colour(r: Regiment) -> void:
 	var bar := Rect2(foot + Vector2(-14.0, 3.0), Vector2(28.0, 3.5))
 	draw_rect(bar, Color(0.0, 0.0, 0.0, 0.55))
 	draw_rect(Rect2(bar.position, Vector2(bar.size.x * share, bar.size.y)), Color(0.85, 0.2, 0.15).lerp(Color(0.35, 0.8, 0.3), share))
+
+
+## A post: a ring in its owner's colour, filling as it is being claimed.
+func _draw_post(p: Dictionary) -> void:
+	var centre := Iso.to_screen(p["world"])
+	var owner: String = p["owner"]
+	var colour := Color(0.85, 0.82, 0.7, 0.8)
+	if owner == "france":
+		colour = Color(0.3, 0.5, 0.95, 0.9)
+	elif owner == "britain":
+		colour = Color(0.9, 0.3, 0.25, 0.9)
+	if p["contested"]:
+		colour = Color(1.0, 0.75, 0.2, 0.95)
+	draw_set_transform(centre, 0.0, Vector2(1.0, Iso.SQ))
+	draw_arc(Vector2.ZERO, battle.territory_radius, 0.0, TAU, 72, colour, 2.5)
+	var progress := float(p["progress"])
+	if progress > 0.0:
+		var claim := Color(0.3, 0.5, 0.95) if p["claim"] == "france" else Color(0.9, 0.3, 0.25)
+		draw_arc(Vector2.ZERO, battle.territory_radius - 8.0, -PI / 2.0, -PI / 2.0 + TAU * progress, 48, claim, 5.0)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	draw_string(ThemeDB.fallback_font, centre + Vector2(-70, -battle.territory_radius * Iso.SQ - 8.0),
+		"%s (+%s %s)" % [p["label"], p["rate"], Rules.label(p["resource"])], HORIZONTAL_ALIGNMENT_CENTER, 140, 12, Color(0.97, 0.94, 0.84))

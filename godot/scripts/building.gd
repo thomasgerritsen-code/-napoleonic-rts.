@@ -111,9 +111,23 @@ func hit(damage: float) -> void:
 		fade.tween_callback(hide)
 
 
+const TOWER_RANGE := 240.0
+const TOWER_RELOAD := 2.6
+const TOWER_SHOTS := 2
+const TOWER_DAMAGE := 18.0
+const HOSPITAL_REACH := 160.0
+const HEAL_SHARE := 0.025    # of a man's health a second
+
+var _reload := 0.0
+
+
 func step(delta: float) -> void:
 	if not standing() or not complete:
 		return
+	if type == "tower":
+		_guard(delta)
+	elif type == "hospital":
+		battle.heal_near(world, side, HOSPITAL_REACH, HEAL_SHARE * delta)
 	if type == "farm":
 		var farmers := battle.farmers_on(self)
 		if farmers > 0:
@@ -131,6 +145,19 @@ func step(delta: float) -> void:
 	queue.pop_front()
 	production = 0.0
 	battle.spawn_trained(self, item)
+
+
+## A musketry tower fires two shots at the nearest enemy in reach.
+func _guard(delta: float) -> void:
+	_reload -= delta
+	if _reload > 0.0:
+		return
+	var foe := battle.nearest_foe(world, side, TOWER_RANGE)
+	if not foe is Unit:
+		_reload = 0.5
+		return
+	_reload = TOWER_RELOAD * randf_range(0.9, 1.1)
+	battle.tower_fires(self, foe as Unit, TOWER_SHOTS, TOWER_DAMAGE)
 
 
 func _show_progress() -> void:

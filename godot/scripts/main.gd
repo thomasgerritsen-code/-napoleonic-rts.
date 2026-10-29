@@ -17,6 +17,10 @@ var buildings: Array[Building] = []
 var supplies: Array[Supply] = []
 var regiments: Array[Regiment] = []
 var houses: Array[Dictionary] = []
+## The web game's three capturable posts: {label, resource, rate, world, owner, claim, progress, contested}.
+var territories: Array[Dictionary] = []
+var territory_radius := 160.0
+var territory_seconds := 15.0
 var economy := {}
 var props := {}
 var selected_units: Array[Unit] = []
@@ -89,6 +93,7 @@ func _process(delta: float) -> void:
 	_keep_apart()
 	for b in buildings:
 		b.step(delta)
+	_hold_territories(delta)
 	ai.update(delta)
 	_tidy_selection()
 	_check_result()
@@ -133,6 +138,13 @@ func _load_opening() -> void:
 		economy[side] = {"food": float(e["food"]), "wood": float(e["wood"]), "iron": float(e["iron"])}
 	_add_villages(start)
 	_add_bridges(start)
+	var posts: Variant = start.get("territories")
+	if posts is Dictionary:
+		territory_radius = float(posts["radius"])
+		territory_seconds = float(posts["captureSeconds"])
+		for p: Dictionary in posts["points"]:
+			territories.append({"label": p["label"], "resource": p["resource"], "rate": float(p["rate"]),
+				"world": Vector2(p["x"], p["y"]), "owner": "", "claim": "", "progress": 0.0, "contested": false})
 	for data: Dictionary in start["resources"]:
 		var s := Supply.new()
 		s.setup(self, data, props)
@@ -433,6 +445,59 @@ func spawn_trained(b: Building, type: String) -> void:
 
 func say(text: String) -> void:
 	status = text
+
+
+## As the web game: soldiers alone on a post claim it in 15 seconds; its
+## owner draws its income while no enemy stands on it.
+func _hold_territories(delta: float) -> void:
+	for p in territories:
+		var here := {"france": false, "britain": false}
+		for u in units:
+			if u.alive() and u.type in ["infantry", "cavalry", "artillery"] and u.world.distance_to(p["world"]) <= territory_radius:
+				if u.regiment == null or not u.regiment.routing:
+					here[u.side] = true
+		p["contested"] = here["france"] and here["britain"]
+		if p["contested"]:
+			continue
+		var side := "france" if here["france"] else ("britain" if here["britain"] else "")
+		if side == "" or side == p["owner"]:
+			p["claim"] = ""
+			p["progress"] = 0.0
+		else:
+			if p["claim"] != side:
+				p["claim"] = side
+				p["progress"] = 0.0
+			p["progress"] = minf(1.0, float(p["progress"]) + delta / territory_seconds)
+			if p["progress"] >= 1.0:
+				p["owner"] = side
+				p["claim"] = ""
+				p["progress"] = 0.0
+				if side == "france":
+					say("%s veroverd." % p["label"])
+		if p["owner"] != "" and (side == "" or side == p["owner"]):
+			credit(p["owner"], p["resource"], float(p["rate"]) * delta)
+
+
+func territories_held(side: String) -> int:
+	var n := 0
+	for p in territories:
+		if p["owner"] == side:
+			n += 1
+	return n
+
+
+func heal_near(at: Vector2, side: String, reach: float, share: float) -> void:
+	for u in units:
+		if u.alive() and u.side == side and u.hp < u.max_hp and u.world.distance_to(at) < reach:
+			u.hp = minf(u.max_hp, u.hp + u.max_hp * share)
+
+
+func tower_fires(tower: Building, foe: Unit, shots: int, damage: float) -> void:
+	var top := tower.world + Vector2(0, -6)
+	for i in shots:
+		_puff(top + Vector2(randf_range(-8, 8), 0), 0.5, 2.2)
+		if randf() < 0.6:
+			foe.hit(damage * randf_range(0.8, 1.4))
 
 
 # ---- musketry and blows ----

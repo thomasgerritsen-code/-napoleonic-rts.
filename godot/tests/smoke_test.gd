@@ -31,6 +31,17 @@ func _initialize() -> void:
 	var point := Vector2(4500, 3200)
 	_check(Iso.to_world(Iso.to_screen(point)).distance_to(point) < 1.0, "screen to world inverts world to screen")
 
+	# The river: a man sent across it goes over a bridge, never through the water.
+	var walker := battle.add_unit("france", "infantry", Vector2(1100, 1900))
+	var across := Vector2(2200, 1900)
+	_check(Nav.route(walker.world, across).size() == 3, "a route across the river goes by a bridge")
+	walker.move_to(across)
+	var wet := false
+	for i in int(90.0 / STEP):
+		battle._process(STEP)
+		wet = wet or Nav.in_water(walker.world)
+	_check(walker.world.distance_to(across) < 20.0 and not wet, "and the man crossed dry-shod (at %s, wet: %s)" % [walker.world, wet])
+
 	# Food: every French peasant to the nearest bush.
 	var french: Array[Unit] = []
 	for u in battle.units:
@@ -83,17 +94,6 @@ func _initialize() -> void:
 	regiment.order_move(from + Vector2(250, 0))
 	_run(battle, 12.0)
 	_check(regiment.centroid().distance_to(from) > 200.0 and not regiment.moving(), "the battalion marched and stands in line")
-
-	# The river: a man sent across it goes over a bridge, never through the water.
-	var walker := battle.add_unit("france", "infantry", Vector2(1100, 1900))
-	var across := Vector2(2200, 1900)
-	_check(Nav.route(walker.world, across).size() == 3, "a route across the river goes by a bridge")
-	walker.move_to(across)
-	var wet := false
-	for i in int(90.0 / STEP):
-		battle._process(STEP)
-		wet = wet or Nav.in_water(walker.world)
-	_check(walker.world.distance_to(across) < 20.0 and not wet, "and the man crossed dry-shod (%s)" % walker.world)
 
 	# The computer.
 	_run(battle, 120.0)

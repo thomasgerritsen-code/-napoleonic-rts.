@@ -96,6 +96,8 @@ async function main() {
         resources: resources.filter(r => !r.dead).map(r => pick(r, ['id', 'type', 'x', 'y', 'amount', 'radius', 'deposit'])),
         villages: plain((window.VILLAGE_SCENERY_V4 || []).map(v => ({ name: v.name, x: v.x, y: v.y,
           houses: (v.houses || []).map(h => pick(h, ['id', 'kind', 'x', 'y', 'w', 'h', 'angle', 'side', 'accessX', 'accessY'])) }))),
+        territories: plain((() => { const t = window.__TERRITORIES__?.state?.(); return t ? { radius: t.radius, captureSeconds: t.captureSeconds,
+          points: t.points.map(p => pick(p, ['id', 'label', 'resource', 'rate', 'x', 'y'])) } : null; })()),
         crossings: plain((typeof WATER_CROSSINGS_V067 !== 'undefined' ? WATER_CROSSINGS_V067 : []).map(c => pick(c, ['id', 'name', 'x', 'y', 'length', 'width', 'angle', 'material'])))
       }
     };
