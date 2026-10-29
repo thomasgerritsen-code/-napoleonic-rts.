@@ -136,10 +136,10 @@ func step(delta: float) -> void:
 	if queue.is_empty():
 		return
 	var item := queue[0]
-	production += delta / float(Rules.training(item).get("time", 6.0))
+	production += delta / Rules.item_time(item)
 	if production < 1.0:
 		return
-	if not battle.has_room(side, item):
+	if not battle.has_room(side, Rules.item_type(item)):
 		production = 0.99
 		return
 	queue.pop_front()

@@ -24,7 +24,13 @@ const VILLAGE = path.join(ROOT, 'graphics-lab', 'assets', 'iso', 'village');
 const ATLASES = ['fr_iso_infantry', 'fr_iso_fallen', 'br_iso_infantry', 'br_iso_fallen',
   'frw_iso_worker', 'brw_iso_worker', 'fro_iso_officer', 'bro_iso_officer',
   'frd_iso_drummer', 'brd_iso_drummer', 'frc_iso_cavalry', 'frc_iso_cavfight',
-  'brc_iso_cavalry', 'brc_iso_cavfight', 'frg_iso_gun', 'brg_iso_gun', 'fra_iso_gunner', 'bra_iso_gunner'];
+  'brc_iso_cavalry', 'brc_iso_cavfight', 'frg_iso_gun', 'brg_iso_gun', 'fra_iso_gunner', 'bra_iso_gunner',
+  // The troop kinds' looks: line companies 2 and 3, grenadiers 4, voltigeurs 5,
+  // guard and riflemen 6, sappers 7; cuirassiers, lancers, greys and the second
+  // line coat; mounted officers; 12-pounders, howitzers and horse artillery.
+  ...['fr2', 'fr3', 'fr4', 'fr5', 'fr6', 'fr7', 'br2', 'br3', 'br4', 'br5', 'br6'].flatMap(p => [`${p}_iso_infantry`, `${p}_iso_fallen`]),
+  ...['frc2', 'frck', 'frcl', 'frco', 'brc2', 'brcg', 'brco'].flatMap(p => [`${p}_iso_cavalry`, `${p}_iso_cavfight`]),
+  'frg12_iso_gun12', 'frgh_iso_gunh', 'frgl_iso_gunl', 'brg12_iso_gun12', 'brgh_iso_gunh', 'brgl_iso_gunl'];
 const PROP_NAMES = ['oak', 'beech', 'pine', 'spruce', 'birch', 'bush', 'hawthorn', 'barracks_fr', 'barracks_br',
   'cottage', 'barn', 'tower_fr', 'tower_br', 'hospital_fr', 'hospital_br', 'well', 'haystack', 'bridge_stone', 'bridge_wood', 'poplar', 'fern', 'hazel'];
 const VILLAGE_KINDS = ['barn', 'chapel', 'cottage', 'cottage2', 'farmhouse', 'farmhouse2', 'inn'];
@@ -90,6 +96,8 @@ async function main() {
         source: 'scripts/export-godot-scenario.js from the web game',
         world: plain(WORLD), types: plain(TYPES), training: plain(TRAINING), buildingTypes: plain(BUILDINGS),
         economies: plain(economies), logging: plain(window.NRTS_CONFIG?.logging || null),
+        troops: plain(window.NRTS_CONFIG?.troops || null), grenades: plain(window.NRTS_CONFIG?.grenades || null),
+        experience: plain(window.NRTS_CONFIG?.regimentExperience || null),
         // The opening as the game sets it up, before anyone has acted.
         buildings: buildings.filter(b => !b.dead && b.complete !== false).map(b => pick(b, ['id', 'side', 'type', 'x', 'y', 'w', 'h', 'hp', 'maxHp'])),
         units: units.filter(u => !u.dead).map(u => pick(u, ['id', 'side', 'type', 'x', 'y', 'hp'])),

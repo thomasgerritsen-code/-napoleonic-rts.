@@ -20,6 +20,8 @@ const MOVE_ANIM := {"cavalry": "walk", "artillery": "roll"}
 var id := 0
 var side := "france"
 var type := "infantry"
+var troop := ""
+var grenade_clock := 0.0
 var battle: Battle
 var regiment: Regiment
 var world := Vector2.ZERO
@@ -54,23 +56,24 @@ var _clock := 0.0
 var _look := 0.0
 
 
-func setup(battle_: Battle, side_: String, type_: String, at: Vector2) -> void:
+func setup(battle_: Battle, side_: String, type_: String, at: Vector2, troop_ := "") -> void:
 	battle = battle_
 	side = side_
 	type = type_
+	troop = troop_
 	world = at
 	slot = at
 	facing = 0.0 if side == "france" else PI
 	_prefix = "fr" if side == "france" else "br"
 	var info := Rules.unit_type(type)
-	max_hp = float(info.get("hp", 100))
+	max_hp = float(info.get("hp", 100)) * stat("hp")
 	hp = max_hp
-	speed = float(info.get("speed", 57))
+	speed = float(info.get("speed", 57)) * stat("speed")
 	_sprite = AnimatedSprite2D.new()
 	_sprite.centered = false
 	_sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE
 	add_child(_sprite)
-	_wear(SETS.get(type, SETS["infantry"]))
+	_wear(_look())
 	if type == "artillery":
 		_man_the_gun()
 	position = Iso.to_screen(world)
@@ -86,7 +89,45 @@ func military() -> bool:
 
 
 func reach() -> float:
-	return float(Rules.unit_type(type).get("range", 20))
+	return float(Rules.unit_type(type).get("range", 20)) * stat("range")
+
+
+## A troop kind's factor on the base type (1 for the plain kind).
+func stat(key: String) -> float:
+	return float(Rules.troop(troop).get(key, 1.0)) if troop != "" else 1.0
+
+
+func reload_time() -> float:
+	return float(Rules.unit_type(type).get("reload", 3.0)) * stat("reload")
+
+
+## The atlases this man wears, as the web iso view picks them: the line in
+## three company coats, grenadiers, voltigeurs, guard or riflemen, sappers;
+## horse by regiment; heavy guns, howitzers and horse guns.
+func _look() -> Array:
+	var p := _prefix
+	match type:
+		"infantry":
+			var coat: String = {"grenadier": "4", "voltigeur": "5", "guard": "6", "rifle": "6", "sapper": "7"}.get(troop,
+				["", "2", "3"][int(Battle.hash01(id, 13) * 3)])
+			return ["%s%s_iso_infantry" % [p, coat], "%s%s_iso_fallen" % [p, coat]]
+		"cavalry":
+			var coat: String = {"cuirassier": "ck", "lancer": "cl", "greys": "cg", "hussar": "c"}.get(troop,
+				"c" if Battle.hash01(id, 5) < 0.5 else "c2")
+			if not ResourceLoader.exists("res://assets/units/%s%s_iso_cavalry_atlas.webp" % [p, coat]):
+				coat = "c"
+			return ["%s%s_iso_cavalry" % [p, coat], "%s%s_iso_cavfight" % [p, coat]]
+		"artillery":
+			var model: String = {"heavy12": ["g12", "gun12"], "howitzer": ["gh", "gunh"], "horseart": ["gl", "gunl"]}.get(troop, ["g", "gun"])[0]
+			var sheet: String = {"heavy12": "gun12", "howitzer": "gunh", "horseart": "gunl"}.get(troop, "gun")
+			return ["%s%s_iso_%s" % [p, model, sheet]]
+		"officer":
+			if troop == "mounted":
+				return ["%sco_iso_cavalry" % p, "%sco_iso_cavfight" % p]
+	var names: Array = []
+	for n: String in SETS.get(type, SETS["infantry"]):
+		names.append(n % p)
+	return names
 
 
 func pop() -> int:
@@ -103,6 +144,7 @@ func step(delta: float) -> void:
 	if state == State.DEAD:
 		return
 	_clock -= delta
+	_grenade(delta)
 	if regiment != null:
 		_step_in_regiment(delta)
 	elif type == "worker":
@@ -110,6 +152,23 @@ func step(delta: float) -> void:
 	else:
 		_step_free(delta)
 	position = Iso.to_screen(world)
+
+
+## Grenadiers and the guard lob a grenade at an enemy within reach while
+## they fight, then wait (the web game: 45 to 135 px, every 16 s).
+func _grenade(delta: float) -> void:
+	if troop != "grenadier" and troop != "guard":
+		return
+	grenade_clock -= delta
+	if grenade_clock > 0.0 or state not in [State.AIM, State.RELOAD, State.FIRE]:
+		return
+	var g: Dictionary = Rules.start()["grenades"] if Rules.start().get("grenades") is Dictionary else {}
+	var foe := battle.nearest_foe(world, side, float(g.get("maxRange", 135)))
+	if foe is Unit and world.distance_to(Battle.spot(foe)) >= float(g.get("minRange", 45)):
+		grenade_clock = float(g.get("cooldown", 16)) * randf_range(0.8, 1.2)
+		battle.throw_grenade(self, Battle.spot(foe))
+	else:
+		grenade_clock = 1.0
 
 
 ## Walk towards `to`, by a bridge if the river lies between; true once there.
@@ -129,7 +188,7 @@ func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
 	world += way.limit_length(speed * pace * delta)
 	facing = way.angle()
 	state = State.MOVE
-	_play(MOVE_ANIM.get(type, "march"))
+	_play("walk" if troop == "mounted" else MOVE_ANIM.get(type, "march"))
 	return false
 
 
@@ -192,7 +251,7 @@ func _step_free(delta: float) -> void:
 			return
 		facing = (at - world).angle()
 		if _clock <= 0.0:
-			_clock = float(Rules.unit_type(type).get("reload", 1.0))
+			_clock = reload_time()
 			_play("slash", true)
 			fired.emit(self, target)
 		return
@@ -209,7 +268,7 @@ func _engage_reach() -> float:
 
 ## Aim, fire, reload; a gun has no aim or reload pictures and only fires.
 func _fire_cycle(foe: Node2D) -> void:
-	var reload := float(Rules.unit_type(type).get("reload", 3.0))
+	var reload := reload_time()
 	match state:
 		State.AIM:
 			if type != "artillery":
@@ -375,7 +434,7 @@ func hit(damage: float) -> void:
 	else:
 		if not _sprite.sprite_frames.has_animation("die_e"):
 			_wear(["%s_iso_infantry", "%s_iso_fallen"])
-		_play(["die", "diefwd", "dieside"].pick_random() if type != "cavalry" else "die", true)
+		_play(["die", "diefwd", "dieside"].pick_random() if type != "cavalry" and troop != "mounted" else "die", true)
 	battle.on_death(self)
 	if regiment != null:
 		regiment.lost(self)
@@ -389,7 +448,7 @@ func muzzle() -> Vector2:
 func _wear(names: Array) -> void:
 	var resolved: Array = []
 	for n: String in names:
-		resolved.append(n % _prefix)
+		resolved.append(n % _prefix if n.contains("%s") else n)
 	var look := AtlasLibrary.get_set(resolved)
 	_sprite.sprite_frames = look["frames"]
 	_sprite.offset = -Vector2(look["pivot"])

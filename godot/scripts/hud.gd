@@ -131,6 +131,7 @@ func _describe() -> String:
 		var state := "vuurt" if r.enemy != null else ("marcheert" if r.moving() else "staat")
 		if r.charging != null:
 			state = "chargeert"
+		state += ", %s" % r.rank_label()
 		var shape: String = {"column": "colonne", "square": "carré"}.get(r.formation, "linie")
 		lines.append("%s: %d man in %s, %s" % [r.name, r.strength(), shape, state])
 	var workers: int = count.get("worker", 0)
@@ -145,9 +146,8 @@ func _rebuild() -> void:
 	var b := battle.selected_building
 	if b != null:
 		if b.complete and b.side == "france":
-			for type in Rules.TRAINED_AT:
-				if Rules.TRAINED_AT[type] == b.type:
-					_button("%s\n%s" % [Rules.label(type), Rules.cost_text(Rules.cost_of(type))], battle.train.bind(type))
+			for item in Rules.trained_at(b.type, "france"):
+				_button("%s\n%s" % [Rules.label(item), Rules.cost_text(Rules.item_cost(item))], battle.train.bind(item))
 		return
 	var has_workers := false
 	var has_free_soldiers := false

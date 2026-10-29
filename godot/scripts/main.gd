@@ -67,6 +67,7 @@ var _river: Array = []
 
 func _ready() -> void:
 	randomize()
+	Regiment.all.clear()
 	var meta: Dictionary = Iso.read_json("res://assets/map/ground.json")
 	Iso.load_relief(meta)
 	_add_ground(meta)
@@ -315,10 +316,10 @@ func _add_ground(meta: Dictionary) -> void:
 	add_child(ground)
 
 
-func add_unit(side: String, type: String, at: Vector2) -> Unit:
+func add_unit(side: String, type: String, at: Vector2, troop := "") -> Unit:
 	var u := Unit.new()
 	u.id = _new_id()
-	u.setup(self, side, type, at)
+	u.setup(self, side, type, at, troop)
 	u.fired.connect(_on_fired)
 	units.append(u)
 	_units_layer.add_child(u)
@@ -542,7 +543,7 @@ func on_destroyed(b: Building) -> void:
 
 func spawn_trained(b: Building, type: String) -> void:
 	var out := b.world + Vector2((1.0 if b.side == "france" else -1.0) * b.size.x * 0.75, b.size.y * 0.55)
-	var u := add_unit(b.side, type, out + Vector2(randf_range(-14, 14), randf_range(-10, 10)))
+	var u := add_unit(b.side, Rules.item_type(type), out + Vector2(randf_range(-14, 14), randf_range(-10, 10)), Rules.item_troop(type))
 	u.slot = u.world + Vector2((1.0 if b.side == "france" else -1.0) * 40.0, randf_range(-20, 20))
 	if b.side == "france":
 		say("%s is klaar." % Rules.label(type))
@@ -653,7 +654,9 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 		return
 	var distance := u.world.distance_to(spot(target))
 	var info := Rules.unit_type(u.type)
-	var damage := float(info.get("damage", 20))
+	var damage := float(info.get("damage", 20)) * u.stat("ranged")
+	if u.regiment != null:
+		damage *= u.regiment.damage_factor()
 	if target is Building:
 		(target as Building).hit(damage * (2.5 if u.type == "artillery" else 0.4))
 		return
@@ -667,7 +670,12 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 				if randf() < 0.45:
 					u.hit(damage * randf_range(0.8, 1.6))
 			elif randf() < 0.6:
-				foe.hit(damage * randf_range(1.0, 2.2))
+				var blow := damage * u.stat("charge") * randf_range(1.0, 2.2)
+				if foe.type == "infantry" or (foe.regiment != null and foe.regiment.routing):
+					blow *= u.stat("vsInfantry")
+				elif foe.type == "cavalry":
+					blow *= u.stat("vsCavalry")
+				foe.hit(blow)
 		"artillery":
 			# Roundshot ploughs through: everyone near the point of impact.
 			var impact := foe.world + Vector2(randf_range(-20, 20), randf_range(-14, 14))
@@ -680,7 +688,40 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			if u.regiment != null:
 				chance *= u.regiment.fire_factor()
 			if randf() < chance:
-				foe.hit(randf_range(45.0, 100.0))
+				# A cuirass turns part of the musket balls.
+				var armour := float(Rules.troop(foe.troop).get("armour", 0.0))
+				foe.hit(randf_range(45.0, 100.0) * u.stat("ranged") * (1.0 - armour)
+					* (u.regiment.damage_factor() if u.regiment != null else 1.0))
+
+
+## A grenade lobbed from the thrower bursts at `at` after its flight, harming
+## every enemy in the burst, as in the web game.
+func throw_grenade(thrower: Unit, at: Vector2) -> void:
+	var g: Dictionary = Rules.start()["grenades"] if Rules.start().get("grenades") is Dictionary else {}
+	var spread := float(g.get("spread", 16))
+	var landing := at + Vector2(randf_range(-spread, spread), randf_range(-spread, spread))
+	var from := thrower.world
+	var flight := randf_range(float(g.get("flightMin", 0.7)), float(g.get("flightMax", 1.2)))
+	var ball := Sprite2D.new()
+	ball.texture = _smoke
+	ball.modulate = Color(0.12, 0.11, 0.1)
+	ball.scale = Vector2.ONE * 0.09
+	ball.position = Iso.to_screen(from) + Vector2(0, -16)
+	_effects.add_child(ball)
+	var tween := ball.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		ball.position = Iso.to_screen(from.lerp(landing, t)) + Vector2(0, -16.0 - sin(t * PI) * 40.0), 0.0, 1.0, flight)
+	tween.tween_callback(func() -> void:
+		ball.queue_free()
+		_burst(thrower.side, landing, float(g.get("radius", 46)), float(g.get("damage", 34))))
+
+
+func _burst(side: String, at: Vector2, radius: float, damage: float) -> void:
+	sounds.play("cannon", at)
+	_puff(at, 1.0, 1.8)
+	for u in units:
+		if u.alive() and u.side != side and u.world.distance_to(at) < radius:
+			u.hit(damage * randf_range(0.7, 1.3))
 
 
 func _puff(world_at: Vector2, size: float, life: float) -> void:
@@ -862,6 +903,18 @@ func form_regiment(from: Array[Unit] = []) -> Regiment:
 	return r
 
 
+## Living men and queued recruits of a training item ("infantry:guard").
+func count_of(side: String, item: String) -> int:
+	var n := 0
+	for u in units:
+		if u.side == side and u.alive() and u.type == Rules.item_type(item) and u.troop == Rules.item_troop(item):
+			n += 1
+	for b in buildings:
+		if b.side == side:
+			n += b.queue.count(item)
+	return n
+
+
 func train(type: String) -> void:
 	var b := selected_building
 	if b == null or not queue_unit(b, type):
@@ -872,18 +925,23 @@ func train(type: String) -> void:
 
 
 func queue_unit(b: Building, type: String) -> bool:
-	if b == null or not b.complete or not b.standing() or Rules.TRAINED_AT.get(type, "") != b.type:
+	if b == null or not b.complete or not b.standing() or Rules.item_building(type) != b.type:
 		return false
-	if type == "artillery" and clock < Rules.ARTILLERY_AFTER:
+	if Rules.item_type(type) == "artillery" and clock < Rules.ARTILLERY_AFTER:
 		if b.side == "france":
 			say("De gieterij levert pas kanonnen na twee minuten.")
 		return false
-	var cost := Rules.cost_of(type)
+	var most: Variant = Rules.troop(Rules.item_troop(type)).get("max")
+	if most != null and count_of(b.side, type) >= int(most):
+		if b.side == "france":
+			say("Van de %s zijn er hooguit %d." % [Rules.label(type), int(most)])
+		return false
+	var cost := Rules.item_cost(type)
 	if not can_afford(b.side, cost):
 		if b.side == "france":
 			say("Niet genoeg grondstoffen: %s nodig." % Rules.cost_text(cost))
 		return false
-	if not has_room(b.side, type):
+	if not has_room(b.side, Rules.item_type(type)):
 		if b.side == "france":
 			say("Geen ruimte: bouw een huis voor meer inwoners.")
 		return false

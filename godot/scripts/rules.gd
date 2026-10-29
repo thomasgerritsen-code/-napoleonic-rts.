@@ -50,7 +50,74 @@ static func cost_of(kind: String) -> Dictionary:
 
 
 static func label(kind: String) -> String:
+	if kind.contains(":"):
+		return troop_label(kind.get_slice(":", 1), "france")
 	return LABELS.get(kind, kind)
+
+
+## The web game's troop kinds (grenadier, voltigeur, guard, sapper, rifle,
+## cuirassier, lancer, hussar, greys, heavy12, howitzer, horseart, mounted).
+static func troops() -> Dictionary:
+	var t: Variant = start().get("troops")
+	return t["kinds"] if t is Dictionary else {}
+
+
+static func troop(kind: String) -> Dictionary:
+	return troops().get(kind, {})
+
+
+static func troop_label(kind: String, side: String) -> String:
+	var t := troop(kind)
+	var names: Variant = t.get("names", {}).get(side) if t.get("names") is Dictionary else null
+	if names is Array:
+		return names[0]
+	return t.get("label", kind)
+
+
+## A training item is "type" or "type:troop"; its building, cost and time.
+static func item_type(item: String) -> String:
+	return item.get_slice(":", 0)
+
+
+static func item_troop(item: String) -> String:
+	return item.get_slice(":", 1) if item.contains(":") else ""
+
+
+static func item_building(item: String) -> String:
+	var t := troop(item_troop(item))
+	if t.has("building"):
+		return t["building"]
+	return TRAINED_AT.get(item_type(item), "")
+
+
+static func item_cost(item: String) -> Dictionary:
+	var cost: Dictionary = cost_of(item_type(item)).duplicate()
+	var extra: Dictionary = troop(item_troop(item)).get("extra", {})
+	for key in extra:
+		cost[key] = float(cost.get(key, 0.0)) + float(extra[key])
+	return cost
+
+
+static func item_time(item: String) -> float:
+	return float(training(item_type(item)).get("time", 6.0)) * float(troop(item_troop(item)).get("time", 1.0))
+
+
+## Everything trained at a building of this type, for this side.
+static func trained_at(building: String, side: String) -> Array[String]:
+	var list: Array[String] = []
+	for type: String in TRAINED_AT:
+		if TRAINED_AT[type] == building:
+			list.append(type)
+	for kind: String in troops():
+		var t: Dictionary = troops()[kind]
+		if side in t.get("sides", []) and item_building("%s:%s" % [t["base"], kind]) == building:
+			list.append("%s:%s" % [t["base"], kind])
+	return list
+
+
+static func experience_ranks() -> Array:
+	var e: Variant = start().get("experience")
+	return e["ranks"] if e is Dictionary else [{"label": "Recruut", "victories": 0, "damage": 1.0}]
 
 
 static func cost_text(cost: Dictionary) -> String:

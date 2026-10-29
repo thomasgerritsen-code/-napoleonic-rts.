@@ -36,13 +36,14 @@ var routing := false
 var enemy: Regiment = null
 var charging: Regiment = null
 var destination := Vector2.ZERO
+var victories := 0
 var _start := 0
 
 
 static func eligible(units: Array[Unit]) -> bool:
 	var count := {"infantry": 0, "officer": 0, "drummer": 0}
 	for u in units:
-		if u.alive() and u.regiment == null and count.has(u.type):
+		if u.alive() and u.regiment == null and count.has(u.type) and u.troop != "mounted":
 			count[u.type] += 1
 	return count["infantry"] >= MIN_MEN and count["officer"] >= 1 and count["drummer"] >= 1
 
@@ -63,7 +64,7 @@ static func raise(units: Array[Unit]) -> Regiment:
 			continue
 		if u.type == "infantry" and infantry < MAX_MEN:
 			infantry += 1
-		elif u.type == "officer" and not officer:
+		elif u.type == "officer" and u.troop != "mounted" and not officer:
 			officer = true
 		elif u.type == "drummer" and not drummer:
 			drummer = true
@@ -74,6 +75,7 @@ static func raise(units: Array[Unit]) -> Regiment:
 		u.target = null
 		r.men.append(u)
 	r._start = r.men.size()
+	all.append(r)
 	var at := r.centroid()
 	r.facing = 0.0 if side_ == "france" else PI
 	r.order_move(at, r.facing)
@@ -254,10 +256,35 @@ func _form_square(at: Vector2, rank_and_file: Array[Unit]) -> void:
 			(face[k] as Unit).slot = at + out * half + along * ((k - (face.size() - 1) / 2.0) * FILE_GAP)
 
 
+## Honours as in the web game: Recruut, Ervaren (1 victory), Veteraan (3),
+## Elite (6); each rank hits a little harder.
+func rank() -> Dictionary:
+	var best: Dictionary = {}
+	for r: Dictionary in Rules.experience_ranks():
+		if victories >= int(r["victories"]):
+			best = r
+	return best
+
+
+func rank_label() -> String:
+	return String(rank().get("label", "Recruut"))
+
+
+func damage_factor() -> float:
+	return float(rank().get("damage", 1.0))
+
+
+## A beaten foe (broken or destroyed) counts as a victory for those fighting it.
+func won() -> void:
+	victories += 1
+
+
 func lost(_unit: Unit) -> void:
 	if routing:
 		return
-	if strength() > 0 and strength() < _start * BREAK_AT:
+	if strength() == 0:
+		_credit_victors()
+	elif strength() < _start * BREAK_AT:
 		rout()
 	else:
 		_form(destination)
@@ -266,6 +293,7 @@ func lost(_unit: Unit) -> void:
 func rout() -> void:
 	if routing:
 		return
+	_credit_victors()
 	routing = true
 	enemy = null
 	charging = null
@@ -337,11 +365,20 @@ func _melee(delta: float) -> void:
 		u.slot = nearest.world
 		if best < MELEE_REACH * MELEE_REACH:
 			contact = true
-			if randf() < MELEE_KILL * delta:
+			if randf() < MELEE_KILL * u.stat("melee") * damage_factor() * delta:
 				nearest.hit(1000.0)
-			elif randf() < MELEE_LOSS * delta:
+			elif randf() < MELEE_LOSS / nearest.stat("melee") * delta:
 				u.hit(1000.0)
 		if routing:
 			return
 	if contact and not foe.routing and foe.strength() < strength() * 0.85:
 		foe.rout()
+
+
+static var all: Array[Regiment] = []
+
+
+func _credit_victors() -> void:
+	for other in all:
+		if other != self and other.side != side and (other.enemy == self or other.charging == self):
+			other.won()

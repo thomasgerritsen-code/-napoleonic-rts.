@@ -16,6 +16,8 @@ const ATTACK_ANYWAY_AFTER := 600.0
 const DEFEND_REACH := 900.0
 const DEPLOY_AT := 480.0
 const CHARGE_ODDS := 1.6
+const CAVALRY := 8
+const GUNS := 3
 
 var battle: Battle
 var plan := "opbouwen"
@@ -136,6 +138,10 @@ func _build() -> void:
 		_lay_out("farm", _near_home(330.0))
 	elif battle.clock > 300.0 and _count("barracks") == 1 and stock["wood"] >= 700.0:
 		_lay_out("barracks", _near_home(380.0))
+	elif battle.clock > 360.0 and _count("stable") == 0 and stock["wood"] >= 360.0:
+		_lay_out("stable", _near_home(400.0))
+	elif battle.clock > 420.0 and _count("foundry") == 0 and stock["wood"] >= 420.0 and stock["iron"] >= 90.0:
+		_lay_out("foundry", _near_home(420.0))
 
 
 func _lay_out(type: String, near: Variant) -> void:
@@ -199,7 +205,8 @@ func _train() -> void:
 		if b.side != SIDE or not b.complete or not b.standing() or b.queue.size() >= 2:
 			continue
 		for queued in b.queue:
-			men[queued] = men.get(queued, 0) + 1
+			var kind := Rules.item_type(queued)
+			men[kind] = men.get(kind, 0) + 1
 		match b.type:
 			"towncenter":
 				if men["worker"] < WORKERS:
@@ -212,7 +219,13 @@ func _train() -> void:
 				elif men["drummer"] < companies:
 					battle.queue_unit(b, "drummer")
 				else:
-					battle.queue_unit(b, "infantry")
+					battle.queue_unit(b, _pick("infantry", ["grenadier", "voltigeur", "rifle"]))
+			"stable":
+				if men.get("cavalry", 0) < CAVALRY:
+					battle.queue_unit(b, _pick("cavalry", ["hussar", "greys"]))
+			"foundry":
+				if men.get("artillery", 0) < GUNS:
+					battle.queue_unit(b, _pick("artillery", ["heavy12", "howitzer", "horseart"]))
 
 
 func _form() -> void:
@@ -308,3 +321,16 @@ func _horse_near(at: Vector2) -> bool:
 		if u.side == "france" and u.alive() and u.type == "cavalry" and u.world.distance_to(at) < 260.0:
 			return true
 	return false
+
+
+## A base type or one of its troop kinds, drawn with the web game's British
+## shares (grenadiers 15%, voltigeurs 15%, riflemen 15%, hussars 55%, ...).
+func _pick(base: String, kinds: Array) -> String:
+	var t: Variant = Rules.start().get("troops")
+	var shares: Dictionary = t["britishShare"] if t is Dictionary and t.has("britishShare") else {}
+	var roll := randf()
+	for kind: String in kinds:
+		roll -= float(shares.get(kind, 0.0))
+		if roll < 0.0 and SIDE in Rules.troop(kind).get("sides", []):
+			return "%s:%s" % [base, kind]
+	return base

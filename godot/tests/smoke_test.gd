@@ -117,6 +117,18 @@ func _initialize() -> void:
 	_check(regiment.reinforce(recruits) == 6 and regiment.strength() == before + 6, "six recruits fill the battalion's ranks")
 	_run(battle, 10.0)
 
+	# Troop kinds: their factors and their own coats.
+	var grenadier := battle.add_unit("france", "infantry", home + Vector2(600, 500), "grenadier")
+	var cuirassier := battle.add_unit("france", "cavalry", home + Vector2(640, 500), "cuirassier")
+	var gun := battle.add_unit("france", "artillery", home + Vector2(680, 500), "heavy12")
+	var mounted := battle.add_unit("france", "officer", home + Vector2(720, 500), "mounted")
+	_check(is_equal_approx(grenadier.max_hp, 140.0) and is_equal_approx(cuirassier.max_hp, 155.0 * 1.5), "grenadiers and cuirassiers have their extra strength")
+	_check(gun.reach() > 305.0 and mounted.speed > 60.0 * 1.6, "a 12-pounder reaches further, a mounted officer rides fast")
+	var french_barracks := Rules.trained_at("barracks", "france")
+	_check(french_barracks.has("infantry:guard") and not Rules.trained_at("barracks", "britain").has("infantry:guard")
+		and Rules.trained_at("stable", "france").has("officer:mounted"), "the barracks and stable offer each side its own troop kinds")
+	_check(Rules.item_cost("infantry:grenadier").get("food", 0) == 140.0, "a grenadier costs the musketeer's price and his extra")
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0
