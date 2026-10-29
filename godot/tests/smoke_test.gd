@@ -206,6 +206,23 @@ func _initialize() -> void:
 	battle.strike(target_man, 10.0, target_man.world - front_way)
 	_check(is_equal_approx(front_loss, 10.0) and is_equal_approx(hp_before - target_man.hp, 15.0), "a battalion takes half as much again from the rear")
 
+	# Open order: the tirailleurs spread out and are harder to hit.
+	var width := func(r: Regiment) -> float:
+		var lo := INF
+		var hi := -INF
+		var across := Vector2.from_angle(r.facing).orthogonal()
+		for u in r.living():
+			lo = minf(lo, u.slot.dot(across))
+			hi = maxf(hi, u.slot.dot(across))
+		return hi - lo
+	var closed: float = width.call(shaken)
+	shaken.set_skirmish(true)
+	var spread_out: float = width.call(shaken)
+	hp_before = target_man.hp
+	battle.strike(target_man, 10.0, target_man.world + front_way)
+	_check(spread_out > closed * 1.8 and hp_before - target_man.hp < 7.5, "tirailleurs spread out (%d to %d px) and are harder to hit" % [closed, spread_out])
+	shaken.set_skirmish(false)
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0

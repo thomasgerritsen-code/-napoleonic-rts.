@@ -13,6 +13,8 @@ extends Node2D
 var battle: Battle
 ## {centre, facing, length, width, progress, level, upgrade_to, upgrade_progress, holder, dug_at}
 var list: Array[Dictionary] = []
+## Where round shot and shells struck: {world, way, at}.
+var craters: Array[Dictionary] = []
 var _clock := 0.0
 
 
@@ -29,6 +31,7 @@ func update(delta: float) -> void:
 	if _clock > 0.0:
 		return
 	_clock = 1.0
+	_repair(cfg)
 	for r in battle.regiments:
 		if r.routing or r.destroyed():
 			continue
@@ -72,6 +75,9 @@ func cover(victim: Unit, from: Vector2, lobbed := false) -> float:
 	if t != null and not lobbed:
 		var way := (from - victim.world).normalized()
 		if way.dot(Vector2.from_angle(t["facing"])) > 0.17:
+			# A breached parapet covers little.
+			if t.get("breached", false):
+				return Battle.depth_rule_static("breachedCover", 0.8)
 			return float(Rules.trench_level(t["level"]).get("damage", cfg["trenchDamage"]))
 	if braced(victim.regiment):
 		return float(cfg["defendDamage"])
@@ -246,9 +252,66 @@ func _upgrade_work(t: Dictionary, delta: float) -> void:
 		battle.refresh_hud()
 
 
+## Round shot or a shell lands: a crater, and the works it falls on knocked
+## down (a trench loses a level; at the first its parapet is breached); a
+## tower beside it is hit. Howitzer shells do more (`works`).
+func shell(at: Vector2, way: Vector2, works: float) -> void:
+	craters.append({"world": at, "way": way.normalized(), "at": battle.clock})
+	if craters.size() > int(Battle.depth_rule_static("maxCraters", 80)):
+		craters.pop_front()
+	for t in list:
+		if t["progress"] < 1.0:
+			continue
+		var d: Vector2 = at - t["centre"]
+		var forward := Vector2.from_angle(t["facing"])
+		var along := absf(d.dot(forward.orthogonal()))
+		var across := d.dot(forward)
+		if along > t["length"] / 2.0 + 8.0 or across < -t["width"] / 2.0 - 8.0 or across > t["width"] / 2.0 + 34.0:
+			continue
+		t["integrity"] = float(t.get("integrity", 100.0)) - Battle.depth_rule_static("shellDamage", 14) * works
+		if t["integrity"] <= 0.0:
+			if t["level"] > 1:
+				t["level"] = int(t["level"]) - 1
+				t["integrity"] = 100.0
+			else:
+				t["integrity"] = 0.0
+				t["breached"] = true
+	for b in battle.buildings:
+		if b.type == "tower" and b.standing() and b.world.distance_to(at) <= Battle.depth_rule_static("towerSplash", 44):
+			b.hit(Battle.depth_rule_static("towerShellDamage", 30) * works)
+	queue_redraw()
+
+
+## The men standing in a damaged trench (three at least) dig it back up.
+func _repair(_cfg: Dictionary) -> void:
+	for t in list:
+		if t["progress"] < 1.0 or float(t.get("integrity", 100.0)) >= 100.0:
+			continue
+		var men := 0
+		var sappers := 0
+		for u in battle.units:
+			if u.alive() and u.type == "infantry" and (u.regiment == null or not u.regiment.routing) and _inside(t, u.world, 0.0):
+				men += 1
+				if u.troop == "sapper":
+					sappers += 1
+		if men < 3:
+			continue
+		var work := 1.0 + float(Rules.troop("sapper").get("work", 0.0)) * sappers / men
+		t["integrity"] = minf(100.0, float(t["integrity"]) + Battle.depth_rule_static("repairPerSecond", 2) * work)
+		if t.get("breached", false) and t["integrity"] >= 50.0:
+			t["breached"] = false
+
+
 ## A cut in the ground: the bank thrown up in front, darker as it deepens; a
 ## revetted trench shows its planks, a fortified one its gabions.
 func _draw() -> void:
+	for c in craters:
+		# Torn earth, the spray thrown on the far side.
+		var at := Iso.to_screen(c["world"])
+		draw_set_transform(at, 0.0, Vector2(1.0, Iso.SQ))
+		draw_circle(Vector2.ZERO, 7.0, Color(0.27, 0.21, 0.14, 0.75))
+		draw_circle(Vector2(c["way"]) * 5.0, 4.5, Color(0.4, 0.32, 0.21, 0.5))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	for t in list:
 		var forward := Vector2.from_angle(t["facing"])
 		var across := forward.orthogonal()

@@ -42,6 +42,9 @@ var _break_base := 0         # the strength its losses are counted from (since i
 var _pace := 1.0             # slowed by its walking wounded
 ## Told to hold its ground (G): it braces and, in line, digs in (Trenches).
 var hold := false
+## Open order (T): spread out, firing at will a little further, hard to hit
+## (harder among trees), easy prey for horse.
+var skirmish := false
 var braced_at := -1.0
 var trench: Variant = null   # the trench it holds or digs
 var last_centre := Vector2.INF
@@ -155,7 +158,18 @@ func order_move(to: Vector2, face: Variant = null) -> void:
 func set_formation(kind: String) -> void:
 	if kind == formation or routing:
 		return
+	if kind == "square":
+		skirmish = false
 	formation = kind
+	_form(destination)
+
+
+func set_skirmish(on: bool) -> void:
+	if routing or on == skirmish:
+		return
+	skirmish = on
+	if on and formation == "square":
+		formation = "line"
 	_form(destination)
 
 
@@ -260,6 +274,11 @@ func _form(at: Vector2) -> void:
 			var depth := r * RANK_GAP
 			if formation == "column":
 				depth -= (grid.y - 1) * RANK_GAP / 2.0
+			if skirmish:
+				# Spread out, each man a little off his file.
+				var u := group[r]
+				lateral = lateral * Battle.depth_rule_static("skirmishSpread", 2.3) + (Battle.hash01(u.id, 21) - 0.5) * 18.0
+				depth = depth * Battle.depth_rule_static("skirmishSpread", 2.3) + (Battle.hash01(u.id, 22) - 0.5) * 18.0
 			group[r].slot = at + right * lateral - forward * depth
 
 

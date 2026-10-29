@@ -124,7 +124,7 @@ func _describe() -> String:
 			lines.append("Graan: %d  ·  %d boeren" % [b.crop, battle.farmers_on(b)])
 		return "\n".join(lines)
 	if battle.selected_units.is_empty():
-		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · G stelling · F bataljon vormen · WASD/wieltje: camera"
+		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · G stelling · T tirailleurs · F bataljon vormen · WASD/wieltje: camera"
 	var count := {}
 	for u in battle.selected_units:
 		count[u.type] = count.get(u.type, 0) + 1
@@ -145,6 +145,9 @@ func _describe() -> String:
 		state += ", %s" % r.rank_label()
 		state += ", moreel %d (%s)" % [r.morale(), r.morale_label()]
 		var shape: String = {"column": "colonne", "square": "carré"}.get(r.formation, "linie")
+		if r.skirmish:
+			shape = "open orde"
+
 		lines.append("%s: %d man in %s, %s" % [r.name, r.strength(), shape, state])
 	var workers: int = count.get("worker", 0)
 	if workers > 0:
@@ -192,6 +195,10 @@ func _rebuild() -> void:
 			holding = holding or r.hold
 			if r.trench != null and r.trench["progress"] >= 1.0:
 				trench = r.trench
+		var open_order := false
+		for r in battle.selected:
+			open_order = open_order or r.skirmish
+		_button("Gesloten orde (T)" if open_order else "Tirailleurs (T)\nverspreid vuren", battle.skirmish)
 		_button("Stelling loslaten (G)" if holding else "Stelling houden (G)\nschrap zetten, ingraven", battle.hold)
 		if trench != null:
 			var next := Rules.trench_level(int(trench["level"]) + 1)

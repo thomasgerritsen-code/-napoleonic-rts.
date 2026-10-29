@@ -400,14 +400,32 @@ func strike(foe: Unit, damage: float, from: Vector2, lobbed := false, horse := f
 				if not horse:
 					share *= depth_rule("rearDamage", 1.5) if rear else depth_rule("flankDamage", 1.25)
 				shock = (depth_rule("rearShock", 2.0) if rear else depth_rule("flankShock", 1.5)) - 1.0
+	if r != null and r.skirmish:
+		if horse:
+			share *= depth_rule("skirmishVsCavalry", 1.7)
+			shock += depth_rule("skirmishVsCavalry", 1.7) - 1.0
+		else:
+			share *= depth_rule("skirmishWoodCover", 0.55) if near_trees(foe.world) else depth_rule("skirmishCover", 0.72)
 	if shock > 0.0:
 		foe.morale = maxf(0.0, foe.morale - 8.0 * shock)
 	foe.hit(damage * share)
 
 
 func depth_rule(key: String, fallback: float) -> float:
+	return depth_rule_static(key, fallback)
+
+
+static func depth_rule_static(key: String, fallback: float) -> float:
 	var d: Variant = Rules.start().get("battleDepth")
 	return float(d.get(key, fallback)) if d is Dictionary else fallback
+
+
+## Trees within a few paces (tirailleurs shelter among them).
+func near_trees(at: Vector2) -> bool:
+	for s in supplies:
+		if s.kind == "wood" and not s.gone() and s.world.distance_squared_to(at) < 46.0 * 46.0:
+			return true
+	return false
 
 
 ## Whether enemy soldiers (not peasants, not men in flight) are within `reach`.
@@ -744,6 +762,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			# A howitzer's shell drops into a trench; roundshot strikes its bank.
 			var impact := foe.world + Vector2(randf_range(-20, 20), randf_range(-14, 14))
 			var lobbed := bool(Rules.troop(u.troop).get("lobbed", false))
+			trenches.shell(impact, impact - u.world, float(Rules.troop(u.troop).get("works", 1.0)))
 			for other in units:
 				if other.alive() and other.side != u.side and other.world.distance_to(impact) < 26.0:
 					strike(other, damage * randf_range(0.6, 1.3), u.world, lobbed)
@@ -950,6 +969,19 @@ func hold() -> void:
 		r.hold = on
 	if not list.is_empty():
 		say("Stelling houden: de linie graaft zich in." if on else "De bataljons houden geen stelling meer.")
+	refresh_hud()
+
+
+## Open order for the selected battalions (or closed again).
+func skirmish() -> void:
+	var list := selected
+	var on := false
+	for r in list:
+		on = on or not r.skirmish
+	for r in list:
+		r.set_skirmish(on)
+	if not list.is_empty():
+		say("Tirailleurs: verspreid, vuren naar believen en verder, moeilijk te raken, maar kwetsbaar voor ruiterij." if on else "Gesloten orde: de gelederen sluiten.")
 	refresh_hud()
 
 
@@ -1174,6 +1206,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				charge()
 			KEY_G:
 				hold()
+			KEY_T:
+				skirmish()
 			KEY_F:
 				form_regiment()
 			KEY_M:

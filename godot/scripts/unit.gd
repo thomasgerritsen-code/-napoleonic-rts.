@@ -97,7 +97,8 @@ func military() -> bool:
 
 
 func reach() -> float:
-	return float(Rules.unit_type(type).get("range", 20)) * stat("range")
+	var open_order := Battle.depth_rule_static("skirmishRange", 1.15) if regiment != null and regiment.skirmish else 1.0
+	return float(Rules.unit_type(type).get("range", 20)) * stat("range") * open_order
 
 
 ## A troop kind's factor on the base type (1 for the plain kind).
@@ -232,9 +233,10 @@ func _step_in_regiment(delta: float) -> void:
 		facing = r.facing
 		idle()
 		return
-	var foe := r.enemy
+	var foe := r.enemy if not r.skirmish else null
 	if foe == null:
-		# No battalion before it: the men fire on any enemy in musket reach.
+		# No battalion before it, or in open order: the men fire at will on
+		# any enemy in musket reach.
 		_look -= delta
 		if _look <= 0.0:
 			_look = LOOK_AROUND
