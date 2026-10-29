@@ -12,6 +12,9 @@ var _failures: Array[String] = []
 func _initialize() -> void:
 	var battle: Battle = load("res://scenes/main.tscn").instantiate()
 	root.add_child(battle)
+	# The scene is set up once the main loop runs its first frame.
+	await process_frame
+	await process_frame
 
 	_check(battle.regiments.size() == 6, "six battalions on the field")
 	var men := 0
