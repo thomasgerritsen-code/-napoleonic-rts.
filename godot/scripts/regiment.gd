@@ -1,28 +1,33 @@
 class_name Regiment
 extends RefCounted
-## A battalion, in line (two ranks, shoulder to shoulder) or in march column
-## (four files deep, quicker but with little fire). It owns its men's places;
-## an order sets the formation at the destination, facing the way it marched.
-## It fights the nearest enemy battalion in musket range once it stands, and
-## breaks and runs when it has lost too many men.
+## A battalion as in the web game: 12 to 36 musketeers with an officer and a
+## drummer, in line (two ranks) or in march column (four files, quicker but
+## with little fire). It owns its men's places; an order sets the formation at
+## the destination, facing the way it marched. Standing, it fires on the
+## nearest enemy battalion or men in musket range; it can charge with the
+## bayonet, and breaks and runs when it has lost too many men.
 
+const MIN_MEN := 12
+const MAX_MEN := 36
 const FILE_GAP := 15.0       # game px between neighbours in a rank
 const RANK_GAP := 19.0       # and between the ranks
 const RANKS := 2
 const COLUMN_FILES := 4
-const COLUMN_SPEED := 1.25   # a column marches a quarter faster
-const COLUMN_FIRE := 0.35    # and hits a third as often
-const RANGE := 190.0         # musket range, centre to centre
-const BREAK_AT := 0.45       # breaks below this share of its men
-const CHARGE_REACH := 380.0  # charges an enemy this close
+const COLUMN_SPEED := 1.25
+const COLUMN_FIRE := 0.35
+const RANGE := 200.0         # the web game's musket range
+const BREAK_AT := 0.45
+const CHARGE_REACH := 380.0
 const CHARGE_SPEED := 1.6
 const MELEE_REACH := 18.0
-const MELEE_KILL := 0.7      # a second's chance to strike down the man in reach
-const MELEE_LOSS := 0.4      # and to be struck down by him
+const MELEE_KILL := 0.7
+const MELEE_LOSS := 0.4
+
+static var _numbers := {"france": 0, "britain": 0}
 
 var name := ""
 var side := "france"
-var soldiers: Array[Soldier] = []
+var men: Array[Unit] = []
 var facing := 0.0
 var formation := "line"
 var routing := false
@@ -32,23 +37,58 @@ var destination := Vector2.ZERO
 var _start := 0
 
 
+static func eligible(units: Array[Unit]) -> bool:
+	var count := {"infantry": 0, "officer": 0, "drummer": 0}
+	for u in units:
+		if u.alive() and u.regiment == null and count.has(u.type):
+			count[u.type] += 1
+	return count["infantry"] >= MIN_MEN and count["officer"] >= 1 and count["drummer"] >= 1
+
+
+## A battalion of the free men among `units` (null if they are too few).
+static func raise(units: Array[Unit]) -> Regiment:
+	if units.is_empty() or not eligible(units):
+		return null
+	var side_: String = units[0].side
+	_numbers[side_] += 1
+	var title := ("%de Ligne" if side_ == "france" else "%dth Foot") % _numbers[side_]
+	var r := Regiment.new(title, side_)
+	var officer := false
+	var drummer := false
+	var infantry := 0
+	for u in units:
+		if not u.alive() or u.regiment != null or u.side != side_:
+			continue
+		if u.type == "infantry" and infantry < MAX_MEN:
+			infantry += 1
+		elif u.type == "officer" and not officer:
+			officer = true
+		elif u.type == "drummer" and not drummer:
+			drummer = true
+		else:
+			continue
+		u.regiment = r
+		u.ordered = false
+		u.target = null
+		r.men.append(u)
+	r._start = r.men.size()
+	var at := r.centroid()
+	r.facing = 0.0 if side_ == "france" else PI
+	r.order_move(at, r.facing)
+	return r
+
+
 func _init(name_: String, side_: String) -> void:
 	name = name_
 	side = side_
 
 
-func add(soldier: Soldier) -> void:
-	soldier.regiment = self
-	soldiers.append(soldier)
-	_start = soldiers.size()
-
-
-func living() -> Array[Soldier]:
-	var men: Array[Soldier] = []
-	for s in soldiers:
-		if s.alive():
-			men.append(s)
-	return men
+func living() -> Array[Unit]:
+	var list: Array[Unit] = []
+	for u in men:
+		if u.alive():
+			list.append(u)
+	return list
 
 
 func strength() -> int:
@@ -64,23 +104,22 @@ func destroyed() -> bool:
 
 
 func centroid() -> Vector2:
-	var men := living()
-	if men.is_empty():
+	var list := living()
+	if list.is_empty():
 		return destination
 	var sum := Vector2.ZERO
-	for s in men:
-		sum += s.world
-	return sum / men.size()
+	for u in list:
+		sum += u.world
+	return sum / list.size()
 
 
 func moving() -> bool:
-	for s in living():
-		if s.world.distance_to(s.slot) > 6.0:
+	for u in living():
+		if u.world.distance_to(u.slot) > 6.0:
 			return true
 	return false
 
 
-## A new line at `to`, facing `face` (or the way it marches).
 func order_move(to: Vector2, face: Variant = null) -> void:
 	if routing:
 		return
@@ -95,7 +134,84 @@ func order_move(to: Vector2, face: Variant = null) -> void:
 	_form(to)
 
 
-## Fix bayonets and run at the nearest enemy battalion within reach.
+func set_formation(kind: String) -> void:
+	if kind == formation or routing:
+		return
+	formation = kind
+	_form(destination)
+
+
+func speed_factor() -> float:
+	if charging != null:
+		return CHARGE_SPEED
+	return COLUMN_SPEED if formation == "column" else 1.0
+
+
+func fire_factor() -> float:
+	return COLUMN_FIRE if formation == "column" else 1.0
+
+
+func shape(count: int) -> Vector2i:
+	if formation == "column":
+		return Vector2i(mini(COLUMN_FILES, count), ceili(float(count) / COLUMN_FILES))
+	return Vector2i(ceili(float(count) / RANKS), mini(RANKS, count))
+
+
+## Places at `at`: the musketeers in files (keeping their order across the
+## front and from front to back), the officer before the centre and the
+## drummer behind it.
+func _form(at: Vector2) -> void:
+	var forward := Vector2.from_angle(facing)
+	var right := forward.orthogonal() * -1.0
+	var rank_and_file: Array[Unit] = []
+	for u in living():
+		if u.type == "infantry":
+			rank_and_file.append(u)
+		elif u.type == "officer":
+			u.slot = at + forward * 22.0
+		else:
+			u.slot = at - forward * (RANK_GAP * 2.0 + 14.0) + right * 10.0
+	if rank_and_file.is_empty():
+		return
+	var grid := shape(rank_and_file.size())
+	var files := grid.x
+	rank_and_file.sort_custom(func(a: Unit, b: Unit) -> bool:
+		return (a.world - at).dot(right) < (b.world - at).dot(right))
+	var per_file := ceili(float(rank_and_file.size()) / files)
+	for file in files:
+		var group: Array[Unit] = []
+		for i in range(file * per_file, mini((file + 1) * per_file, rank_and_file.size())):
+			group.append(rank_and_file[i])
+		group.sort_custom(func(a: Unit, b: Unit) -> bool:
+			return (a.world - at).dot(forward) > (b.world - at).dot(forward))
+		for r in group.size():
+			var lateral := (file - (files - 1) / 2.0) * FILE_GAP
+			var depth := r * RANK_GAP
+			if formation == "column":
+				depth -= (grid.y - 1) * RANK_GAP / 2.0
+			group[r].slot = at + right * lateral - forward * depth
+
+
+func lost(_unit: Unit) -> void:
+	if routing:
+		return
+	if strength() > 0 and strength() < _start * BREAK_AT:
+		rout()
+	else:
+		_form(destination)
+
+
+func rout() -> void:
+	if routing:
+		return
+	routing = true
+	enemy = null
+	charging = null
+	var home_x := 120.0 if side == "france" else Iso.WORLD.x - 120.0
+	for u in living():
+		u.slot = Vector2(home_x, u.world.y + randf_range(-160.0, 160.0))
+
+
 func charge(regiments: Array[Regiment]) -> bool:
 	if routing:
 		return false
@@ -116,82 +232,9 @@ func charge(regiments: Array[Regiment]) -> bool:
 	return true
 
 
-func set_formation(kind: String) -> void:
-	if kind == formation or routing:
-		return
-	formation = kind
-	_form(destination)
-
-
-func speed_factor() -> float:
-	if charging != null:
-		return CHARGE_SPEED
-	return COLUMN_SPEED if formation == "column" else 1.0
-
-
-func fire_factor() -> float:
-	return COLUMN_FIRE if formation == "column" else 1.0
-
-
-## Files across the front and ranks behind, for this many men.
-func shape(men: int) -> Vector2i:
-	if formation == "column":
-		return Vector2i(mini(COLUMN_FILES, men), ceili(float(men) / COLUMN_FILES))
-	return Vector2i(ceili(float(men) / RANKS), mini(RANKS, men))
-
-
-## Places in the formation at `at`. Men keep their order across the front and
-## from front to back, so files do not cross on the way.
-func _form(at: Vector2) -> void:
-	var men := living()
-	if men.is_empty():
-		return
-	var forward := Vector2.from_angle(facing)
-	var right := forward.orthogonal() * -1.0
-	var size := shape(men.size())
-	var files := size.x
-	var ranks := size.y
-	men.sort_custom(func(a: Soldier, b: Soldier) -> bool:
-		return (a.world - at).dot(right) < (b.world - at).dot(right))
-	# Cut the front into files, then order each file front to back.
-	var per_file := ceili(float(men.size()) / files)
-	for file in files:
-		var group: Array[Soldier] = []
-		for i in range(file * per_file, mini((file + 1) * per_file, men.size())):
-			group.append(men[i])
-		group.sort_custom(func(a: Soldier, b: Soldier) -> bool:
-			return (a.world - at).dot(forward) > (b.world - at).dot(forward))
-		for r in group.size():
-			var lateral := (file - (files - 1) / 2.0) * FILE_GAP
-			var depth := r * RANK_GAP - (ranks - 1) * RANK_GAP / 2.0 if formation == "column" else r * RANK_GAP
-			group[r].slot = at + right * lateral - forward * depth
-
-
-## Close the ranks after losses (the line keeps its place and front).
-func lost(_soldier: Soldier) -> void:
-	if not routing and strength() > 0 and strength() < _start * BREAK_AT:
-		rout()
-	elif not routing:
-		_form(destination)
-
-
-func rout() -> void:
-	if routing:
-		return
-	routing = true
-	enemy = null
-	charging = null
-	# Back to its own side of the field.
-	var home_x := 60.0 if side == "france" else Iso.WORLD.x - 60.0
-	for s in living():
-		s.slot = Vector2(home_x, s.world.y + randf_range(-120.0, 120.0))
-
-
+## Choose the enemy to fire on or keep charging; the men move themselves.
 func update(delta: float, regiments: Array[Regiment]) -> void:
 	if routing or destroyed():
-		var men := living()
-		for s in men:
-			s.step(delta, null)
 		return
 	if charging != null:
 		_melee(delta)
@@ -200,21 +243,16 @@ func update(delta: float, regiments: Array[Regiment]) -> void:
 	if enemy != null and (enemy.destroyed() or enemy.routing or enemy.centroid().distance_to(here) > RANGE * 1.15):
 		enemy = null
 	if enemy == null and not moving():
-		var best_d := RANGE
+		var best := RANGE
 		for other in regiments:
 			if other.side == side or other.routing or other.destroyed():
 				continue
 			var d := other.centroid().distance_to(here)
-			if d < best_d:
-				best_d = d
+			if d < best:
+				best = d
 				enemy = other
-	var enemy_at: Variant = enemy.centroid() if enemy != null else null
-	for s in living():
-		s.step(delta, enemy_at)
 
 
-## Each man runs at the nearest enemy; men in reach of each other fight. A
-## battalion that is reached by a stronger one breaks.
 func _melee(delta: float) -> void:
 	var foe := charging
 	if foe.routing or foe.destroyed():
@@ -224,24 +262,23 @@ func _melee(delta: float) -> void:
 		return
 	var them := foe.living()
 	var contact := false
-	for s in living():
-		var nearest: Soldier = null
+	for u in living():
+		var nearest: Unit = null
 		var best := INF
 		for o in them:
-			var d := s.world.distance_squared_to(o.world)
+			var d := u.world.distance_squared_to(o.world)
 			if d < best:
 				best = d
 				nearest = o
 		if nearest == null:
 			break
-		s.slot = nearest.world
+		u.slot = nearest.world
 		if best < MELEE_REACH * MELEE_REACH:
 			contact = true
 			if randf() < MELEE_KILL * delta:
 				nearest.hit(1000.0)
 			elif randf() < MELEE_LOSS * delta:
-				s.hit(1000.0)
-		s.step(delta, null)
+				u.hit(1000.0)
 		if routing:
 			return
 	if contact and not foe.routing and foe.strength() < strength() * 0.85:

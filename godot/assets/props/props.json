@@ -1,4 +1,5 @@
 {
+ "pxPerM": 41.2903,
  "props": {
   "oak": {
    "footprint": {
@@ -83,7 +84,160 @@
     "y": 64
    },
    "w": 194
+  },
+  "hawthorn": {
+   "footprint": {
+    "d": 2.25,
+    "w": 2.94
+   },
+   "h": 139,
+   "heightM": 1.97,
+   "image": "hawthorn.webp",
+   "pivot": {
+    "x": 85,
+    "y": 89
+   },
+   "w": 204
+  },
+  "barracks_fr": {
+   "footprint": {
+    "d": 15.13,
+    "w": 17.67
+   },
+   "h": 706,
+   "heightM": 10.82,
+   "image": "barracks_fr.webp",
+   "pivot": {
+    "x": 392,
+    "y": 457
+   },
+   "w": 939
+  },
+  "barracks_br": {
+   "footprint": {
+    "d": 15.13,
+    "w": 17.67
+   },
+   "h": 706,
+   "heightM": 10.82,
+   "image": "barracks_br.webp",
+   "pivot": {
+    "x": 392,
+    "y": 457
+   },
+   "w": 939
+  },
+  "cottage": {
+   "footprint": {
+    "d": 9.63,
+    "w": 9.88
+   },
+   "h": 462,
+   "heightM": 7.82,
+   "image": "cottage.webp",
+   "pivot": {
+    "x": 231,
+    "y": 292
+   },
+   "w": 574
+  },
+  "barn": {
+   "footprint": {
+    "d": 12.29,
+    "w": 13.39
+   },
+   "h": 575,
+   "heightM": 8.67,
+   "image": "barn.webp",
+   "pivot": {
+    "x": 303,
+    "y": 371
+   },
+   "w": 731
+  },
+  "tower_fr": {
+   "footprint": {
+    "d": 8.74,
+    "w": 8.74
+   },
+   "h": 682,
+   "heightM": 13.22,
+   "image": "tower_fr.webp",
+   "pivot": {
+    "x": 207,
+    "y": 482
+   },
+   "w": 604
+  },
+  "tower_br": {
+   "footprint": {
+    "d": 8.74,
+    "w": 8.74
+   },
+   "h": 675,
+   "heightM": 13.22,
+   "image": "tower_br.webp",
+   "pivot": {
+    "x": 207,
+    "y": 475
+   },
+   "w": 604
+  },
+  "hospital_fr": {
+   "footprint": {
+    "d": 9.8,
+    "w": 9.27
+   },
+   "h": 381,
+   "heightM": 5.1,
+   "image": "hospital_fr.webp",
+   "pivot": {
+    "x": 254,
+    "y": 257
+   },
+   "w": 510
+  },
+  "hospital_br": {
+   "footprint": {
+    "d": 9.31,
+    "w": 9.94
+   },
+   "h": 324,
+   "heightM": 5.1,
+   "image": "hospital_br.webp",
+   "pivot": {
+    "x": 248,
+    "y": 201
+   },
+   "w": 537
+  },
+  "well": {
+   "footprint": {
+    "d": 2.51,
+    "w": 2.87
+   },
+   "h": 186,
+   "heightM": 3.15,
+   "image": "well.webp",
+   "pivot": {
+    "x": 86,
+    "y": 123
+   },
+   "w": 218
+  },
+  "haystack": {
+   "footprint": {
+    "d": 3,
+    "w": 3
+   },
+   "h": 195,
+   "heightM": 3.4,
+   "image": "haystack.webp",
+   "pivot": {
+    "x": 89,
+    "y": 125
+   },
+   "w": 227
   }
- },
- "pxPerM": 41.2903
+ }
 }

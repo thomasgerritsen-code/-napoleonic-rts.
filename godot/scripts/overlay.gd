@@ -1,17 +1,14 @@
 class_name Overlay
 extends Node2D
 ## Drawn over the field: each battalion's colour with its strength, the box
-## being dragged and a brief marker where an order was given.
+## being dragged, a marker where an order was given, and the outline of a
+## building being placed (green where it may stand, red where not).
 
 const FLAG := {"france": [Color(0.12, 0.24, 0.62), Color(0.95, 0.94, 0.9), Color(0.8, 0.14, 0.16)],
 	"britain": [Color(0.78, 0.12, 0.14), Color(0.95, 0.94, 0.9), Color(0.1, 0.18, 0.5)]}
 
 var battle: Battle
-
-var box := Rect2():
-	set(value):
-		box = value
-		queue_redraw()
+var box := Rect2()
 
 var _mark := Vector2.ZERO
 var _mark_life := 0.0
@@ -20,7 +17,6 @@ var _mark_life := 0.0
 func mark(canvas_at: Vector2) -> void:
 	_mark = canvas_at
 	_mark_life = 0.8
-	queue_redraw()
 
 
 func _process(delta: float) -> void:
@@ -33,6 +29,8 @@ func _draw() -> void:
 		for r in battle.regiments:
 			if not r.destroyed():
 				_draw_colour(r)
+		if battle.placing != "":
+			_draw_plan(battle.placing)
 	if box.size != Vector2.ZERO:
 		draw_rect(box, Color(0.95, 0.9, 0.6, 0.12))
 		draw_rect(box, Color(0.95, 0.9, 0.6, 0.85), false, 1.5)
@@ -40,6 +38,24 @@ func _draw() -> void:
 		var a := clampf(_mark_life / 0.8, 0.0, 1.0)
 		draw_set_transform(_mark, 0.0, Vector2(1.0, Iso.SQ))
 		draw_arc(Vector2.ZERO, 18.0 + (1.0 - a) * 14.0, 0.0, TAU, 32, Color(0.95, 0.85, 0.4, a), 2.0)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_plan(type: String) -> void:
+	var at := Iso.to_world(get_global_mouse_position())
+	var site: Variant = battle.site_for(type, at)
+	var where: Vector2 = site if site != null else at
+	var info := Rules.building_type(type)
+	var size := Vector2(float(info.get("w", 60)), float(info.get("h", 50)))
+	var centre := Iso.to_screen(where)
+	var rect := Rect2(centre - Vector2(size.x, size.y * Iso.SQ) / 2.0, Vector2(size.x, size.y * Iso.SQ))
+	var colour := Color(0.4, 0.9, 0.4) if site != null else Color(0.95, 0.3, 0.25)
+	draw_rect(rect, Color(colour, 0.22))
+	draw_rect(rect, colour, false, 2.0)
+	if type == "lumbercamp":
+		draw_set_transform(centre, 0.0, Vector2(1.0, Iso.SQ))
+		draw_arc(Vector2.ZERO, Rules.logging_radius(), 0.0, TAU, 64, Color(colour, 0.5), 1.5)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## A small colour on a pole above the battalion, and a bar for its strength.

@@ -1,10 +1,13 @@
 extends SceneTree
 ## Headless check, run by CI:
 ##   godot --headless --path godot --script res://tests/smoke_test.gd
-## The battle loads with both armies, the projection inverts, an order moves a
-## battalion in line, and left alone the armies close and fight.
+## The web game's opening loads; peasants gather food, build a lumber camp and
+## cut wood; the town centre trains a peasant; musketeers with an officer and
+## a drummer form a battalion that marches; the computer develops its base;
+## and two battalions within range fight.
 
-const LIMIT_MS := 120000
+const LIMIT_MS := 150000
+const STEP := 0.1
 
 var _failures: Array[String] = []
 
@@ -16,40 +19,106 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 
-	_check(battle.regiments.size() == 6, "six battalions on the field")
-	var men := 0
-	for r in battle.regiments:
-		men += r.strength()
-	_check(men == 6 * Battle.MEN, "every battalion at full strength (%d men)" % men)
-
+	var start := Rules.start()
+	var towns := 0
+	for b in battle.buildings:
+		if b.type == "towncenter":
+			towns += 1
+	_check(towns == 2, "both town centres stand")
+	_check(battle.units.size() == start["units"].size(), "the opening's %d peasants are there" % battle.units.size())
+	_check(battle.supplies.size() == start["resources"].size(), "the map's %d resources are there" % battle.supplies.size())
+	_check(battle.houses.size() > 20, "the villages' %d houses are there" % battle.houses.size())
 	var point := Vector2(4500, 3200)
-	var back := Iso.to_world(Iso.to_screen(point))
-	_check(back.distance_to(point) < 1.0, "screen to world inverts world to screen (%s)" % back)
+	_check(Iso.to_world(Iso.to_screen(point)).distance_to(point) < 1.0, "screen to world inverts world to screen")
 
-	var french: Regiment = battle.regiments[0]
-	var start := french.centroid()
-	var pick: Array[Regiment] = [french]
-	battle._select(pick, false)
-	battle._order(start + Vector2(-220, 0), null)
-	for i in 160:
-		battle._process(0.05)
-	var moved := french.centroid().distance_to(start)
-	_check(moved > 170.0, "the ordered battalion marched (%.0f px)" % moved)
-	_check(not french.moving(), "and stands in its new line")
+	# Food: every French peasant to the nearest bush.
+	var french: Array[Unit] = []
+	for u in battle.units:
+		if u.side == "france":
+			french.append(u)
+	var food := float(battle.economy["france"]["food"])
+	for u in french:
+		u.set_task("gather", battle.nearest_supply(u.world, "food", "france"))
+	_run(battle, 60.0)
+	var gathered := float(battle.economy["france"]["food"]) - food
+	_check(gathered > 50.0, "peasants gathered and delivered food (+%d)" % gathered)
 
+	# Wood: a lumber camp by the nearest wood, built, then trees cut.
+	var home := battle.town_centre("france").world
+	var camp: Building = null
+	var tree: Supply = null
+	var best := INF
+	for s in battle.supplies:
+		if s.kind == "wood" and s.world.distance_to(home) < best:
+			best = s.world.distance_to(home)
+			tree = s
+	for ring in range(1, 12):
+		for i in 16:
+			var at := tree.world + Vector2.from_angle(TAU * i / 16.0) * ring * 40.0
+			if camp == null and battle.site_for("lumbercamp", at) != null:
+				camp = battle.lay_out("france", "lumbercamp", at, french)
+	_check(camp != null, "a lumber camp was laid out by the wood")
+	_run(battle, 40.0)
+	_check(camp != null and camp.complete, "the peasants built the lumber camp")
+	var wood := float(battle.economy["france"]["wood"])
+	_run(battle, 60.0)
+	_check(float(battle.economy["france"]["wood"]) > wood + 40.0, "peasants cut and delivered wood")
+
+	# Training.
+	var people := battle.pop_used("france")
+	_check(battle.queue_unit(battle.town_centre("france"), "worker"), "the town centre takes a peasant to train")
+	_run(battle, 10.0)
+	_check(battle.pop_used("france") == people + 1, "and the peasant came out")
+
+	# A battalion.
+	var company: Array[Unit] = []
+	var muster := home + Vector2(500, 300)
+	for i in 14:
+		company.append(battle.add_unit("france", "infantry", muster + Vector2(i * 16, 0)))
+	company.append(battle.add_unit("france", "officer", muster + Vector2(0, 30)))
+	company.append(battle.add_unit("france", "drummer", muster + Vector2(20, 30)))
+	var regiment := battle.form_regiment(company)
+	_check(regiment != null and regiment.men.size() == 16, "fourteen musketeers, an officer and a drummer form a battalion")
+	var from := regiment.centroid()
+	regiment.order_move(from + Vector2(250, 0))
+	_run(battle, 12.0)
+	_check(regiment.centroid().distance_to(from) > 200.0 and not regiment.moving(), "the battalion marched and stands in line")
+
+	# The computer.
+	_run(battle, 120.0)
+	var british_buildings := 0
+	for b in battle.buildings:
+		if b.side == "britain" and b.standing():
+			british_buildings += 1
+	_check(british_buildings >= 2, "the computer built (%d buildings)" % british_buildings)
+	_check(battle.pop_used("britain") > 6, "and trained (%d people)" % battle.pop_used("britain"))
+
+	# A fight: a British battalion set down within musket range.
+	var enemies: Array[Unit] = []
+	var there := regiment.centroid() + Vector2(170, 0)
+	for i in 14:
+		enemies.append(battle.add_unit("britain", "infantry", there + Vector2(0, i * 16 - 100)))
+	enemies.append(battle.add_unit("britain", "officer", there + Vector2(30, 0)))
+	enemies.append(battle.add_unit("britain", "drummer", there + Vector2(30, 20)))
+	var foe := battle.form_regiment(enemies)
+	_check(foe != null, "a British battalion forms")
+	_run(battle, 60.0)
 	var fallen := {"france": 0, "britain": 0}
-	for i in 3600:
-		battle._process(0.05)
-	for r in battle.regiments:
-		for s in r.soldiers:
-			if not s.alive():
-				fallen[r.side] += 1
-	_check(fallen["france"] > 0 and fallen["britain"] > 0, "both sides lost men in the fight (%s)" % fallen)
+	for u in battle.units:
+		if not u.alive():
+			fallen[u.side] += 1
+	_check(fallen["france"] > 0 and fallen["britain"] > 0, "both battalions lost men in the firefight (%s)" % fallen)
 
-	print("GODOT_SMOKE ", JSON.stringify({"men": men, "moved": moved, "fallen": fallen, "result": battle.result}))
+	print("GODOT_SMOKE ", JSON.stringify({"food": gathered, "economy": battle.economy, "fallen": fallen,
+		"pop": {"france": battle.pop_used("france"), "britain": battle.pop_used("britain")}, "plan": battle.ai.plan}))
 	for failure in _failures:
 		printerr("FAILED: ", failure)
 	quit(1 if _failures.size() > 0 else 0)
+
+
+func _run(battle: Battle, seconds: float) -> void:
+	for i in int(seconds / STEP):
+		battle._process(STEP)
 
 
 ## A script error stops _initialize before it quits; this ends the run anyway.
