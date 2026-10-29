@@ -58,7 +58,7 @@ func step(delta: float, enemy_at: Variant) -> void:
 	var to_slot := slot - world
 	var far := to_slot.length() > 3.0
 	if far:
-		var speed := ROUT_SPEED if routing else SPEED
+		var speed := ROUT_SPEED if routing else SPEED * (regiment.speed_factor() if regiment != null else 1.0)
 		world += to_slot.limit_length(speed * delta)
 		facing = to_slot.angle()
 		position = Iso.to_screen(world)

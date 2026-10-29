@@ -1,13 +1,17 @@
 class_name Regiment
 extends RefCounted
-## A battalion in line: two ranks, shoulder to shoulder. It owns its men's
-## places; an order sets a new line at the destination, facing the way it
-## marched. It fights the nearest enemy battalion in musket range once it
-## stands, and breaks and runs when it has lost too many men.
+## A battalion, in line (two ranks, shoulder to shoulder) or in march column
+## (four files deep, quicker but with little fire). It owns its men's places;
+## an order sets the formation at the destination, facing the way it marched.
+## It fights the nearest enemy battalion in musket range once it stands, and
+## breaks and runs when it has lost too many men.
 
 const FILE_GAP := 15.0       # game px between neighbours in a rank
 const RANK_GAP := 19.0       # and between the ranks
 const RANKS := 2
+const COLUMN_FILES := 4
+const COLUMN_SPEED := 1.25   # a column marches a quarter faster
+const COLUMN_FIRE := 0.35    # and hits a third as often
 const RANGE := 190.0         # musket range, centre to centre
 const BREAK_AT := 0.45       # breaks below this share of its men
 
@@ -15,6 +19,7 @@ var name := ""
 var side := "france"
 var soldiers: Array[Soldier] = []
 var facing := 0.0
+var formation := "line"
 var routing := false
 var enemy: Regiment = null
 var destination := Vector2.ZERO
@@ -42,6 +47,10 @@ func living() -> Array[Soldier]:
 
 func strength() -> int:
 	return living().size()
+
+
+func full_strength() -> int:
+	return _start
 
 
 func destroyed() -> bool:
@@ -79,29 +88,53 @@ func order_move(to: Vector2, face: Variant = null) -> void:
 	_form(to)
 
 
-## Places in the line at `at`. Men keep their order across the line, so files
-## do not cross on the way.
+func set_formation(kind: String) -> void:
+	if kind == formation or routing:
+		return
+	formation = kind
+	_form(destination)
+
+
+func speed_factor() -> float:
+	return COLUMN_SPEED if formation == "column" else 1.0
+
+
+func fire_factor() -> float:
+	return COLUMN_FIRE if formation == "column" else 1.0
+
+
+## Files across the front and ranks behind, for this many men.
+func shape(men: int) -> Vector2i:
+	if formation == "column":
+		return Vector2i(mini(COLUMN_FILES, men), ceili(float(men) / COLUMN_FILES))
+	return Vector2i(ceili(float(men) / RANKS), mini(RANKS, men))
+
+
+## Places in the formation at `at`. Men keep their order across the front and
+## from front to back, so files do not cross on the way.
 func _form(at: Vector2) -> void:
 	var men := living()
 	if men.is_empty():
 		return
 	var forward := Vector2.from_angle(facing)
 	var right := forward.orthogonal() * -1.0
-	var files := ceili(float(men.size()) / RANKS)
+	var size := shape(men.size())
+	var files := size.x
+	var ranks := size.y
 	men.sort_custom(func(a: Soldier, b: Soldier) -> bool:
 		return (a.world - at).dot(right) < (b.world - at).dot(right))
-	# Front rank takes the men nearest the front within each file.
+	# Cut the front into files, then order each file front to back.
+	var per_file := ceili(float(men.size()) / files)
 	for file in files:
-		var pair: Array[Soldier] = []
-		for r in RANKS:
-			var i := file * RANKS + r
-			if i < men.size():
-				pair.append(men[i])
-		pair.sort_custom(func(a: Soldier, b: Soldier) -> bool:
+		var group: Array[Soldier] = []
+		for i in range(file * per_file, mini((file + 1) * per_file, men.size())):
+			group.append(men[i])
+		group.sort_custom(func(a: Soldier, b: Soldier) -> bool:
 			return (a.world - at).dot(forward) > (b.world - at).dot(forward))
-		for r in pair.size():
+		for r in group.size():
 			var lateral := (file - (files - 1) / 2.0) * FILE_GAP
-			pair[r].slot = at + right * lateral - forward * (r * RANK_GAP)
+			var depth := r * RANK_GAP - (ranks - 1) * RANK_GAP / 2.0 if formation == "column" else r * RANK_GAP
+			group[r].slot = at + right * lateral - forward * depth
 
 
 ## Close the ranks after losses (the line keeps its place and front).

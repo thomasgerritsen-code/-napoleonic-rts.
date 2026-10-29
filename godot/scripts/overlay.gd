@@ -1,7 +1,12 @@
 class_name Overlay
 extends Node2D
-## Drawn over the field: the box being dragged and a brief marker where an
-## order was given.
+## Drawn over the field: each battalion's colour with its strength, the box
+## being dragged and a brief marker where an order was given.
+
+const FLAG := {"france": [Color(0.12, 0.24, 0.62), Color(0.95, 0.94, 0.9), Color(0.8, 0.14, 0.16)],
+	"britain": [Color(0.78, 0.12, 0.14), Color(0.95, 0.94, 0.9), Color(0.1, 0.18, 0.5)]}
+
+var battle: Battle
 
 var box := Rect2():
 	set(value):
@@ -19,12 +24,15 @@ func mark(canvas_at: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
-	if _mark_life > 0.0:
-		_mark_life -= delta
-		queue_redraw()
+	_mark_life = maxf(0.0, _mark_life - delta)
+	queue_redraw()
 
 
 func _draw() -> void:
+	if battle != null:
+		for r in battle.regiments:
+			if not r.destroyed():
+				_draw_colour(r)
 	if box.size != Vector2.ZERO:
 		draw_rect(box, Color(0.95, 0.9, 0.6, 0.12))
 		draw_rect(box, Color(0.95, 0.9, 0.6, 0.85), false, 1.5)
@@ -32,3 +40,22 @@ func _draw() -> void:
 		var a := clampf(_mark_life / 0.8, 0.0, 1.0)
 		draw_set_transform(_mark, 0.0, Vector2(1.0, Iso.SQ))
 		draw_arc(Vector2.ZERO, 18.0 + (1.0 - a) * 14.0, 0.0, TAU, 32, Color(0.95, 0.85, 0.4, a), 2.0)
+
+
+## A small colour on a pole above the battalion, and a bar for its strength.
+func _draw_colour(r: Regiment) -> void:
+	var foot := Iso.to_screen(r.centroid()) + Vector2(0.0, -34.0)
+	var colours: Array = FLAG[r.side]
+	var top := foot + Vector2(0.0, -22.0)
+	draw_line(foot, top, Color(0.25, 0.18, 0.1), 1.5)
+	if r.routing:
+		draw_rect(Rect2(top, Vector2(14, 9)), Color(0.92, 0.92, 0.88))
+	else:
+		for i in 3:
+			draw_rect(Rect2(top + Vector2(i * 6.0, 0.0), Vector2(6, 10)), colours[i])
+	if r in battle.selected:
+		draw_rect(Rect2(top - Vector2(1, 1), Vector2(20, 12)), Color(1.0, 0.86, 0.35), false, 1.5)
+	var share := float(r.strength()) / maxf(1.0, float(r.full_strength()))
+	var bar := Rect2(foot + Vector2(-14.0, 3.0), Vector2(28.0, 3.5))
+	draw_rect(bar, Color(0.0, 0.0, 0.0, 0.55))
+	draw_rect(Rect2(bar.position, Vector2(bar.size.x * share, bar.size.y)), Color(0.85, 0.2, 0.15).lerp(Color(0.35, 0.8, 0.3), share))

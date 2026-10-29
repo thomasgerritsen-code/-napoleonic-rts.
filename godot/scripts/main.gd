@@ -12,6 +12,7 @@ const FRANCE_X := 4300.0
 const BRITAIN_X := 5500.0
 const LINE_YS := [2950.0, 3250.0, 3550.0]
 const AI_EVERY := 2.5
+const DEPLOY_AT := 480.0     # the computer forms line this close to the enemy
 
 var regiments: Array[Regiment] = []
 var selected: Array[Regiment] = []
@@ -42,6 +43,7 @@ func _ready() -> void:
 	_effects.z_index = 10
 	add_child(_effects)
 	_overlay = Overlay.new()
+	_overlay.battle = self
 	_overlay.z_index = 20
 	add_child(_overlay)
 	_add_trees()
@@ -158,10 +160,11 @@ func _add_regiment(title: String, side: String, look: String, at: Vector2, face:
 	return regiment
 
 
-## The computer's battalions close to musket range of the nearest French one.
+## The computer's battalions close to musket range of the nearest French one,
+## in column while far off and deploying into line once near.
 func _command_britain() -> void:
 	for r in regiments:
-		if r.side != "britain" or r.routing or r.destroyed() or r.enemy != null or r.moving():
+		if r.side != "britain" or r.routing or r.destroyed() or r.enemy != null:
 			continue
 		var here := r.centroid()
 		var target: Regiment = null
@@ -174,6 +177,10 @@ func _command_britain() -> void:
 					target = other
 		if target == null:
 			continue
+		var near := best < DEPLOY_AT
+		if r.moving() and (r.formation == "line" or not near):
+			continue
+		r.set_formation("line" if near else "column")
 		var there := target.centroid()
 		var stand := there + (here - there).normalized() * (Regiment.RANGE - 30.0)
 		r.order_move(stand, (there - stand).angle())
@@ -191,7 +198,7 @@ func _on_fired(soldier: Soldier) -> void:
 		return
 	var target: Soldier = men.pick_random()
 	var distance := soldier.world.distance_to(target.world)
-	var chance := clampf(0.45 - distance / 600.0, 0.06, 0.4)
+	var chance := clampf(0.45 - distance / 600.0, 0.06, 0.4) * soldier.regiment.fire_factor()
 	if randf() < chance:
 		target.hit(randf_range(45.0, 100.0))
 
@@ -228,8 +235,15 @@ func _puff_texture() -> Texture2D:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if key != null and key.pressed and key.physical_keycode == KEY_R and result != "":
-		get_tree().reload_current_scene()
+	if key != null and key.pressed and not key.echo:
+		match key.physical_keycode:
+			KEY_R:
+				if result != "":
+					get_tree().reload_current_scene()
+			KEY_1:
+				set_formation("line")
+			KEY_2:
+				set_formation("column")
 		return
 	if event is InputEventMouseMotion and _drag_start != null:
 		_overlay.box = Rect2(_drag_start, Vector2.ZERO).expand(get_global_mouse_position())
@@ -317,6 +331,11 @@ func _order(to: Vector2, face: Variant) -> void:
 		r.order_move(to + right * (offset + w / 2.0), facing)
 		offset += w
 	_overlay.mark(Iso.to_screen(to))
+
+
+func set_formation(kind: String) -> void:
+	for r in selected:
+		r.set_formation(kind)
 
 
 func _check_result() -> void:

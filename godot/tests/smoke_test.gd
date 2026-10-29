@@ -4,6 +4,8 @@ extends SceneTree
 ## The battle loads with both armies, the projection inverts, an order moves a
 ## battalion in line, and left alone the armies close and fight.
 
+const LIMIT_MS := 120000
+
 var _failures: Array[String] = []
 
 
@@ -45,6 +47,14 @@ func _initialize() -> void:
 	for failure in _failures:
 		printerr("FAILED: ", failure)
 	quit(1 if _failures.size() > 0 else 0)
+
+
+## A script error stops _initialize before it quits; this ends the run anyway.
+func _process(_delta: float) -> bool:
+	if Time.get_ticks_msec() > LIMIT_MS:
+		printerr("FAILED: the check did not finish (see the errors above)")
+		quit(2)
+	return false
 
 
 func _check(ok: bool, what: String) -> void:
