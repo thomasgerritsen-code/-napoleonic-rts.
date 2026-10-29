@@ -14,6 +14,11 @@ const COLUMN_SPEED := 1.25   # a column marches a quarter faster
 const COLUMN_FIRE := 0.35    # and hits a third as often
 const RANGE := 190.0         # musket range, centre to centre
 const BREAK_AT := 0.45       # breaks below this share of its men
+const CHARGE_REACH := 380.0  # charges an enemy this close
+const CHARGE_SPEED := 1.6
+const MELEE_REACH := 18.0
+const MELEE_KILL := 0.7      # a second's chance to strike down the man in reach
+const MELEE_LOSS := 0.4      # and to be struck down by him
 
 var name := ""
 var side := "france"
@@ -22,6 +27,7 @@ var facing := 0.0
 var formation := "line"
 var routing := false
 var enemy: Regiment = null
+var charging: Regiment = null
 var destination := Vector2.ZERO
 var _start := 0
 
@@ -85,7 +91,29 @@ func order_move(to: Vector2, face: Variant = null) -> void:
 		facing = (to - from).angle()
 	destination = to
 	enemy = null
+	charging = null
 	_form(to)
+
+
+## Fix bayonets and run at the nearest enemy battalion within reach.
+func charge(regiments: Array[Regiment]) -> bool:
+	if routing:
+		return false
+	var here := centroid()
+	var best := CHARGE_REACH
+	var target: Regiment = null
+	for other in regiments:
+		if other.side == side or other.routing or other.destroyed():
+			continue
+		var d := other.centroid().distance_to(here)
+		if d < best:
+			best = d
+			target = other
+	if target == null:
+		return false
+	charging = target
+	enemy = null
+	return true
 
 
 func set_formation(kind: String) -> void:
@@ -96,6 +124,8 @@ func set_formation(kind: String) -> void:
 
 
 func speed_factor() -> float:
+	if charging != null:
+		return CHARGE_SPEED
 	return COLUMN_SPEED if formation == "column" else 1.0
 
 
@@ -140,14 +170,17 @@ func _form(at: Vector2) -> void:
 ## Close the ranks after losses (the line keeps its place and front).
 func lost(_soldier: Soldier) -> void:
 	if not routing and strength() > 0 and strength() < _start * BREAK_AT:
-		_rout()
+		rout()
 	elif not routing:
 		_form(destination)
 
 
-func _rout() -> void:
+func rout() -> void:
+	if routing:
+		return
 	routing = true
 	enemy = null
+	charging = null
 	# Back to its own side of the field.
 	var home_x := 60.0 if side == "france" else Iso.WORLD.x - 60.0
 	for s in living():
@@ -159,6 +192,9 @@ func update(delta: float, regiments: Array[Regiment]) -> void:
 		var men := living()
 		for s in men:
 			s.step(delta, null)
+		return
+	if charging != null:
+		_melee(delta)
 		return
 	var here := centroid()
 	if enemy != null and (enemy.destroyed() or enemy.routing or enemy.centroid().distance_to(here) > RANGE * 1.15):
@@ -175,3 +211,38 @@ func update(delta: float, regiments: Array[Regiment]) -> void:
 	var enemy_at: Variant = enemy.centroid() if enemy != null else null
 	for s in living():
 		s.step(delta, enemy_at)
+
+
+## Each man runs at the nearest enemy; men in reach of each other fight. A
+## battalion that is reached by a stronger one breaks.
+func _melee(delta: float) -> void:
+	var foe := charging
+	if foe.routing or foe.destroyed():
+		charging = null
+		destination = centroid()
+		_form(destination)
+		return
+	var them := foe.living()
+	var contact := false
+	for s in living():
+		var nearest: Soldier = null
+		var best := INF
+		for o in them:
+			var d := s.world.distance_squared_to(o.world)
+			if d < best:
+				best = d
+				nearest = o
+		if nearest == null:
+			break
+		s.slot = nearest.world
+		if best < MELEE_REACH * MELEE_REACH:
+			contact = true
+			if randf() < MELEE_KILL * delta:
+				nearest.hit(1000.0)
+			elif randf() < MELEE_LOSS * delta:
+				s.hit(1000.0)
+		s.step(delta, null)
+		if routing:
+			return
+	if contact and not foe.routing and foe.strength() < strength() * 0.85:
+		foe.rout()

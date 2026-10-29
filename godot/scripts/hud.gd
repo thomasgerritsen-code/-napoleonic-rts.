@@ -41,10 +41,12 @@ func show_state(battle: Battle) -> void:
 	var lines: Array[String] = []
 	for r in battle.selected:
 		var state := "vuurt" if r.enemy != null else ("marcheert" if r.moving() else "staat")
+		if r.charging != null:
+			state = "chargeert"
 		var shape := "colonne" if r.formation == "column" else "linie"
 		lines.append("%s: %d man in %s, %s" % [r.name, r.strength(), shape, state])
 	if lines.is_empty():
 		lines.append("Niets geselecteerd")
-	lines.append("Klik of sleep: selecteren (Shift: toevoegen)  ·  Rechtsklik: marcheren (slepen: richting)  ·  1 linie, 2 colonne  ·  WASD/pijltjes, middelste knop, wieltje: camera")
+	lines.append("Klik of sleep: selecteren (Shift: toevoegen)  ·  Rechtsklik: marcheren (slepen: richting)  ·  1 linie, 2 colonne, C charge  ·  WASD/pijltjes, middelste knop, wieltje: camera")
 	_bottom.text = "\n".join(lines)
 	_result.text = battle.result + ("\nDruk op R voor een nieuwe slag." if battle.result != "" else "")

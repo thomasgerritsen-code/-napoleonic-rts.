@@ -13,6 +13,7 @@ const BRITAIN_X := 5500.0
 const LINE_YS := [2950.0, 3250.0, 3550.0]
 const AI_EVERY := 2.5
 const DEPLOY_AT := 480.0     # the computer forms line this close to the enemy
+const CHARGE_ODDS := 1.6     # and charges when this much stronger
 
 var regiments: Array[Regiment] = []
 var selected: Array[Regiment] = []
@@ -164,7 +165,12 @@ func _add_regiment(title: String, side: String, look: String, at: Vector2, face:
 ## in column while far off and deploying into line once near.
 func _command_britain() -> void:
 	for r in regiments:
-		if r.side != "britain" or r.routing or r.destroyed() or r.enemy != null:
+		if r.side != "britain" or r.routing or r.destroyed() or r.charging != null:
+			continue
+		# A much stronger battalion in a firefight goes in with the bayonet.
+		if r.enemy != null:
+			if r.strength() > r.enemy.strength() * CHARGE_ODDS:
+				r.charge(regiments)
 			continue
 		var here := r.centroid()
 		var target: Regiment = null
@@ -244,6 +250,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				set_formation("line")
 			KEY_2:
 				set_formation("column")
+			KEY_C:
+				charge()
 		return
 	if event is InputEventMouseMotion and _drag_start != null:
 		_overlay.box = Rect2(_drag_start, Vector2.ZERO).expand(get_global_mouse_position())
@@ -336,6 +344,11 @@ func _order(to: Vector2, face: Variant) -> void:
 func set_formation(kind: String) -> void:
 	for r in selected:
 		r.set_formation(kind)
+
+
+func charge() -> void:
+	for r in selected:
+		r.charge(regiments)
 
 
 func _check_result() -> void:
