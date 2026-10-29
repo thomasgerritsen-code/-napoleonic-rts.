@@ -193,6 +193,19 @@ func _initialize() -> void:
 	_run(battle, 40.0)
 	_check(not shaken.routing and shaken.morale() >= Regiment.RALLY_MORALE - 10.0, "and rallies once out of danger (morale %d)" % shaken.morale())
 
+	# Fire from behind hits harder than fire from the front.
+	var target_man: Unit = null
+	for u in shaken.living():
+		if u.type == "infantry":
+			target_man = u
+	var front_way := Vector2.from_angle(shaken.facing) * 120.0
+	var hp_before := target_man.hp
+	battle.strike(target_man, 10.0, target_man.world + front_way)
+	var front_loss := hp_before - target_man.hp
+	hp_before = target_man.hp
+	battle.strike(target_man, 10.0, target_man.world - front_way)
+	_check(is_equal_approx(front_loss, 10.0) and is_equal_approx(hp_before - target_man.hp, 15.0), "a battalion takes half as much again from the rear")
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0

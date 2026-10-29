@@ -101,6 +101,7 @@ async function main() {
         troops: plain(window.NRTS_CONFIG?.troops || null), grenades: plain(window.NRTS_CONFIG?.grenades || null),
         experience: plain(window.NRTS_CONFIG?.regimentExperience || null), towers: plain(window.NRTS_CONFIG?.towers || null),
         medics: plain(window.NRTS_CONFIG?.medics || null), regimentOrders: plain(window.NRTS_CONFIG?.regimentOrders || null),
+        battleDepth: plain(window.NRTS_CONFIG?.battleDepth || null),
         // The opening as the game sets it up, before anyone has acted.
         buildings: buildings.filter(b => !b.dead && b.complete !== false).map(b => pick(b, ['id', 'side', 'type', 'x', 'y', 'w', 'h', 'hp', 'maxHp'])),
         units: units.filter(u => !u.dead).map(u => pick(u, ['id', 'side', 'type', 'x', 'y', 'hp'])),

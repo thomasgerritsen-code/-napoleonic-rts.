@@ -36,6 +36,7 @@ var placing := ""                    # a building type being placed
 var result := ""
 var status := ""
 var clock := 0.0
+var flank_hits := 0
 ## The battalions among the selected men.
 var selected: Array[Regiment]:
 	get:
@@ -381,6 +382,34 @@ func is_foe(node: Node2D, side: String) -> bool:
 	return false
 
 
+## A blow or shot from `from` landing on `foe`, as the web game weighs it:
+## a trench or a braced line takes less, a battalion hit in the flank (x1.25)
+## or the rear (x1.5) more and shakes harder (x1.5, x2); a square has no flank.
+## Charging horse weigh the flank themselves.
+func strike(foe: Unit, damage: float, from: Vector2, lobbed := false, horse := false) -> void:
+	var share := trenches.cover(foe, from, lobbed)
+	var r := foe.regiment
+	var shock := 0.0
+	if r != null and r.formation != "square" and not r.routing:
+		var way := from - foe.world
+		if way.length() > 0.5:
+			var c := way.normalized().dot(Vector2.from_angle(r.facing))
+			if c < 0.5:
+				var rear := c < -0.5
+				flank_hits += 1
+				if not horse:
+					share *= depth_rule("rearDamage", 1.5) if rear else depth_rule("flankDamage", 1.25)
+				shock = (depth_rule("rearShock", 2.0) if rear else depth_rule("flankShock", 1.5)) - 1.0
+	if shock > 0.0:
+		foe.morale = maxf(0.0, foe.morale - 8.0 * shock)
+	foe.hit(damage * share)
+
+
+func depth_rule(key: String, fallback: float) -> float:
+	var d: Variant = Rules.start().get("battleDepth")
+	return float(d.get(key, fallback)) if d is Dictionary else fallback
+
+
 ## Whether enemy soldiers (not peasants, not men in flight) are within `reach`.
 func soldiers_near(at: Vector2, side: String, reach: float) -> bool:
 	for u in units:
@@ -642,7 +671,7 @@ func tower_fires(tower: Building, foe: Unit, shots: int, damage: float) -> void:
 	for i in shots:
 		_puff(top + Vector2(randf_range(-8, 8), 0), 0.5, 2.2)
 		if randf() < 0.6:
-			foe.hit(damage * randf_range(0.8, 1.4) * trenches.cover(foe, tower.world))
+			strike(foe, damage * randf_range(0.8, 1.4), tower.world)
 
 
 ## A marching battalion's drummer beats the step: the one nearest the
@@ -700,7 +729,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			# Horse breaks on a square's bayonets: few blows land, many riders fall.
 			if foe.regiment != null and foe.regiment.formation == "square" and not foe.regiment.routing:
 				if randf() < 0.15:
-					foe.hit(damage * randf_range(1.0, 2.2) * trenches.cover(foe, u.world))
+					strike(foe, damage * randf_range(1.0, 2.2), u.world, false, true)
 				if randf() < 0.45:
 					u.hit(damage * randf_range(0.8, 1.6))
 			elif randf() < 0.6:
@@ -709,7 +738,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 					blow *= u.stat("vsInfantry")
 				elif foe.type == "cavalry":
 					blow *= u.stat("vsCavalry")
-				foe.hit(blow * trenches.cover(foe, u.world))
+				strike(foe, blow, u.world, false, true)
 		"artillery":
 			# Roundshot ploughs through: everyone near the point of impact.
 			# A howitzer's shell drops into a trench; roundshot strikes its bank.
@@ -717,7 +746,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			var lobbed := bool(Rules.troop(u.troop).get("lobbed", false))
 			for other in units:
 				if other.alive() and other.side != u.side and other.world.distance_to(impact) < 26.0:
-					other.hit(damage * randf_range(0.6, 1.3) * trenches.cover(other, u.world, lobbed))
+					strike(other, damage * randf_range(0.6, 1.3), u.world, lobbed)
 			_puff(impact, 0.8, 1.6)
 		_:
 			var chance := clampf(0.45 - distance / 600.0, 0.06, 0.4)
@@ -726,8 +755,8 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			if randf() < chance:
 				# A cuirass turns part of the musket balls.
 				var armour := float(Rules.troop(foe.troop).get("armour", 0.0))
-				foe.hit(randf_range(45.0, 100.0) * u.stat("ranged") * (1.0 - armour)
-					* (u.regiment.damage_factor() if u.regiment != null else 1.0) * trenches.cover(foe, u.world))
+				strike(foe, randf_range(45.0, 100.0) * u.stat("ranged") * (1.0 - armour)
+					* (u.regiment.damage_factor() if u.regiment != null else 1.0), u.world)
 
 
 ## A grenade lobbed from the thrower bursts at `at` after its flight, harming
