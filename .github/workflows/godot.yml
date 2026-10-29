@@ -40,8 +40,8 @@ jobs:
 
       - name: Import the project
         run: |
+          # Script errors are reported per script in the next step.
           timeout 300 "$RUNNER_TEMP/godot" --headless --path godot --import 2>&1 | tee import.log
-          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" import.log; then exit 1; fi
 
       - name: Check every script
         run: |
