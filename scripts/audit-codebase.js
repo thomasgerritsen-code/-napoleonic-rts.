@@ -5,7 +5,9 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
-const EXCLUDED_DIRS = new Set(['.git', 'node_modules', 'playwright-report', 'test-results']);
+const EXCLUDED_DIRS = new Set(['.git', 'node_modules', 'playwright-report', 'test-results', 'public']);
+// Build output: copies of the game made for Vercel and the Windows program.
+const EXCLUDED_PATHS = new Set([path.join('desktop', 'site'), path.join('desktop', 'dist')]);
 
 function fail(message) {
   throw new Error(`[codebase-audit] ${message}`);
@@ -15,6 +17,7 @@ function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory() && EXCLUDED_DIRS.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
+    if (entry.isDirectory() && EXCLUDED_PATHS.has(path.relative(ROOT, full))) continue;
     if (entry.isDirectory()) walk(full, out);
     else out.push(full);
   }

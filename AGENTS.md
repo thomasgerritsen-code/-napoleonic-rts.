@@ -36,6 +36,9 @@ de een heel als de ander pusht.
   los. Een script dat een naam van een later script noemt (ook in `typeof`)
   begint vanzelf een nieuwe bundel, dus de laadvolgorde blijft zoals in `play.html`.
   Houd scripts strict (`'use strict'` bovenaan), anders laadt het los.
+- `desktop/` maakt er een Windows-programma van (Electron): `npm run dist` daar,
+  of de workflow *Windows program* op GitHub. Het programma bevat een eigen kopie
+  van het spel; aan de game zelf hoeft daarvoor niets te veranderen.
 
 ## Testen voor een push
 

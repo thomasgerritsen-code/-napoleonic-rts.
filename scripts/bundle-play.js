@@ -103,7 +103,7 @@ function bundlePlay(root, { page = 'play.html', outDir = 'bundle' } = {}) {
 
 // Copies the site into outDir (Vercel serves a build's output folder), leaving
 // out what is never served.
-const NOT_SERVED = new Set(['.git', 'node_modules', 'public', '.vercel', 'playwright-report', 'test-results']);
+const NOT_SERVED = new Set(['.git', 'node_modules', 'public', '.vercel', 'playwright-report', 'test-results', 'desktop']);
 function copySite(root, outDir) {
   const out = path.resolve(root, outDir);
   fs.rmSync(out, { recursive: true, force: true });
