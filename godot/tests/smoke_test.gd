@@ -179,11 +179,11 @@ func _initialize() -> void:
 
 	# Morale: a shaken battalion breaks and runs, and rallies once out of danger.
 	var shaken_men: Array[Unit] = []
-	var camp := home + Vector2(300, -500)
+	var quiet := home + Vector2(300, -500)
 	for i in 14:
-		shaken_men.append(battle.add_unit("france", "infantry", camp + Vector2(i * 15, 0)))
-	shaken_men.append(battle.add_unit("france", "officer", camp + Vector2(100, 30)))
-	shaken_men.append(battle.add_unit("france", "drummer", camp + Vector2(120, 30)))
+		shaken_men.append(battle.add_unit("france", "infantry", quiet + Vector2(i * 15, 0)))
+	shaken_men.append(battle.add_unit("france", "officer", quiet + Vector2(100, 30)))
+	shaken_men.append(battle.add_unit("france", "drummer", quiet + Vector2(120, 30)))
 	var shaken := battle.form_regiment(shaken_men)
 	_run(battle, 1.0)
 	for u in shaken.living():

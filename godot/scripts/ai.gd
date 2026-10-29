@@ -4,15 +4,17 @@ extends RefCounted
 ## work (food first, wood from a lumber camp, iron from a mine once it has
 ## the means), builds houses before it runs out of room, a farm when the
 ## berries run out, a barracks, and trains musketeers with officers and
-## drummers. Full companies become battalions; with two (or after ten
-## minutes, one) it marches on the French town centre in column and deploys
-## into line near the enemy, and it turns back to defend its own base.
+## drummers. Full companies become battalions. It attacks in waves as the
+## web game's campaign pressure: the first after two and a half minutes,
+## then every three (give or take half a minute), when it has a dozen men
+## and at least 0.8 of the French strength (or the wave is two minutes
+## late). It marches on the French town centre in column, deploys into line
+## near the enemy, breaks off when the fight is lost or has lasted long
+## enough, regroups at home, and turns back to defend its own base.
 
 const SIDE := "britain"
 const THINK_EVERY := 1.0
 const WORKERS := 14
-const ATTACK_WITH := 2
-const ATTACK_ANYWAY_AFTER := 600.0
 const DEFEND_REACH := 900.0
 const DEPLOY_AT := 480.0
 const CHARGE_ODDS := 1.6
@@ -25,12 +27,19 @@ var plan := "opbouwen"
 var army_only := false
 var _clock := 0.0
 var _home := Vector2.ZERO
+## The wave: "verdedigen", "aanval", "hergroeperen".
+var stance := "verdedigen"
+var waves := 0
+var _next_wave := 150.0
+var _stance_since := 0.0
+var _losing_since := -1.0
 
 
 func _init(battle_: Battle) -> void:
 	battle = battle_
 	var tc := battle.town_centre(SIDE)
 	_home = tc.world if tc != null else Iso.WORLD - Vector2(600, 600)
+	_next_wave = _pressure("firstWave", 150)
 
 
 func update(delta: float) -> void:
@@ -265,8 +274,11 @@ func _command() -> void:
 	if mine.is_empty():
 		return
 	var threat: Variant = _threat()
-	var attacking := army_only or mine.size() >= ATTACK_WITH or battle.clock > ATTACK_ANYWAY_AFTER
+	_choose_stance(mine, threat)
+	var attacking := army_only or stance == "aanval"
 	var goal: Variant = threat
+	if goal == null and stance == "hergroeperen":
+		goal = _muster()
 	if goal == null and attacking:
 		var tc := battle.town_centre("france")
 		goal = tc.world if tc != null else null
@@ -303,6 +315,69 @@ func _command() -> void:
 		var stand := there + (here - there).normalized() * (Regiment.RANGE * 0.8)
 		r.order_move(stand if near else here + (there - here).limit_length(900.0), (there - here).angle())
 		plan = "verdedigen" if threat != null else "aanval op het Franse stadhuis"
+
+
+func _pressure(key: String, fallback: float) -> float:
+	var p: Variant = Rules.start().get("pressure")
+	return float(p.get(key, fallback)) if p is Dictionary else fallback
+
+
+func _set_stance(to: String) -> void:
+	stance = to
+	_stance_since = battle.clock
+
+
+## Fighting strength near a point: guns count 3, horse 1.8, each by its health.
+func _strength(side: String, at: Vector2, reach: float) -> float:
+	var sum := 0.0
+	for u in battle.units:
+		if u.side == side and u.alive() and u.military() and (u.regiment == null or not u.regiment.routing) and u.world.distance_to(at) < reach:
+			sum += (3.0 if u.type == "artillery" else (1.8 if u.type == "cavalry" else 1.0)) * maxf(0.0, u.hp / maxf(1.0, u.max_hp))
+	return sum
+
+
+func _army(side: String) -> float:
+	return _strength(side, Iso.WORLD / 2.0, INF)
+
+
+## The wave clock: defend and gather, attack when ready, break off when the
+## fight is lost or long, regroup, and the next wave.
+func _choose_stance(mine: Array[Regiment], threat: Variant) -> void:
+	var age := battle.clock - _stance_since
+	var men := 0
+	var morale := 0.0
+	for r in mine:
+		men += r.strength()
+		morale += r.morale()
+	morale /= maxf(1.0, mine.size())
+	var ratio := _army(SIDE) / maxf(1.0, _army("france"))
+	match stance:
+		"verdedigen":
+			var late := battle.clock >= _next_wave + _pressure("maxDelay", 120)
+			if threat == null and battle.clock >= _next_wave and men >= int(_pressure("minWaveUnits", 12)) and (ratio >= _pressure("minRatio", 0.8) or late):
+				waves += 1
+				_losing_since = -1.0
+				_set_stance("aanval")
+		"aanval":
+			var tc := battle.town_centre("france")
+			var at := tc.world if tc != null else Iso.WORLD / 2.0
+			var front := mine[0].centroid()
+			var ours := _strength(SIDE, front, 900.0)
+			var theirs := _strength("france", front, 900.0)
+			if theirs > 0.0 and ours / theirs < _pressure("breakRatio", 0.5):
+				if _losing_since < 0.0:
+					_losing_since = battle.clock
+			else:
+				_losing_since = -1.0
+			var losing := _losing_since >= 0.0 and battle.clock - _losing_since > _pressure("breakAfter", 12) and age > _pressure("minFight", 25)
+			var siege := front.distance_to(at) < 700.0 and theirs < 1.0
+			var spent := morale < 37.0 and theirs > 0.0 and ours / theirs < 0.9
+			if (age > _pressure("maxAttack", 150) + _pressure("maxMarch", 300) and not siege) or losing or spent or ratio < 0.45:
+				_next_wave = battle.clock + _pressure("interval", 180) + randf_range(-1.0, 1.0) * _pressure("jitter", 30)
+				_set_stance("hergroeperen")
+		"hergroeperen":
+			if morale > 60.0 and age > 8.0:
+				_set_stance("verdedigen")
 
 
 ## The nearest Frenchman come too close to home, if any.
