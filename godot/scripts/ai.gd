@@ -273,6 +273,8 @@ func _command() -> void:
 		if army_only:
 			goal = _nearest_french_battalion(mine[0].centroid())
 	for r in mine:
+		# Defending its base, a battalion holds its ground and digs in.
+		r.hold = threat != null and r.centroid().distance_to(_home) < DEFEND_REACH
 		if r.charging != null:
 			continue
 		# Horse close by: form square until it has gone.

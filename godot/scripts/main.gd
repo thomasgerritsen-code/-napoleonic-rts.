@@ -49,6 +49,7 @@ var woods := Woods.new()
 var weather: Weather
 var sounds: Sounds
 var medics: FieldMedics
+var trenches: Trenches
 var _woods_clock := 0.0
 var _drum_clock := 0.0
 const WALL_CELL := 80.0
@@ -72,6 +73,9 @@ func _ready() -> void:
 	var meta: Dictionary = Iso.read_json("res://assets/map/ground.json")
 	Iso.load_relief(meta)
 	_add_ground(meta)
+	trenches = Trenches.new()
+	trenches.battle = self
+	add_child(trenches)
 	props = Iso.read_json("res://assets/props/props.json")["props"]
 	var map: Dictionary = Iso.read_json("res://assets/map/gamemap.json")
 	_river = map["river"]["points"]
@@ -129,6 +133,7 @@ func _process(delta: float) -> void:
 	for b in buildings:
 		b.step(delta)
 	medics.update(delta)
+	trenches.update(delta)
 	_hold_territories(delta)
 	_beat_drums(delta)
 	_woods_clock -= delta
@@ -620,7 +625,7 @@ func tower_fires(tower: Building, foe: Unit, shots: int, damage: float) -> void:
 	for i in shots:
 		_puff(top + Vector2(randf_range(-8, 8), 0), 0.5, 2.2)
 		if randf() < 0.6:
-			foe.hit(damage * randf_range(0.8, 1.4))
+			foe.hit(damage * randf_range(0.8, 1.4) * trenches.cover(foe, tower.world))
 
 
 ## A marching battalion's drummer beats the step: the one nearest the
@@ -678,7 +683,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			# Horse breaks on a square's bayonets: few blows land, many riders fall.
 			if foe.regiment != null and foe.regiment.formation == "square" and not foe.regiment.routing:
 				if randf() < 0.15:
-					foe.hit(damage * randf_range(1.0, 2.2))
+					foe.hit(damage * randf_range(1.0, 2.2) * trenches.cover(foe, u.world))
 				if randf() < 0.45:
 					u.hit(damage * randf_range(0.8, 1.6))
 			elif randf() < 0.6:
@@ -687,13 +692,15 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 					blow *= u.stat("vsInfantry")
 				elif foe.type == "cavalry":
 					blow *= u.stat("vsCavalry")
-				foe.hit(blow)
+				foe.hit(blow * trenches.cover(foe, u.world))
 		"artillery":
 			# Roundshot ploughs through: everyone near the point of impact.
+			# A howitzer's shell drops into a trench; roundshot strikes its bank.
 			var impact := foe.world + Vector2(randf_range(-20, 20), randf_range(-14, 14))
+			var lobbed := bool(Rules.troop(u.troop).get("lobbed", false))
 			for other in units:
 				if other.alive() and other.side != u.side and other.world.distance_to(impact) < 26.0:
-					other.hit(damage * randf_range(0.6, 1.3))
+					other.hit(damage * randf_range(0.6, 1.3) * trenches.cover(other, u.world, lobbed))
 			_puff(impact, 0.8, 1.6)
 		_:
 			var chance := clampf(0.45 - distance / 600.0, 0.06, 0.4)
@@ -703,7 +710,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 				# A cuirass turns part of the musket balls.
 				var armour := float(Rules.troop(foe.troop).get("armour", 0.0))
 				foe.hit(randf_range(45.0, 100.0) * u.stat("ranged") * (1.0 - armour)
-					* (u.regiment.damage_factor() if u.regiment != null else 1.0))
+					* (u.regiment.damage_factor() if u.regiment != null else 1.0) * trenches.cover(foe, u.world))
 
 
 ## A grenade lobbed from the thrower bursts at `at` after its flight, harming
@@ -884,6 +891,27 @@ func set_formation(kind: String) -> void:
 func charge() -> void:
 	for r in selected:
 		r.charge(regiments)
+
+
+## Hold the ground (or stop holding it): a battalion that holds braces, and in
+## line digs a trench.
+func hold() -> void:
+	var list := selected
+	var on := false
+	for r in list:
+		on = on or not r.hold
+	for r in list:
+		r.hold = on
+	if not list.is_empty():
+		say("Stelling houden: de linie graaft zich in." if on else "De bataljons houden geen stelling meer.")
+	refresh_hud()
+
+
+func upgrade_trench() -> void:
+	for r in selected:
+		if trenches.upgrade(r):
+			break
+	refresh_hud()
 
 
 ## The selected free musketeers fill the selected battalion's ranks.
@@ -1098,6 +1126,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				set_formation("square")
 			KEY_C:
 				charge()
+			KEY_G:
+				hold()
 			KEY_F:
 				form_regiment()
 			KEY_M:

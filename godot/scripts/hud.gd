@@ -124,7 +124,7 @@ func _describe() -> String:
 			lines.append("Graan: %d  ·  %d boeren" % [b.crop, battle.farmers_on(b)])
 		return "\n".join(lines)
 	if battle.selected_units.is_empty():
-		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · F bataljon vormen · WASD/wieltje: camera"
+		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · G stelling · F bataljon vormen · WASD/wieltje: camera"
 	var count := {}
 	for u in battle.selected_units:
 		count[u.type] = count.get(u.type, 0) + 1
@@ -136,6 +136,12 @@ func _describe() -> String:
 		var state := "vuurt" if r.enemy != null else ("marcheert" if r.moving() else "staat")
 		if r.charging != null:
 			state = "chargeert"
+		if r.trench != null and r.trench["progress"] >= 1.0:
+			state += ", in een loopgraaf (%s)" % Rules.trench_level(r.trench["level"]).get("label", "")
+		elif r.trench != null:
+			state += ", graaft (%d%%)" % int(r.trench["progress"] * 100)
+		elif battle.trenches.braced(r):
+			state += ", houdt stand"
 		state += ", %s" % r.rank_label()
 		var shape: String = {"column": "colonne", "square": "carré"}.get(r.formation, "linie")
 		lines.append("%s: %d man in %s, %s" % [r.name, r.strength(), shape, state])
@@ -179,6 +185,17 @@ func _rebuild() -> void:
 		if has_free_soldiers:
 			_button("Aanvullen\nlosse musketiers erbij", battle.reinforce)
 		_button("Charge (C)", battle.charge)
+		var holding := false
+		var trench: Variant = null
+		for r in battle.selected:
+			holding = holding or r.hold
+			if r.trench != null and r.trench["progress"] >= 1.0:
+				trench = r.trench
+		_button("Stelling loslaten (G)" if holding else "Stelling houden (G)\nschrap zetten, ingraven", battle.hold)
+		if trench != null:
+			var next := Rules.trench_level(int(trench["level"]) + 1)
+			if not next.is_empty() and trench["upgrade_to"] == 0:
+				_button("%s\n%s · %d s" % [next["label"], Rules.cost_text(next["cost"]), next["seconds"]], battle.upgrade_trench)
 
 
 func _button(text: String, action: Callable) -> Button:

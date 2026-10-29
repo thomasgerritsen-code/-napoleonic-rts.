@@ -9,9 +9,9 @@ extends RefCounted
 const SPEEDS := {"idle": 2.0, "march": 9.0, "aim": 3.0, "fire": 12.0, "reload": 5.0,
 	"die": 7.0, "diefwd": 7.0, "dieside": 7.0, "work": 6.0, "farm": 5.0, "mine": 6.0,
 	"build": 6.0, "command": 3.0, "walk": 8.0, "trot": 11.0, "gallop": 13.0, "slash": 9.0,
-	"rear": 4.0, "roll": 8.0}
+	"rear": 4.0, "roll": 8.0, "dig": 3.6, "rest": 0.7, "rfire": 7.0}
 const LOOPING := ["idle", "march", "aim", "work", "farm", "mine", "build", "command",
-	"walk", "trot", "gallop", "roll"]
+	"walk", "trot", "gallop", "roll", "dig", "rest"]
 
 static var _cache := {}
 

@@ -104,6 +104,8 @@ func stat(key: String) -> float:
 
 func reload_time() -> float:
 	var hurt := 1.35 if injury() < 0.7 else (1.15 if injury() < 1.0 else 1.0)
+	if regiment != null and battle.trenches.braced(regiment):
+		hurt *= float(Rules.orders()["defendReload"])
 	return float(Rules.unit_type(type).get("reload", 3.0)) * stat("reload") * hurt
 
 
@@ -125,7 +127,10 @@ func _coats() -> Array:
 		"infantry":
 			var coat: String = {"grenadier": "4", "voltigeur": "5", "guard": "6", "rifle": "6", "sapper": "7"}.get(troop,
 				["", "2", "3"][int(Battle.hash01(id, 13) * 3)])
-			return ["%s%s_iso_infantry" % [p, coat], "%s%s_iso_fallen" % [p, coat]]
+			var dig := "%s%s_iso_dig" % [p, coat]
+			if not ResourceLoader.exists("res://assets/units/%s_atlas.webp" % dig):
+				dig = "%s_iso_dig" % p
+			return ["%s%s_iso_infantry" % [p, coat], "%s%s_iso_fallen" % [p, coat], dig]
 		"cavalry":
 			var coat: String = {"cuirassier": "ck", "lancer": "cl", "greys": "cg", "hussar": "c"}.get(troop,
 				"c" if Battle.hash01(id, 5) < 0.5 else "c2")
@@ -202,6 +207,8 @@ func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
 		pace *= battle.weather.pace(type)
 	if regiment == null:
 		pace *= injury()
+	if type == "cavalry" and not battle.trenches.list.is_empty() and battle.trenches.obstacle_at(world):
+		pace *= float(Rules.orders()["cavalryTrenchSpeed"])
 	world += way.limit_length(speed * pace * delta)
 	facing = way.angle()
 	state = State.MOVE
@@ -232,6 +239,8 @@ func _step_in_regiment(delta: float) -> void:
 		if target == null or not battle.is_foe(target, side):
 			facing = r.facing
 			idle()
+			if not battle.trenches.list.is_empty() and battle.trenches.digging_at(world):
+				_play("dig")
 			return
 		facing = (Battle.spot(target) - world).angle()
 		_fire_cycle(target)

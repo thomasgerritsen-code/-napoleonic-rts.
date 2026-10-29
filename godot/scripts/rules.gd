@@ -152,3 +152,16 @@ static func medics() -> Dictionary:
 	var m: Variant = start().get("medics")
 	return m if m is Dictionary else {"types": ["infantry", "officer", "drummer"], "woundedShare": 0.45, "bleedOutSeconds": 90,
 		"healSeconds": 45, "teams": 2, "teamSpeed": 44, "reach": 1600, "aiAfter": 240}
+
+
+## Bracing, digging and trenches (the web game's regiment orders).
+static func orders() -> Dictionary:
+	var o: Variant = start().get("regimentOrders")
+	return o if o is Dictionary else {"braceSeconds": 4, "defendDamage": 0.7, "defendReload": 0.85, "digDelay": 3, "digSeconds": 25,
+		"trenchWidth": 40, "trenchDamage": 0.5, "trenchSnap": 110, "maxTrenches": 40, "cavalryTrenchSpeed": 0.3, "cavalryExposed": 1.4,
+		"trenchLevels": [null, {"label": "Veldschans"}]}
+
+
+static func trench_level(level: int) -> Dictionary:
+	var levels: Array = orders()["trenchLevels"]
+	return levels[level] if level >= 1 and level < levels.size() else {}

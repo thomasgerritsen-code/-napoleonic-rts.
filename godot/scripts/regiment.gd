@@ -39,6 +39,12 @@ var destination := Vector2.ZERO
 var victories := 0
 var _start := 0
 var _pace := 1.0             # slowed by its walking wounded
+## Told to hold its ground (G): it braces and, in line, digs in (Trenches).
+var hold := false
+var braced_at := -1.0
+var trench: Variant = null   # the trench it holds or digs
+var last_centre := Vector2.INF
+var still_seconds := 0
 
 
 static func eligible(units: Array[Unit]) -> bool:

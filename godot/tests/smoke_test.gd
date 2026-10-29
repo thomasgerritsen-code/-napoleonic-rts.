@@ -158,6 +158,25 @@ func _initialize() -> void:
 	_check(battle.medics.stats["healed"] >= 1 and regiment.strength() == strength + 1,
 		"he is mended and back in the ranks (%s)" % battle.medics.stats)
 
+	# Holding ground: the line braces, digs a trench and is covered in it.
+	regiment.set_formation("line")
+	regiment.hold = true
+	_run(battle, 42.0)
+	var trench: Variant = regiment.trench
+	_check(trench != null and trench["progress"] >= 1.0, "a battalion holding its ground digs a trench (%s)" % (trench["progress"] if trench != null else "none"))
+	var digger: Unit = null
+	for u in regiment.living():
+		if u.type == "infantry" and battle.trenches.trench_at(u.world) != null:
+			digger = u
+	var ahead: Vector2 = Vector2.from_angle(regiment.facing) * 150.0
+	_check(digger != null and battle.trenches.cover(digger, digger.world + ahead) < 0.6
+		and battle.trenches.cover(digger, digger.world - ahead) > 0.6, "the trench covers its men from the front, not from behind")
+	battle.economy["france"]["wood"] += 200.0
+	_check(battle.trenches.upgrade(regiment), "the trench is revetted for wood")
+	_run(battle, 12.0)
+	_check(trench != null and trench["level"] == 2, "and becomes a revetted trench (level %s)" % (trench["level"] if trench != null else 0))
+	regiment.hold = false
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0
