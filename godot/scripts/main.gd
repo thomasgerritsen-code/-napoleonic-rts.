@@ -7,7 +7,7 @@ extends Node2D
 ##
 ## Mouse: click or drag to select, right click to order (move, attack,
 ## gather, build, farm); drag the right button to set a battalion's facing.
-## Keys: 1 line, 2 column, C charge, F form a battalion, Escape cancels a
+## Keys: 1 line, 2 column, 3 square, C charge, F form a battalion, Escape cancels a
 ## building plan; WASD/arrows, the middle button and the wheel move the camera.
 
 const SIDES := ["france", "britain"]
@@ -660,7 +660,13 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 	var foe := target as Unit
 	match u.type:
 		"cavalry":
-			if randf() < 0.6:
+			# Horse breaks on a square's bayonets: few blows land, many riders fall.
+			if foe.regiment != null and foe.regiment.formation == "square" and not foe.regiment.routing:
+				if randf() < 0.15:
+					foe.hit(damage * randf_range(1.0, 2.2))
+				if randf() < 0.45:
+					u.hit(damage * randf_range(0.8, 1.6))
+			elif randf() < 0.6:
 				foe.hit(damage * randf_range(1.0, 2.2))
 		"artillery":
 			# Roundshot ploughs through: everyone near the point of impact.
@@ -827,6 +833,21 @@ func charge() -> void:
 		r.charge(regiments)
 
 
+## The selected free musketeers fill the selected battalion's ranks.
+func reinforce() -> void:
+	var battalions: Array[Regiment] = selected
+	if battalions.is_empty():
+		return
+	var free: Array[Unit] = []
+	for u in selected_units:
+		if u.regiment == null and u.type == "infantry":
+			free.append(u)
+	var added := battalions[0].reinforce(free)
+	say("%s aangevuld met %d man." % [battalions[0].name, added] if added > 0 else "Selecteer een bataljon en losse musketiers om aan te vullen.")
+	if _hud != null:
+		_hud.refresh()
+
+
 func form_regiment(from: Array[Unit] = []) -> Regiment:
 	var r := Regiment.raise(selected_units if from.is_empty() else from)
 	if r == null:
@@ -980,6 +1001,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				set_formation("line")
 			KEY_2:
 				set_formation("column")
+			KEY_3:
+				set_formation("square")
 			KEY_C:
 				charge()
 			KEY_F:

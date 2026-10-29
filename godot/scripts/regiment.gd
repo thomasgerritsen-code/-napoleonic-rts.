@@ -15,6 +15,8 @@ const RANKS := 2
 const COLUMN_FILES := 4
 const COLUMN_SPEED := 1.25
 const COLUMN_FIRE := 0.35
+const SQUARE_SPEED := 0.45   # a square shuffles
+const SQUARE_FIRE := 0.6     # and fires from every face, each with fewer muskets
 const RANGE := 200.0         # the web game's musket range
 const BREAK_AT := 0.45
 const CHARGE_REACH := 380.0
@@ -144,11 +146,40 @@ func set_formation(kind: String) -> void:
 func speed_factor() -> float:
 	if charging != null:
 		return CHARGE_SPEED
+	if formation == "square":
+		return SQUARE_SPEED
 	return COLUMN_SPEED if formation == "column" else 1.0
 
 
 func fire_factor() -> float:
+	if formation == "square":
+		return SQUARE_FIRE
 	return COLUMN_FIRE if formation == "column" else 1.0
+
+
+## Fill the ranks from free musketeers among `units`, up to the full 36.
+func reinforce(units: Array[Unit]) -> int:
+	if routing:
+		return 0
+	var added := 0
+	var infantry := 0
+	for u in living():
+		if u.type == "infantry":
+			infantry += 1
+	for u in units:
+		if infantry >= MAX_MEN:
+			break
+		if u.alive() and u.side == side and u.regiment == null and u.type == "infantry":
+			u.regiment = self
+			u.ordered = false
+			u.target = null
+			men.append(u)
+			infantry += 1
+			added += 1
+	if added > 0:
+		_start = maxi(_start, strength())
+		_form(destination)
+	return added
 
 
 func shape(count: int) -> Vector2i:
@@ -168,10 +199,13 @@ func _form(at: Vector2) -> void:
 		if u.type == "infantry":
 			rank_and_file.append(u)
 		elif u.type == "officer":
-			u.slot = at + forward * 22.0
+			u.slot = at + forward * (0.0 if formation == "square" else 22.0)
 		else:
-			u.slot = at - forward * (RANK_GAP * 2.0 + 14.0) + right * 10.0
+			u.slot = at + right * 12.0 if formation == "square" else at - forward * (RANK_GAP * 2.0 + 14.0) + right * 10.0
 	if rank_and_file.is_empty():
+		return
+	if formation == "square":
+		_form_square(at, rank_and_file)
 		return
 	var grid := shape(rank_and_file.size())
 	var files := grid.x
@@ -190,6 +224,34 @@ func _form(at: Vector2) -> void:
 			if formation == "column":
 				depth -= (grid.y - 1) * RANK_GAP / 2.0
 			group[r].slot = at + right * lateral - forward * depth
+
+
+## A hollow square: the men on four faces looking out, officer and drummer
+## inside. Each face takes its men from the side of the square they stand on.
+func _form_square(at: Vector2, rank_and_file: Array[Unit]) -> void:
+	var count := rank_and_file.size()
+	var per_face := ceili(count / 4.0)
+	var half := (per_face - 1) * FILE_GAP / 2.0 + FILE_GAP
+	var faces: Array[Array] = [[], [], [], []]
+	var forward := Vector2.from_angle(facing)
+	# Fill the faces in turn with the men nearest each.
+	var left: Array = rank_and_file.duplicate()
+	for f in 4:
+		var out := forward.rotated(f * PI / 2.0)
+		left.sort_custom(func(a: Unit, b: Unit) -> bool:
+			return (a.world - at).dot(out) > (b.world - at).dot(out))
+		var take := mini(per_face, left.size())
+		for k in take:
+			faces[f].append(left[k])
+		left = left.slice(take)
+	for f in 4:
+		var out := forward.rotated(f * PI / 2.0)
+		var along := out.orthogonal()
+		var face: Array = faces[f]
+		face.sort_custom(func(a: Unit, b: Unit) -> bool:
+			return (a.world - at).dot(along) < (b.world - at).dot(along))
+		for k in face.size():
+			(face[k] as Unit).slot = at + out * half + along * ((k - (face.size() - 1) / 2.0) * FILE_GAP)
 
 
 func lost(_unit: Unit) -> void:

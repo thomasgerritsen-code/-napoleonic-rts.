@@ -220,6 +220,11 @@ func _form() -> void:
 	for u in _mine():
 		if u.regiment == null and u.type in ["infantry", "officer", "drummer"] and u.world.distance_to(_home) < 900.0:
 			free.append(u)
+	# Free musketeers first fill a battalion that has lost men.
+	for r in battle.regiments:
+		if r.side == SIDE and not r.routing and not r.destroyed() and r.strength() < Regiment.MAX_MEN and r.centroid().distance_to(_home) < 1200.0:
+			if r.reinforce(free) > 0:
+				return
 	if Regiment.eligible(free):
 		var r := battle.form_regiment(free)
 		if r != null:
@@ -244,6 +249,15 @@ func _command() -> void:
 			goal = _nearest_french_battalion(mine[0].centroid())
 	for r in mine:
 		if r.charging != null:
+			continue
+		# Horse close by: form square until it has gone.
+		var horse := _horse_near(r.centroid())
+		if horse and r.formation != "square":
+			r.set_formation("square")
+			continue
+		if not horse and r.formation == "square":
+			r.set_formation("line")
+		if horse:
 			continue
 		if r.enemy != null:
 			if r.strength() > r.enemy.strength() * CHARGE_ODDS:
@@ -287,3 +301,10 @@ func _nearest_french_battalion(from: Vector2) -> Variant:
 				best_d = d
 				best = r.centroid()
 	return best
+
+
+func _horse_near(at: Vector2) -> bool:
+	for u in battle.units:
+		if u.side == "france" and u.alive() and u.type == "cavalry" and u.world.distance_to(at) < 260.0:
+			return true
+	return false

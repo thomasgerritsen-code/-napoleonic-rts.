@@ -119,7 +119,7 @@ func _describe() -> String:
 			lines.append("Graan: %d  ·  %d boeren" % [b.crop, battle.farmers_on(b)])
 		return "\n".join(lines)
 	if battle.selected_units.is_empty():
-		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · C charge · F bataljon vormen · WASD/wieltje: camera"
+		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · F bataljon vormen · WASD/wieltje: camera"
 	var count := {}
 	for u in battle.selected_units:
 		count[u.type] = count.get(u.type, 0) + 1
@@ -131,7 +131,8 @@ func _describe() -> String:
 		var state := "vuurt" if r.enemy != null else ("marcheert" if r.moving() else "staat")
 		if r.charging != null:
 			state = "chargeert"
-		lines.append("%s: %d man in %s, %s" % [r.name, r.strength(), "colonne" if r.formation == "column" else "linie", state])
+		var shape: String = {"column": "colonne", "square": "carré"}.get(r.formation, "linie")
+		lines.append("%s: %d man in %s, %s" % [r.name, r.strength(), shape, state])
 	var workers: int = count.get("worker", 0)
 	if workers > 0:
 		lines.append("Boeren: rechtsklik op struiken, bomen bij een kamp, ijzer bij een mijn, of een akker.")
@@ -161,6 +162,9 @@ func _rebuild() -> void:
 	if not battle.selected.is_empty():
 		_button("Linie (1)", battle.set_formation.bind("line"))
 		_button("Colonne (2)", battle.set_formation.bind("column"))
+		_button("Carré (3)\ntegen cavalerie", battle.set_formation.bind("square"))
+		if has_free_soldiers:
+			_button("Aanvullen\nlosse musketiers erbij", battle.reinforce)
 		_button("Charge (C)", battle.charge)
 
 

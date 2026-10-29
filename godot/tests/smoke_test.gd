@@ -100,6 +100,23 @@ func _initialize() -> void:
 	_run(battle, 12.0)
 	_check(regiment.centroid().distance_to(from) > 200.0 and not regiment.moving(), "the battalion marched and stands in line")
 
+	# A square, and new men filling the ranks.
+	regiment.set_formation("square")
+	_run(battle, 8.0)
+	var centre := regiment.centroid()
+	var faces := {}
+	for u in regiment.living():
+		if u.type == "infantry":
+			faces[Iso.direction((u.world - centre).angle() - regiment.facing)] = true
+	_check(faces.size() >= 4 and not regiment.moving(), "the battalion forms a square facing every way (%d directions)" % faces.size())
+	regiment.set_formation("line")
+	var recruits: Array[Unit] = []
+	for i in 6:
+		recruits.append(battle.add_unit("france", "infantry", regiment.centroid() + Vector2(-60, i * 16)))
+	var before := regiment.strength()
+	_check(regiment.reinforce(recruits) == 6 and regiment.strength() == before + 6, "six recruits fill the battalion's ranks")
+	_run(battle, 10.0)
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0
