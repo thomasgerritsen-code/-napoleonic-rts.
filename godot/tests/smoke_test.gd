@@ -177,6 +177,22 @@ func _initialize() -> void:
 	_check(trench != null and trench["level"] == 2, "and becomes a revetted trench (level %s)" % (trench["level"] if trench != null else 0))
 	regiment.hold = false
 
+	# Morale: a shaken battalion breaks and runs, and rallies once out of danger.
+	var shaken_men: Array[Unit] = []
+	var camp := home + Vector2(300, -500)
+	for i in 14:
+		shaken_men.append(battle.add_unit("france", "infantry", camp + Vector2(i * 15, 0)))
+	shaken_men.append(battle.add_unit("france", "officer", camp + Vector2(100, 30)))
+	shaken_men.append(battle.add_unit("france", "drummer", camp + Vector2(120, 30)))
+	var shaken := battle.form_regiment(shaken_men)
+	_run(battle, 1.0)
+	for u in shaken.living():
+		u.morale = 8.0
+	_run(battle, 0.5)
+	_check(shaken.routing, "a battalion whose morale gives way breaks and runs")
+	_run(battle, 40.0)
+	_check(not shaken.routing and shaken.morale() >= Regiment.RALLY_MORALE - 10.0, "and rallies once out of danger (morale %d)" % shaken.morale())
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0

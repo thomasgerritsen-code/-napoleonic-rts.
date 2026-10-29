@@ -16,6 +16,8 @@ const LAB_MEN := 36
 
 ## "campaign" (the full game) or "lab" (the test field), chosen in the menu.
 static var mode := "campaign"
+## The battle being fought (for the battalions' sense of danger).
+static var current: Battle = null
 
 var units: Array[Unit] = []
 var buildings: Array[Building] = []
@@ -69,6 +71,7 @@ var _river: Array = []
 
 func _ready() -> void:
 	randomize()
+	current = self
 	Regiment.all.clear()
 	var meta: Dictionary = Iso.read_json("res://assets/map/ground.json")
 	Iso.load_relief(meta)
@@ -121,6 +124,11 @@ func _ready() -> void:
 	_hud.battle = self
 	add_child(_hud)
 	say("Rechtsklik met boeren op struiken voor voedsel; bouw een houthakkerskamp bij het bos voor hout.")
+
+
+func _exit_tree() -> void:
+	if current == self:
+		current = null
 
 
 func _process(delta: float) -> void:
@@ -370,6 +378,15 @@ func is_foe(node: Node2D, side: String) -> bool:
 		return (node as Unit).alive() and (node as Unit).side != side
 	if node is Building:
 		return (node as Building).standing() and (node as Building).side != side
+	return false
+
+
+## Whether enemy soldiers (not peasants, not men in flight) are within `reach`.
+func soldiers_near(at: Vector2, side: String, reach: float) -> bool:
+	for u in units:
+		if u.side != side and u.alive() and u.military() and (u.regiment == null or not u.regiment.routing) \
+				and u.world.distance_squared_to(at) < reach * reach:
+			return true
 	return false
 
 

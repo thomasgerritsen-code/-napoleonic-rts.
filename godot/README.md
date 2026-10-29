@@ -20,14 +20,18 @@ garde, sappeurs, riflemen, kurassiers, lansiers, huzaren, Scots Greys,
 cavalerie, ervaring van bataljons (Recruut tot Elite), schiettorens die twee
 keer versterkt kunnen worden, en gewonden: wie valt kan gewond blijven liggen,
 brancardiers van het veldhospitaal halen hem op en na herstel keert hij terug
-naar zijn bataljon. Lichtgewonden lopen en herladen trager.
+naar zijn bataljon. Lichtgewonden lopen en herladen trager. Een bataljon dat
+stelling houdt (G) zet zich schrap en graaft in linie een loopgraaf, die met
+hout en ijzer bekleed en versterkt kan worden. Moreel: treffers en vallende
+kameraden schokken de mannen, officier en tamboer houden ze bijeen; een
+bataljon dat breekt slaat op de vlucht en verzamelt zich buiten gevaar weer.
 
 De beginsituatie en de plaatjes komen uit de webversie via
 `node scripts/export-godot-scenario.js` (met het spel lokaal geserveerd).
 
 Besturing: klik of sleep om te selecteren (Shift voegt toe), rechtsklik voor
 een opdracht (lopen, aanvallen, verzamelen, bouwen, op de akker werken), rechts
-slepen zet de richting van een bataljon. Toetsen: 1 linie, 2 colonne, C charge,
+slepen zet de richting van een bataljon. Toetsen: 1 linie, 2 colonne, 3 carré, C charge, G stelling houden,
 F bataljon vormen, Escape annuleert een bouwplan; WASD/pijltjes, middelste
 muisknop en wieltje voor de camera, R voor een nieuwe slag na afloop.
 

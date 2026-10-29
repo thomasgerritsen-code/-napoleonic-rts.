@@ -78,6 +78,17 @@ func cover(victim: Unit, from: Vector2, lobbed := false) -> float:
 	return 1.0
 
 
+## The share of the shock to his nerve a man takes: in a trench or a braced
+## line he stands it better.
+func shock_factor(u: Unit) -> float:
+	var cfg := Rules.orders()
+	if not list.is_empty():
+		var t: Variant = trench_at(u.world)
+		if t != null:
+			return float(Rules.trench_level(t["level"]).get("shock", cfg.get("trenchShock", 0.45)))
+	return float(cfg.get("defendShock", 0.55)) if braced(u.regiment) else 1.0
+
+
 ## The cut, its bank and the ditch in front: horses flounder there.
 func obstacle_at(p: Vector2) -> bool:
 	for t in list:

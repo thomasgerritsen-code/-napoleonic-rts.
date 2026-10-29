@@ -38,6 +38,7 @@ var charging: Regiment = null
 var destination := Vector2.ZERO
 var victories := 0
 var _start := 0
+var _break_base := 0         # the strength its losses are counted from (since it last rallied)
 var _pace := 1.0             # slowed by its walking wounded
 ## Told to hold its ground (G): it braces and, in line, digs in (Trenches).
 var hold := false
@@ -45,6 +46,11 @@ var braced_at := -1.0
 var trench: Variant = null   # the trench it holds or digs
 var last_centre := Vector2.INF
 var still_seconds := 0
+var _lost_officer := false
+var _lost_drummer := false
+var _safe_for := 0.0         # seconds a routing battalion has been out of danger
+const RALLY_MORALE := 62.0
+const RALLY_SAFE := 235.0
 
 
 static func eligible(units: Array[Unit]) -> bool:
@@ -82,6 +88,7 @@ static func raise(units: Array[Unit]) -> Regiment:
 		u.target = null
 		r.men.append(u)
 	r._start = r.men.size()
+	r._break_base = r._start
 	all.append(r)
 	var at := r.centroid()
 	r.facing = 0.0 if side_ == "france" else PI
@@ -187,6 +194,7 @@ func reinforce(units: Array[Unit]) -> int:
 			added += 1
 	if added > 0:
 		_start = maxi(_start, strength())
+		_break_base = maxi(_break_base, strength())
 		_form(destination)
 	return added
 
@@ -283,6 +291,81 @@ func _form_square(at: Vector2, rank_and_file: Array[Unit]) -> void:
 			(face[k] as Unit).slot = at + out * half + along * ((k - (face.size() - 1) / 2.0) * FILE_GAP)
 
 
+## The battalion's morale as the web game: its men's average, +5 with its
+## officer (-20 without), +5 with its drummer (-8 without).
+func morale() -> float:
+	var list := living()
+	if list.is_empty():
+		return 0.0
+	var sum := 0.0
+	var officer := false
+	var drummer := false
+	for u in list:
+		sum += u.morale
+		officer = officer or u.type == "officer"
+		drummer = drummer or u.type == "drummer"
+	return clampf(sum / list.size() + (5.0 if officer else -20.0) + (5.0 if drummer else -8.0), 0.0, 100.0)
+
+
+func morale_label() -> String:
+	if routing:
+		return "op de vlucht"
+	var m := morale()
+	return "standvastig" if m > 75.0 else ("geschokt" if m > 50.0 else ("aarzelt" if m > 25.0 else "breekt"))
+
+
+func leader_near(u: Unit, kind: String, reach: float) -> bool:
+	for m in men:
+		if m.type == kind and m.alive() and m.world.distance_squared_to(u.world) <= reach * reach:
+			return true
+	return false
+
+
+## Nerve: the men steady when no enemy is near (quicker with officer and
+## drummer); losing the officer or drummer shakes them all; a battalion whose
+## morale gives way breaks, and one that has run out of danger rallies.
+func _nerve(delta: float) -> void:
+	var list := living()
+	var officer := false
+	var drummer := false
+	for u in list:
+		officer = officer or u.type == "officer"
+		drummer = drummer or u.type == "drummer"
+	if not officer and not _lost_officer:
+		_lost_officer = true
+		for u in list:
+			u.morale = maxf(0.0, u.morale - 25.0)
+	if not drummer and not _lost_drummer:
+		_lost_drummer = true
+		for u in list:
+			u.morale = maxf(0.0, u.morale - 10.0)
+	var here := centroid()
+	var danger := Battle.current != null and Battle.current.soldiers_near(here, side, RALLY_SAFE if routing else 180.0)
+	var gain := 0.2 if danger else 1.2 + (0.55 if officer else -0.5) + (0.45 if drummer else 0.0)
+	for u in list:
+		u.morale = minf(100.0, u.morale + gain * delta)
+	if routing:
+		_safe_for = 0.0 if danger else _safe_for + delta
+		if _safe_for >= 5.0 and officer and list.size() > maxi(3, _start / 3) and morale() >= RALLY_MORALE:
+			rally()
+	elif morale() < 22.0 and strength() > 0:
+		rout()
+
+
+## Back in order where it stands, facing the way it fled from.
+func rally() -> void:
+	routing = false
+	_safe_for = 0.0
+	formation = "line"
+	var here := centroid()
+	facing = 0.0 if side == "france" else PI
+	destination = here
+	for u in living():
+		u.morale = maxf(u.morale, 55.0)
+	_break_base = strength()
+	_form(here)
+
+
 ## Honours as in the web game: Recruut, Ervaren (1 victory), Veteraan (3),
 ## Elite (6); each rank hits a little harder.
 func rank() -> Dictionary:
@@ -311,7 +394,7 @@ func lost(_unit: Unit) -> void:
 		return
 	if strength() == 0:
 		_credit_victors()
-	elif strength() < _start * BREAK_AT:
+	elif strength() < _break_base * BREAK_AT:
 		rout()
 	else:
 		_form(destination)
@@ -346,12 +429,18 @@ func charge(regiments: Array[Regiment]) -> bool:
 		return false
 	charging = target
 	enemy = null
+	# The cheer of a charge.
+	for u in living():
+		u.morale = minf(100.0, u.morale + 8.0)
 	return true
 
 
 ## Choose the enemy to fire on or keep charging; the men move themselves.
 func update(delta: float, regiments: Array[Regiment]) -> void:
-	if routing or destroyed():
+	if destroyed():
+		return
+	_nerve(delta)
+	if routing:
 		return
 	# The battalion keeps together at the pace its wounded can go.
 	var list := living()

@@ -143,6 +143,7 @@ func _describe() -> String:
 		elif battle.trenches.braced(r):
 			state += ", houdt stand"
 		state += ", %s" % r.rank_label()
+		state += ", moreel %d (%s)" % [r.morale(), r.morale_label()]
 		var shape: String = {"column": "colonne", "square": "carré"}.get(r.formation, "linie")
 		lines.append("%s: %d man in %s, %s" % [r.name, r.strength(), shape, state])
 	var workers: int = count.get("worker", 0)

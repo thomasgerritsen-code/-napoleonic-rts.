@@ -24,6 +24,9 @@ var troop := ""
 var grenade_clock := 0.0
 ## Fallen but wounded (FieldMedics): "lying", "carried", "healing", "healed" or "dead".
 var wound := ""
+## Nerve, 0 to 100 (the web game's morale): shaken by hits and by comrades
+## falling near him, steadied by his officer and drummer.
+var morale := 100.0
 var wounded_at := 0.0
 var heal_until := 0.0
 var hospital: Building = null
@@ -449,8 +452,11 @@ func hit(damage: float) -> void:
 		return
 	hp -= damage
 	queue_redraw()
+	if type != "worker":
+		_shaken((8.0 + damage * 0.08) * battle.trenches.shock_factor(self))
 	if hp > 0.0:
 		return
+	morale = 0.0
 	state = State.DEAD
 	selected = false
 	z_index = -1
@@ -462,8 +468,40 @@ func hit(damage: float) -> void:
 			_wear(["%s_iso_infantry", "%s_iso_fallen"])
 		_play(["die", "diefwd", "dieside"].pick_random() if type != "cavalry" and troop != "mounted" else "die", true)
 	battle.on_death(self)
+	if type != "worker":
+		_witnessed()
 	if regiment != null:
 		regiment.lost(self)
+
+
+## A hit shakes the man, and a little those beside him in the ranks.
+func _shaken(amount: float) -> void:
+	morale = maxf(0.0, morale - amount)
+	if regiment == null:
+		return
+	for u in regiment.men:
+		if u != self and u.alive() and u.world.distance_squared_to(world) < 80.0 * 80.0:
+			u.morale = maxf(0.0, u.morale - amount * 0.16)
+
+
+## A comrade falling unnerves those who see it, an officer most; their own
+## officer and drummer close by keep them steady.
+func _witnessed() -> void:
+	var base := 11.0 if type == "officer" else (8.0 if type == "drummer" else 6.0)
+	if regiment != null:
+		for u in regiment.men:
+			if u.alive():
+				u.morale = maxf(0.0, u.morale - 5.0)
+	for u in battle.units:
+		if u == self or u.side != side or not u.alive() or u.type == "worker":
+			continue
+		var d := u.world.distance_to(world)
+		if d >= 190.0:
+			continue
+		var steady := 1.0
+		if u.regiment != null:
+			steady = (0.68 if u.regiment.leader_near(u, "officer", 210.0) else 1.0) * (0.86 if u.regiment.leader_near(u, "drummer", 170.0) else 1.0)
+		u.morale = maxf(0.0, u.morale - minf(11.0, base * (1.0 - d / 190.0) * steady))
 
 
 ## Where the flash and smoke appear, in world space.
