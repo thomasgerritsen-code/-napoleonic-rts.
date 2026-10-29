@@ -31,6 +31,11 @@ func _initialize() -> void:
 	var point := Vector2(4500, 3200)
 	_check(Iso.to_world(Iso.to_screen(point)).distance_to(point) < 1.0, "screen to world inverts world to screen")
 
+	battle.fog.refresh()
+	_check(battle.fog.sees(battle.town_centre("france").world), "France sees its own base")
+	_check(not battle.fog.sees(battle.town_centre("britain").world) and not battle.town_centre("britain").visible,
+		"the British base lies hidden in the fog")
+
 	# The river: a man sent across it goes over a bridge, never through the water.
 	var walker := battle.add_unit("france", "infantry", Vector2(1100, 1900))
 	var across := Vector2(2200, 1900)

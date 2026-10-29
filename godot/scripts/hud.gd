@@ -13,9 +13,11 @@ var _plan: Label
 var _result: Label
 var _buttons: GridContainer
 var _dirty := true
+var _minimap: Minimap
 
 
 func _ready() -> void:
+	layer = 2
 	var bar := _panel(Vector2(0, 0), Vector2(0, 40))
 	bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	bar.offset_bottom = 40
@@ -41,6 +43,13 @@ func _ready() -> void:
 	_buttons.add_theme_constant_override("h_separation", 6)
 	_buttons.add_theme_constant_override("v_separation", 6)
 	add_child(_buttons)
+	_minimap = Minimap.new()
+	_minimap.battle = battle
+	_minimap.camera = battle.camera if battle != null else null
+	_minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_minimap.offset_left = -Minimap.SIZE.x - 14
+	_minimap.offset_top = 74
+	add_child(_minimap)
 	_result = _label(self, Vector2.ZERO, 30)
 	_result.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_result.offset_top = 110
@@ -82,10 +91,9 @@ func _process(_delta: float) -> void:
 	if battle == null:
 		return
 	var e: Dictionary = battle.economy["france"]
-	var minutes := int(battle.clock) / 60
-	_top.text = "NAPOLEONIC RTS   ·   %d voedsel   ·   %d hout   ·   %d ijzer   ·   %d/%d inwoners   ·   gebieden %d–%d   ·   %d:%02d" % [
+	_top.text = "NAPOLEONIC RTS   ·   %d voedsel   ·   %d hout   ·   %d ijzer   ·   %d/%d inwoners   ·   gebieden %d–%d   ·   %s" % [
 		e["food"], e["wood"], e["iron"], battle.pop_used("france"), battle.pop_cap("france"),
-		battle.territories_held("france"), battle.territories_held("britain"), minutes, int(battle.clock) % 60]
+		battle.territories_held("france"), battle.territories_held("britain"), DayNight.clock_text(battle.clock)]
 	_status.text = battle.status
 	_plan.text = "Britse bevelhebber: %s" % battle.ai.plan
 	_info.text = _describe()

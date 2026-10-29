@@ -39,10 +39,11 @@ var selected: Array[Regiment]:
 		return list
 
 var ai: BritishCommand
+var fog: Fog
 var _units_layer: Node2D
 var _effects: Node2D
 var _overlay: Overlay
-var _camera: BattleCamera
+var camera: BattleCamera
 var _hud: Hud
 var _smoke: Texture2D
 var _next_id := 10000
@@ -67,6 +68,9 @@ func _ready() -> void:
 	_effects = Node2D.new()
 	_effects.z_index = 10
 	add_child(_effects)
+	fog = Fog.new()
+	fog.battle = self
+	add_child(fog)
 	_overlay = Overlay.new()
 	_overlay.battle = self
 	_overlay.z_index = 20
@@ -74,10 +78,13 @@ func _ready() -> void:
 	_smoke = _puff_texture()
 	_load_opening()
 	ai = BritishCommand.new(self)
-	_camera = BattleCamera.new()
-	add_child(_camera)
+	camera = BattleCamera.new()
+	add_child(camera)
 	var home := town_centre("france")
-	_camera.focus(Iso.to_screen(home.world + Vector2(260, 60)) if home != null else Iso.to_screen(Iso.WORLD / 2.0))
+	camera.focus(Iso.to_screen(home.world + Vector2(260, 60)) if home != null else Iso.to_screen(Iso.WORLD / 2.0))
+	var day := DayNight.new()
+	day.battle = self
+	add_child(day)
 	_hud = Hud.new()
 	_hud.battle = self
 	add_child(_hud)
@@ -806,7 +813,7 @@ func place(at: Vector2) -> void:
 func _thing_at(at: Vector2, enemy: bool) -> Node2D:
 	var screen := Iso.to_screen(at)
 	for u in units:
-		if u.alive() and (u.side != "france") == enemy and u.position.distance_to(screen) < 14.0:
+		if u.alive() and (u.side != "france") == enemy and u.visible and u.position.distance_to(screen) < 14.0:
 			return u
 	for b in buildings:
 		if b.standing() and (b.side != "france") == enemy and absf(b.world.x - at.x) < b.size.x / 2.0 and absf(b.world.y - at.y) < b.size.y / 2.0:
@@ -838,6 +845,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				charge()
 			KEY_F:
 				form_regiment()
+			KEY_V:
+				fog.enabled = not fog.enabled
+				fog.refresh()
 		return
 	if event is InputEventMouseMotion and _drag_start != null:
 		_overlay.box = Rect2(_drag_start, Vector2.ZERO).expand(get_global_mouse_position())
