@@ -58,9 +58,18 @@
     statusEl.textContent=n?`${n} boer${n===1?'':'en'} kapt hout voor het houthakkerskamp.`:'Bouw en voltooi eerst een eigen houthakkerskamp bij dit bos.';return n>0;
   };
   function startCampWork(u,b){const r=nearestTree(u.side,u.x,u.y,b);if(!r||!assign(u,r,b))stopWorkerAtCurrentPosition(u);}
+  // A camp's forest is finite: once no tree in reach of any own camp is left,
+  // its peasants stop. Tell the player why, at most every 20 seconds.
+  let exhaustedNoticeAt=-Infinity;
+  function forestExhausted(u){
+    if(root.__NRTS_SERVER__||u.side!=='france'||typeof statusEl==='undefined'||elapsed-exhaustedNoticeAt<20)return;
+    exhaustedNoticeAt=elapsed;
+    statusEl.textContent='Het bos bij je houthakkerskamp is op: bouw een nieuw kamp bij een ander bos.';
+  }
   const baseWorker=updateWorker;
   updateWorker=function updateLumberWorker(u,dt){
     const prior=workerSide;workerSide=u.side;
+    const logging=!!u.lumberCampId&&['gather','return','lumber-deliver'].includes(u.task);
     try{
       const b=u.task==='build'&&u.buildingTarget?.type==='lumbercamp'?u.buildingTarget:null;
       if(b){
@@ -90,7 +99,10 @@
       }
       const result=baseWorker(u,dt);
       if(u.task==='return'&&u.lumberCampId)u.task='lumber-deliver';return result;
-    }finally{workerSide=prior;}
+    }finally{
+      workerSide=prior;
+      if(logging&&!u.task&&u.resourceExhaustedStop)forestExhausted(u);
+    }
   };
   function developCamps(){
     if(root.__NRTS_SERVER__||root.__NRTS_HUMAN_BRITAIN__||gameOver)return;
