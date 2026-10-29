@@ -139,6 +139,25 @@ func _initialize() -> void:
 	_check(tower.tower_level == 2 and is_equal_approx(tower.max_hp, 1600.0) and tower.upgrade_to == 0, "the tower is strengthened to level 2 (%d hp)" % tower.max_hp)
 	_check(battle.fog == null or battle.fog.vision(tower) > sight, "and sees further from it")
 
+	# The wounded: a musketeer falls wounded, a stretcher team brings him to the
+	# field hospital, and once mended he marches back to his battalion.
+	var hospital := battle.add_building("france", "hospital", regiment.centroid() + Vector2(-260, 0), true)
+	for i in 4:
+		battle.add_building("france", "house", hospital.world + Vector2(-160, i * 70 - 100), true)
+	var casualty: Unit = null
+	for u in regiment.living():
+		if u.type == "infantry":
+			casualty = u
+	casualty.hit(1000.0)
+	battle.medics.wound(casualty)
+	_check(casualty.wound == "lying", "a fallen musketeer lies wounded")
+	_run(battle, 20.0)
+	_check(casualty.wound in ["carried", "healing"], "a stretcher team carries him in (%s)" % casualty.wound)
+	var strength := regiment.strength()
+	_run(battle, 50.0)
+	_check(battle.medics.stats["healed"] >= 1 and regiment.strength() == strength + 1,
+		"he is mended and back in the ranks (%s)" % battle.medics.stats)
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0

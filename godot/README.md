@@ -14,6 +14,14 @@ kanonnen op; 12–36 musketiers met een officier en een tamboer vormen een
 bataljon. De Britse computer bouwt zijn basis op, vormt bataljons en valt aan.
 Wie zijn stadhuis verliest, verliest.
 
+Verder uit de webversie: de troepsoorten (grenadiers met granaten, voltigeurs,
+garde, sappeurs, riflemen, kurassiers, lansiers, huzaren, Scots Greys,
+12-ponders, houwitsers, rijdende artillerie, bereden officieren), carré tegen
+cavalerie, ervaring van bataljons (Recruut tot Elite), schiettorens die twee
+keer versterkt kunnen worden, en gewonden: wie valt kan gewond blijven liggen,
+brancardiers van het veldhospitaal halen hem op en na herstel keert hij terug
+naar zijn bataljon. Lichtgewonden lopen en herladen trager.
+
 De beginsituatie en de plaatjes komen uit de webversie via
 `node scripts/export-godot-scenario.js` (met het spel lokaal geserveerd).
 

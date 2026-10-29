@@ -38,6 +38,7 @@ var charging: Regiment = null
 var destination := Vector2.ZERO
 var victories := 0
 var _start := 0
+var _pace := 1.0             # slowed by its walking wounded
 
 
 static func eligible(units: Array[Unit]) -> bool:
@@ -147,10 +148,10 @@ func set_formation(kind: String) -> void:
 
 func speed_factor() -> float:
 	if charging != null:
-		return CHARGE_SPEED
+		return CHARGE_SPEED * _pace
 	if formation == "square":
-		return SQUARE_SPEED
-	return COLUMN_SPEED if formation == "column" else 1.0
+		return SQUARE_SPEED * _pace
+	return (COLUMN_SPEED if formation == "column" else 1.0) * _pace
 
 
 func fire_factor() -> float:
@@ -182,6 +183,26 @@ func reinforce(units: Array[Unit]) -> int:
 		_start = maxi(_start, strength())
 		_form(destination)
 	return added
+
+
+## A man back from the field hospital: a musketeer fills the ranks, an
+## officer or drummer takes his place again if nobody has.
+func take_back(u: Unit) -> bool:
+	if routing or destroyed():
+		return false
+	if u.type == "infantry":
+		var one: Array[Unit] = [u]
+		return reinforce(one) > 0
+	if u.type == "officer" and u.troop == "mounted":
+		return false
+	for m in living():
+		if m.type == u.type:
+			return false
+	u.regiment = self
+	u.ordered = false
+	men.append(u)
+	_form(destination)
+	return true
 
 
 func shape(count: int) -> Vector2i:
@@ -326,6 +347,12 @@ func charge(regiments: Array[Regiment]) -> bool:
 func update(delta: float, regiments: Array[Regiment]) -> void:
 	if routing or destroyed():
 		return
+	# The battalion keeps together at the pace its wounded can go.
+	var list := living()
+	var sum := 0.0
+	for u in list:
+		sum += u.injury()
+	_pace = 0.7 + 0.3 * sum / list.size()
 	if charging != null:
 		_melee(delta)
 		return

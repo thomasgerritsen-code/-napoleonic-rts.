@@ -48,6 +48,7 @@ var fog: Fog
 var woods := Woods.new()
 var weather: Weather
 var sounds: Sounds
+var medics: FieldMedics
 var _woods_clock := 0.0
 var _drum_clock := 0.0
 const WALL_CELL := 80.0
@@ -90,6 +91,9 @@ func _ready() -> void:
 	_overlay.z_index = 20
 	add_child(_overlay)
 	_smoke = _puff_texture()
+	medics = FieldMedics.new()
+	medics.battle = self
+	add_child(medics)
 	_load_opening()
 	if mode == "lab":
 		_set_up_lab()
@@ -124,6 +128,7 @@ func _process(delta: float) -> void:
 	_keep_apart()
 	for b in buildings:
 		b.step(delta)
+	medics.update(delta)
 	_hold_territories(delta)
 	_beat_drums(delta)
 	_woods_clock -= delta
@@ -529,6 +534,13 @@ func start_work_at(u: Unit, b: Building) -> void:
 
 func on_death(u: Unit) -> void:
 	selected_units.erase(u)
+	medics.on_fallen(u)
+	u.queue_redraw()
+
+
+## A thing on the field, drawn in order with the men and buildings.
+func add_to_field(node: Node2D) -> void:
+	_units_layer.add_child(node)
 
 
 func on_destroyed(b: Building) -> void:

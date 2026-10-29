@@ -142,6 +142,9 @@ func _build() -> void:
 		_lay_out("stable", _near_home(400.0))
 	elif battle.clock > 420.0 and _count("foundry") == 0 and stock["wood"] >= 420.0 and stock["iron"] >= 90.0:
 		_lay_out("foundry", _near_home(420.0))
+	elif battle.clock > float(Rules.medics()["aiAfter"]) and _count("hospital") == 0 and stock["wood"] >= 280.0 and stock["food"] >= 160.0:
+		# Behind the town centre, away from the French.
+		_lay_out("hospital", _home - (Iso.WORLD / 2.0 - _home).normalized() * 170.0)
 	elif battle.clock > Rules.tower_ai()["after"] and _count("tower") < Rules.tower_ai()["max"] and _count("tower") == _count("tower", true) \
 			and stock["wood"] >= Rules.cost_of("tower").get("wood", 260) + 120.0:
 		_lay_out("tower", _towards_france(250.0 + 60.0 * _count("tower")))

@@ -22,6 +22,11 @@ var side := "france"
 var type := "infantry"
 var troop := ""
 var grenade_clock := 0.0
+## Fallen but wounded (FieldMedics): "lying", "carried", "healing", "healed" or "dead".
+var wound := ""
+var wounded_at := 0.0
+var heal_until := 0.0
+var hospital: Building = null
 var battle: Battle
 var regiment: Regiment
 var world := Vector2.ZERO
@@ -98,7 +103,17 @@ func stat(key: String) -> float:
 
 
 func reload_time() -> float:
-	return float(Rules.unit_type(type).get("reload", 3.0)) * stat("reload")
+	var hurt := 1.35 if injury() < 0.7 else (1.15 if injury() < 1.0 else 1.0)
+	return float(Rules.unit_type(type).get("reload", 3.0)) * stat("reload") * hurt
+
+
+## Walking wounded (the web game's field care): below 65% of his health a man
+## goes at 0.82 of his pace, below 30% at 0.62; he reloads slower too.
+func injury() -> float:
+	if not alive() or not (type in ["infantry", "cavalry", "officer", "drummer"]):
+		return 1.0
+	var share := hp / max_hp
+	return 0.62 if share < 0.3 else (0.82 if share < 0.65 else 1.0)
 
 
 ## The atlases this man wears, as the web iso view picks them: the line in
@@ -185,6 +200,8 @@ func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
 		return true
 	if battle.weather != null:
 		pace *= battle.weather.pace(type)
+	if regiment == null:
+		pace *= injury()
 	world += way.limit_length(speed * pace * delta)
 	facing = way.angle()
 	state = State.MOVE
@@ -505,6 +522,14 @@ func _play(state_name: String, restart := false) -> void:
 
 
 func _draw() -> void:
+	if wound == "lying":
+		# Alive: a white mark with a red cross over him.
+		draw_circle(Vector2(0, -10), 3.2, Color(0.98, 0.97, 0.94, 0.85))
+		draw_rect(Rect2(-0.6, -12.0, 1.2, 4.0), Color(0.6, 0.08, 0.08))
+		draw_rect(Rect2(-2.0, -10.6, 4.0, 1.2), Color(0.6, 0.08, 0.08))
+	if alive() and injury() < 1.0:
+		# A bandage round his head.
+		draw_rect(Rect2(-2.0, -27.0, 4.0, 1.6), Color(0.93, 0.89, 0.82))
 	if not selected:
 		return
 	var color := Color(0.45, 0.65, 1.0, 0.9) if side == "france" else Color(1.0, 0.45, 0.4, 0.9)

@@ -145,3 +145,10 @@ static func tower_level(level: int) -> Dictionary:
 static func tower_ai() -> Dictionary:
 	var t: Variant = start().get("towers")
 	return {"after": float(t.get("aiAfter", 300)), "max": int(t.get("aiMax", 2))} if t is Dictionary else {"after": 300.0, "max": 2}
+
+
+## The wounded and the field hospital's stretcher teams (the web game's medics).
+static func medics() -> Dictionary:
+	var m: Variant = start().get("medics")
+	return m if m is Dictionary else {"types": ["infantry", "officer", "drummer"], "woundedShare": 0.45, "bleedOutSeconds": 90,
+		"healSeconds": 45, "teams": 2, "teamSpeed": 44, "reach": 1600, "aiAfter": 240}
