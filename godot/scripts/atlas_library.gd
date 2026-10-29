@@ -16,6 +16,10 @@ const LOOPING := ["idle", "march", "aim", "work", "farm", "mine", "build", "comm
 static var _cache := {}
 
 
+static func clear() -> void:
+	_cache.clear()
+
+
 ## {frames: SpriteFrames, pivot: Vector2} for atlases like ["fr_iso_infantry", "fr_iso_fallen"].
 static func get_set(names: Array) -> Dictionary:
 	var key := "+".join(names)

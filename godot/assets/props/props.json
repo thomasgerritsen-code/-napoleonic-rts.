@@ -238,6 +238,34 @@
     "y": 125
    },
    "w": 227
+  },
+  "bridge_stone": {
+   "footprint": {
+    "d": 5.1,
+    "w": 12.8
+   },
+   "h": 208,
+   "heightM": 2.04,
+   "image": "bridge_stone.webp",
+   "pivot": {
+    "x": 291,
+    "y": 126
+   },
+   "w": 612
+  },
+  "bridge_wood": {
+   "footprint": {
+    "d": 4.43,
+    "w": 12.16
+   },
+   "h": 194,
+   "heightM": 2,
+   "image": "bridge_wood.webp",
+   "pivot": {
+    "x": 278,
+    "y": 119
+   },
+   "w": 585
   }
  }
 }

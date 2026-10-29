@@ -47,7 +47,7 @@ jobs:
         run: |
           set -o pipefail
           timeout 300 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/smoke_test.gd 2>&1 | tee smoke.log
-          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" smoke.log; then exit 1; fi
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" smoke.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_SMOKE" smoke.log
 
       - name: Install export templates

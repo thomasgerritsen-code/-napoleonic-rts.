@@ -45,6 +45,8 @@ var selected := false:
 			queue_redraw()
 
 var _sprite: AnimatedSprite2D
+var _path: Array[Vector2] = []
+var _goal := Vector2(INF, INF)
 var _prefix := "fr"
 var _anim := ""
 var _clock := 0.0
@@ -107,10 +109,17 @@ func step(delta: float) -> void:
 	position = Iso.to_screen(world)
 
 
-## Walk towards `to`; true once there.
+## Walk towards `to`, by a bridge if the river lies between; true once there.
 func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
-	var way := to - world
+	if to.distance_squared_to(_goal) > 1.0:
+		_goal = to
+		_path = Nav.route(world, Nav.dry(world, to))
+	var next: Vector2 = _path[0] if not _path.is_empty() else to
+	var way := next - world
 	if way.length() <= 3.0:
+		if _path.size() > 1:
+			_path.pop_front()
+			return false
 		return true
 	world += way.limit_length(speed * pace * delta)
 	facing = way.angle()

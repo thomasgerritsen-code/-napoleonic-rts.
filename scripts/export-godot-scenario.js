@@ -26,7 +26,7 @@ const ATLASES = ['fr_iso_infantry', 'fr_iso_fallen', 'br_iso_infantry', 'br_iso_
   'frd_iso_drummer', 'brd_iso_drummer', 'frc_iso_cavalry', 'frc_iso_cavfight',
   'brc_iso_cavalry', 'brc_iso_cavfight', 'frg_iso_gun', 'brg_iso_gun', 'fra_iso_gunner', 'bra_iso_gunner'];
 const PROP_NAMES = ['oak', 'beech', 'pine', 'spruce', 'birch', 'bush', 'hawthorn', 'barracks_fr', 'barracks_br',
-  'cottage', 'barn', 'tower_fr', 'tower_br', 'hospital_fr', 'hospital_br', 'well', 'haystack'];
+  'cottage', 'barn', 'tower_fr', 'tower_br', 'hospital_fr', 'hospital_br', 'well', 'haystack', 'bridge_stone', 'bridge_wood'];
 const VILLAGE_KINDS = ['barn', 'chapel', 'cottage', 'cottage2', 'farmhouse', 'farmhouse2', 'inn'];
 // As the web iso view: half the cottages whitewashed, some farmhouses stone.
 const strHash = text => { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };

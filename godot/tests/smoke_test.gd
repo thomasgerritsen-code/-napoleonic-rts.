@@ -84,6 +84,17 @@ func _initialize() -> void:
 	_run(battle, 12.0)
 	_check(regiment.centroid().distance_to(from) > 200.0 and not regiment.moving(), "the battalion marched and stands in line")
 
+	# The river: a man sent across it goes over a bridge, never through the water.
+	var walker := battle.add_unit("france", "infantry", Vector2(1100, 1900))
+	var across := Vector2(2200, 1900)
+	_check(Nav.route(walker.world, across).size() == 3, "a route across the river goes by a bridge")
+	walker.move_to(across)
+	var wet := false
+	for i in int(90.0 / STEP):
+		battle._process(STEP)
+		wet = wet or Nav.in_water(walker.world)
+	_check(walker.world.distance_to(across) < 20.0 and not wet, "and the man crossed dry-shod (%s)" % walker.world)
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0
@@ -113,6 +124,10 @@ func _initialize() -> void:
 		"pop": {"france": battle.pop_used("france"), "britain": battle.pop_used("britain")}, "plan": battle.ai.plan}))
 	for failure in _failures:
 		printerr("FAILED: ", failure)
+	# Let go of the battle and the shared sprite sets before leaving.
+	battle.queue_free()
+	await process_frame
+	AtlasLibrary.clear()
 	quit(1 if _failures.size() > 0 else 0)
 
 

@@ -53,7 +53,9 @@ func _ready() -> void:
 	Iso.load_relief(meta)
 	_add_ground(meta)
 	props = Iso.read_json("res://assets/props/props.json")["props"]
-	_river = Iso.read_json("res://assets/map/gamemap.json")["river"]["points"]
+	var map: Dictionary = Iso.read_json("res://assets/map/gamemap.json")
+	_river = map["river"]["points"]
+	Nav.setup(map["river"], Rules.start()["crossings"])
 	_units_layer = Node2D.new()
 	_units_layer.name = "Units"
 	_units_layer.y_sort_enabled = true
@@ -84,11 +86,42 @@ func _process(delta: float) -> void:
 		r.update(delta, regiments)
 	for u in units:
 		u.step(delta)
+	_keep_apart()
 	for b in buildings:
 		b.step(delta)
 	ai.update(delta)
 	_tidy_selection()
 	_check_result()
+
+
+## Men do not stand in one another: pairs closer than a pace step apart.
+## Neighbours are found through a grid of cells a pace wide.
+func _keep_apart() -> void:
+	const PACE := 10.0
+	var grid := {}
+	for u in units:
+		if u.alive():
+			var cell := Vector2i(floori(u.world.x / PACE), floori(u.world.y / PACE))
+			if grid.has(cell):
+				grid[cell].append(u)
+			else:
+				grid[cell] = [u]
+	for u in units:
+		if not u.alive() or u.type == "artillery":
+			continue
+		var cell := Vector2i(floori(u.world.x / PACE), floori(u.world.y / PACE))
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				for other: Unit in grid.get(cell + Vector2i(dx, dy), []):
+					if other == u or other.id < u.id:
+						continue
+					var gap := other.world - u.world
+					var d := gap.length()
+					if d >= PACE or d < 0.01:
+						continue
+					var push := gap / d * (PACE - d) * 0.5
+					u.world -= push
+					other.world += push
 
 
 # ---- the opening ----
@@ -99,6 +132,7 @@ func _load_opening() -> void:
 		var e: Dictionary = start["economies"][side]
 		economy[side] = {"food": float(e["food"]), "wood": float(e["wood"]), "iron": float(e["iron"])}
 	_add_villages(start)
+	_add_bridges(start)
 	for data: Dictionary in start["resources"]:
 		var s := Supply.new()
 		s.setup(self, data, props)
@@ -132,6 +166,23 @@ func _add_villages(start: Dictionary) -> void:
 			house.scale = Vector2.ONE * float(h["scale"])
 			house.position = Iso.to_screen(Vector2(h["x"], h["y"]))
 			_units_layer.add_child(house)
+
+
+## The bridges, scaled to each crossing as in the web iso view.
+func _add_bridges(start: Dictionary) -> void:
+	const DECK_M := {"bridge_stone": 12.8, "bridge_wood": 12.0}
+	for c: Dictionary in start["crossings"]:
+		var kind := "bridge_stone" if c.get("material", "wood") == "stone" else "bridge_wood"
+		var prop: Dictionary = props[kind]
+		var bridge := Sprite2D.new()
+		bridge.texture = load("res://assets/props/%s.webp" % kind)
+		bridge.centered = false
+		bridge.offset = -Vector2(prop["pivot"]["x"], prop["pivot"]["y"])
+		bridge.scale = Vector2.ONE * Iso.SPRITE_SCALE * float(c["length"]) / (float(DECK_M[kind]) * Iso.PPM)
+		bridge.position = Iso.to_screen(Vector2(c["x"], c["y"]))
+		# Men on the deck are drawn over it.
+		bridge.z_index = -1
+		add_child(bridge)
 
 
 func _add_ground(meta: Dictionary) -> void:
@@ -512,7 +563,7 @@ func order(at: Vector2, face: Variant = null) -> void:
 			w.set_task("farm", own)
 		else:
 			w.task = ""
-			w.move_to(at)
+			w.move_to(Nav.dry(w.world, at))
 	_spread(free, at, foe)
 	var battalions: Array[Regiment] = selected
 	if not battalions.is_empty():
