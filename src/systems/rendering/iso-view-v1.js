@@ -439,7 +439,7 @@
         if (u < 0.45 && !blocked(ux, uy)) trees.push({ x: ux, y: uy, kind: tree(pickKind(UNDERGROWTH, u / 0.45)), scale: 0.55 + u * 0.3 });
         if (r < 0.12) continue;   // clearings
         if (blocked(tx, ty)) continue;
-        trees.push({ x: tx, y: ty, kind: tree(pickKind(WOOD_MIX[mix], hash(Math.round(tx), Math.round(ty)))), scale: 0.5 + r * 0.25 });
+        trees.push({ x: tx, y: ty, kind: tree(pickKind(WOOD_MIX[mix], hash(Math.round(tx), Math.round(ty)))), scale: 0.5 + r * 0.25, wood: true });
       }
     });
     // Avenues: poplars line both sides of the chaussees, as along Napoleon's
@@ -495,11 +495,75 @@
     view.stats.willows = willows; view.stats.fieldPlants = field;
     return trees;
   }
+  // ---- felling ----
+  // Most of a wood is scenery; the trees peasants fell (wood resources) stand
+  // among it. Each scenery tree of a wood belongs to the nearest such tree and
+  // falls once that tree is cut down far enough, so a wood thins out as it is
+  // worked and is gone when its wood is. The tree itself falls last, at empty.
+  // A falling tree tips over from its foot, lies a moment and fades away.
+  const FELL = { link: 260, fall: 1.1, lie: .7, fade: .9 };
+  const felled = new WeakMap();   // tree -> { at, dir } once it falls
+  const woodFull = new WeakMap(); // wood resource -> the most wood it held
+  const standing = new WeakSet(); // trees seen upright (game objects stay untouched)
+  let fellLinks = null;
+  function linkWoodTrees() {
+    view.stats.fallingTrees = 0;
+    const first = resources[0];
+    if (fellLinks && fellLinks.trees === view.woodTrees && fellLinks.list === resources && fellLinks.first === first && fellLinks.n === resources.length) return;
+    const wood = resources.filter(r => r.type === 'wood' && !r.dead && r.amount > 0), groups = new Map();
+    for (const tr of view.woodTrees || []) {
+      tr.fellBy = null; if (!tr.wood) continue;
+      let best = null, bd = FELL.link * FELL.link;
+      for (const r of wood) { const d = (r.x - tr.x) ** 2 + (r.y - tr.y) ** 2; if (d < bd) { bd = d; best = r; } }
+      if (!best) continue;
+      if (!groups.has(best)) groups.set(best, []);
+      groups.get(best).push(tr);
+    }
+    // The k-th of n scenery trees falls when its tree has k/(n+1) of its wood
+    // left (the nearest last, so the cutting works into the wood).
+    for (const [r, list] of groups) {
+      list.sort((a, b) => ((b.x - r.x) ** 2 + (b.y - r.y) ** 2) - ((a.x - r.x) ** 2 + (a.y - r.y) ** 2));
+      list.forEach((tr, i) => { tr.fellBy = r; tr.fellAt = 1 - (i + 1) / (list.length + 1); });
+    }
+    fellLinks = { trees: view.woodTrees, list: resources, first, n: resources.length };
+    view.stats.fellLinked = [...groups.values()].reduce((n, list) => n + list.length, 0);
+  }
+  // Seconds into its fall, or null while it stands. A tree already down when
+  // first seen (a loaded game, a joined match) is simply gone.
+  function fallState(tree, down, now) {
+    let f = felled.get(tree);
+    if (!down) { if (f) felled.delete(tree); return null; }
+    if (!f) { f = { at: standing.has(tree) ? now : -Infinity, dir: hash(Math.round(tree.x), Math.round(tree.y) + 5) < .5 ? -1 : 1 }; felled.set(tree, f); }
+    return f;
+  }
+  function fallingDrawable(prop, kind, wx, wy, k, f, now) {
+    const t = (now - f.at) / 1000, end = FELL.fall + FELL.lie + FELL.fade;
+    if (t >= end) return null;
+    const X = sx(wx), Y = gy(wx, wy), p = Math.min(1, t / FELL.fall);
+    // Slow to start, then down hard, with a small bounce on the ground.
+    const angle = f.dir * (Math.PI * .46) * (p * p) + (t > FELL.fall ? f.dir * Math.sin(Math.min(1, (t - FELL.fall) / .25) * Math.PI) * .05 : 0);
+    const alpha = t < FELL.fall + FELL.lie ? 1 : 1 - (t - FELL.fall - FELL.lie) / FELL.fade;
+    const reach = Math.max(prop.w, prop.h) * k;
+    return { gpu: false, y: wy, area: [X - reach, Y - reach, X + reach, Y + reach * .3], draw: () => {
+      const palette = global.__SEASONS_V1__?.paletteFor(kind, wx, wy, seasonState()) || 'base';
+      const image = global.__SEASONAL_PROPS_V1__?.source(prop.image, palette) || prop.image;
+      ctx.save(); ctx.globalAlpha *= Math.max(0, alpha); ctx.translate(X, Y); ctx.rotate(angle);
+      ctx.drawImage(image, -prop.pivot.x * k, -prop.pivot.y * k, prop.w * k, prop.h * k);
+      ctx.restore(); view.stats.props++; view.stats.fallingTrees++; } };
+  }
   function woodTreeDrawable(tr) {
     const X = sx(tr.x), Y = gy(tr.x, tr.y);
     if (X < -150 || X > innerWidth + 150 || Y < -30 || Y > innerHeight + 260) return null;
     const prop = view.props[tr.kind]; if (!prop) return null;
     const k = spriteK() * tr.scale;
+    if (tr.fellBy) {
+      const r = tr.fellBy, full = Math.max(woodFull.get(r) || 0, r.amount);
+      woodFull.set(r, full);
+      const down = r.dead || r.amount <= 0 || r.amount < full * tr.fellAt, now = performance.now();
+      const f = fallState(tr, down, now);
+      if (f) return fallingDrawable(prop, tr.kind, tr.x, tr.y, k, f, now);
+      standing.add(tr);
+    }
     return { gpu: true, y: tr.y, box: box(X, Y, prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
       drawPlant(prop,tr.kind,tr.x,tr.y, X - prop.pivot.x * k, Y - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
   }
@@ -1370,13 +1434,16 @@
       const h=buildings.some(b=>!b.dead&&b.type==='mine'&&Math.hypot(b.x-r.x,b.y-r.y)<2)?188:224;
       return {gpu:true,y:r.y-.01,box:box(sx(r.x),gy(r.x,r.y),128,144,256,h,k),draw:()=>{drawScenery(image,0,0,256,h,sx(r.x)-128*k,gy(r.x,r.y)-144*k,256*k,h*k);view.stats.props++;}};
     }
-    if (r.dead || r.amount <= 0) return null;
     if (r.type === 'wood') {
       const kind=tree(['oak', 'beech', 'birch', 'pine', 'spruce', 'oak', 'poplar'][Math.floor(hash(r.id, 3) * 7)]),prop=view.props[kind]; if (!prop) return null;
-      const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25);
+      const k = spriteK() * (0.55 + hash(r.id, 5) * 0.25), now = performance.now();
+      const f = fallState(r, r.dead || r.amount <= 0, now);
+      if (f) return fallingDrawable(prop, kind, r.x, r.y, k, f, now);
+      standing.add(r);
       return { gpu: true, y: r.y, box: box(sx(r.x), gy(r.x, r.y), prop.pivot.x, prop.pivot.y, prop.w, prop.h, k), draw: () => {
         drawPlant(prop,kind,r.x,r.y, sx(r.x) - prop.pivot.x * k, gy(r.x, r.y) - prop.pivot.y * k, prop.w * k, prop.h * k); view.stats.props++; } };
     }
+    if (r.dead || r.amount <= 0) return null;
     if (r.type === 'iron') { const x = sx(r.x), y = gy(r.x, r.y), s = 9 * z() + 2; return { gpu: glScene(), y: r.y, area: [x - s * 1.3, y - s * 1.4, x + s * 1.5, y + s * .7], draw: () => drawRock(r) }; }
     // Berry bushes: some hawthorns with their red haws among the bushes.
     const kind=hash(r.id, 9) < 0.5 && view.props.hawthorn ? 'hawthorn' : 'bush',prop=view.props[kind]; if (!prop) return null;
@@ -2095,6 +2162,7 @@
     if (view.village && view.props.well && !view.dressing) view.dressing = buildDressing();
     for (const it of view.dressing || []) { const d = dressingDrawable(it); if (d) list.push(d); }
     if (view.props.oak && !view.woodTrees) view.woodTrees = buildWoodTrees();
+    linkWoodTrees();
     for (const tr of view.woodTrees || []) { const d = woodTreeDrawable(tr); if (d) list.push(d); }
     for (const r of resources) {
       const X = sx(r.x), Y = gy(r.x, r.y);
