@@ -43,6 +43,15 @@ jobs:
           timeout 300 "$RUNNER_TEMP/godot" --headless --path godot --import 2>&1 | tee import.log
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" import.log; then exit 1; fi
 
+      - name: Check every script
+        run: |
+          failed=0
+          for f in godot/scripts/*.gd godot/tests/*.gd; do
+            out=$(timeout 60 "$RUNNER_TEMP/godot" --headless --path godot --check-only --script "res://${f#godot/}" 2>&1 || true)
+            if echo "$out" | grep -E "SCRIPT ERROR|Parse Error"; then echo "^^ in $f"; failed=1; fi
+          done
+          exit $failed
+
       - name: Headless battle check
         run: |
           set -o pipefail

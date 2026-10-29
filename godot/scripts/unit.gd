@@ -160,7 +160,7 @@ func _grenade(delta: float) -> void:
 	if troop != "grenadier" and troop != "guard":
 		return
 	grenade_clock -= delta
-	if grenade_clock > 0.0 or state not in [State.AIM, State.RELOAD, State.FIRE]:
+	if grenade_clock > 0.0 or not (state in [State.AIM, State.RELOAD, State.FIRE]):
 		return
 	var g: Dictionary = Rules.start()["grenades"] if Rules.start().get("grenades") is Dictionary else {}
 	var foe := battle.nearest_foe(world, side, float(g.get("maxRange", 135)))
