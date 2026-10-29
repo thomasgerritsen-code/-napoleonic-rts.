@@ -127,12 +127,28 @@ func _initialize() -> void:
 
 	print("GODOT_SMOKE ", JSON.stringify({"food": gathered, "economy": battle.economy, "fallen": fallen,
 		"pop": {"france": battle.pop_used("france"), "britain": battle.pop_used("britain")}, "plan": battle.ai.plan}))
-	for failure in _failures:
-		printerr("FAILED: ", failure)
-	# Let go of the battle and the shared sprite sets before leaving.
 	battle.queue_free()
 	await process_frame
+
+	# The test field: large armies, no economy; the British advance and fight.
+	Battle.mode = "lab"
+	var lab: Battle = load("res://scenes/main.tscn").instantiate()
+	root.add_child(lab)
+	await process_frame
+	await process_frame
+	_check(lab.regiments.size() == 2 * Battle.LAB_BATTALIONS, "the test field has %d battalions" % lab.regiments.size())
+	_run(lab, 90.0)
+	var lab_fallen := 0
+	for u in lab.units:
+		if not u.alive():
+			lab_fallen += 1
+	_check(lab_fallen > 10, "and on the test field the armies met and fought (%d fallen)" % lab_fallen)
+	lab.queue_free()
+	await process_frame
+	Battle.mode = "campaign"
 	AtlasLibrary.clear()
+	for failure in _failures:
+		printerr("FAILED: ", failure)
 	quit(1 if _failures.size() > 0 else 0)
 
 

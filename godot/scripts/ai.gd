@@ -19,6 +19,8 @@ const CHARGE_ODDS := 1.6
 
 var battle: Battle
 var plan := "opbouwen"
+## On the test field: no economy, the battalions attack at once.
+var army_only := false
 var _clock := 0.0
 var _home := Vector2.ZERO
 
@@ -34,10 +36,11 @@ func update(delta: float) -> void:
 	if _clock > 0.0 or battle.town_centre(SIDE) == null:
 		return
 	_clock = THINK_EVERY
-	_economy()
-	_build()
-	_train()
-	_form()
+	if not army_only:
+		_economy()
+		_build()
+		_train()
+		_form()
 	_command()
 
 
@@ -232,11 +235,13 @@ func _command() -> void:
 	if mine.is_empty():
 		return
 	var threat: Variant = _threat()
-	var attacking := mine.size() >= ATTACK_WITH or battle.clock > ATTACK_ANYWAY_AFTER
+	var attacking := army_only or mine.size() >= ATTACK_WITH or battle.clock > ATTACK_ANYWAY_AFTER
 	var goal: Variant = threat
 	if goal == null and attacking:
 		var tc := battle.town_centre("france")
 		goal = tc.world if tc != null else null
+		if army_only:
+			goal = _nearest_french_battalion(mine[0].centroid())
 	for r in mine:
 		if r.charging != null:
 			continue
@@ -269,4 +274,16 @@ func _threat() -> Variant:
 			if d < best_d:
 				best_d = d
 				best = u.world
+	return best
+
+
+func _nearest_french_battalion(from: Vector2) -> Variant:
+	var best: Variant = null
+	var best_d := INF
+	for r in battle.regiments:
+		if r.side == "france" and not r.routing and not r.destroyed():
+			var d := r.centroid().distance_to(from)
+			if d < best_d:
+				best_d = d
+				best = r.centroid()
 	return best

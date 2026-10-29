@@ -11,6 +11,11 @@ extends Node2D
 ## building plan; WASD/arrows, the middle button and the wheel move the camera.
 
 const SIDES := ["france", "britain"]
+const LAB_BATTALIONS := 4    # a side on the test field
+const LAB_MEN := 36
+
+## "campaign" (the full game) or "lab" (the test field), chosen in the menu.
+static var mode := "campaign"
 
 var units: Array[Unit] = []
 var buildings: Array[Building] = []
@@ -40,6 +45,8 @@ var selected: Array[Regiment]:
 
 var ai: BritishCommand
 var fog: Fog
+var woods := Woods.new()
+var _woods_clock := 0.0
 var _units_layer: Node2D
 var _effects: Node2D
 var _overlay: Overlay
@@ -77,11 +84,16 @@ func _ready() -> void:
 	add_child(_overlay)
 	_smoke = _puff_texture()
 	_load_opening()
+	if mode == "lab":
+		_set_up_lab()
 	ai = BritishCommand.new(self)
+	ai.army_only = mode == "lab"
 	camera = BattleCamera.new()
 	add_child(camera)
 	var home := town_centre("france")
 	camera.focus(Iso.to_screen(home.world + Vector2(260, 60)) if home != null else Iso.to_screen(Iso.WORLD / 2.0))
+	if mode == "lab":
+		camera.focus(Iso.to_screen(Vector2(4900, 3100)))
 	var day := DayNight.new()
 	day.battle = self
 	add_child(day)
@@ -101,6 +113,10 @@ func _process(delta: float) -> void:
 	for b in buildings:
 		b.step(delta)
 	_hold_territories(delta)
+	_woods_clock -= delta
+	if _woods_clock <= 0.0:
+		_woods_clock = 0.5
+		woods.update()
 	ai.update(delta)
 	_tidy_selection()
 	_check_result()
@@ -157,12 +173,38 @@ func _load_opening() -> void:
 		s.setup(self, data, props)
 		supplies.append(s)
 		_units_layer.add_child(s)
+	woods.plant(self, _units_layer, Iso.read_json("res://assets/map/gamemap.json"))
 	for data: Dictionary in start["buildings"]:
 		var b := add_building(String(data["side"]), String(data["type"]), Vector2(data["x"], data["y"]), true)
 		b.id = int(data["id"])
 	for data: Dictionary in start["units"]:
 		var u := add_unit(String(data["side"]), String(data["type"]), Vector2(data["x"], data["y"]))
 		u.id = int(data["id"])
+
+
+## The test field: four full battalions a side face each other on the open
+## ground east of the river, guns and horse on the wings.
+func _set_up_lab() -> void:
+	for side in SIDES:
+		var x := 4300.0 if side == "france" else 5500.0
+		var face := 0.0 if side == "france" else PI
+		for i in LAB_BATTALIONS:
+			var at := Vector2(x, 2700.0 + i * 260.0)
+			var company: Array[Unit] = []
+			for n in LAB_MEN:
+				company.append(add_unit(side, "infantry", at + Vector2((n % 18) * 15.0, (n / 18) * 19.0)))
+			company.append(add_unit(side, "officer", at + Vector2(0, -24)))
+			company.append(add_unit(side, "drummer", at + Vector2(20, -24)))
+			var r := form_regiment(company)
+			r.order_move(at, face)
+		for n in 6:
+			add_unit(side, "cavalry", Vector2(x + (0.0 if side == "france" else 40.0), 2450.0 + n * 22.0))
+		for n in 2:
+			add_unit(side, "artillery", Vector2(x - 120.0 if side == "france" else x + 120.0, 2950.0 + n * 260.0))
+	if camera != null:
+		camera.focus(Iso.to_screen(Vector2(4900, 3100)))
+	fog.enabled = false
+	say("Testveld: selecteer bataljons en geef orders. De Britten rukken op.")
 
 
 ## The villages' houses, each turned to its road as in the web game.
@@ -835,6 +877,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_R:
 				if result != "":
 					get_tree().reload_current_scene()
+			KEY_F10:
+				get_tree().change_scene_to_file("res://scenes/menu.tscn")
 			KEY_ESCAPE:
 				placing = ""
 			KEY_1:

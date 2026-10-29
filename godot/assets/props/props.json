@@ -266,6 +266,48 @@
     "y": 119
    },
    "w": 585
+  },
+  "poplar": {
+   "footprint": {
+    "d": 2.41,
+    "w": 2.38
+   },
+   "h": 436,
+   "heightM": 9.18,
+   "image": "poplar.webp",
+   "pivot": {
+    "x": 76,
+    "y": 330
+   },
+   "w": 284
+  },
+  "fern": {
+   "footprint": {
+    "d": 1.72,
+    "w": 1.65
+   },
+   "h": 71,
+   "heightM": 0.54,
+   "image": "fern.webp",
+   "pivot": {
+    "x": 61,
+    "y": 34
+   },
+   "w": 130
+  },
+  "hazel": {
+   "footprint": {
+    "d": 2.4,
+    "w": 3.02
+   },
+   "h": 182,
+   "heightM": 3.04,
+   "image": "hazel.webp",
+   "pivot": {
+    "x": 88,
+    "y": 118
+   },
+   "w": 222
   }
  }
 }
