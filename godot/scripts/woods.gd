@@ -14,6 +14,7 @@ const UNDERGROWTH := [["fern", 0.45], ["hazel", 0.3], ["hawthorn", 0.25]]
 const LINK := 260.0
 
 var _trees: Array[Dictionary] = []     # {sprite, supply, fall_at, down}
+var _others: Array[Sprite2D] = []      # undergrowth and trees without wood
 
 
 static func pick(table: Array, r: float) -> String:
@@ -67,7 +68,9 @@ func _add(battle: Battle, layer: Node2D, textures: Dictionary, kind: String, at:
 	sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE * size
 	sprite.position = Iso.to_screen(at)
 	layer.add_child(sprite)
-	if supply != null:
+	if supply == null:
+		_others.append(sprite)
+	else:
 		var tree := {"sprite": sprite, "supply": supply, "at": at, "fall_at": 0.0, "down": false}
 		_trees.append(tree)
 		if not groups.has(supply):
@@ -118,3 +121,10 @@ func update() -> void:
 			tween.tween_interval(0.7)
 			tween.tween_property(sprite, "modulate:a", 0.0, 0.9)
 			tween.tween_callback(sprite.hide)
+
+
+func tint(colour: Color) -> void:
+	for tree in _trees:
+		(tree["sprite"] as Sprite2D).self_modulate = colour
+	for sprite in _others:
+		sprite.self_modulate = colour

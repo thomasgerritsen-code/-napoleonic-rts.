@@ -121,6 +121,8 @@ func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
 			_path.pop_front()
 			return false
 		return true
+	if battle.weather != null:
+		pace *= battle.weather.pace(type)
 	world += way.limit_length(speed * pace * delta)
 	facing = way.angle()
 	state = State.MOVE

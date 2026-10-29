@@ -93,7 +93,8 @@ func _process(_delta: float) -> void:
 	var e: Dictionary = battle.economy["france"]
 	_top.text = "NAPOLEONIC RTS   ·   %d voedsel   ·   %d hout   ·   %d ijzer   ·   %d/%d inwoners   ·   gebieden %d–%d   ·   %s" % [
 		e["food"], e["wood"], e["iron"], battle.pop_used("france"), battle.pop_cap("france"),
-		battle.territories_held("france"), battle.territories_held("britain"), DayNight.clock_text(battle.clock)]
+		battle.territories_held("france"), battle.territories_held("britain"),
+		DayNight.clock_text(battle.clock) + ("  ·  " + battle.weather.label() if battle.weather != null else "")]
 	_status.text = battle.status
 	_plan.text = "Britse bevelhebber: %s" % battle.ai.plan
 	_info.text = _describe()

@@ -46,6 +46,7 @@ var selected: Array[Regiment]:
 var ai: BritishCommand
 var fog: Fog
 var woods := Woods.new()
+var weather: Weather
 var _woods_clock := 0.0
 var _units_layer: Node2D
 var _effects: Node2D
@@ -94,6 +95,9 @@ func _ready() -> void:
 	camera.focus(Iso.to_screen(home.world + Vector2(260, 60)) if home != null else Iso.to_screen(Iso.WORLD / 2.0))
 	if mode == "lab":
 		camera.focus(Iso.to_screen(Vector2(4900, 3100)))
+	weather = Weather.new()
+	weather.battle = self
+	add_child(weather)
 	var day := DayNight.new()
 	day.battle = self
 	add_child(day)
@@ -549,9 +553,21 @@ func tower_fires(tower: Building, foe: Unit, shots: int, damage: float) -> void:
 			foe.hit(damage * randf_range(0.8, 1.4))
 
 
+## The season's colour on every tree and bush.
+func tint_trees(colour: Color) -> void:
+	for s in supplies:
+		if s.kind != "iron":
+			s.modulate = Color(colour, s.modulate.a)
+	woods.tint(colour)
+
+
 # ---- musketry and blows ----
 
 func _on_fired(u: Unit, target: Node2D) -> void:
+	if u.type == "infantry" and weather != null and weather.misfires():
+		# Damp powder: a flash in the pan and no shot.
+		_puff(u.muzzle(), 0.25, 1.2)
+		return
 	if u.type != "cavalry":
 		_puff(u.muzzle(), 1.3 if u.type == "artillery" else 0.55, 3.2 if u.type == "artillery" else 2.6)
 	if not is_foe(target, u.side):
