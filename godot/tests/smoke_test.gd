@@ -243,6 +243,16 @@ func _initialize() -> void:
 		squadron.set_formation("square")
 		_check(squadron.formation != "square" and squadron.morale() > 75.0, "horse forms no square, and misses no drummer")
 
+	# Peasants sent to work with a button: to the wood by the lumber camp.
+	var hand: Unit = null
+	for u in battle.units:
+		if u.side == "france" and u.type == "worker" and u.alive():
+			hand = u
+	var just_hand: Array[Unit] = [hand]
+	battle.select_units(just_hand)
+	battle.assign_workers("wood")
+	_check(hand.task == "gather" and hand.task_target is Supply and (hand.task_target as Supply).kind == "wood", "a peasant is sent to cut wood with a button")
+
 	# A gun loads grapeshot: a cone of balls at close range, from its own stock.
 	var battery := battle.add_unit("france", "artillery", quiet + Vector2(-300, 400))
 	var close_foe := battle.add_unit("britain", "infantry", battery.world + Vector2(80, 0))

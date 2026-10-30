@@ -190,6 +190,10 @@ func _rebuild() -> void:
 		has_workers = has_workers or u.type == "worker"
 		has_free_soldiers = has_free_soldiers or (u.military() and u.regiment == null)
 	if has_workers:
+		_button("Naar de akkers\n3 boeren per akker", battle.assign_workers.bind("farm"))
+		_button("Houthakken\nbij een eigen kamp", battle.assign_workers.bind("wood"))
+		_button("IJzer winnen\nbij een eigen mijn", battle.assign_workers.bind("iron"))
+		_button("Bouw verder\nonafgemaakte gebouwen", battle.assign_workers.bind("build"))
 		for type in Rules.BUILDABLE:
 			_button("%s\n%s" % [Rules.label(type), Rules.cost_text(Rules.cost_of(type))], battle.start_placing.bind(type))
 	if gun != null:

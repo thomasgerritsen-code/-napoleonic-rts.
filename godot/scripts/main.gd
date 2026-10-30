@@ -1088,6 +1088,42 @@ func skirmish() -> void:
 	refresh_hud()
 
 
+## The selected peasants to work: on fields with room (three to a field),
+## at the wood by a lumber camp, at a mine, or on unfinished buildings.
+func assign_workers(work: String) -> void:
+	var sent := 0
+	for u in selected_units:
+		if u.type != "worker" or not u.alive():
+			continue
+		match work:
+			"farm":
+				var best: Building = null
+				for b in buildings:
+					if b.side == "france" and b.type == "farm" and b.complete and b.standing() and farmers_on(b) < 3 \
+							and (best == null or b.world.distance_to(u.world) < best.world.distance_to(u.world)):
+						best = b
+				if best != null:
+					u.set_task("farm", best)
+					sent += 1
+			"wood", "iron":
+				var s := nearest_supply(u.world, work, "france")
+				if s != null:
+					u.set_task("gather", s)
+					sent += 1
+			"build":
+				var best: Building = null
+				for b in buildings:
+					if b.side == "france" and not b.complete and b.standing() \
+							and (best == null or b.world.distance_to(u.world) < best.world.distance_to(u.world)):
+						best = b
+				if best != null:
+					u.set_task("build", best)
+					sent += 1
+	var what: String = {"farm": "naar de akkers", "wood": "naar het hout", "iron": "naar de mijn", "build": "aan het bouwen"}[work]
+	say("%d boer%s %s." % [sent, "" if sent == 1 else "en", what] if sent > 0 else {"farm": "Geen akker met plaats.", "wood": "Geen hout bij een eigen houthakkerskamp.",
+		"iron": "Geen afzetting met een eigen mijn.", "build": "Niets in aanbouw."}[work])
+
+
 ## Halt: the battalions stand where they are, the free men stop.
 func halt() -> void:
 	for r in selected:
