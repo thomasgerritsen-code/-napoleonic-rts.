@@ -35,6 +35,16 @@ var selected_units: Array[Unit] = []
 var selected_building: Building = null
 var placing := ""                    # a building type being placed
 var result := ""
+## How the battle ended: winner ("france", "britain", "draw"), reason
+## ("elimination", "territories") and the web game's statistics per side.
+var winner := ""
+var end_reason := ""
+var ended_at := 0.0
+var stats := {"france": {"trained": 0, "units_lost": 0, "buildings_lost": 0}, "britain": {"trained": 0, "units_lost": 0, "buildings_lost": 0}}
+## The side holding all three territories uncontested, and for how long.
+var hold_side := ""
+var held_seconds := 0.0
+const HOLD_TO_WIN := 120.0
 var status := ""
 var clock := 0.0
 var flank_hits := 0
@@ -141,6 +151,8 @@ func _exit_tree() -> void:
 
 
 func _process(delta: float) -> void:
+	if result != "":
+		return
 	clock += delta
 	_deliver_orders()
 	for r in regiments:
@@ -162,7 +174,7 @@ func _process(delta: float) -> void:
 		_auto_regiments()
 	ai.update(delta)
 	_tidy_selection()
-	_check_result()
+	_check_result(delta)
 
 
 ## Men do not stand in one another: pairs closer than a pace step apart.
@@ -616,6 +628,7 @@ func start_work_at(u: Unit, b: Building) -> void:
 
 func on_death(u: Unit) -> void:
 	selected_units.erase(u)
+	stats[u.side]["units_lost"] += 1
 	medics.on_fallen(u)
 	u.queue_redraw()
 
@@ -627,6 +640,7 @@ func add_to_field(node: Node2D) -> void:
 
 func on_destroyed(b: Building) -> void:
 	_walls_dirty = true
+	stats[b.side]["buildings_lost"] += 1
 	if selected_building == b:
 		selected_building = null
 	if b.side == "france":
@@ -636,6 +650,7 @@ func on_destroyed(b: Building) -> void:
 
 
 func spawn_trained(b: Building, type: String) -> void:
+	stats[b.side]["trained"] += 1
 	var out := b.world + Vector2((1.0 if b.side == "france" else -1.0) * b.size.x * 0.75, b.size.y * 0.55)
 	var u := add_unit(b.side, Rules.item_type(type), out + Vector2(randf_range(-14, 14), randf_range(-10, 10)), Rules.item_troop(type))
 	u.slot = u.world + Vector2((1.0 if b.side == "france" else -1.0) * 40.0, randf_range(-20, 20))
@@ -1555,10 +1570,72 @@ func _select_in(box: Rect2, add: bool) -> void:
 	select_units(soldiers if not soldiers.is_empty() else picked, add)
 
 
-func _check_result() -> void:
+## The web game's rules: a side is beaten when its headquarters has fallen
+## and it has no fighting men left; or a side wins by holding all three
+## territories, uncontested, for two minutes (a challenge starts the count
+## again).
+func _check_result(delta: float) -> void:
 	if result != "":
 		return
-	if town_centre("britain") == null:
-		result = "Overwinning! Het Britse stadhuis is gevallen."
-	elif town_centre("france") == null:
-		result = "Nederlaag. Uw stadhuis is gevallen."
+	var f := _beaten("france")
+	var b := _beaten("britain")
+	if f or b:
+		_finish("draw" if f and b else ("britain" if f else "france"), "elimination")
+		return
+	var side := ""
+	if territories.size() == 3:
+		side = territories[0]["owner"]
+		for p in territories:
+			if p["owner"] != side or p["contested"] or p["claim"] != "":
+				side = ""
+	held_seconds = held_seconds + delta if side != "" and side == hold_side else 0.0
+	hold_side = side
+	if side != "" and held_seconds >= HOLD_TO_WIN:
+		_finish(side, "territories")
+
+
+## Seconds still to hold all three territories, for the HUD.
+func hold_left() -> float:
+	return HOLD_TO_WIN - held_seconds
+
+
+func _beaten(side: String) -> bool:
+	if town_centre(side) != null:
+		return false
+	for u in units:
+		if u.side == side and u.alive() and u.type != "worker":
+			return false
+	return true
+
+
+func _finish(side: String, reason: String) -> void:
+	winner = side
+	end_reason = reason
+	ended_at = clock
+	var names := {"france": "Frankrijk", "britain": "Groot-Brittannië"}
+	result = "Gelijkspel" if side == "draw" else ("Overwinning!" if side == "france" else "Nederlaag")
+	if reason == "territories":
+		status = "%s heeft alle drie gebieden twee minuten onbetwist beheerst." % names[side]
+	elif side == "draw":
+		status = "Beide legers hebben hun hoofdkwartier en alle gevechtstroepen verloren."
+	else:
+		status = "%s heeft het vijandelijke hoofdkwartier en alle gevechtstroepen uitgeschakeld." % names[side]
+	refresh_hud()
+
+
+## A side's numbers for the end screen: trained, lost and remaining men and
+## buildings, and territories held.
+func side_stats(side: String) -> Dictionary:
+	var alive := 0
+	for u in units:
+		if u.side == side and u.alive():
+			alive += 1
+	var standing := 0
+	for b in buildings:
+		if b.side == side and b.standing():
+			standing += 1
+	var s: Dictionary = stats[side].duplicate()
+	s["units_remaining"] = alive
+	s["buildings_remaining"] = standing
+	s["territories"] = territories_held(side)
+	return s

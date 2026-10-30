@@ -13,6 +13,7 @@ var _plan: Label
 var _result: Label
 var _buttons: GridContainer
 var _dirty := true
+var _end: Panel = null
 var _minimap: Minimap
 
 
@@ -98,7 +99,13 @@ func _process(_delta: float) -> void:
 	_status.text = battle.status
 	_plan.text = "Britse bevelhebber: %s" % battle.ai.plan
 	_info.text = _describe()
-	_result.text = battle.result + ("\nDruk op R voor een nieuwe slag." if battle.result != "" else "")
+	_result.text = ""
+	if battle.result != "" and _end == null:
+		_show_end()
+	if battle.result == "" and battle.hold_side != "":
+		_result.text = "%s beheerst alle gebieden · nog %d:%02d tot gebiedsoverwinning" % [
+			"Frankrijk" if battle.hold_side == "france" else "Groot-Brittannië", int(battle.hold_left()) / 60, int(battle.hold_left()) % 60]
+		_result.add_theme_font_size_override("font_size", 16)
 	if _dirty:
 		_dirty = false
 		_rebuild()
@@ -223,6 +230,69 @@ func _rebuild() -> void:
 			var next := Rules.trench_level(int(trench["level"]) + 1)
 			if not next.is_empty() and trench["upgrade_to"] == 0:
 				_button("%s\n%s · %d s" % [next["label"], Rules.cost_text(next["cost"]), next["seconds"]], battle.upgrade_trench)
+
+
+## The end of the battle, as the web game shows it: the outcome, why, how
+## long it lasted, and each army's numbers; a new battle or the main menu.
+func _show_end() -> void:
+	_end = Panel.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.14, 0.11, 0.96)
+	style.border_color = Color(0.71, 0.63, 0.44)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(12)
+	_end.add_theme_stylebox_override("panel", style)
+	_end.custom_minimum_size = Vector2(620, 470)
+	_end.set_anchors_preset(Control.PRESET_CENTER)
+	_end.offset_left = -310
+	_end.offset_right = 310
+	_end.offset_top = -235
+	_end.offset_bottom = 235
+	add_child(_end)
+	var box := VBoxContainer.new()
+	box.position = Vector2(24, 20)
+	box.size = Vector2(572, 430)
+	box.add_theme_constant_override("separation", 8)
+	_end.add_child(box)
+	var title := Label.new()
+	title.text = battle.result
+	title.add_theme_font_size_override("font_size", 36)
+	title.add_theme_color_override("font_color", Color(0.95, 0.85, 0.56))
+	box.add_child(title)
+	for line in [battle.status, "Speelduur %d:%02d" % [int(battle.ended_at) / 60, int(battle.ended_at) % 60]]:
+		var l := Label.new()
+		l.text = line
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_color_override("font_color", Color(0.93, 0.9, 0.83))
+		box.add_child(l)
+	var table := GridContainer.new()
+	table.columns = 3
+	table.add_theme_constant_override("h_separation", 40)
+	box.add_child(table)
+	var f := battle.side_stats("france")
+	var b := battle.side_stats("britain")
+	var rows := [["Leger", "Frankrijk", "Groot-Brittannië"], ["Getrainde eenheden", f["trained"], b["trained"]],
+		["Verloren eenheden", f["units_lost"], b["units_lost"]], ["Resterende eenheden", f["units_remaining"], b["units_remaining"]],
+		["Verloren gebouwen", f["buildings_lost"], b["buildings_lost"]], ["Resterende gebouwen", f["buildings_remaining"], b["buildings_remaining"]],
+		["Gebieden in bezit", f["territories"], b["territories"]]]
+	for row: Array in rows:
+		for cell: Variant in row:
+			var c := Label.new()
+			c.text = str(cell)
+			c.add_theme_color_override("font_color", Color(0.93, 0.9, 0.83))
+			table.add_child(c)
+	var buttons := HBoxContainer.new()
+	box.add_child(buttons)
+	var again := Button.new()
+	again.text = "Nieuwe slag (R)"
+	again.custom_minimum_size = Vector2(170, 44)
+	again.pressed.connect(func() -> void: battle.get_tree().reload_current_scene())
+	buttons.add_child(again)
+	var menu := Button.new()
+	menu.text = "Hoofdmenu (F10)"
+	menu.custom_minimum_size = Vector2(170, 44)
+	menu.pressed.connect(func() -> void: battle.get_tree().change_scene_to_file("res://scenes/menu.tscn"))
+	buttons.add_child(menu)
 
 
 func _button(text: String, action: Callable) -> Button:
