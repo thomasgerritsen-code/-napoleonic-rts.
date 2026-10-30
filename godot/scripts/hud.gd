@@ -183,12 +183,17 @@ func _rebuild() -> void:
 		return
 	var has_workers := false
 	var has_free_soldiers := false
+	var gun: Unit = null
 	for u in battle.selected_units:
+		if u.type == "artillery":
+			gun = u
 		has_workers = has_workers or u.type == "worker"
 		has_free_soldiers = has_free_soldiers or (u.military() and u.regiment == null)
 	if has_workers:
 		for type in Rules.BUILDABLE:
 			_button("%s\n%s" % [Rules.label(type), Rules.cost_text(Rules.cost_of(type))], battle.start_placing.bind(type))
+	if gun != null:
+		_button("%s (K)\nronde kogel %d · kartets %d" % ["Ronde kogel laden" if gun.shot == "grape" else "Kartets laden", gun.ammo["round"], gun.ammo["grape"]], battle.toggle_shot)
 	if has_free_soldiers:
 		_button("Regiment vormen (F)\nmusk.+off.+tamb. of 4+ ruiters+off. te paard", func() -> void: battle.form_regiment())
 	if not battle.selected.is_empty():

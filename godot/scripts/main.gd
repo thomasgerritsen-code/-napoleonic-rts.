@@ -749,6 +749,16 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 		# Damp powder: a flash in the pan and no shot.
 		_puff(u.muzzle(), 0.25, 1.2)
 		return
+	if u.type == "artillery":
+		if u.side != "france":
+			# The computer loads grapeshot when the enemy comes close.
+			u.shot = "grape" if u.world.distance_to(spot(target)) < Unit.GRAPE_REACH and u.ammo["grape"] > 0 else "round"
+		if u.ammo[u.shot] <= 0:
+			return
+		u.ammo[u.shot] -= 1
+		if u.shot == "grape":
+			_grapeshot(u, target)
+			return
 	if u.type != "cavalry":
 		sounds.play("cannon" if u.type == "artillery" else "musket", u.world)
 		_puff(u.muzzle(), 1.3 if u.type == "artillery" else 0.55, 3.2 if u.type == "artillery" else 2.6)
@@ -798,6 +808,41 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 				var armour := float(Rules.troop(foe.troop).get("armour", 0.0))
 				strike(foe, randf_range(45.0, 100.0) * u.stat("ranged") * (1.0 - armour)
 					* (u.regiment.damage_factor() if u.regiment != null else 1.0), u.world)
+
+
+## Grapeshot: a cone of balls, everyone within 145 px and about 16 degrees of
+## the line of fire, hardest close by (the web game: 24 at the muzzle).
+func _grapeshot(u: Unit, target: Node2D) -> void:
+	sounds.play("cannon", u.world)
+	_puff(u.muzzle(), 1.5, 2.6)
+	wildlife.alarm(u.world)
+	var aim := (spot(target) - u.world).angle()
+	for other in units:
+		if not other.alive() or other.side == u.side:
+			continue
+		var way := other.world - u.world
+		var d := way.length()
+		if d > Unit.GRAPE_REACH or absf(angle_difference(aim, way.angle())) >= 0.28:
+			continue
+		strike(other, 24.0 * (1.0 - d / 190.0), u.world)
+		_puff(other.world, 0.3, 1.0)
+
+
+## Round shot or grapeshot for the selected guns.
+func toggle_shot() -> void:
+	var guns: Array[Unit] = []
+	for u in selected_units:
+		if u.type == "artillery" and u.alive():
+			guns.append(u)
+	if guns.is_empty():
+		return
+	var next := "round" if guns[0].shot == "grape" else "grape"
+	var left := 0
+	for g in guns:
+		g.shot = next
+		left += int(g.ammo[next])
+	say("%s geladen · munitie %d." % ["Kartets" if next == "grape" else "Ronde kogel", left])
+	refresh_hud()
 
 
 ## A grenade lobbed from the thrower bursts at `at` after its flight, harming
@@ -1399,6 +1444,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				skirmish()
 			KEY_H:
 				halt()
+			KEY_K:
+				toggle_shot()
 			KEY_F:
 				form_regiment()
 			KEY_M:

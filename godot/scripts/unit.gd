@@ -30,6 +30,11 @@ var morale := 100.0
 ## Wind, 0 to 100 (the web game's stamina): marching and charging tire a man,
 ## standing he gets it back; a tired man goes slower.
 var stamina := 100.0
+## A gun's charge, round shot or grapeshot ("grape"), and what it has left
+## of each (the web game: 24 round, 10 grape).
+var shot := "round"
+var ammo := {"round": 24, "grape": 10}
+const GRAPE_REACH := 145.0
 var wounded_at := 0.0
 var heal_until := 0.0
 var hospital: Building = null
@@ -100,6 +105,8 @@ func military() -> bool:
 
 
 func reach() -> float:
+	if type == "artillery" and shot == "grape":
+		return GRAPE_REACH
 	var open_order := Battle.depth_rule_static("skirmishRange", 1.15) if regiment != null and regiment.skirmish else 1.0
 	return float(Rules.unit_type(type).get("range", 20)) * stat("range") * open_order
 

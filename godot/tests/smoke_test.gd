@@ -243,6 +243,20 @@ func _initialize() -> void:
 		squadron.set_formation("square")
 		_check(squadron.formation != "square" and squadron.morale() > 75.0, "horse forms no square, and misses no drummer")
 
+	# A gun loads grapeshot: a cone of balls at close range, from its own stock.
+	var battery := battle.add_unit("france", "artillery", quiet + Vector2(-300, 400))
+	var close_foe := battle.add_unit("britain", "infantry", battery.world + Vector2(80, 0))
+	var just_gun: Array[Unit] = [battery]
+	battle.select_units(just_gun)
+	battle.toggle_shot()
+	var foe_hp := close_foe.hp
+	battle._on_fired(battery, close_foe)
+	_check(battery.shot == "grape" and battery.reach() < 150.0 and battery.ammo["grape"] == 9 and close_foe.hp < foe_hp,
+		"grapeshot sweeps the men before the gun (%d grape left)" % battery.ammo["grape"])
+	close_foe.hit(1000.0)
+	var nobody: Array[Unit] = []
+	battle.select_units(nobody)
+
 	# The barracks: a rally point, a quick battalion from the men around it,
 	# and what is missing trained with Auto-bataljon on.
 	var depot := battle.add_building("france", "barracks", home + Vector2(-350, 900), true)
