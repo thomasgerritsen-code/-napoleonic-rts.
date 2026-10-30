@@ -7,8 +7,15 @@ extends Node2D
 ## with sappers). Men in a finished trench, of either side, take half the
 ## losses from fire in front of them (not from shells and grenades lobbed in,
 ## nor from the flank); a trench can be revetted and fortified for wood and
-## iron. Any battalion that halts by an empty trench steps into it. Horses at
-## the cut and its ditch go slowly and are easy targets.
+## iron. Any battalion that halts by an empty trench steps into it, or is sent
+## into one with a click on it (more battalions form a second line behind).
+## Horses at the cut and its ditch go slowly and are easy targets.
+##
+## How it looks is the web iso view's (TrenchArt): the cut and its bed here,
+## under everything; the bank as a node among the men (in front of or behind
+## them as it lies); and the men in it dressed every frame: sunk to the bed
+## (or the fire-step), hidden below the near lip, the front rank leaning on the
+## bank with its muskets over it, the officer and drummer at the two ends.
 
 var battle: Battle
 ## {centre, facing, length, width, progress, level, upgrade_to, upgrade_progress, holder, dug_at}
@@ -16,10 +23,68 @@ var list: Array[Dictionary] = []
 ## Where round shot and shells struck: {world, way, at}.
 var craters: Array[Dictionary] = []
 var _clock := 0.0
+var _next_id := 0
+var _banks: Array[Node2D] = []
+var _fascine: Texture2D
+var _gabion: Texture2D
+var _bags: Texture2D
+var _props := {}
+
+
+## The bank of one trench, among the men so that it stands in front of or
+## behind them as it lies.
+class Bank extends Node2D:
+	var owner_list: Trenches
+	var index := 0
+
+	func _draw() -> void:
+		if index >= owner_list.list.size():
+			return
+		var t: Dictionary = owner_list.list[index]
+		TrenchArt.draw_bank(self, t, position)
+		TrenchArt.draw_revetment(self, t, position, owner_list._gabion, owner_list._props.get("gabion", {}),
+			owner_list._bags, owner_list._props.get("sandbags", {}))
 
 
 func _ready() -> void:
 	z_index = -5
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	var props: Dictionary = Iso.read_json("res://assets/props/props.json")["props"]
+	_props = props
+	for name_: String in ["fascine_wall", "gabion", "sandbags"]:
+		var path := "res://assets/props/%s.webp" % name_
+		if ResourceLoader.exists(path):
+			match name_:
+				"fascine_wall":
+					_fascine = load(path)
+				"gabion":
+					_gabion = load(path)
+				"sandbags":
+					_bags = load(path)
+
+
+## Every frame: the banks in place and the men in the trenches dressed.
+func _process(_delta: float) -> void:
+	if battle == null:
+		return
+	while _banks.size() < list.size():
+		var bank := Bank.new()
+		bank.owner_list = self
+		bank.index = _banks.size()
+		battle.add_to_field(bank)
+		_banks.append(bank)
+	while _banks.size() > list.size():
+		_banks.pop_back().queue_free()
+	var busy := false
+	for i in list.size():
+		var t := list[i]
+		var f := TrenchArt.Frame.new(t)
+		_banks[i].position = f.at(0.0, f.w + 7.0)
+		_banks[i].queue_redraw()
+		busy = busy or t["progress"] < 1.0 or int(t.get("upgrade_to", 0)) != 0
+	if busy:
+		queue_redraw()
+	_dress_men()
 
 
 ## Once a second: who stands braced, who digs, who mans a trench.
@@ -48,6 +113,13 @@ func update(delta: float) -> void:
 		_man(r, c, cfg)
 		if r.hold and still and r.formation == "line":
 			_dig(r, c, cfg)
+		if r.trench != null:
+			_staff(r)
+			# The computer fortifies its trenches when it has wood and iron to spare.
+			var next := Rules.trench_level(int(r.trench["level"]) + 1)
+			if not battle.commanded(r.side) and r.hold and r.still_seconds >= 3 and not next.is_empty() \
+					and battle.can_afford(r.side, {"wood": float(next["cost"].get("wood", 0)) + 200.0, "iron": float(next["cost"].get("iron", 0)) + 40.0}):
+				upgrade(r)
 	queue_redraw()
 
 
@@ -184,7 +256,8 @@ func _along_front(r: Regiment, c: Vector2, cfg: Dictionary) -> Dictionary:
 		hi = 0.0
 		back = 0.0
 		front = 0.0
-	return {"centre": c + across * (lo + hi) / 2.0 + forward * (back + front) / 2.0, "facing": r.facing,
+	_next_id += 1
+	return {"id": _next_id, "centre": c + across * (lo + hi) / 2.0 + forward * (back + front) / 2.0, "facing": r.facing,
 		"length": maxf(60.0, hi - lo + 30.0), "width": maxf(float(cfg["trenchWidth"]), front - back + 26.0),
 		"progress": 0.0, "level": 1, "upgrade_to": 0, "upgrade_progress": 0.0, "side": r.side, "dug_at": battle.clock}
 
@@ -310,37 +383,101 @@ func _draw() -> void:
 		draw_circle(Vector2(c["way"]) * 5.0, 4.5, Color(0.4, 0.32, 0.21, 0.5))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	for t in list:
-		var forward := Vector2.from_angle(t["facing"])
-		var across := forward.orthogonal()
-		var half_l: float = t["length"] / 2.0
-		var half_w: float = t["width"] / 2.0
-		var c: Vector2 = t["centre"]
-		var p: float = t["progress"]
-		var outer := _quad(c, forward, across, half_l + 6.0, half_w + 5.0)
-		draw_colored_polygon(outer, Color(0.42, 0.34, 0.23, 0.5 * p + 0.15))
-		var inner := _quad(c, forward, across, half_l, half_w * maxf(0.3, p))
-		draw_colored_polygon(inner, Color(0.36, 0.28, 0.18).lerp(Color(0.2, 0.15, 0.1), p))
-		if p < 1.0:
+		TrenchArt.draw_bed(self, t, battle.clock if battle != null else 0.0, _fascine, _props.get("fascine_wall", {}))
+
+
+## The men in the trenches as the web iso view shows them: in a trench being
+## dug the musketeers sink with it as they dig; in a finished one the front
+## rank steps onto the fire-step and leans on the bank, the ranks behind stand
+## on the bed; the near wall hides them below its lip.
+func _dress_men() -> void:
+	var front := {}
+	var lips := {}
+	for t in list:
+		var f := TrenchArt.Frame.new(t)
+		lips[TrenchArt.id_of(t)] = TrenchArt.lower_lip(TrenchArt.outline(f))
+	for u in battle.units:
+		if not u.alive() or u.regiment == null or u.type == "artillery":
+			if u.leaning or u._cut != null:
+				u.trench_look(Vector2.ZERO, INF, false)
 			continue
-		# The parapet: earth heaped along the front.
-		var bank := PackedVector2Array()
-		for k in 9:
-			var s := -half_l + 2.0 * half_l * k / 8.0
-			bank.append(Iso.to_screen(c + forward * (half_w + 6.0) + across * s) + Vector2(0, -3.0 - int(t["level"])))
-		draw_polyline(bank, Color(0.5, 0.41, 0.27), 5.0 + t["level"])
-		if t["level"] >= 2:
-			for k in 2:
-				var side_at := c + forward * (half_w - 2.0) * (1 - 2 * k)
-				draw_line(Iso.to_screen(side_at - across * half_l), Iso.to_screen(side_at + across * half_l), Color(0.45, 0.31, 0.17), 2.0)
-		if t["level"] >= 3:
-			var gabions := int(t["length"] / 16.0)
-			for k in gabions:
-				var s := -half_l + 8.0 + (2.0 * half_l - 16.0) * k / maxf(1.0, gabions - 1)
-				draw_circle(Iso.to_screen(c + forward * (half_w + 6.0) + across * s) + Vector2(0, -8), 4.0, Color(0.55, 0.47, 0.32))
+		var t: Variant = _sunk_in(u.world)
+		if t == null:
+			if u.leaning or u._cut != null or u._sprite.position != Vector2.ZERO:
+				u.trench_look(Vector2.ZERO, INF, false)
+			continue
+		var tid := TrenchArt.id_of(t)
+		var out := Vector2.from_angle(t["facing"])
+		var v: float = (u.world - Vector2(t["centre"])).dot(out)
+		if not front.has(tid):
+			var best := -INF
+			for m in battle.units:
+				if m.alive() and m.type == "infantry" and _inside(t, m.world, 0.0):
+					best = maxf(best, (m.world - Vector2(t["centre"])).dot(out))
+			front[tid] = best
+		var p: float = minf(1.0, t["progress"])
+		var digging := u.type == "infantry" and (p < 1.0 or int(t.get("upgrade_to", 0)) != 0) and battle.clock - float(t.get("dug_at", -99.0)) < 2.0
+		var lean := not digging and p >= 1.0 and u.type == "infantry" and not u.regiment.routing \
+			and u.world.distance_to(u.slot) < 6.0 and v > float(front[tid]) - 8.0
+		var offset := Vector2.ZERO
+		var sink := TrenchArt.SINK * p
+		if lean:
+			var to: float = t["width"] / 2.0 - TrenchArt.LEAN_GAP - v
+			offset = Iso.to_screen(u.world + out * to) - Iso.to_screen(u.world)
+			sink = (TrenchArt.FIRE_STEP_NEAR if sin(float(t["facing"])) > 0.3 else TrenchArt.FIRE_STEP) * p
+		offset.y += sink * TrenchArt.PPM * TrenchArt.LIFT
+		u.trench_look(offset, TrenchArt.lip_y(lips[tid], u.position.x + offset.x), lean)
 
 
-func _quad(c: Vector2, forward: Vector2, across: Vector2, half_l: float, half_w: float) -> PackedVector2Array:
-	var points := PackedVector2Array()
-	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
-		points.append(Iso.to_screen(c + across * half_l * corner.x + forward * half_w * corner.y))
-	return points
+## The trench (finished, or being dug or built up) a point lies in.
+func _sunk_in(p: Vector2) -> Variant:
+	for t in list:
+		if _inside(t, p, 0.0) and (t["progress"] >= 1.0 or battle.clock - float(t.get("dug_at", -99.0)) < 2.0):
+			return t
+	return null
+
+
+## The drummer and the officer go down into the trench too, the drummer at one
+## end behind the ranks and the officer at the other.
+func _staff(r: Regiment) -> void:
+	var t: Dictionary = r.trench
+	var w: float = t["width"] / 2.0
+	var out := Vector2.from_angle(t["facing"])
+	var along := out.rotated(PI / 2.0)
+	for u in r.living():
+		var end := -1.0 if u.type == "drummer" else (1.0 if u.type == "officer" else 0.0)
+		if end == 0.0:
+			continue
+		var spot: Vector2 = Vector2(t["centre"]) + along * end * (t["length"] / 2.0 - w * 0.45) - out * w * 0.2
+		if u.slot.distance_to(spot) > 3.0:
+			u.slot = spot
+
+
+## Sent into a trench with a click: the first battalion mans it (marching up
+## in line, front the way it faces), the others form a second line behind.
+## False if there is no trench of ours to be had there.
+func order_into(battalions: Array[Regiment], at: Vector2) -> bool:
+	var t: Variant = null
+	for x in list:
+		if x["progress"] >= 1.0 and _inside(x, at, 14.0):
+			t = x
+	if t == null or battalions.is_empty():
+		return false
+	for other in battle.regiments:
+		if is_same(other.trench, t) and other.side != battalions[0].side and not other.destroyed():
+			return false
+	var out := Vector2.from_angle(t["facing"])
+	var back: float = t["width"] + 30.0
+	var held := _held_by_other(t, battalions[0]) and not is_same(battalions[0].trench, t)
+	for i in battalions.size():
+		var r := battalions[i]
+		r.set_formation("line")
+		var row := i + (1 if held else 0)
+		if row == 0:
+			r.trench = t
+			t["side"] = r.side
+			r.hold = true
+		else:
+			r.trench = null
+		r.order_move(Vector2(t["centre"]) - out * back * row, t["facing"])
+	return true

@@ -220,6 +220,32 @@ func _initialize() -> void:
 	_run(battle, 12.0)
 	_check(trench != null and trench["level"] == 2, "and becomes a revetted trench (level %s)" % (trench["level"] if trench != null else 0))
 	regiment.hold = false
+	# In the trench the men stand lower, cut off below its near lip; the front
+	# rank leans on the bank (its muskets over it); officer and drummer at the ends.
+	battle.trenches._process(0.0)
+	var leaning_men := 0
+	var sunk_men := 0
+	for u in regiment.living():
+		if u.leaning:
+			leaning_men += 1
+		if u.get("_cut") != null and (u.get("_sprite") as AnimatedSprite2D).position.y > 4.0:
+			sunk_men += 1
+	_check(leaning_men >= 3 and sunk_men >= 6, "the front rank leans on the bank and the men stand down in the trench (%d leaning, %d sunk)" % [leaning_men, sunk_men])
+	var trench_end := false
+	for u in regiment.living():
+		if u.type == "drummer" and u.slot.distance_to(Vector2(trench["centre"])) > float(trench["length"]) / 2.0 - float(trench["width"]):
+			trench_end = true
+	_check(trench_end, "the drummer stands at an end of the trench")
+	# A second battalion sent into the trench forms a second line behind it.
+	var second_line: Array[Unit] = []
+	for i in 12:
+		second_line.append(battle.add_unit("france", "infantry", Vector2(trench["centre"]) + Vector2(-300, i * 15)))
+	second_line.append(battle.add_unit("france", "officer", Vector2(trench["centre"]) + Vector2(-320, 0)))
+	second_line.append(battle.add_unit("france", "drummer", Vector2(trench["centre"]) + Vector2(-320, 20)))
+	var reserve := battle.form_regiment(second_line)
+	var both: Array[Regiment] = [reserve]
+	_check(battle.trenches.order_into(both, Vector2(trench["centre"])) and reserve.trench == null
+		and reserve.destination.distance_to(Vector2(trench["centre"])) > float(trench["width"]), "a battalion sent to a held trench forms up behind it")
 
 	# Morale: a shaken battalion breaks and runs, and rallies once out of danger.
 	var shaken_men: Array[Unit] = []

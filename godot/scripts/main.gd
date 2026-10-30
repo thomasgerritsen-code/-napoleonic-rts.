@@ -1142,7 +1142,13 @@ func order(at: Vector2, face: Variant = null) -> void:
 	_spread(walkers, at, null, PEASANT_GAP)
 	_spread(free, at, foe)
 	var battalions: Array[Regiment] = selected
-	if not battalions.is_empty():
+	# A click on a trench of ours sends the battalions into it.
+	if not battalions.is_empty() and foe == null and trenches.order_into(battalions, at):
+		say("%s bezet de loopgraaf." % battalions[0].name)
+	elif not battalions.is_empty():
+		for r in battalions:
+			# An ordinary move lets go of the trench.
+			r.trench = null
 		_order_battalions(battalions, at if foe == null else spot(foe), face)
 	if _overlay != null:
 		_overlay.mark(Iso.to_screen(at))

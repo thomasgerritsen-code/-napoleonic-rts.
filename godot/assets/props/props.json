@@ -378,6 +378,41 @@
     "y": 113
    },
    "w": 375
+  },
+  "fascine_wall": {
+   "h": 166,
+   "image": "fascine_wall.webp",
+   "pxPerM": 123.871,
+   "tileM": 4,
+   "w": 495
+  },
+  "gabion": {
+   "footprint": {
+    "d": 0.69,
+    "w": 0.72
+   },
+   "h": 75,
+   "heightM": 1.02,
+   "image": "gabion.webp",
+   "pivot": {
+    "x": 42,
+    "y": 46
+   },
+   "w": 98
+  },
+  "sandbags": {
+   "footprint": {
+    "d": 0.36,
+    "w": 1.58
+   },
+   "h": 41,
+   "heightM": 0.44,
+   "image": "sandbags.webp",
+   "pivot": {
+    "x": 59,
+    "y": 20
+   },
+   "w": 126
   }
  }
 }

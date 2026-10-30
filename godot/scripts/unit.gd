@@ -74,6 +74,17 @@ var anim_state := ""
 var anim_seq := 0
 ## Online, on the client: where the host last had this man.
 var net_target := Vector2.INF
+## In a trench (Trenches dresses the men each frame): leaning on the bank
+## (resting and firing over it), and the cut that hides him below its lip.
+var leaning := false
+var _cut: ShaderMaterial = null
+const CUT_SHADER := """shader_type canvas_item;
+uniform float cut_y = 1.0e6;
+varying float local_y;
+void vertex() { local_y = VERTEX.y; }
+void fragment() { if (local_y > cut_y) { discard; } }
+"""
+static var _cut_shader: Shader = null
 var _clock := 0.0
 var _look := 0.0
 
@@ -553,6 +564,29 @@ func net_glide(delta: float) -> void:
 	position = Iso.to_screen(world)
 
 
+## Dressed by the trench he stands in: drawn `offset` lower (sunk, or moved
+## to the bank), cut off below screen y `lip_y` (the near wall hides him
+## there), leaning on the bank or not. `lip_y` INF takes him out again.
+func trench_look(offset: Vector2, lip_y: float, lean: bool) -> void:
+	if lean != leaning:
+		leaning = lean
+		_play(anim_state if anim_state != "rest" and anim_state != "rfire" else "idle", true)
+	_sprite.position = offset
+	if lip_y == INF:
+		if _cut != null:
+			_sprite.material = null
+			_cut = null
+		return
+	if _cut == null:
+		if _cut_shader == null:
+			_cut_shader = Shader.new()
+			_cut_shader.code = CUT_SHADER
+		_cut = ShaderMaterial.new()
+		_cut.shader = _cut_shader
+		_sprite.material = _cut
+	_cut.set_shader_parameter("cut_y", (lip_y - position.y - offset.y) / _sprite.scale.y)
+
+
 ## A hit shakes the man, and a little those beside him in the ranks.
 func _shaken(amount: float) -> void:
 	morale = maxf(0.0, morale - amount)
@@ -635,6 +669,11 @@ func _crew_play(state_name: String) -> void:
 
 
 func _play(state_name: String, restart := false) -> void:
+	# On the fire-step the musket lies over the bank: resting, firing over it.
+	if leaning and state_name in ["idle", "aim", "reload"]:
+		state_name = "rest"
+	elif leaning and state_name == "fire":
+		state_name = "rfire"
 	if state_name != anim_state or restart:
 		anim_seq += 1
 	anim_state = state_name
