@@ -81,7 +81,10 @@ func _process(_delta: float) -> void:
 	for i in list.size():
 		var t := list[i]
 		var f := TrenchArt.Frame.new(t)
-		_banks[i].position = f.at(0.0, f.w + 7.0)
+		var at := f.at(0.0, f.w + 7.0)
+		if not TrenchArt.near(t):
+			at.y = TrenchArt.bank_top(f) - 1.0
+		_banks[i].position = at
 		_banks[i].queue_redraw()
 		busy = busy or t["progress"] < 1.0 or int(t.get("upgrade_to", 0)) != 0
 	if busy:
@@ -101,7 +104,14 @@ func _place_revetment() -> void:
 		s.queue_free()
 	_revetment.clear()
 	for t in list:
-		for spot: Array in TrenchArt.revetment_spots(t):
+		# Far or beside: among themselves back to front, all drawn before the
+		# men (just after the bank). Near: after the leaning front rank.
+		var near := TrenchArt.near(t)
+		var spots := TrenchArt.revetment_spots(t)
+		spots.sort_custom(func(a: Array, b: Array) -> bool: return Vector2(a[1]).y < Vector2(b[1]).y)
+		var first := TrenchArt.bank_top(TrenchArt.Frame.new(t))
+		for n in spots.size():
+			var spot: Array = spots[n]
 			var kind: String = spot[0]
 			var tex: Texture2D = _gabion if kind == "gabion" else _bags
 			if tex == null:
@@ -111,8 +121,11 @@ func _place_revetment() -> void:
 			sprite.texture = tex
 			sprite.centered = false
 			sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE * (1.0 if kind == "gabion" else 0.8)
-			sprite.offset = -Vector2(meta["pivot"]["x"], meta["pivot"]["y"])
-			sprite.position = spot[1]
+			var at: Vector2 = spot[1]
+			var sort_at := at if near else Vector2(at.x, first + 0.5 + n * 0.001)
+			sprite.offset = -Vector2(meta["pivot"]["x"], meta["pivot"]["y"]) + (at - sort_at) / sprite.scale
+			sprite.position = sort_at
+			sprite.z_index = 1 if near else 0
 			battle.add_to_field(sprite)
 			_revetment.append(sprite)
 
@@ -436,18 +449,23 @@ func _draw() -> void:
 func _dress_men() -> void:
 	var front := {}
 	var lips := {}
+	var crests := {}
 	for t in list:
 		var f := TrenchArt.Frame.new(t)
 		lips[TrenchArt.id_of(t)] = TrenchArt.lower_lip(TrenchArt.outline(f))
+		crests[TrenchArt.id_of(t)] = TrenchArt.crest(f)
 	for u in battle.units:
 		if not u.alive() or u.regiment == null or u.type == "artillery":
 			if u.leaning or u._cut != null:
 				u.trench_look(Vector2.ZERO, INF, false)
+				if u.z_index == 1:
+					u.z_index = 0
 			continue
 		var t: Variant = _sunk_in(u.world)
 		if t == null:
 			if u.leaning or u._cut != null or u._sprite.position != Vector2.ZERO:
 				u.trench_look(Vector2.ZERO, INF, false)
+				u.z_index = 0
 			continue
 		var tid := TrenchArt.id_of(t)
 		var out := Vector2.from_angle(t["facing"])
@@ -469,7 +487,13 @@ func _dress_men() -> void:
 			offset = Iso.to_screen(u.world + out * to) - Iso.to_screen(u.world)
 			sink = (TrenchArt.FIRE_STEP_NEAR if sin(float(t["facing"])) > 0.3 else TrenchArt.FIRE_STEP) * p
 		offset.y += sink * TrenchArt.PPM * TrenchArt.LIFT
-		u.trench_look(offset, TrenchArt.lip_y(lips[tid], u.position.x + offset.x), lean)
+		# Leaning over a bank on the near side: drawn after it, cut off a little
+		# below its crest, so chest, arms and musket hang over it.
+		var over := lean and TrenchArt.near(t)
+		u.z_index = 1 if over else 0
+		var cut := TrenchArt.lip_y(crests[tid], u.position.x + offset.x) + TrenchArt.CREST_OVERHANG * TrenchArt.PPM * TrenchArt.LIFT if over \
+			else TrenchArt.lip_y(lips[tid], u.position.x + offset.x)
+		u.trench_look(offset, cut, lean)
 
 
 ## The trench (finished, or being dug or built up) a point lies in.

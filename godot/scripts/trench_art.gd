@@ -18,6 +18,7 @@ const FIRE_STEP := 0.5            # the ledge the front rank stands on, m
 const FIRE_STEP_NEAR := 0.9       # ...lower when the bank is on the camera side
 const PARAPET_H := 0.5            # height of the bank, m
 const LEAN_GAP := 3.0             # px between the leaning men and the bank
+const CREST_OVERHANG := 0.12      # m below the crest a man leaning over a near bank still shows
 const DITCH_FROM := 34.0
 const DITCH_TO := 50.0
 const GABION_GAP := 1.25          # m between gabions
@@ -136,6 +137,35 @@ static func gradient_fill(canvas: CanvasItem, pts: PackedVector2Array, colors: A
 	canvas.draw_polygon(pts, cols)
 
 
+## A strip between rows of points (each as long as the others), coloured row
+## by row: a gradient that runs across the rows, whichever way they lie.
+static func band(canvas: CanvasItem, rows: Array, colors: Array) -> void:
+	for r in rows.size() - 1:
+		var a: PackedVector2Array = rows[r]
+		var b: PackedVector2Array = rows[r + 1]
+		var cols := PackedColorArray([colors[r], colors[r], colors[r + 1], colors[r + 1]])
+		for i in a.size() - 1:
+			var quad := PackedVector2Array([a[i], a[i + 1], b[i + 1], b[i]])
+			if fillable(quad):
+				canvas.draw_polygon(quad, cols)
+
+
+## A line rounded off (corner cutting, ends kept), as the web game draws its
+## earthworks with curves; the same number of points for lines of one length.
+static func smooth(pts: PackedVector2Array, rounds := 2) -> PackedVector2Array:
+	var line := pts
+	for _r in rounds:
+		if line.size() < 3:
+			return line
+		var next := PackedVector2Array([line[0]])
+		for i in line.size() - 1:
+			next.append(line[i].lerp(line[i + 1], 0.25))
+			next.append(line[i].lerp(line[i + 1], 0.75))
+		next.append(line[line.size() - 1])
+		line = next
+	return line
+
+
 ## Fill the parts of `pts` that lie inside `clip`.
 static func clipped_fill(canvas: CanvasItem, pts: PackedVector2Array, clip: PackedVector2Array, color: Color) -> void:
 	if not fillable(pts):
@@ -168,11 +198,18 @@ static func draw_bed(canvas: CanvasItem, t: Dictionary, clock: float, fascine: T
 		for u: float in ps["us"]:
 			inner.append(f.at(u * 1.04, lip_v(f, u) + DITCH_FROM))
 			outer.append(f.at(u * 1.04, lip_v(f, u) + DITCH_TO))
-		outer.reverse()
-		var trough := inner + outer
 		var a := minf(1.0, (p - 0.5) * 2.0)
-		gradient_fill(canvas, trough, [Color(0.31, 0.25, 0.16, 0.85), Color(0.18, 0.15, 0.1, 0.95), Color(0.47, 0.41, 0.27, 0.55)],
-			f.at(0, f.w + DITCH_FROM).y, f.at(0, f.w + DITCH_TO).y, a)
+		var rows: Array = []
+		for k: float in [0.0, 0.45, 0.8, 1.0]:
+			var row := PackedVector2Array()
+			for j in inner.size():
+				row.append(inner[j].lerp(outer[j], k))
+			rows.append(smooth(row))
+		var stops := [Color(0.31, 0.25, 0.16, 0.85), Color(0.18, 0.15, 0.1, 0.95), Color(0.27, 0.23, 0.15, 0.9), Color(0.47, 0.41, 0.27, 0.55)]
+		var faded: Array = []
+		for c: Color in stops:
+			faded.append(Color(c.r, c.g, c.b, c.a * a))
+		band(canvas, rows, faded)
 	# Trodden, spoil-strewn ground round the cut.
 	var trod := 0.5 + 0.5 * p
 	fill(canvas, outline(f, 0.0, 0.0, 7.0), Color(0.41, 0.34, 0.23, 0.55 * trod))
@@ -283,20 +320,18 @@ static func draw_bank(canvas: CanvasItem, t: Dictionary, shift: Vector2) -> void
 		ridge.append(f.at(u, lip_v(f, u) + 7.0, lift(f, u)) - shift)
 		outer.append(f.at(u * 1.05, lip_v(f, u) + 30.0 + 8.0 * h(tid + i, 4)) - shift)
 		i += 1
+	inner = smooth(inner)
+	ridge = smooth(ridge)
+	outer = smooth(outer)
 	var rev_ridge := ridge.duplicate()
 	rev_ridge.reverse()
 	fill(canvas, inner + rev_ridge, Color("#4a3a27"))
-	var rev_outer := outer.duplicate()
-	rev_outer.reverse()
-	var crest_y := f.at(0, f.w + 7.0, PARAPET_H).y - shift.y
-	var foot_y := f.at(0, f.w + 36.0).y - shift.y
-	var slope := ridge + rev_outer
-	var a := minf(crest_y, foot_y)
-	var b := maxf(crest_y, foot_y)
-	var cols := [Color("#8d7652"), Color("#74663f"), Color(0.35, 0.42, 0.22, 0.0)]
-	if crest_y > foot_y:
-		cols.reverse()
-	gradient_fill(canvas, slope, cols, a, b)
+	# The slope coloured from the crest out to its foot (whichever way that
+	# lies on the screen), greening over and fading into the grass.
+	var mid := PackedVector2Array()
+	for k in ridge.size():
+		mid.append(ridge[k].lerp(outer[k], 0.55))
+	band(canvas, [ridge, mid, outer], [Color("#8d7652"), Color("#74663f"), Color(0.35, 0.42, 0.22, 0.0)])
 	canvas.draw_polyline(ridge.slice(1, ridge.size() - 1), Color(0.72, 0.63, 0.45, 0.6), 1.6, true)
 	for k in ps["n"] * 2:
 		var u := (h(tid, k + 40) * 2.0 - 1.0) * f.half * 0.95
@@ -305,6 +340,32 @@ static func draw_bank(canvas: CanvasItem, t: Dictionary, shift: Vector2) -> void
 		canvas.draw_set_transform(spot, 0.0, Vector2(1.0, 0.6))
 		canvas.draw_circle(Vector2.ZERO, 1.5 + h(k, 7) * 2.0, Color(0.29, 0.23, 0.15, 0.55) if k % 3 else Color(0.59, 0.5, 0.35, 0.5))
 		canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## Whether the bank lies on the camera's side of the cut (enemy to the south):
+## then the men in it are drawn before it, but the leaning front rank after
+## it, cut off along its crest; otherwise all are drawn after it.
+static func near(t: Dictionary) -> bool:
+	return sin(float(t["facing"])) > 0.0
+
+
+## The highest point of the bank and its ditch on the screen: drawn from
+## there, they lie under the men in the trench when the bank is far or beside.
+static func bank_top(f: Frame) -> float:
+	var top := INF
+	for u: float in parapet_shape(f)["us"]:
+		for v: float in [0.0, 7.0, 38.0, DITCH_TO]:
+			top = minf(top, f.at(u * 1.05, lip_v(f, u) + v, lift(f, u) if v == 7.0 else 0.0).y)
+	return top
+
+
+## The bank's crest along the cut, left to right on the screen.
+static func crest(f: Frame) -> PackedVector2Array:
+	var pts: Array[Vector2] = []
+	for u: float in parapet_shape(f)["us"]:
+		pts.append(f.at(u, lip_v(f, u) + 7.0, lift(f, u)))
+	pts.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+	return PackedVector2Array(pts)
 
 
 ## Gabions in a row along the inside of the bank (gaps between them for the

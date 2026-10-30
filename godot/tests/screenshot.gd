@@ -44,9 +44,20 @@ func _initialize() -> void:
 	var r2 := battle.form_regiment(others)
 	r2.order_move(north + Vector2(90, 10), -PI / 2.0)
 	r2.hold = true
+	# A third facing south: the bank on the near side, the front rank leaning
+	# over it.
+	var south_men: Array[Unit] = []
+	var south := home + Vector2(800, 1000)
+	for i in 24:
+		south_men.append(battle.add_unit("france", "infantry", south + Vector2((i % 12) * 15, (i / 12) * 19)))
+	south_men.append(battle.add_unit("france", "officer", south + Vector2(90, -30)))
+	south_men.append(battle.add_unit("france", "drummer", south + Vector2(90, 50)))
+	var r3 := battle.form_regiment(south_men)
+	r3.order_move(south + Vector2(90, 10), PI / 2.0)
+	r3.hold = true
 	for i in int(45.0 / STEP):
 		battle._process(STEP)
-	for x in [r, r2]:
+	for x in [r, r2, r3]:
 		if x.trench != null:
 			x.trench["level"] = 3
 	# Two grain fields (one ripe) and a lumber camp near the town centre.
@@ -56,6 +67,7 @@ func _initialize() -> void:
 	battle.add_building("france", "lumbercamp", home + Vector2(-60, 520), true)
 	await _shot(battle, Vector2(r.trench["centre"]) if r.trench != null else spot, out.path_join("trench.png"))
 	await _shot(battle, Vector2(r2.trench["centre"]) if r2.trench != null else north, out.path_join("trench_across.png"))
+	await _shot(battle, Vector2(r3.trench["centre"]) if r3.trench != null else south, out.path_join("trench_near.png"))
 	await _shot(battle, home + Vector2(140, 520), out.path_join("sites.png"))
 	print("SHOTS ", out)
 	quit(0)
