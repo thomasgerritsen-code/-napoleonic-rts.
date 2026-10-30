@@ -45,11 +45,11 @@ func _draw() -> void:
 		var colour := Color(0.9, 0.85, 0.6) if owner == "" else (Color(0.3, 0.5, 1.0) if owner == "france" else Color(1.0, 0.35, 0.3))
 		draw_arc(_to_map(p["world"]), 4.0, 0.0, TAU, 12, colour, 1.5)
 	for b in battle.buildings:
-		if b.standing() and (b.side == "france" or b.visible):
+		if b.standing() and (b.side == battle.me or b.visible):
 			var c := Color(0.25, 0.45, 1.0) if b.side == "france" else Color(0.95, 0.25, 0.2)
 			draw_rect(Rect2(_to_map(b.world) - Vector2(2.5, 2.5), Vector2(5, 5)), c)
 	for u in battle.units:
-		if u.alive() and (u.side == "france" or u.visible):
+		if u.alive() and (u.side == battle.me or u.visible):
 			var c := Color(0.55, 0.7, 1.0) if u.side == "france" else Color(1.0, 0.45, 0.4)
 			draw_rect(Rect2(_to_map(u.world) - Vector2(1, 1), Vector2(2, 2)), c)
 	if camera != null:

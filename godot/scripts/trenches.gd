@@ -222,15 +222,13 @@ func upgrade(r: Regiment) -> bool:
 	if t["progress"] < 1.0 or t["upgrade_to"] != 0 or next.is_empty():
 		return false
 	if not battle.can_afford(r.side, next["cost"]):
-		if r.side == "france":
-			battle.say("Niet genoeg grondstoffen: %s nodig." % Rules.cost_text(next["cost"]))
+		battle.say("Niet genoeg grondstoffen: %s nodig." % Rules.cost_text(next["cost"]), r.side)
 		return false
 	battle.pay(r.side, next["cost"])
 	t["upgrade_to"] = int(t["level"]) + 1
 	t["upgrade_progress"] = 0.0
 	t["upgrader"] = r
-	if r.side == "france":
-		battle.say("Loopgraaf: %s (%d s)." % [String(next["label"]).to_lower(), next["seconds"]])
+	battle.say("Loopgraaf: %s (%d s)." % [String(next["label"]).to_lower(), next["seconds"]], r.side)
 	return true
 
 
@@ -247,8 +245,7 @@ func _upgrade_work(t: Dictionary, delta: float) -> void:
 	if t["upgrade_progress"] >= 1.0:
 		t["level"] = t["upgrade_to"]
 		t["upgrade_to"] = 0
-		if r.side == "france":
-			battle.say("Loopgraaf %s." % String(next["label"]).to_lower())
+		battle.say("Loopgraaf %s." % String(next["label"]).to_lower(), r.side)
 		battle.refresh_hud()
 
 

@@ -91,10 +91,10 @@ func refresh() -> void:
 func _process(_delta: float) -> void:
 	if battle == null:
 		return
-	var e: Dictionary = battle.economy["france"]
+	var e: Dictionary = battle.economy[battle.me]
 	_top.text = "NAPOLEONIC RTS   ·   %d voedsel   ·   %d hout   ·   %d ijzer   ·   %d/%d inwoners   ·   gebieden %d–%d   ·   %s" % [
-		e["food"], e["wood"], e["iron"], battle.pop_used("france"), battle.pop_cap("france"),
-		battle.territories_held("france"), battle.territories_held("britain"),
+		e["food"], e["wood"], e["iron"], battle.pop_used(battle.me), battle.pop_cap(battle.me),
+		battle.territories_held(battle.me), battle.territories_held("britain" if battle.me == "france" else "france"),
 		DayNight.clock_text(battle.clock) + ("  ·  " + battle.weather.label() if battle.weather != null else "")]
 	_status.text = battle.status
 	_plan.text = "Britse bevelhebber: %s" % battle.ai.plan
@@ -127,7 +127,7 @@ func _describe() -> String:
 			lines.append("%s · niveau %d/3 · bereik %d · %d schoten van %d" % [level["label"], b.tower_level, level["range"], level["shots"], level["damage"]])
 			if b.upgrade_to != 0:
 				lines.append("Versterken… niveau %d/3 · %d%%" % [b.upgrade_to, int(b.upgrade_progress * 100)])
-		if b.complete and not Rules.trained_at(b.type, b.side).is_empty() and b.side == "france":
+		if b.complete and not Rules.trained_at(b.type, b.side).is_empty() and b.side == battle.me:
 			lines.append("Rechtsklik zet het verzamelpunt%s." % (" (gezet)" if b.rally != null else ""))
 		if b.type == "farm":
 			lines.append("Graan: %d  ·  %d boeren" % [b.crop, battle.farmers_on(b)])
@@ -169,8 +169,8 @@ func _rebuild() -> void:
 		child.queue_free()
 	var b := battle.selected_building
 	if b != null:
-		if b.complete and b.side == "france":
-			for item in Rules.trained_at(b.type, "france"):
+		if b.complete and b.side == battle.me:
+			for item in Rules.trained_at(b.type, battle.me):
 				_button("%s\n%s" % [Rules.label(item), Rules.cost_text(Rules.item_cost(item))], battle.train.bind(item))
 			if b.type == "barracks":
 				var plan := battle.quick_plan(b)

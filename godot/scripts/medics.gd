@@ -198,7 +198,7 @@ func _send_teams(h: Building, delta: float, cfg: Dictionary) -> void:
 					w.modulate.a = 0.0
 					t.state = "idle"
 					t.target = null
-		t.visible = h.side == "france" or battle.fog == null or battle.fog.sees(t.world)
+		t.visible = h.side == battle.me or battle.fog == null or battle.fog.sees(t.world)
 		t.show_step(lift)
 
 
@@ -240,7 +240,6 @@ func _discharge(w: Unit) -> void:
 	var r := w.regiment
 	if r != null and not r.routing and not r.destroyed() and r.take_back(u):
 		stats["rejoined"] += 1
-		if w.side == "france":
-			battle.say("Hersteld uit het veldhospitaal: terug naar %s." % r.name)
-	elif w.side == "britain":
+		battle.say("Hersteld uit het veldhospitaal: terug naar %s." % r.name, w.side)
+	elif not battle.commanded(w.side):
 		battle.ai.on_trained(u)

@@ -194,8 +194,7 @@ func _strengthen(delta: float) -> void:
 	if _sprite != null:
 		_sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE * (0.55 + 0.04 * (tower_level - 1))
 	battle.refresh_hud()
-	if side == "france":
-		battle.say("%s gereed · niveau %d/3." % [next["label"], tower_level])
+	battle.say("%s gereed · niveau %d/3." % [next["label"], tower_level], side)
 
 
 func _show_progress() -> void:

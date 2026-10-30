@@ -90,10 +90,10 @@ func refresh() -> void:
 	_visible.fill(0)
 	var sources: Array[Node2D] = []
 	for u in battle.units:
-		if u.side == "france" and u.alive():
+		if u.side == battle.me and u.alive():
 			sources.append(u)
 	for b in battle.buildings:
-		if b.side == "france" and b.complete and b.standing():
+		if b.side == battle.me and b.complete and b.standing():
 			sources.append(b)
 	for s in sources:
 		var at := Battle.spot(s)
@@ -114,8 +114,8 @@ func refresh() -> void:
 	_image.set_data(_cols, _rows, false, Image.FORMAT_LA8, _pixels)
 	_texture.update(_image)
 	for u in battle.units:
-		if u.side != "france":
+		if u.side != battle.me:
 			u.visible = sees(u.world) or not u.alive() and explored(u.world)
 	for b in battle.buildings:
-		if b.side != "france":
+		if b.side != battle.me:
 			b.visible = explored(b.world)

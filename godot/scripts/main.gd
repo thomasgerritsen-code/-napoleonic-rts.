@@ -19,6 +19,9 @@ const QUICK_REACH := 520.0  # how far around a barracks its men are gathered
 static var mode := "campaign"
 ## The battle being fought (for the battalions' sense of danger).
 static var current: Battle = null
+## Online: "" (alone against the computer), "host" (plays France and runs the
+## battle) or "client" (plays Britain, shown the host's battle).
+static var net_role := ""
 
 var units: Array[Unit] = []
 var buildings: Array[Building] = []
@@ -47,6 +50,11 @@ var held_seconds := 0.0
 const HOLD_TO_WIN := 120.0
 var status := ""
 var clock := 0.0
+## The side this player commands; the computer (alone) or the other player
+## (online) has the other.
+var me := "france"
+## Online: the link to the other player (NetLink), or null.
+var net: Node = null
 var flank_hits := 0
 ## The battalions among the selected men.
 var selected: Array[Regiment]:
@@ -87,6 +95,7 @@ var _orders: Array[Dictionary] = []   # orders on their way to the battalions
 func _ready() -> void:
 	randomize()
 	current = self
+	me = "britain" if net_role == "client" else "france"
 	Regiment.all.clear()
 	var meta: Dictionary = Iso.read_json("res://assets/map/ground.json")
 	Iso.load_relief(meta)
@@ -127,7 +136,7 @@ func _ready() -> void:
 	ai.army_only = mode == "lab"
 	camera = BattleCamera.new()
 	add_child(camera)
-	var home := town_centre("france")
+	var home := town_centre(me)
 	camera.focus(Iso.to_screen(home.world + Vector2(260, 60)) if home != null else Iso.to_screen(Iso.WORLD / 2.0))
 	if mode == "lab":
 		camera.focus(Iso.to_screen(Vector2(4900, 3100)))
@@ -172,7 +181,8 @@ func _process(delta: float) -> void:
 		_woods_clock = 0.5
 		woods.update()
 		_auto_regiments()
-	ai.update(delta)
+	if net_role == "":
+		ai.update(delta)
 	_tidy_selection()
 	_check_result(delta)
 
@@ -591,17 +601,14 @@ func pay(side: String, cost: Dictionary) -> void:
 # ---- what happens ----
 
 func notice_idle(u: Unit, used_up: Supply) -> void:
-	if u.side != "france":
-		return
 	if used_up != null and used_up.kind == "wood":
-		say("Het bos bij uw houthakkerskamp is op: bouw een nieuw kamp bij een ander bos.")
+		say("Het bos bij uw houthakkerskamp is op: bouw een nieuw kamp bij een ander bos.", u.side)
 	elif used_up != null:
-		say("Een boer heeft geen %s meer in de buurt." % Rules.label(used_up.kind))
+		say("Een boer heeft geen %s meer in de buurt." % Rules.label(used_up.kind), u.side)
 
 
 func on_built(b: Building, by: Unit) -> void:
-	if b.side == "france":
-		say("%s voltooid." % Rules.label(b.type))
+	say("%s voltooid." % Rules.label(b.type), b.side)
 	# The builders go to work at what they built.
 	for u in units:
 		if u.alive() and u.type == "worker" and u.task == "" and u.side == b.side and u.world.distance_to(b.world) < b.reach_radius() + 30.0:
@@ -643,8 +650,7 @@ func on_destroyed(b: Building) -> void:
 	stats[b.side]["buildings_lost"] += 1
 	if selected_building == b:
 		selected_building = null
-	if b.side == "france":
-		say("Uw %s is verwoest!" % Rules.label(b.type).to_lower())
+	say("Uw %s is verwoest!" % Rules.label(b.type).to_lower(), b.side)
 	if _hud != null:
 		_hud.refresh()
 
@@ -662,16 +668,25 @@ func spawn_trained(b: Building, type: String) -> void:
 			u.set_task("gather", supply)
 		else:
 			u.move_to(to + Vector2(randf_range(-30, 30), randf_range(-20, 20)))
-	if b.side == "france":
-		say("%s is klaar." % Rules.label(type))
-		if _hud != null:
-			_hud.refresh()
+	if commanded(b.side):
+		say("%s is klaar." % Rules.label(type), b.side)
+		refresh_hud()
 	else:
 		ai.on_trained(u)
 
 
-func say(text: String) -> void:
-	status = text
+## A message for the player of `side` ("" or our own side: this screen;
+## online, the other player's are sent to them; the computer's go nowhere).
+func say(text: String, side := "") -> void:
+	if side == "" or side == me:
+		status = text
+	elif net != null and net_role == "host":
+		net.call("tell", text)
+
+
+## Whether a person commands this side (us, or the other player online).
+func commanded(side: String) -> bool:
+	return side == me or net_role != ""
 
 
 ## As the web game: soldiers alone on a post claim it in 15 seconds; its
@@ -699,8 +714,7 @@ func _hold_territories(delta: float) -> void:
 				p["owner"] = side
 				p["claim"] = ""
 				p["progress"] = 0.0
-				if side == "france":
-					say("%s veroverd." % p["label"])
+				say("%s veroverd." % p["label"], side)
 		if p["owner"] != "" and (side == "" or side == p["owner"]):
 			credit(p["owner"], p["resource"], float(p["rate"]) * delta)
 
@@ -765,7 +779,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 		_puff(u.muzzle(), 0.25, 1.2)
 		return
 	if u.type == "artillery":
-		if u.side != "france":
+		if not commanded(u.side):
 			# The computer loads grapeshot when the enemy comes close.
 			u.shot = "grape" if u.world.distance_to(spot(target)) < Unit.GRAPE_REACH and u.ammo["grape"] > 0 else "round"
 		if u.ammo[u.shot] <= 0:
@@ -930,7 +944,7 @@ func select_units(list: Array[Unit], add := false) -> void:
 		selected_building.selected = false
 		selected_building = null
 	for u in list:
-		if u.alive() and u.side == "france" and not selected_units.has(u):
+		if u.alive() and u.side == me and not selected_units.has(u):
 			selected_units.append(u)
 			u.selected = true
 	if _hud != null:
@@ -956,7 +970,7 @@ func _tidy_selection() -> void:
 
 func order(at: Vector2, face: Variant = null) -> void:
 	var b := selected_building
-	if b != null and b.side == "france" and b.complete and not Rules.trained_at(b.type, "france").is_empty():
+	if b != null and b.side == me and b.complete and not Rules.trained_at(b.type, me).is_empty():
 		b.rally = at
 		say("Verzamelpunt van %s gezet." % Rules.label(b.type).to_lower())
 		if _overlay != null:
@@ -977,7 +991,7 @@ func order(at: Vector2, face: Variant = null) -> void:
 		else:
 			free.append(u)
 	for w in workers:
-		if supply != null and supply.usable_by("france"):
+		if supply != null and supply.usable_by(me):
 			w.set_task("gather", supply)
 		elif supply != null and supply.kind == "wood":
 			say("Hout kappen kan alleen binnen bereik van een eigen houthakkerskamp.")
@@ -987,9 +1001,9 @@ func order(at: Vector2, face: Variant = null) -> void:
 			say("IJzer winnen kan alleen bij een eigen mijn op de afzetting.")
 			w.task = ""
 			w.move_to(at)
-		elif own != null and own.side == "france" and not own.complete:
+		elif own != null and own.side == me and not own.complete:
 			w.set_task("build", own)
-		elif own != null and own.side == "france" and own.type == "farm":
+		elif own != null and own.side == me and own.type == "farm":
 			w.set_task("farm", own)
 		else:
 			w.task = ""
@@ -1114,21 +1128,21 @@ func assign_workers(work: String) -> void:
 			"farm":
 				var best: Building = null
 				for b in buildings:
-					if b.side == "france" and b.type == "farm" and b.complete and b.standing() and farmers_on(b) < 3 \
+					if b.side == me and b.type == "farm" and b.complete and b.standing() and farmers_on(b) < 3 \
 							and (best == null or b.world.distance_to(u.world) < best.world.distance_to(u.world)):
 						best = b
 				if best != null:
 					u.set_task("farm", best)
 					sent += 1
 			"wood", "iron":
-				var s := nearest_supply(u.world, work, "france")
+				var s := nearest_supply(u.world, work, me)
 				if s != null:
 					u.set_task("gather", s)
 					sent += 1
 			"build":
 				var best: Building = null
 				for b in buildings:
-					if b.side == "france" and not b.complete and b.standing() \
+					if b.side == me and not b.complete and b.standing() \
 							and (best == null or b.world.distance_to(u.world) < best.world.distance_to(u.world)):
 						best = b
 				if best != null:
@@ -1143,7 +1157,7 @@ func assign_workers(work: String) -> void:
 func cycle_regiment(back := false) -> void:
 	var own: Array[Regiment] = []
 	for r in regiments:
-		if r.side == "france" and not r.destroyed():
+		if r.side == me and not r.destroyed():
 			own.append(r)
 	if own.is_empty():
 		return
@@ -1232,8 +1246,7 @@ func quick_regiment(b: Building = null) -> Regiment:
 		return null
 	var plan := quick_plan(b)
 	if not plan["ok"]:
-		if b.side == "france":
-			say("Nog nodig voor een bataljon: %s. Kies 'Train ontbrekende'." % _missing_text(plan["missing"]))
+		say("Nog nodig voor een bataljon: %s. Kies 'Train ontbrekende'." % _missing_text(plan["missing"]), b.side)
 		return null
 	var r := form_regiment(plan["men"])
 	if r != null:
@@ -1289,7 +1302,7 @@ func toggle_auto_regiment() -> void:
 
 func _auto_regiments() -> void:
 	for b in buildings:
-		if b.type == "barracks" and b.side == "france" and b.auto_regiment and b.complete and b.standing() and quick_plan(b)["ok"]:
+		if b.type == "barracks" and commanded(b.side) and b.auto_regiment and b.complete and b.standing() and quick_plan(b)["ok"]:
 			var r := quick_regiment(b)
 			if r != null:
 				say("%s gevormd bij de kazerne (Auto-bataljon)." % r.name)
@@ -1328,10 +1341,9 @@ func form_regiment(from: Array[Unit] = []) -> Regiment:
 				Regiment.MIN_MEN, Regiment.MAX_MEN, Regiment.CAV_MIN, Regiment.CAV_MAX])
 		return null
 	regiments.append(r)
-	if r.side == "france":
-		say("%s gevormd met %d man." % [r.name, r.men.size()])
-		if _hud != null:
-			_hud.refresh()
+	if commanded(r.side):
+		say("%s gevormd met %d man." % [r.name, r.men.size()], r.side)
+		refresh_hud()
 	return r
 
 
@@ -1363,13 +1375,11 @@ func upgrade_tower(b: Building) -> bool:
 		return false
 	var next := Rules.tower_level(b.tower_level + 1)
 	if not can_afford(b.side, next["cost"]):
-		if b.side == "france":
-			say("Te weinig grondstoffen voor %s." % String(next["label"]).to_lower())
+		say("Te weinig grondstoffen voor %s." % String(next["label"]).to_lower(), b.side)
 		return false
 	pay(b.side, next["cost"])
 	b.start_upgrade()
-	if b.side == "france":
-		say("%s wordt gebouwd (%d s)." % [next["label"], next["seconds"]])
+	say("%s wordt gebouwd (%d s)." % [next["label"], next["seconds"]], b.side)
 	refresh_hud()
 	return true
 
@@ -1383,22 +1393,18 @@ func queue_unit(b: Building, type: String) -> bool:
 	if b == null or not b.complete or not b.standing() or Rules.item_building(type) != b.type:
 		return false
 	if Rules.item_type(type) == "artillery" and clock < Rules.ARTILLERY_AFTER:
-		if b.side == "france":
-			say("De gieterij levert pas kanonnen na twee minuten.")
+		say("De gieterij levert pas kanonnen na twee minuten.", b.side)
 		return false
 	var most: Variant = Rules.troop(Rules.item_troop(type)).get("max")
 	if most != null and count_of(b.side, type) >= int(most):
-		if b.side == "france":
-			say("Van de %s zijn er hooguit %d." % [Rules.label(type), int(most)])
+		say("Van de %s zijn er hooguit %d." % [Rules.label(type), int(most)], b.side)
 		return false
 	var cost := Rules.item_cost(type)
 	if not can_afford(b.side, cost):
-		if b.side == "france":
-			say("Niet genoeg grondstoffen: %s nodig." % Rules.cost_text(cost))
+		say("Niet genoeg grondstoffen: %s nodig." % Rules.cost_text(cost), b.side)
 		return false
 	if not has_room(b.side, Rules.item_type(type)):
-		if b.side == "france":
-			say("Geen ruimte: bouw een huis voor meer inwoners.")
+		say("Geen ruimte: bouw een huis voor meer inwoners.", b.side)
 		return false
 	pay(b.side, cost)
 	b.queue.append(type)
@@ -1406,7 +1412,7 @@ func queue_unit(b: Building, type: String) -> bool:
 
 
 func start_placing(type: String) -> void:
-	if not can_afford("france", Rules.cost_of(type)):
+	if not can_afford(me, Rules.cost_of(type)):
 		say("Niet genoeg grondstoffen: %s nodig." % Rules.cost_text(Rules.cost_of(type)))
 		return
 	placing = type
@@ -1471,7 +1477,7 @@ func place(at: Vector2) -> void:
 	for u in selected_units:
 		if u.type == "worker":
 			builders.append(u)
-	var b := lay_out("france", placing, at, builders)
+	var b := lay_out(me, placing, at, builders)
 	if b == null:
 		say("Daar kan de %s niet staan." % Rules.label(placing).to_lower())
 		return
@@ -1484,10 +1490,10 @@ func place(at: Vector2) -> void:
 func _thing_at(at: Vector2, enemy: bool) -> Node2D:
 	var screen := Iso.to_screen(at)
 	for u in units:
-		if u.alive() and (u.side != "france") == enemy and u.visible and u.position.distance_to(screen) < 14.0:
+		if u.alive() and (u.side != me) == enemy and u.visible and u.position.distance_to(screen) < 14.0:
 			return u
 	for b in buildings:
-		if b.standing() and (b.side != "france") == enemy and absf(b.world.x - at.x) < b.size.x / 2.0 and absf(b.world.y - at.y) < b.size.y / 2.0:
+		if b.standing() and (b.side != me) == enemy and absf(b.world.x - at.x) < b.size.x / 2.0 and absf(b.world.y - at.y) < b.size.y / 2.0:
 			return b
 	return null
 
@@ -1577,7 +1583,7 @@ func _select_in(box: Rect2, add: bool) -> void:
 		var nearest: Unit = null
 		var best := 16.0
 		for u in units:
-			if u.alive() and u.side == "france":
+			if u.alive() and u.side == me:
 				var d := u.position.distance_to(box.position)
 				if d < best:
 					best = d
@@ -1595,7 +1601,7 @@ func _select_in(box: Rect2, add: bool) -> void:
 		return
 	var soldiers: Array[Unit] = []
 	for u in units:
-		if u.alive() and u.side == "france" and box.has_point(u.position):
+		if u.alive() and u.side == me and box.has_point(u.position):
 			picked.append(u)
 			if u.military():
 				soldiers.append(u)
@@ -1646,7 +1652,7 @@ func _finish(side: String, reason: String) -> void:
 	end_reason = reason
 	ended_at = clock
 	var names := {"france": "Frankrijk", "britain": "Groot-Brittannië"}
-	result = "Gelijkspel" if side == "draw" else ("Overwinning!" if side == "france" else "Nederlaag")
+	result = "Gelijkspel" if side == "draw" else ("Overwinning!" if side == me else "Nederlaag")
 	if reason == "territories":
 		status = "%s heeft alle drie gebieden twee minuten onbetwist beheerst." % names[side]
 	elif side == "draw":
