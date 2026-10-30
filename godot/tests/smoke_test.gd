@@ -298,6 +298,22 @@ func _initialize() -> void:
 	var nobody_now: Array[Unit] = []
 	battle.select_units(nobody_now)
 
+	# Peasants sent somewhere together spread out instead of ending in a heap.
+	var group: Array[Unit] = []
+	for u in battle.units:
+		if u.side == "france" and u.type == "worker" and u.alive() and group.size() < 6:
+			group.append(u)
+	battle.select_units(group)
+	battle.order(quiet + Vector2(-200, 300))
+	var closest := INF
+	for a_man in group:
+		for b_man in group:
+			if a_man != b_man:
+				closest = minf(closest, a_man.slot.distance_to(b_man.slot))
+	_check(group.size() == 6 and closest >= 20.0, "six peasants sent together each get their own spot (%d px apart at least)" % closest)
+	var nobody_then: Array[Unit] = []
+	battle.select_units(nobody_then)
+
 	# An order takes a moment to reach a battalion.
 	var ordered: Array[Regiment] = [shaken]
 	var goal_spot := shaken.centroid() + Vector2(120, 0)

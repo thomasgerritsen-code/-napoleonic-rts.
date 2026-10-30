@@ -14,6 +14,8 @@ const SIDES := ["france", "britain"]
 const LAB_BATTALIONS := 4    # a side on the test field
 const LAB_MEN := 36
 const QUICK_REACH := 520.0  # how far around a barracks its men are gathered
+const PEASANT_GAP := 22.0   # between peasants sent somewhere together
+const SOLDIER_GAP := 20.0   # between loose soldiers sent somewhere together
 
 ## "campaign" (the full game) or "lab" (the test field), chosen in the menu.
 static var mode := "campaign"
@@ -1110,6 +1112,7 @@ func order(at: Vector2, face: Variant = null) -> void:
 	var supply := _supply_at(at)
 	var own := _thing_at(at, false) as Building
 	var workers: Array[Unit] = []
+	var walkers: Array[Unit] = []
 	var free: Array[Unit] = []
 	for u in selected_units:
 		if u.regiment != null:
@@ -1135,7 +1138,8 @@ func order(at: Vector2, face: Variant = null) -> void:
 			w.set_task("farm", own)
 		else:
 			w.task = ""
-			w.move_to(Nav.dry(w.world, at))
+			walkers.append(w)
+	_spread(walkers, at, null, PEASANT_GAP)
 	_spread(free, at, foe)
 	var battalions: Array[Regiment] = selected
 	if not battalions.is_empty():
@@ -1144,16 +1148,35 @@ func order(at: Vector2, face: Variant = null) -> void:
 		_overlay.mark(Iso.to_screen(at))
 
 
-func _spread(list: Array[Unit], at: Vector2, foe: Node2D) -> void:
-	var across := ceili(sqrt(list.size()))
-	for i in list.size():
-		var u := list[i]
-		if foe != null:
+## Men sent together without a battalion: at an enemy, all go for it; to a
+## place, each gets his own spot in a small square around it, `gap` apart,
+## the man furthest left taking the left of the square and so on, so they
+## do not cross or end in a heap.
+func _spread(list: Array[Unit], at: Vector2, foe: Node2D, gap := SOLDIER_GAP) -> void:
+	if list.is_empty():
+		return
+	if foe != null:
+		for u in list:
 			u.move_to(spot(foe))
 			u.ordered = false
 			u.target = foe
-		else:
-			u.move_to(at + Vector2((i % across - (across - 1) / 2.0) * 18.0, (i / across) * 18.0))
+		return
+	var across := ceili(sqrt(list.size()))
+	var rows := ceili(float(list.size()) / across)
+	var spots: Array[Vector2] = []
+	for i in list.size():
+		var row := i / across
+		var in_row := mini(across, list.size() - row * across)
+		spots.append(at + Vector2((i % across - (in_row - 1) / 2.0) * gap, (row - (rows - 1) / 2.0) * gap))
+	# Rows from the back, each from the left: men and spots in the same order.
+	var men := list.duplicate()
+	men.sort_custom(func(a: Unit, b: Unit) -> bool: return a.world.y < b.world.y)
+	for r in rows:
+		var row_men := men.slice(r * across, (r + 1) * across)
+		row_men.sort_custom(func(a: Unit, b: Unit) -> bool: return a.world.x < b.world.x)
+		for k in row_men.size():
+			var u: Unit = row_men[k]
+			u.move_to(Nav.dry(u.world, spots[r * across + k]))
 
 
 ## Several battalions stand side by side across the line of march.
