@@ -236,6 +236,12 @@ func _initialize() -> void:
 		if u.type == "drummer" and u.slot.distance_to(Vector2(trench["centre"])) > float(trench["length"]) / 2.0 - float(trench["width"]):
 			trench_end = true
 	_check(trench_end, "the drummer stands at an end of the trench")
+	var soaked: Dictionary = trench.duplicate()
+	if not Nav.bridges().is_empty():
+		soaked["centre"] = Vector2(Nav.bridges()[0]["west"]).lerp(Nav.bridges()[0]["east"], 0.5)
+	else:
+		soaked["centre"] = Vector2(Nav.river_x(0.0), 0.0)
+	_check(not battle.trenches._dry(soaked) and battle.trenches._dry(trench), "no trench is dug in the river or across a bridge")
 	# A second battalion sent into the trench forms a second line behind it.
 	var second_line: Array[Unit] = []
 	for i in 12:

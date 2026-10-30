@@ -36,7 +36,7 @@ func _initialize() -> void:
 	# A second one facing north: its trench runs across the screen, the bank
 	# on the far side, the near wall hiding the men's legs.
 	var others: Array[Unit] = []
-	var north := home + Vector2(1100, 700)
+	var north := home + Vector2(400, 820)
 	for i in 24:
 		others.append(battle.add_unit("france", "infantry", north + Vector2((i % 12) * 15, (i / 12) * 19)))
 	others.append(battle.add_unit("france", "officer", north + Vector2(90, -30)))

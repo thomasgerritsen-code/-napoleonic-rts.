@@ -256,12 +256,25 @@ func _dig(r: Regiment, c: Vector2, cfg: Dictionary) -> void:
 		if list.size() >= int(cfg["maxTrenches"]):
 			return
 		t = _along_front(r, c, cfg)
+		if not _dry(t):
+			return
 		list.append(t)
 		r.trench = t
 	var foe := battle.nearest_foe(c, r.side, 260.0)
 	t["progress"] = minf(1.0, t["progress"] + (0.4 if foe != null else 1.0) * _work(r) / float(cfg["digSeconds"]))
 	t["dug_at"] = battle.clock
 	t["side"] = r.side
+
+
+## No trench in the river or across a bridge.
+func _dry(t: Dictionary) -> bool:
+	var f := TrenchArt.Frame.new(t)
+	for u: float in [-1.0, -0.5, 0.0, 0.5, 1.0]:
+		for v: float in [-1.0, 0.0, 1.0]:
+			var p := f.c + f.along * u * f.half + f.out * v * (f.w + 8.0)
+			if Nav.in_water(p) or Nav.on_bridge(p):
+				return false
+	return true
 
 
 ## Long enough for every file and deep enough for every rank, with room to stand.
