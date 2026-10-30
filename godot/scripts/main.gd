@@ -23,6 +23,8 @@ static var current: Battle = null
 ## "host" (plays France and runs the battle) or "client" (plays Britain,
 ## shown the host's battle).
 static var online_role := ""
+## The side this player takes online (the host chooses).
+static var online_side := "france"
 ## This battle's part online (from online_role).
 var net_role := ""
 
@@ -106,7 +108,7 @@ func _ready() -> void:
 	randomize()
 	current = self
 	net_role = online_role
-	me = "britain" if net_role == "client" else "france"
+	me = online_side if net_role != "" else "france"
 	local_side = me
 	Regiment.all.clear()
 	var meta: Dictionary = Iso.read_json("res://assets/map/ground.json")
@@ -172,6 +174,8 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if current == self:
 		current = null
+	if sync != null:
+		sync.detach()
 
 
 func _process(delta: float) -> void:
@@ -183,6 +187,9 @@ func _process(delta: float) -> void:
 		return
 	if sync != null:
 		sync.host_step(delta)
+		# The battle waits while the other player is away.
+		if not sync.link.connected:
+			return
 	if result != "":
 		return
 	clock += delta
@@ -483,6 +490,17 @@ func replay_fx(e: Array) -> void:
 		_puff(at, e[3], e[4])
 	elif kind.begins_with("s:"):
 		sounds.play(kind.substr(2), at)
+
+
+## A new battle in this scene (online, on both ends at once). In the tests,
+## where the battle is not the scene, it only notes that it would.
+var restarted := false
+
+
+func restart() -> void:
+	restarted = true
+	if get_tree().current_scene == self:
+		get_tree().reload_current_scene()
 
 
 ## Online, client: the host's battle has ended.

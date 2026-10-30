@@ -382,11 +382,13 @@ func _initialize() -> void:
 	# Online: a host and a client in this program, over a loopback link.
 	var links := NetLink.pair(self)
 	Battle.online_role = "host"
+	Battle.online_side = "france"
 	var hosting: Battle = load("res://scenes/main.tscn").instantiate()
 	root.add_child(hosting)
 	await process_frame
 	await process_frame
 	Battle.online_role = "client"
+	Battle.online_side = "britain"
 	var joining: Battle = load("res://scenes/main.tscn").instantiate()
 	root.add_child(joining)
 	await process_frame
@@ -419,6 +421,29 @@ func _initialize() -> void:
 	joining.fog.refresh()
 	_check(joining.fog.sees(joining.town_centre("britain").world) and not joining.fog.sees(joining.town_centre("france").world),
 		"the client sees its own base and not the French one")
+	# Stretcher teams of a British field hospital show on the client too.
+	hosting.add_building("britain", "hospital", hosting.town_centre("britain").world + Vector2(-200, 160), true)
+	_run(hosting, 0.5)
+	var their_teams := 0
+	for crew: Array in joining.medics.teams.values():
+		their_teams += crew.size()
+	_check(their_teams == 2, "the client sees the hospital's two stretcher teams (%d)" % their_teams)
+	# The line breaks: the host's battle waits, and goes on when it is back.
+	links[0].drop()
+	var paused_at := hosting.clock
+	_run(hosting, 2.0)
+	_check(is_equal_approx(hosting.clock, paused_at) and joining.status.contains("opnieuw verbinden"),
+		"while the other player is away the battle stands still (%s)" % joining.status)
+	links[0].restore()
+	_run(hosting, 1.0)
+	_check(hosting.clock > paused_at + 0.5, "and goes on once they are back")
+	# Another battle once both ask for one.
+	joining.sync.ask_rematch()
+	_check(not hosting.restarted and hosting.sync.they_want_more, "one player asking does not restart the battle")
+	hosting.sync.ask_rematch()
+	_check(hosting.restarted and joining.restarted, "when both ask, both start a new battle")
+	Battle.online_role = ""
+	Battle.online_side = "france"
 	hosting.queue_free()
 	joining.queue_free()
 	for link in links:

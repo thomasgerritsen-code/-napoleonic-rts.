@@ -41,9 +41,12 @@ F bataljon vormen, Escape annuleert een bouwplan; WASD/pijltjes, middelste
 muisknop en wieltje voor de camera, R voor een nieuwe slag na afloop.
 
 **Online spelen** (twee spelers, elk met het spel): de een kiest in het menu
-*Online: een slag hosten* en speelt Frankrijk; het menu toont zijn adres. De
-ander vult dat adres in bij *Meedoen* en speelt Groot-Brittannië. De slag
-begint zodra beiden verbonden zijn. De host rekent de slag door en stuurt de
+*Online hosten als Frankrijk* of *als Groot-Brittannië*; het menu toont zijn
+adres. De ander vult dat adres in bij *Meedoen* en speelt de andere kant. De
+slag begint zodra beiden verbonden zijn. Valt de verbinding weg, dan staat de
+slag stil en verbindt de ander vanzelf opnieuw; wie het spel opnieuw heeft
+gestart, komt via *Meedoen* terug in de lopende slag. Na afloop beginnen
+beiden met *Opnieuw spelen* een nieuwe slag. De host rekent de slag door en stuurt de
 stand tien keer per seconde; de bevelen van de ander gaan naar de host. Op
 hetzelfde netwerk werkt het direct; over internet moet de host UDP-poort
 47300 in zijn router doorsturen (of gebruik samen een VPN zoals Tailscale of

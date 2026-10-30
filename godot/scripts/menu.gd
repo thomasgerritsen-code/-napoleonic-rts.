@@ -1,8 +1,10 @@
 extends Control
 ## The start menu, as the web game's: a battle against the computer, the
 ## test field where two large armies meet without economy, or a battle
-## online against another player: one hosts (France) and waits, the other
-## joins with the host's address (Britain); it starts once both are there.
+## online against another player: one hosts (as France or Britain) and
+## waits, the other joins with the host's address and plays the other side;
+## it starts once both are there. A player who left can join again while the
+## host's battle runs.
 
 var _online_note: Label
 var _address: LineEdit
@@ -58,12 +60,16 @@ func _choice(box: VBoxContainer, text: String, note: String, mode: String) -> vo
 
 
 func _online(box: VBoxContainer) -> void:
-	var host_button := Button.new()
-	host_button.text = "Online: een slag hosten\nU speelt Frankrijk; de ander doet mee met uw adres (poort %d)." % NetLink.PORT
-	host_button.custom_minimum_size = Vector2(420, 64)
-	host_button.add_theme_font_size_override("font_size", 15)
-	host_button.pressed.connect(_host)
-	box.add_child(host_button)
+	var hosting := HBoxContainer.new()
+	box.add_child(hosting)
+	for side: String in ["france", "britain"]:
+		var host_button := Button.new()
+		host_button.text = "Online hosten als\n%s" % ("Frankrijk" if side == "france" else "Groot-Brittannië")
+		host_button.tooltip_text = "De ander doet mee met uw adres (UDP-poort %d) en speelt de andere kant." % NetLink.PORT
+		host_button.custom_minimum_size = Vector2(208, 56)
+		host_button.add_theme_font_size_override("font_size", 15)
+		host_button.pressed.connect(_host.bind(side))
+		hosting.add_child(host_button)
 	var row := HBoxContainer.new()
 	box.add_child(row)
 	_address = LineEdit.new()
@@ -71,7 +77,7 @@ func _online(box: VBoxContainer) -> void:
 	_address.custom_minimum_size = Vector2(270, 44)
 	row.add_child(_address)
 	var join_button := Button.new()
-	join_button.text = "Meedoen (Brits)"
+	join_button.text = "Meedoen"
 	join_button.custom_minimum_size = Vector2(146, 44)
 	join_button.pressed.connect(_join)
 	row.add_child(join_button)
@@ -84,8 +90,9 @@ func _online(box: VBoxContainer) -> void:
 	box.add_child(_online_note)
 
 
-func _host() -> void:
+func _host(side: String) -> void:
 	var link := NetLink.make(get_tree())
+	link.host_side = side
 	var err := link.host()
 	if err != OK:
 		_online_note.text = "Hosten lukt niet (poort %d bezet?)." % NetLink.PORT
@@ -98,8 +105,8 @@ func _host() -> void:
 		", ".join(mine) if not mine.is_empty() else "onbekend", NetLink.PORT]
 	link.joined.connect(func() -> void:
 		_online_note.text = "Tegenstander verbonden: de slag begint."
-		link.start())
-	link.started.connect(_go.bind("host"))
+		link.start(side))
+	link.started.connect(func(own: String) -> void: _go("host", own))
 
 
 func _join() -> void:
@@ -114,18 +121,20 @@ func _join() -> void:
 	_online_note.text = "Verbinden met %s…" % address
 	link.joined.connect(func() -> void: _online_note.text = "Verbonden: wachten tot de host begint.")
 	link.left.connect(func() -> void: _online_note.text = "Geen verbinding met %s." % address)
-	link.started.connect(_go.bind("client"))
+	link.started.connect(func(own: String) -> void: _go("client", own))
+	link.resumed.connect(func(own: String) -> void: _go("client", own))
 
 
-func _go(role: String) -> void:
+func _go(role: String, side: String) -> void:
 	# The menu goes; its listeners on the link go with it.
 	var link := NetLink.find(get_tree())
 	if link != null:
-		for sig: String in ["joined", "left", "started"]:
+		for sig: String in ["joined", "left", "started", "resumed"]:
 			for c: Dictionary in link.get_signal_connection_list(sig):
 				var callable: Callable = c["callable"]
 				if callable.get_object() == self:
 					link.disconnect(sig, callable)
 	Battle.mode = "campaign"
 	Battle.online_role = role
+	Battle.online_side = side
 	get_tree().change_scene_to_file("res://scenes/main.tscn")

@@ -19,6 +19,9 @@ var _clock := 0.0
 var _fx: Array = []              # host: effects since the last snapshot
 var snapshots := 0               # client: snapshots shown
 var commands := 0                # host: commands carried out
+## Another battle: whether we and the other player have asked for one.
+var we_want_more := false
+var they_want_more := false
 
 
 func _init(battle_: Battle, link_: NetLink) -> void:
@@ -26,11 +29,65 @@ func _init(battle_: Battle, link_: NetLink) -> void:
 	link = link_
 	if link.role == "host":
 		link.command_received.connect(run_command)
+		link.joined.connect(_on_back)
 	else:
 		link.snapshot_received.connect(apply)
-		link.told.connect(func(text: String) -> void: battle.status = text)
-	link.left.connect(func() -> void:
-		battle.status = "De verbinding met de andere speler is verbroken.")
+		link.told.connect(_on_told)
+	link.left.connect(_on_left)
+	link.started.connect(_on_started)
+	link.rematch_asked.connect(_on_rematch_asked)
+
+
+## The battle is closing: it hears the line no more.
+func detach() -> void:
+	for sig in link.get_signal_list():
+		for c: Dictionary in link.get_signal_connection_list(sig["name"]):
+			var callable: Callable = c["callable"]
+			if callable.get_object() == self:
+				link.disconnect(sig["name"], callable)
+
+
+func _on_told(text: String) -> void:
+	battle.status = text
+
+
+func _on_left() -> void:
+	battle.status = ("De andere speler is weg: de slag staat stil tot hij terug is." if link.role == "host"
+		else "De verbinding met de host is verbroken: opnieuw verbinden…")
+
+
+## Host: the other player is back (or started the game anew): the battle
+## goes on, and a player in the menu is let in again.
+func _on_back() -> void:
+	battle.status = "De andere speler is weer verbonden."
+	link.resume()
+
+
+## A new battle (both asked for one): this one makes way for it.
+func _on_started(side: String) -> void:
+	Battle.online_role = battle.net_role
+	Battle.online_side = side
+	detach()
+	battle.restart()
+
+
+func ask_rematch() -> void:
+	we_want_more = true
+	link.ask_rematch()
+	battle.status = "Opnieuw spelen gevraagd: wachten op de andere speler…" if not they_want_more else battle.status
+	_maybe_restart()
+
+
+func _on_rematch_asked() -> void:
+	they_want_more = true
+	battle.status = "De andere speler wil opnieuw spelen."
+	battle.refresh_hud()
+	_maybe_restart()
+
+
+func _maybe_restart() -> void:
+	if link.role == "host" and we_want_more and they_want_more:
+		link.start(battle.local_side)
 
 
 # ---- host ----
@@ -83,7 +140,7 @@ func snapshot() -> Dictionary:
 		"wetness": battle.weather.wetness if battle.weather != null else 0.0,
 		"result": battle.result, "winner": battle.winner, "end_reason": battle.end_reason, "ended_at": battle.ended_at,
 		"stats": battle.stats, "hold_side": battle.hold_side, "held_seconds": battle.held_seconds,
-		"wildlife_alarm": [], "fx": fx_now}
+		"teams": battle.medics.net_teams(), "fx": fx_now}
 
 
 ## Host: carry out a client's order with its own selection and side.
@@ -144,6 +201,7 @@ func apply(data: Dictionary) -> void:
 	if battle.weather != null:
 		battle.weather.raining = data["raining"]
 		battle.weather.wetness = data["wetness"]
+	battle.medics.apply_net_teams(data.get("teams", []))
 	for e: Array in data["fx"]:
 		battle.replay_fx(e)
 	battle.stats = data["stats"]

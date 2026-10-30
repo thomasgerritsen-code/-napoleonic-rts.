@@ -136,6 +136,50 @@ func update(delta: float) -> void:
 			wounded.remove_at(i)
 
 
+## Online, host: where the stretcher teams are, for the client.
+func net_teams() -> Array:
+	var list: Array = []
+	for h in teams:
+		var b := h as Building
+		for t: Team in teams[h]:
+			list.append([b.id, roundi(t.world.x), roundi(t.world.y), snappedf(t.facing, 0.01), t.state, t.moving,
+				t.target.id if t.target != null else 0])
+	return list
+
+
+## Online, client: show the host's stretcher teams, carrying whom they carry.
+func apply_net_teams(list: Array) -> void:
+	var seen := {}
+	for a: Array in list:
+		var h := battle.building_by_id(int(a[0]))
+		if h == null:
+			continue
+		if not teams.has(h):
+			var none: Array[Team] = []
+			teams[h] = none
+		var crew: Array[Team] = teams[h]
+		var i: int = seen.get(h, 0)
+		seen[h] = i + 1
+		if i >= crew.size():
+			var fresh := Team.new(h.side, Vector2(a[1], a[2]))
+			battle.add_to_field(fresh)
+			crew.append(fresh)
+		var t := crew[i]
+		t.world = t.world.lerp(Vector2(a[1], a[2]), 0.6) if t.world.distance_to(Vector2(a[1], a[2])) < 200.0 else Vector2(a[1], a[2])
+		t.facing = a[3]
+		t.state = a[4]
+		t.moving = a[5]
+		t.target = battle.unit_by_id(int(a[6])) if int(a[6]) > 0 else null
+		t.visible = h.side == battle.me or battle.fog == null or battle.fog.sees(t.world)
+		t.show_step(7.0)
+	# Teams of a fallen hospital go.
+	for h in teams.keys():
+		if not seen.has(h):
+			for t: Team in teams[h]:
+				t.queue_free()
+			teams.erase(h)
+
+
 func _raise_teams(h: Building, count: int) -> void:
 	var list: Array[Team] = []
 	for i in count:

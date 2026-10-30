@@ -288,6 +288,16 @@ func _show_end() -> void:
 			table.add_child(c)
 	var buttons := HBoxContainer.new()
 	box.add_child(buttons)
+	if battle.net_role != "" and battle.sync != null:
+		var rematch := Button.new()
+		rematch.text = "Opnieuw spelen"
+		rematch.tooltip_text = "Een nieuwe slag zodra ook de andere speler dit kiest."
+		rematch.custom_minimum_size = Vector2(170, 44)
+		rematch.pressed.connect(func() -> void:
+			battle.sync.ask_rematch()
+			rematch.disabled = true
+			rematch.text = "Wachten op de ander…")
+		buttons.add_child(rematch)
 	if battle.net_role == "":
 		var again := Button.new()
 		again.text = "Nieuwe slag (R)"
