@@ -288,6 +288,12 @@ func _initialize() -> void:
 	_run(battle, 12.0)
 	_check(battle.regiments.size() == before_count + 1, "the barracks forms the battalion by itself once the drummer is ready")
 
+	# Tab selects the next battalion.
+	battle.cycle_regiment()
+	_check(not battle.selected.is_empty() and battle.selected[0].side == "france", "Tab selects a French battalion")
+	var nobody_now: Array[Unit] = []
+	battle.select_units(nobody_now)
+
 	# An order takes a moment to reach a battalion.
 	var ordered: Array[Regiment] = [shaken]
 	var goal_spot := shaken.centroid() + Vector2(120, 0)

@@ -1139,6 +1139,35 @@ func assign_workers(work: String) -> void:
 		"iron": "Geen afzetting met een eigen mijn.", "build": "Niets in aanbouw."}[work])
 
 
+## Tab: the next (Shift: previous) French battalion, selected and in view.
+func cycle_regiment(back := false) -> void:
+	var own: Array[Regiment] = []
+	for r in regiments:
+		if r.side == "france" and not r.destroyed():
+			own.append(r)
+	if own.is_empty():
+		return
+	var now := own.find(selected[0]) if not selected.is_empty() else -1
+	var next := own[posmod(now + (-1 if back else 1), own.size())]
+	select_units(next.living())
+	focus_selection()
+
+
+## Space: the camera to the selection.
+func focus_selection() -> void:
+	if camera == null:
+		return
+	if selected_building != null:
+		camera.focus(Iso.to_screen(selected_building.world))
+		return
+	if selected_units.is_empty():
+		return
+	var sum := Vector2.ZERO
+	for u in selected_units:
+		sum += u.world
+	camera.focus(Iso.to_screen(sum / selected_units.size()))
+
+
 ## Halt: the battalions stand where they are, the free men stop.
 func halt() -> void:
 	for r in selected:
@@ -1497,6 +1526,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				halt()
 			KEY_K:
 				toggle_shot()
+			KEY_TAB:
+				cycle_regiment(key.shift_pressed)
+			KEY_SPACE:
+				focus_selection()
 			KEY_F:
 				form_regiment()
 			KEY_M:
