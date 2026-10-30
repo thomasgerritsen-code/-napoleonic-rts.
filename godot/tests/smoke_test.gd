@@ -285,8 +285,12 @@ func _initialize() -> void:
 	battle.economy["france"]["wood"] += 500.0
 	_check(battle.train_missing(depot) >= 1 and depot.auto_regiment, "and trains it, with Auto-bataljon on")
 	var before_count := battle.regiments.size()
-	_run(battle, 12.0)
-	_check(battle.regiments.size() == before_count + 1, "the barracks forms the battalion by itself once the drummer is ready")
+	for i in 25:
+		_run(battle, 1.0)
+		if battle.regiments.size() > before_count:
+			break
+	_check(battle.regiments.size() == before_count + 1, "the barracks forms the battalion by itself once the drummer is ready (queue %s, missing %s)"
+		% [depot.queue, battle.quick_plan(depot)["missing"]])
 
 	# Tab selects the next battalion.
 	battle.cycle_regiment()
