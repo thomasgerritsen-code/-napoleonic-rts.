@@ -53,6 +53,7 @@ var weather: Weather
 var sounds: Sounds
 var medics: FieldMedics
 var trenches: Trenches
+var wildlife: Wildlife
 var _woods_clock := 0.0
 var _drum_clock := 0.0
 const WALL_CELL := 80.0
@@ -68,6 +69,7 @@ var _next_id := 10000
 var _drag_start: Variant = null
 var _order_start: Variant = null
 var _river: Array = []
+var _woods_list: Array = []
 
 
 func _ready() -> void:
@@ -105,6 +107,10 @@ func _ready() -> void:
 	_load_opening()
 	if mode == "lab":
 		_set_up_lab()
+	# Deer and rabbits, once the bases stand (they keep clear of buildings).
+	wildlife = Wildlife.new()
+	wildlife.battle = self
+	wildlife.populate(_woods_list, _units_layer)
 	ai = BritishCommand.new(self)
 	ai.army_only = mode == "lab"
 	camera = BattleCamera.new()
@@ -142,6 +148,7 @@ func _process(delta: float) -> void:
 	for b in buildings:
 		b.step(delta)
 	medics.update(delta)
+	wildlife.update(delta)
 	trenches.update(delta)
 	_hold_territories(delta)
 	_beat_drums(delta)
@@ -251,7 +258,9 @@ func _load_opening() -> void:
 		s.setup(self, data, props)
 		supplies.append(s)
 		_units_layer.add_child(s)
-	woods.plant(self, _units_layer, Iso.read_json("res://assets/map/gamemap.json"))
+	var woods_map: Dictionary = Iso.read_json("res://assets/map/gamemap.json")
+	woods.plant(self, _units_layer, woods_map)
+	_woods_list = woods_map["woods"]
 	for data: Dictionary in start["buildings"]:
 		var b := add_building(String(data["side"]), String(data["type"]), Vector2(data["x"], data["y"]), true)
 		b.id = int(data["id"])
@@ -731,6 +740,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 	if u.type != "cavalry":
 		sounds.play("cannon" if u.type == "artillery" else "musket", u.world)
 		_puff(u.muzzle(), 1.3 if u.type == "artillery" else 0.55, 3.2 if u.type == "artillery" else 2.6)
+	wildlife.alarm(u.world)
 	if not is_foe(target, u.side):
 		return
 	var distance := u.world.distance_to(spot(target))
@@ -803,6 +813,7 @@ func throw_grenade(thrower: Unit, at: Vector2) -> void:
 func _burst(side: String, at: Vector2, radius: float, damage: float) -> void:
 	sounds.play("cannon", at)
 	_puff(at, 1.0, 1.8)
+	wildlife.alarm(at)
 	for u in units:
 		if u.alive() and u.side != side and u.world.distance_to(at) < radius:
 			u.hit(damage * randf_range(0.7, 1.3))

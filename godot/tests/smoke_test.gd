@@ -31,6 +31,15 @@ func _initialize() -> void:
 	var point := Vector2(4500, 3200)
 	_check(Iso.to_world(Iso.to_screen(point)).distance_to(point) < 1.0, "screen to world inverts world to screen")
 
+	var deer := 0
+	for a in battle.wildlife.animals:
+		if a["kind"] != "rabbit":
+			deer += 1
+	_check(deer >= 6 and battle.wildlife.animals.size() > deer + 10, "deer by the woods and rabbits in the meadows (%d animals)" % battle.wildlife.animals.size())
+	var startled: Dictionary = battle.wildlife.animals[0]
+	battle.wildlife.alarm(startled["world"])
+	_check(startled["state"] == "run", "gunfire sends them running")
+
 	battle.fog.refresh()
 	_check(battle.fog.sees(battle.town_centre("france").world), "France sees its own base")
 	_check(not battle.fog.sees(battle.town_centre("britain").world) and not battle.town_centre("britain").visible,
