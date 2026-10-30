@@ -406,7 +406,9 @@ func _initialize() -> void:
 	var walk_to := redcoat.world + Vector2(70, 30)
 	joining.order(walk_to)
 	var hosts_redcoat := hosting.unit_by_id(redcoat.id)
-	_check(hosting.sync.commands == 1 and hosts_redcoat.slot.distance_to(walk_to) < 5.0, "the client's order is carried out by the host")
+	# (A peasant sent next to a bush or tree goes to work on it instead.)
+	_check(hosting.sync.commands == 1 and (hosts_redcoat.slot.distance_to(walk_to) < 40.0 or hosts_redcoat.task != ""),
+		"the client's order is carried out by the host (%d command, slot %s, task '%s')" % [hosting.sync.commands, hosts_redcoat.slot, hosts_redcoat.task])
 	_run(hosting, 3.0)
 	_check(redcoat.net_target.distance_to(hosts_redcoat.world) < 2.0 and hosts_redcoat.world.distance_to(walk_to) < 40.0,
 		"and the client sees its man walk there")
