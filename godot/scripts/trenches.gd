@@ -25,6 +25,10 @@ var craters: Array[Dictionary] = []
 var _clock := 0.0
 var _next_id := 0
 var _banks: Array[Node2D] = []
+## The gabions and sandbags, each its own sprite among the men; rebuilt when
+## a trench's look changes (key: what they were built for).
+var _revetment: Array[Sprite2D] = []
+var _revetment_key := ""
 var _fascine: Texture2D
 var _gabion: Texture2D
 var _bags: Texture2D
@@ -42,8 +46,6 @@ class Bank extends Node2D:
 			return
 		var t: Dictionary = owner_list.list[index]
 		TrenchArt.draw_bank(self, t, position)
-		TrenchArt.draw_revetment(self, t, position, owner_list._gabion, owner_list._props.get("gabion", {}),
-			owner_list._bags, owner_list._props.get("sandbags", {}))
 
 
 func _ready() -> void:
@@ -84,7 +86,35 @@ func _process(_delta: float) -> void:
 		busy = busy or t["progress"] < 1.0 or int(t.get("upgrade_to", 0)) != 0
 	if busy:
 		queue_redraw()
+	_place_revetment()
 	_dress_men()
+
+
+func _place_revetment() -> void:
+	var key := ""
+	for t in list:
+		key += "%d:%d:%d:%.2f;" % [TrenchArt.id_of(t), int(t.get("level", 1)), int(t.get("upgrade_to", 0)), float(t.get("upgrade_progress", 0.0))]
+	if key == _revetment_key:
+		return
+	_revetment_key = key
+	for s in _revetment:
+		s.queue_free()
+	_revetment.clear()
+	for t in list:
+		for spot: Array in TrenchArt.revetment_spots(t):
+			var kind: String = spot[0]
+			var tex: Texture2D = _gabion if kind == "gabion" else _bags
+			if tex == null:
+				continue
+			var meta: Dictionary = _props.get(kind, {})
+			var sprite := Sprite2D.new()
+			sprite.texture = tex
+			sprite.centered = false
+			sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE * (1.0 if kind == "gabion" else 0.8)
+			sprite.offset = -Vector2(meta["pivot"]["x"], meta["pivot"]["y"])
+			sprite.position = spot[1]
+			battle.add_to_field(sprite)
+			_revetment.append(sprite)
 
 
 ## Once a second: who stands braced, who digs, who mans a trench.

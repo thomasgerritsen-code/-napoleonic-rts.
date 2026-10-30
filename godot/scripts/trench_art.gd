@@ -308,43 +308,29 @@ static func draw_bank(canvas: CanvasItem, t: Dictionary, shift: Vector2) -> void
 
 
 ## Gabions in a row along the inside of the bank (gaps between them for the
-## muskets), and sandbags along the crest of a bank running across the screen.
-static func draw_revetment(canvas: CanvasItem, t: Dictionary, shift: Vector2, gabion: Texture2D, gabion_meta: Dictionary,
-		bags: Texture2D, bags_meta: Dictionary) -> void:
+## muskets), and sandbags along the crest of a bank running across the screen:
+## where each stands on the screen, as [kind ("gabion"/"sandbags"), screen
+## point]. Each is drawn as its own sprite among the men, so it stands in front
+## of or behind each man as it should.
+static func revetment_spots(t: Dictionary) -> Array:
 	var level := int(t.get("level", 1))
 	var build := 1.0 if level >= 3 else (float(t.get("upgrade_progress", 0.0)) if int(t.get("upgrade_to", 0)) == 3 else 0.0)
-	if gabion == null or t["progress"] < 1.0 or build <= 0.0:
-		return
+	var spots: Array = []
+	if t["progress"] < 1.0 or build <= 0.0:
+		return spots
 	var f := Frame.new(t)
 	var tid := id_of(t)
-	var near := sin(float(t["facing"])) > 0.0
 	var step := GABION_GAP * PPM
 	var n := maxi(1, floori((2.0 * f.half - f.w * 1.2) / step))
-	var spots: Array[Vector2] = []
 	for i in n + 1:
 		if build < 1.0 and h(tid * 7 + i, 9) > build:
 			continue
 		var u := -n * step / 2.0 + i * step + (h(tid * 13 + i, 2) - 0.5) * 3.0
-		spots.append(f.at(u, lip_v(f, u) + 3.0, minf(lift(f, u), 0.12)) - shift)
-	spots.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.y < b.y)
-	var k := Iso.SPRITE_SCALE
-	var baskets := func() -> void:
-		for s in spots:
-			canvas.draw_texture_rect(gabion, Rect2(s - Vector2(gabion_meta["pivot"]["x"], gabion_meta["pivot"]["y"]) * k,
-				Vector2(gabion.get_width(), gabion.get_height()) * k), false)
-	var sacks := func() -> void:
-		if bags == null or build < 1.0 or absf(sin(float(t["facing"]))) <= 0.82:
-			return
+		spots.append(["gabion", f.at(u, lip_v(f, u) + 3.0, minf(lift(f, u), 0.12))])
+	if build >= 1.0 and absf(sin(float(t["facing"]))) > 0.82:
 		var bs := 1.7 * PPM
 		var m := maxi(1, floori((2.0 * f.half - f.w * 1.6) / bs))
 		for i in m + 1:
 			var u := -m * bs / 2.0 + i * bs
-			var s := f.at(u, lip_v(f, u) + 8.0, lift(f, u) * 0.95) - shift
-			canvas.draw_texture_rect(bags, Rect2(s - Vector2(bags_meta["pivot"]["x"], bags_meta["pivot"]["y"]) * k * 0.8,
-				Vector2(bags.get_width(), bags.get_height()) * k * 0.8), false)
-	if near:
-		baskets.call()
-		sacks.call()
-	else:
-		sacks.call()
-		baskets.call()
+			spots.append(["sandbags", f.at(u, lip_v(f, u) + 8.0, lift(f, u) * 0.95)])
+	return spots
