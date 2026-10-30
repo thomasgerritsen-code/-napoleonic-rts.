@@ -34,6 +34,10 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 
+	# The computer builds and trains as ever, but sends no attack waves while
+	# the features are checked (one would sweep through the test men).
+	battle.ai.set("_next_wave", 1.0e9)
+
 	var start := Rules.start()
 	var towns := 0
 	for b in battle.buildings:
