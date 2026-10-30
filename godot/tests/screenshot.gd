@@ -74,7 +74,8 @@ func _initialize() -> void:
 
 
 func _shot(battle: Battle, at: Vector2, path: String) -> void:
-	battle.camera.zoom = Vector2.ONE * 2.2
+	var zoom := OS.get_environment("SHOT_ZOOM")
+	battle.camera.zoom = Vector2.ONE * (float(zoom) if zoom != "" else 2.2)
 	battle.camera.focus(Iso.to_screen(at))
 	for i in 12:
 		battle.trenches._process(0.0)
