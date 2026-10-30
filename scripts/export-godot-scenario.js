@@ -36,7 +36,8 @@ const ATLASES = ['fr_iso_infantry', 'fr_iso_fallen', 'br_iso_infantry', 'br_iso_
   // Wildlife: red deer and rabbits.
   'wds_iso_stag', 'wdh_iso_hind', 'wrb_iso_rabbit'];
 const PROP_NAMES = ['oak', 'beech', 'pine', 'spruce', 'birch', 'bush', 'hawthorn', 'barracks_fr', 'barracks_br',
-  'cottage', 'barn', 'tower_fr', 'tower_br', 'hospital_fr', 'hospital_br', 'well', 'haystack', 'bridge_stone', 'bridge_wood', 'poplar', 'fern', 'hazel'];
+  'cottage', 'barn', 'tower_fr', 'tower_br', 'hospital_fr', 'hospital_br', 'well', 'haystack', 'bridge_stone', 'bridge_wood', 'poplar', 'fern', 'hazel',
+  'lumbercamp_fr', 'lumbercamp_br', 'field_bare', 'field_young', 'field_ripe'];
 const VILLAGE_KINDS = ['barn', 'chapel', 'cottage', 'cottage2', 'farmhouse', 'farmhouse2', 'inn'];
 // As the web iso view: half the cottages whitewashed, some farmhouses stone.
 const strHash = text => { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };

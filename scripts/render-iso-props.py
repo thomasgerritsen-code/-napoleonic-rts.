@@ -540,6 +540,116 @@ def build_hospital(root, side):
 
 
 # --- field-work kit (trenches) ---------------------------------------------------
+# --- work sites -------------------------------------------------------------------
+def pennant(root, x, y, colors, height=3.2):
+    """A small camp flag on a staff, the side's colours (fr tricolour, br red/blue)."""
+    part("cyl", (0.045, height, 0.035), (x, y, height / 2), M("#6b4a2e", "bark"), root, name="staff", segments=8)
+    fw, fh = 0.95, 0.6
+    for i, c in enumerate(colors):
+        part("box", (fw / len(colors), 0.04, fh), (x + fw / len(colors) * (i + 0.5), y, height - fh / 2 - 0.08),
+             M(c, "cloth", 0.9), root, name="pennant")
+
+
+def log(root, length, r, loc, rot=(0, 90, 0), name="log"):
+    part("cyl", (r, length), loc, M("#6a4a2f", "bark", 0.9, scale=1.4), root, rot=rot, name=name, segments=12)
+    # Pale cut ends.
+    axis = Vector((1, 0, 0)) if rot[1] else Vector((0, 1, 0))
+    for sgn in (-1, 1):
+        end = Vector(loc) + axis * sgn * (length / 2 + 0.005)
+        part("cyl", (r * 0.92, 0.02), tuple(end), M("#c9a774", "plain", 0.8), root, rot=rot, name="cut", segments=12)
+
+
+def build_lumbercamp(root, side):
+    """A woodcutters' camp: an open lean-to shed over split wood, a pile of
+    trunks, a chopping block with its axe, a sawhorse and chips on the ground."""
+    rng = random.Random(41)
+    # A trodden patch of bare earth (round-edged, not a slab).
+    part("cyl", (1.0, 0.03), (0, 0.2, 0.015), M("#7a6347", "dirt", 0.95, alt="#6f6a45"), root, name="yard", segments=28)
+    bpy.context.object.scale = (3.2, 2.35, 1.0)
+    # The shed: four posts, a plank roof sloping to the front.
+    wood = M("#6e4c2e", "planks", 0.85)
+    for x in (-1.7, 1.7):
+        part("box", (0.16, 0.16, 2.5), (x, 1.75, 1.25), wood, root, name="post")
+        part("box", (0.16, 0.16, 1.9), (x, 0.35, 0.95), wood, root, name="post")
+    part("box", (3.9, 1.75, 0.08), (0, 1.05, 2.22), M("#7b5636", "planks", 0.85, scale=1.4), root, rot=(-12, 0, 0), name="roof")
+    # Split wood stacked under it, end out.
+    for row in range(4):
+        for k in range(11):
+            x = -1.45 + k * 0.29 + (0.14 if row % 2 else 0)
+            if x > 1.5:
+                continue
+            part("box", (0.25, 1.1, 0.2), (x, 1.15, 0.14 + row * 0.21), M("#b48a58" if (k + row) % 3 else "#9c7448", "plain", 0.85),
+                 root, rot=(0, 0, rng.uniform(-4, 4)), name="split")
+    # A pile of trunks in front, three, two and one.
+    for row, count in enumerate((3, 2, 1)):
+        for k in range(count):
+            y = -0.95 + (k - (count - 1) / 2) * 0.42
+            log(root, 2.8, 0.2, (-1.5, y, 0.22 + row * 0.36), name="trunk")
+    # Chopping block with the axe in it, and chips about.
+    part("cyl", (0.32, 0.55), (1.35, -0.85, 0.3), M("#7a5a3a", "bark", 0.9), root, name="block", segments=14)
+    part("cyl", (0.3, 0.02), (1.35, -0.85, 0.585), M("#c9a774", "plain", 0.8), root, name="blocktop", segments=14)
+    part("box", (0.05, 0.05, 0.8), (1.45, -0.85, 0.95), M("#8a6a44", "plain", 0.7), root, rot=(0, 28, 0), name="haft")
+    part("box", (0.26, 0.04, 0.14), (1.3, -0.85, 0.63), M("#6d7378", "plain", 0.35, metal=0.8), root, rot=(0, 28, 0), name="axehead")
+    for i in range(14):
+        part("box", (0.12, 0.05, 0.02), (1.35 + rng.uniform(-0.8, 0.8), -0.85 + rng.uniform(-0.7, 0.6), 0.05),
+             M("#c7a46f", "plain", 0.85), root, rot=(0, 0, rng.uniform(0, 180)), name="chip")
+    # A sawhorse with a trunk across it.
+    for x in (0.35, 1.25):
+        for a in (22, -22):
+            part("box", (0.08, 0.08, 0.95), (x, 0.0 + (0.12 if a > 0 else -0.12), 0.44), wood, root, rot=(a, 0, 0), name="leg")
+    log(root, 1.9, 0.16, (0.8, 0.0, 0.92), name="sawlog")
+    pennant(root, 2.6, 1.9, ("#24315c", "#efeee8", "#b02a2e") if side == "fr" else ("#c0282d", "#22336b"))
+
+
+FIELD_W, FIELD_D = 155.44 / 22.5, 117.92 / 22.5    # the game's farm footprint in metres
+
+
+def build_field(root, stage):
+    """A grain field on the farm's footprint: ploughed furrows, green shoots or
+    ripe wheat; a low wattle fence along the far sides and a scarecrow."""
+    rng = random.Random(7)
+    w, d = FIELD_W, FIELD_D
+    part("box", (w, d, 0.05), (0, 0, 0.025), M("#6b5236", "dirt", 0.95, alt="#5d4a33"), root, name="soil")
+    rows = 13
+    for i in range(rows):
+        y = -d / 2 + 0.3 + i * (d - 0.6) / (rows - 1)
+        part("box", (w - 0.35, 0.16, 0.07), (0, y, 0.07), M("#7d6142", "dirt", 0.95, alt="#6e5539"), root, name="furrow")
+        if stage != "young":
+            continue
+        n = 24
+        for k in range(n):
+            x = -w / 2 + 0.3 + k * (w - 0.6) / (n - 1) + rng.uniform(-0.05, 0.05)
+            if stage == "young":
+                part("ico", (0.11, 1.0, 1.0, 0.7), (x, y + rng.uniform(-0.03, 0.03), 0.16),
+                     M("#6f9a3e" if rng.random() < 0.7 else "#86ab4a", "leaves", 0.9), root, name="shoot")
+    if stage == "ripe":
+        # Ripe wheat: a golden band along each furrow, its ears nodding on top.
+        for i in range(rows):
+            y = -d / 2 + 0.3 + i * (d - 0.6) / (rows - 1)
+            part("box", (w - 0.45, 0.3, 0.42), (0, y, 0.27), M("#c9a14e", "straw", 0.95), root, name="wheat")
+            for k in range(46):
+                x = -w / 2 + 0.3 + k * (w - 0.6) / 45 + rng.uniform(-0.04, 0.04)
+                part("ball", (0.05, 1.0, 1.0, 1.7), (x, y + rng.uniform(-0.1, 0.1), 0.5 + rng.uniform(-0.03, 0.05)),
+                     M("#dcbd6c" if rng.random() < 0.7 else "#cda75a", "straw", 0.95), root, name="ear", segments=6)
+    # Wattle fence along the far and the left side.
+    fence = M("#6a4a2c", "bark", 0.9)
+    for x in [(-w / 2) + k * w / 8 for k in range(9)]:
+        part("cyl", (0.05, 0.75), (x, d / 2 + 0.1, 0.37), fence, root, name="stake", segments=6)
+    for y in [(-d / 2) + k * d / 6 for k in range(7)]:
+        part("cyl", (0.05, 0.75), (-w / 2 - 0.1, y, 0.37), fence, root, name="stake", segments=6)
+    for z in (0.35, 0.6):
+        part("box", (w, 0.06, 0.06), (0, d / 2 + 0.1, z), fence, root, name="rail")
+        part("box", (0.06, d, 0.06), (-w / 2 - 0.1, 0, z), fence, root, name="rail")
+    # A scarecrow in the far corner.
+    sx, sy = w / 2 - 0.8, d / 2 - 0.7
+    part("cyl", (0.04, 1.7), (sx, sy, 0.85), fence, root, name="pole", segments=6)
+    part("box", (0.9, 0.05, 0.05), (sx, sy, 1.35), fence, root, name="arms")
+    part("box", (0.36, 0.2, 0.55), (sx, sy, 1.25), M("#7b3b2a", "cloth"), root, name="coat")
+    part("ball", (0.14,), (sx, sy, 1.66), M("#c9b07a", "straw"), root, name="head", segments=10)
+    part("cyl", (0.26, 0.05, 0.26), (sx, sy, 1.79), M("#4b3a27", "straw"), root, name="brim", segments=12)
+    part("cyl", (0.12, 0.16, 0.08), (sx, sy, 1.88), M("#4b3a27", "straw"), root, name="crown", segments=10)
+
+
 def build_gabion(root):
     """A gabion: a wicker basket of upright stakes and woven withies, filled
     with earth, as set along the inside of a parapet."""
@@ -604,6 +714,11 @@ BUILDERS = {
     "beech": build_beech, "birch": build_birch, "pine": build_pine, "spruce": build_spruce, "willow": build_willow,
     "hawthorn": build_hawthorn, "hazel": build_hazel, "fern": build_fern,
     "bridge": build_bridge, "bridge_stone": build_bridge_stone, "bridge_wood": build_bridge_wood,
+    "lumbercamp_fr": lambda r: build_lumbercamp(r, "fr"),
+    "lumbercamp_br": lambda r: build_lumbercamp(r, "br"),
+    "field_bare": lambda r: build_field(r, "bare"),
+    "field_young": lambda r: build_field(r, "young"),
+    "field_ripe": lambda r: build_field(r, "ripe"),
 }
 
 
@@ -620,7 +735,7 @@ def world_points():
 
 
 # Buildings turn to the camera at an angle so two facades and a gable show.
-YAW = {"tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
+YAW = {"lumbercamp_fr": 28, "lumbercamp_br": -28, "tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
 
 
 def render_prop(kind: str, out: Path, samples: int) -> dict:

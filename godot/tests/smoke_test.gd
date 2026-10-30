@@ -162,6 +162,17 @@ func _initialize() -> void:
 		and Rules.trained_at("stable", "france").has("officer:mounted"), "the barracks and stable offer each side its own troop kinds")
 	_check(Rules.item_cost("infantry:grenadier").get("food", 0) == 140.0, "a grenadier costs the musketeer's price and his extra")
 
+	# The grain field and the lumber camp wear their Blender pictures; the
+	# field ripens from green shoots to golden wheat.
+	var acre := battle.add_building("france", "farm", home + Vector2(-420, -300), true)
+	var young_look: String = acre.get("_shown_field")
+	acre.crop = Rules.FARM_CAPACITY
+	acre.call("_show_field")
+	_check(young_look == "field_young" and acre.get("_shown_field") == "field_ripe", "a field ripens from green shoots to golden wheat")
+	var sawpit := battle.add_building("france", "lumbercamp", home + Vector2(-420, -520), true)
+	var shown: Sprite2D = sawpit.get("_sprite")
+	_check(shown != null and shown.texture.resource_path.ends_with("lumbercamp_fr.webp"), "the lumber camp wears its Blender picture")
+
 	# A tower strengthened to level 2: more health, further reach, and it sees further.
 	var tower := battle.add_building("france", "tower", home + Vector2(-200, 380), true)
 	battle.economy["france"]["wood"] += 400.0

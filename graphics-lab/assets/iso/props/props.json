@@ -189,6 +189,48 @@
    },
    "w": 130
   },
+  "field_bare": {
+   "footprint": {
+    "d": 5.44,
+    "w": 7.1
+   },
+   "h": 197,
+   "heightM": 1.96,
+   "image": "field_bare.webp",
+   "pivot": {
+    "x": 175,
+    "y": 113
+   },
+   "w": 375
+  },
+  "field_ripe": {
+   "footprint": {
+    "d": 5.44,
+    "w": 7.1
+   },
+   "h": 197,
+   "heightM": 1.96,
+   "image": "field_ripe.webp",
+   "pivot": {
+    "x": 175,
+    "y": 113
+   },
+   "w": 375
+  },
+  "field_young": {
+   "footprint": {
+    "d": 5.44,
+    "w": 7.1
+   },
+   "h": 197,
+   "heightM": 1.96,
+   "image": "field_young.webp",
+   "pivot": {
+    "x": 175,
+    "y": 113
+   },
+   "w": 375
+  },
   "gabion": {
    "footprint": {
     "d": 0.69,
@@ -272,6 +314,34 @@
     "y": 257
    },
    "w": 510
+  },
+  "lumbercamp_br": {
+   "footprint": {
+    "d": 5.12,
+    "w": 7.34
+   },
+   "h": 229,
+   "heightM": 3.2,
+   "image": "lumbercamp_br.webp",
+   "pivot": {
+    "x": 163,
+    "y": 142
+   },
+   "w": 403
+  },
+  "lumbercamp_fr": {
+   "footprint": {
+    "d": 6.11,
+    "w": 6.05
+   },
+   "h": 277,
+   "heightM": 3.2,
+   "image": "lumbercamp_fr.webp",
+   "pivot": {
+    "x": 156,
+    "y": 183
+   },
+   "w": 350
   },
   "oak": {
    "footprint": {

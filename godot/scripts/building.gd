@@ -2,8 +2,9 @@ class_name Building
 extends Node2D
 ## A building of the web game, drawn with its art: the town centre and
 ## barracks (the Blender barracks), houses (a cottage), stable and foundry (a
-## barn), tower, field hospital, lumber camp and mine (the web game's own
-## drawings), and fields drawn here. It rises while peasants work on it,
+## barn), tower, field hospital, the lumber camp and the grain field (Blender
+## props in the same style: a woodcutters' shed, and a field ploughed, green
+## or ripe as its grain grows), and the mine (the web game's own drawing). It rises while peasants work on it,
 ## trains units in a queue, and a field grows grain for its farmers.
 
 const PROP := {"towncenter": "barracks", "barracks": "barracks", "house": "cottage", "stable": "barn",
@@ -36,6 +37,7 @@ var selected := false:
 		queue_redraw()
 
 var _sprite: Sprite2D
+var _shown_field := ""
 
 
 func setup(battle_: Battle, side_: String, type_: String, at: Vector2, built: bool) -> void:
@@ -56,12 +58,21 @@ func setup(battle_: Battle, side_: String, type_: String, at: Vector2, built: bo
 
 
 func _add_art() -> void:
-	if type == "farm":
-		return
 	_sprite = Sprite2D.new()
 	_sprite.centered = false
 	var nation := "france" if side == "france" else "britain"
-	if type in ["lumbercamp", "mine"]:
+	if type == "farm" or type == "lumbercamp":
+		# Modelled at true size: one metre is Iso.SPRITE_SCALE game px.
+		var prop_name := _field_look() if type == "farm" else "lumbercamp_" + ("fr" if side == "france" else "br")
+		var prop: Dictionary = battle.props[prop_name]
+		_sprite.texture = load("res://assets/props/%s.webp" % prop_name)
+		_sprite.offset = -Vector2(prop["pivot"]["x"], prop["pivot"]["y"])
+		_sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE
+		if type == "farm":
+			# The field lies flat: the men walk over it, not behind it.
+			_sprite.z_index = -1
+			_shown_field = prop_name
+	elif type == "mine":
 		# The web game draws these sites 1.5 footprints wide, foot at 0.64 of 224.
 		_sprite.texture = load("res://assets/art/%s_%s.png" % [type, nation])
 		var k := size.x * 1.5 / 256.0
@@ -239,7 +250,7 @@ func _show_progress() -> void:
 
 func _draw() -> void:
 	if type == "farm":
-		_draw_field()
+		_show_field()
 	var ground := Rect2(-size.x / 2.0, -size.y * Iso.SQ / 2.0, size.x, size.y * Iso.SQ)
 	if selected:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, Iso.SQ))
@@ -261,16 +272,16 @@ func _draw() -> void:
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * production, bar.size.y)), Color(0.6, 0.75, 1.0))
 
 
-## A ploughed field in furrows, golden as the grain stands.
-func _draw_field() -> void:
-	var w := size.x
-	var h := size.y * Iso.SQ
-	var corners := PackedVector2Array([Vector2(-w / 2, -h / 2), Vector2(w / 2, -h / 2), Vector2(w / 2, h / 2), Vector2(-w / 2, h / 2)])
+## The field as its grain stands: ploughed, green, or ripe.
+func _field_look() -> String:
 	var ripe := crop / Rules.FARM_CAPACITY if complete else 0.0
-	var soil := Color(0.42, 0.32, 0.2, 0.35 + 0.55 * progress)
-	draw_colored_polygon(corners, soil.lerp(Color(0.78, 0.66, 0.3), ripe * 0.85))
-	var rows := 9
-	for i in rows + 1:
-		var y := -h / 2 + h * i / rows
-		draw_line(Vector2(-w / 2, y), Vector2(w / 2, y), Color(0.3, 0.22, 0.12, 0.45), 1.0)
-	draw_polyline(corners + PackedVector2Array([corners[0]]), Color(0.36, 0.27, 0.15, 0.9), 1.5)
+	return "field_bare" if ripe < 0.15 else ("field_young" if ripe < 0.6 else "field_ripe")
+
+
+func _show_field() -> void:
+	var look := _field_look()
+	if look != _shown_field and _sprite != null:
+		_shown_field = look
+		_sprite.texture = load("res://assets/props/%s.webp" % look)
+		var prop: Dictionary = battle.props[look]
+		_sprite.offset = -Vector2(prop["pivot"]["x"], prop["pivot"]["y"])
