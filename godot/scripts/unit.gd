@@ -27,6 +27,9 @@ var wound := ""
 ## Nerve, 0 to 100 (the web game's morale): shaken by hits and by comrades
 ## falling near him, steadied by his officer and drummer.
 var morale := 100.0
+## Wind, 0 to 100 (the web game's stamina): marching and charging tire a man,
+## standing he gets it back; a tired man goes slower.
+var stamina := 100.0
 var wounded_at := 0.0
 var heal_until := 0.0
 var hospital: Building = null
@@ -169,13 +172,25 @@ func step(delta: float) -> void:
 		return
 	_clock -= delta
 	_grenade(delta)
+	var was := world
 	if regiment != null:
 		_step_in_regiment(delta)
 	elif type == "worker":
 		_step_worker(delta)
 	else:
 		_step_free(delta)
+	if type != "worker":
+		var drain := -7.5
+		if regiment != null and regiment.charging != null:
+			drain = 10.0
+		elif world.distance_squared_to(was) > 0.0001:
+			drain = 4.5 if type == "cavalry" else 2.8
+		stamina = clampf(stamina - drain * delta, 0.0, 100.0)
 	position = Iso.to_screen(world)
+
+
+func wind() -> float:
+	return 0.68 + 0.32 * stamina / 100.0
 
 
 ## Grenadiers and the guard lob a grenade at an enemy within reach while
@@ -210,7 +225,7 @@ func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
 	if battle.weather != null:
 		pace *= battle.weather.pace(type)
 	if regiment == null:
-		pace *= injury()
+		pace *= injury() * wind()
 	if type == "cavalry" and not battle.trenches.list.is_empty() and battle.trenches.obstacle_at(world):
 		pace *= float(Rules.orders()["cavalryTrenchSpeed"])
 	world += way.limit_length(speed * pace * delta)

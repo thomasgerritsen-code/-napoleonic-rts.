@@ -464,9 +464,11 @@ func update(delta: float, regiments: Array[Regiment]) -> void:
 	# The battalion keeps together at the pace its wounded can go.
 	var list := living()
 	var sum := 0.0
+	var wind := 0.0
 	for u in list:
 		sum += u.injury()
-	_pace = 0.7 + 0.3 * sum / list.size()
+		wind += u.wind()
+	_pace = (0.7 + 0.3 * sum / list.size()) * wind / list.size()
 	if charging != null:
 		_melee(delta)
 		return
