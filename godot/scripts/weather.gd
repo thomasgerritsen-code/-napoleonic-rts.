@@ -30,8 +30,8 @@ var _season := -1
 func _ready() -> void:
 	layer = 1
 	_rain = CPUParticles2D.new()
-	_rain.amount = 700
-	_rain.lifetime = 0.7
+	_rain.amount = 1100
+	_rain.lifetime = 0.45
 	_rain.emitting = false
 	_rain.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
 	_rain.direction = Vector2(-0.25, 1.0)
@@ -77,9 +77,11 @@ func _season_index() -> int:
 func _process(delta: float) -> void:
 	if battle == null:
 		return
+	# Drops are born over the whole screen (and a strip above it), so the rain
+	# fills it top to bottom whatever its size; each falls for a moment.
 	var view := get_viewport().get_visible_rect().size
-	_rain.position = Vector2(view.x / 2.0 + 80.0, -20.0)
-	_rain.emission_rect_extents = Vector2(view.x / 2.0 + 160.0, 10.0)
+	_rain.position = Vector2(view.x / 2.0 + 80.0, view.y / 2.0 - 60.0)
+	_rain.emission_rect_extents = Vector2(view.x / 2.0 + 160.0, view.y / 2.0 + 60.0)
 	_rain.emitting = raining
 	update(delta)
 
