@@ -33,6 +33,7 @@ const CAV_FILE_GAP := 29.0
 const CAV_RANK_GAP := 31.0
 const CAV_CHARGE_REACH := 520.0
 
+var id := 0                  # online: the same battalion on both ends
 var name := ""
 var side := "france"
 ## "infantry" (a battalion) or "cavalry" (a regiment of horse: riders of one
@@ -190,6 +191,12 @@ func strength() -> int:
 
 func full_strength() -> int:
 	return _start
+
+
+## Online, on the client: the host's count.
+func set_full_strength(n: int) -> void:
+	_start = n
+	_break_base = n
 
 
 func destroyed() -> bool:

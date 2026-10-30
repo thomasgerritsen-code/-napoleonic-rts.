@@ -378,6 +378,50 @@ func _initialize() -> void:
 	lab.queue_free()
 	await process_frame
 	Battle.mode = "campaign"
+
+	# Online: a host and a client in this program, over a loopback link.
+	var links := NetLink.pair(self)
+	Battle.online_role = "host"
+	var hosting: Battle = load("res://scenes/main.tscn").instantiate()
+	root.add_child(hosting)
+	await process_frame
+	await process_frame
+	Battle.online_role = "client"
+	var joining: Battle = load("res://scenes/main.tscn").instantiate()
+	root.add_child(joining)
+	await process_frame
+	await process_frame
+	Battle.online_role = ""
+	hosting.go_online(links[0])
+	joining.go_online(links[1])
+	_check(hosting.me == "france" and joining.me == "britain", "online the host plays France, the client Britain")
+	_run(hosting, 0.3)
+	_check(joining.sync.snapshots >= 1 and joining.units.size() == hosting.units.size(), "the client is shown the host's battle")
+	var redcoat: Unit = null
+	for u in joining.units:
+		if u.side == "britain" and u.type == "worker":
+			redcoat = u
+	var picked_one: Array[Unit] = [redcoat]
+	joining.select_units(picked_one)
+	var walk_to := redcoat.world + Vector2(70, 30)
+	joining.order(walk_to)
+	var hosts_redcoat := hosting.unit_by_id(redcoat.id)
+	_check(hosting.sync.commands == 1 and hosts_redcoat.slot.distance_to(walk_to) < 5.0, "the client's order is carried out by the host")
+	_run(hosting, 3.0)
+	_check(redcoat.net_target.distance_to(hosts_redcoat.world) < 2.0 and hosts_redcoat.world.distance_to(walk_to) < 40.0,
+		"and the client sees its man walk there")
+	joining.select_building(joining.town_centre("britain"))
+	joining.train("worker")
+	_check(hosting.town_centre("britain").queue.size() == 1 and joining.status.contains("opleiding"),
+		"the client trains a peasant, and hears it from the host (%s)" % joining.status)
+	joining.fog.refresh()
+	_check(joining.fog.sees(joining.town_centre("britain").world) and not joining.fog.sees(joining.town_centre("france").world),
+		"the client sees its own base and not the French one")
+	hosting.queue_free()
+	joining.queue_free()
+	for link in links:
+		link.queue_free()
+	await process_frame
 	AtlasLibrary.clear()
 	for failure in _failures:
 		printerr("FAILED: ", failure)

@@ -113,9 +113,13 @@ func hit(damage: float) -> void:
 	if hp <= 0.0:
 		hp = 0.0
 		battle.on_destroyed(self)
-		var fade := create_tween()
-		fade.tween_property(self, "modulate", Color(0.3, 0.28, 0.25, 0.0), 2.5)
-		fade.tween_callback(hide)
+		_collapse()
+
+
+func _collapse() -> void:
+	var fade := create_tween()
+	fade.tween_property(self, "modulate", Color(0.3, 0.28, 0.25, 0.0), 2.5)
+	fade.tween_callback(hide)
 
 
 const HOSPITAL_REACH := 160.0
@@ -195,6 +199,36 @@ func _strengthen(delta: float) -> void:
 		_sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE * (0.55 + 0.04 * (tower_level - 1))
 	battle.refresh_hud()
 	battle.say("%s gereed · niveau %d/3." % [next["label"], tower_level], side)
+
+
+## Online: what the client needs to show this building.
+func net_state() -> Array:
+	return [id, side, type, roundi(world.x), roundi(world.y), snappedf(hp, 0.1), max_hp, complete, snappedf(progress, 0.001),
+		queue.duplicate(), snappedf(production, 0.001), snappedf(crop, 0.1), tower_level, upgrade_to, snappedf(upgrade_progress, 0.001),
+		rally, auto_regiment]
+
+
+## Online, on the client: take on the host's state for this building.
+func net_apply(a: Array) -> void:
+	var was_standing := standing()
+	hp = a[5]
+	max_hp = a[6]
+	complete = a[7]
+	progress = a[8]
+	queue.assign(a[9])
+	production = a[10]
+	crop = a[11]
+	if tower_level != a[12] and _sprite != null:
+		_sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE * (0.55 + 0.04 * (int(a[12]) - 1))
+	tower_level = a[12]
+	upgrade_to = a[13]
+	upgrade_progress = a[14]
+	rally = a[15]
+	auto_regiment = a[16]
+	_show_progress()
+	if was_standing and not standing():
+		battle.on_destroyed(self)
+		_collapse()
 
 
 func _show_progress() -> void:

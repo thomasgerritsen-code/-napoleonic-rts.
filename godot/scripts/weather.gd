@@ -85,13 +85,16 @@ func _process(delta: float) -> void:
 
 
 func update(delta: float) -> void:
-	_next -= delta
+	# Online, the client takes rain and wetness from the host's snapshots.
+	var client := battle != null and battle.net_role == "client"
+	_next -= 0.0 if client else delta
 	if _next <= 0.0:
 		raining = not raining
 		_next = randf_range(RAIN.x, RAIN.y) if raining else randf_range(DRY.x, DRY.y)
 		if battle != null and raining:
 			battle.say("Het begint te regenen: modder vertraagt de mannen en natte lopen ketsen.")
-	wetness = clampf(wetness + (delta / SOAK if raining else -delta / DRY_OUT), 0.0, 1.0)
+	if not client:
+		wetness = clampf(wetness + (delta / SOAK if raining else -delta / DRY_OUT), 0.0, 1.0)
 	var season := _season_index()
 	if season != _season and battle != null:
 		_season = season

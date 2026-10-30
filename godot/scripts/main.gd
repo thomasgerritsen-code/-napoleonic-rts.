@@ -19,9 +19,12 @@ const QUICK_REACH := 520.0  # how far around a barracks its men are gathered
 static var mode := "campaign"
 ## The battle being fought (for the battalions' sense of danger).
 static var current: Battle = null
-## Online: "" (alone against the computer), "host" (plays France and runs the
-## battle) or "client" (plays Britain, shown the host's battle).
-static var net_role := ""
+## The menu's choice for the next battle: "" (alone against the computer),
+## "host" (plays France and runs the battle) or "client" (plays Britain,
+## shown the host's battle).
+static var online_role := ""
+## This battle's part online (from online_role).
+var net_role := ""
 
 var units: Array[Unit] = []
 var buildings: Array[Building] = []
@@ -53,8 +56,15 @@ var clock := 0.0
 ## The side this player commands; the computer (alone) or the other player
 ## (online) has the other.
 var me := "france"
-## Online: the link to the other player (NetLink), or null.
-var net: Node = null
+## The side of the player at this screen (me can stand in for the other
+## player while the host carries out their command).
+var local_side := "france"
+## Online: snapshots and commands over the link to the other player.
+var sync: NetSync = null
+## Online, host: true while carrying out the other player's command.
+var _remote := false
+var _unit_index := {}
+var _building_index := {}
 var flank_hits := 0
 ## The battalions among the selected men.
 var selected: Array[Regiment]:
@@ -95,7 +105,9 @@ var _orders: Array[Dictionary] = []   # orders on their way to the battalions
 func _ready() -> void:
 	randomize()
 	current = self
+	net_role = online_role
 	me = "britain" if net_role == "client" else "france"
+	local_side = me
 	Regiment.all.clear()
 	var meta: Dictionary = Iso.read_json("res://assets/map/ground.json")
 	Iso.load_relief(meta)
@@ -152,6 +164,9 @@ func _ready() -> void:
 	_hud.battle = self
 	add_child(_hud)
 	say("Rechtsklik met boeren op struiken voor voedsel; bouw een houthakkerskamp bij het bos voor hout.")
+	var link := NetLink.find(get_tree())
+	if net_role != "" and link != null:
+		go_online(link)
 
 
 func _exit_tree() -> void:
@@ -160,6 +175,14 @@ func _exit_tree() -> void:
 
 
 func _process(delta: float) -> void:
+	current = self
+	if net_role == "client":
+		for u in units:
+			u.net_glide(delta)
+		_tidy_selection()
+		return
+	if sync != null:
+		sync.host_step(delta)
 	if result != "":
 		return
 	clock += delta
@@ -370,24 +393,105 @@ func _add_ground(meta: Dictionary) -> void:
 	add_child(ground)
 
 
-func add_unit(side: String, type: String, at: Vector2, troop := "") -> Unit:
+func add_unit(side: String, type: String, at: Vector2, troop := "", id := 0) -> Unit:
 	var u := Unit.new()
-	u.id = _new_id()
+	u.id = id if id > 0 else _new_id()
 	u.setup(self, side, type, at, troop)
 	u.fired.connect(_on_fired)
 	units.append(u)
+	_unit_index[u.id] = u
 	_units_layer.add_child(u)
 	return u
 
 
-func add_building(side: String, type: String, at: Vector2, built: bool) -> Building:
+func add_building(side: String, type: String, at: Vector2, built: bool, id := 0) -> Building:
 	var b := Building.new()
-	b.id = _new_id()
+	b.id = id if id > 0 else _new_id()
 	b.setup(self, side, type, at, built)
 	buildings.append(b)
+	_building_index[b.id] = b
 	_units_layer.add_child(b)
 	_walls_dirty = true
 	return b
+
+
+func unit_by_id(id: int) -> Unit:
+	return _unit_index.get(id)
+
+
+func building_by_id(id: int) -> Building:
+	return _building_index.get(id)
+
+
+## Online: play over a NetLink, as "host" or "client".
+func go_online(link: NetLink) -> void:
+	sync = NetSync.new(self, link)
+
+
+## Online, client: a player's action goes to the host instead (true when it
+## did). The host carries it out with this selection.
+func _relay(action: String, args: Array = []) -> bool:
+	if net_role != "client" or sync == null:
+		return false
+	var ids: Array[int] = []
+	for u in selected_units:
+		ids.append(u.id)
+	sync.link.send_command({"name": action, "args": args, "units": ids,
+		"building": selected_building.id if selected_building != null else 0})
+	return true
+
+
+## Online, host: carry out the other player's command as them.
+func acting_for(side: String, picked: Array[Unit], b: Building, action: Callable) -> void:
+	var saved_me := me
+	var saved_units := selected_units
+	var saved_building := selected_building
+	var saved_placing := placing
+	me = side
+	selected_units = picked
+	selected_building = b
+	_remote = true
+	action.call()
+	_remote = false
+	for u in units:
+		if u.side == side:
+			u.selected = false
+	for x in buildings:
+		if x.side == side:
+			x.selected = false
+	me = saved_me
+	selected_units = saved_units
+	selected_building = saved_building
+	placing = saved_placing
+
+
+## A building laid out where the player of `me` asks, by its selected peasants.
+func build_at(type: String, at: Vector2) -> void:
+	placing = type
+	place(at)
+
+
+func play_sound(kind: String, at: Vector2) -> void:
+	sounds.play(kind, at)
+	if sync != null and net_role == "host":
+		sync.fx("s:" + kind, at)
+
+
+## Online, client: the host's shots and smoke.
+func replay_fx(e: Array) -> void:
+	var kind: String = e[0]
+	var at := Vector2(e[1], e[2])
+	if kind == "p":
+		_puff(at, e[3], e[4])
+	elif kind.begins_with("s:"):
+		sounds.play(kind.substr(2), at)
+
+
+## Online, client: the host's battle has ended.
+func end_for_client() -> void:
+	var at := ended_at
+	_finish(winner, end_reason)
+	ended_at = at
 
 
 func _new_id() -> int:
@@ -678,10 +782,12 @@ func spawn_trained(b: Building, type: String) -> void:
 ## A message for the player of `side` ("" or our own side: this screen;
 ## online, the other player's are sent to them; the computer's go nowhere).
 func say(text: String, side := "") -> void:
-	if side == "" or side == me:
+	if side == "":
+		side = me
+	if side == local_side:
 		status = text
-	elif net != null and net_role == "host":
-		net.call("tell", text)
+	elif net_role == "host" and sync != null:
+		sync.link.tell(text)
 
 
 ## Whether a person commands this side (us, or the other player online).
@@ -735,7 +841,7 @@ func heal_near(at: Vector2, side: String, reach: float, share: float) -> void:
 
 func tower_fires(tower: Building, foe: Unit, shots: int, damage: float) -> void:
 	var top := tower.world + Vector2(0, -6)
-	sounds.play("musket", top)
+	play_sound("musket", top)
 	for i in shots:
 		_puff(top + Vector2(randf_range(-8, 8), 0), 0.5, 2.2)
 		if randf() < 0.6:
@@ -760,7 +866,7 @@ func _beat_drums(delta: float) -> void:
 			best_d = d
 			best = r
 	if best != null:
-		sounds.play("drum", best.centroid())
+		play_sound("drum", best.centroid())
 
 
 ## The season's colour on every tree and bush.
@@ -789,7 +895,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			_grapeshot(u, target)
 			return
 	if u.type != "cavalry":
-		sounds.play("cannon" if u.type == "artillery" else "musket", u.world)
+		play_sound("cannon" if u.type == "artillery" else "musket", u.world)
 		_puff(u.muzzle(), 1.3 if u.type == "artillery" else 0.55, 3.2 if u.type == "artillery" else 2.6)
 	wildlife.alarm(u.world)
 	if not is_foe(target, u.side):
@@ -842,7 +948,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 ## Grapeshot: a cone of balls, everyone within 145 px and about 16 degrees of
 ## the line of fire, hardest close by (the web game: 24 at the muzzle).
 func _grapeshot(u: Unit, target: Node2D) -> void:
-	sounds.play("cannon", u.world)
+	play_sound("cannon", u.world)
 	_puff(u.muzzle(), 1.5, 2.6)
 	wildlife.alarm(u.world)
 	var aim := (spot(target) - u.world).angle()
@@ -859,6 +965,8 @@ func _grapeshot(u: Unit, target: Node2D) -> void:
 
 ## Round shot or grapeshot for the selected guns.
 func toggle_shot() -> void:
+	if _relay("toggle_shot"):
+		return
 	var guns: Array[Unit] = []
 	for u in selected_units:
 		if u.type == "artillery" and u.alive():
@@ -897,7 +1005,7 @@ func throw_grenade(thrower: Unit, at: Vector2) -> void:
 
 
 func _burst(side: String, at: Vector2, radius: float, damage: float) -> void:
-	sounds.play("cannon", at)
+	play_sound("cannon", at)
 	_puff(at, 1.0, 1.8)
 	wildlife.alarm(at)
 	for u in units:
@@ -906,6 +1014,8 @@ func _burst(side: String, at: Vector2, radius: float, damage: float) -> void:
 
 
 func _puff(world_at: Vector2, size: float, life: float) -> void:
+	if sync != null and net_role == "host":
+		sync.fx("p", world_at, size, life)
 	var puff := Sprite2D.new()
 	puff.texture = _smoke
 	puff.position = Iso.to_screen(world_at) + Vector2(0.0, -10.0)
@@ -969,6 +1079,8 @@ func _tidy_selection() -> void:
 
 
 func order(at: Vector2, face: Variant = null) -> void:
+	if _relay("order", [at, face]):
+		return
 	var b := selected_building
 	if b != null and b.side == me and b.complete and not Rules.trained_at(b.type, me).is_empty():
 		b.rally = at
@@ -1081,11 +1193,15 @@ func _deliver_orders() -> void:
 
 
 func set_formation(kind: String) -> void:
+	if _relay("set_formation", [kind]):
+		return
 	for r in selected:
 		r.set_formation(kind)
 
 
 func charge() -> void:
+	if _relay("charge"):
+		return
 	for r in selected:
 		r.charge(regiments)
 
@@ -1093,6 +1209,8 @@ func charge() -> void:
 ## Hold the ground (or stop holding it): a battalion that holds braces, and in
 ## line digs a trench.
 func hold() -> void:
+	if _relay("hold"):
+		return
 	var list := selected
 	var on := false
 	for r in list:
@@ -1106,6 +1224,8 @@ func hold() -> void:
 
 ## Open order for the selected battalions (or closed again).
 func skirmish() -> void:
+	if _relay("skirmish"):
+		return
 	var list := selected
 	var on := false
 	for r in list:
@@ -1120,6 +1240,8 @@ func skirmish() -> void:
 ## The selected peasants to work: on fields with room (three to a field),
 ## at the wood by a lumber camp, at a mine, or on unfinished buildings.
 func assign_workers(work: String) -> void:
+	if _relay("assign_workers", [work]):
+		return
 	var sent := 0
 	for u in selected_units:
 		if u.type != "worker" or not u.alive():
@@ -1184,6 +1306,8 @@ func focus_selection() -> void:
 
 ## Halt: the battalions stand where they are, the free men stop.
 func halt() -> void:
+	if _relay("halt"):
+		return
 	for r in selected:
 		r.order_move(r.centroid(), r.facing)
 	for u in selected_units:
@@ -1241,6 +1365,8 @@ func quick_plan(b: Building) -> Dictionary:
 
 
 func quick_regiment(b: Building = null) -> Regiment:
+	if b == null and _relay("quick_regiment"):
+		return null
 	b = b if b != null else selected_building
 	if b == null or b.type != "barracks":
 		return null
@@ -1270,6 +1396,8 @@ func _missing_text(missing: Dictionary) -> String:
 ## Train what the barracks lacks for a battalion (men already queued count),
 ## and let it form the battalion itself once they are ready.
 func train_missing(b: Building = null) -> int:
+	if b == null and _relay("train_missing"):
+		return 0
 	b = b if b != null else selected_building
 	if b == null or b.type != "barracks":
 		return 0
@@ -1293,6 +1421,8 @@ func train_missing(b: Building = null) -> int:
 
 
 func toggle_auto_regiment() -> void:
+	if _relay("toggle_auto_regiment"):
+		return
 	var b := selected_building
 	if b != null and b.type == "barracks":
 		b.auto_regiment = not b.auto_regiment
@@ -1309,6 +1439,8 @@ func _auto_regiments() -> void:
 
 
 func upgrade_trench() -> void:
+	if _relay("upgrade_trench"):
+		return
 	for r in selected:
 		if trenches.upgrade(r):
 			break
@@ -1317,6 +1449,8 @@ func upgrade_trench() -> void:
 
 ## The selected free musketeers fill the selected battalion's ranks.
 func reinforce() -> void:
+	if _relay("reinforce"):
+		return
 	var battalions: Array[Regiment] = selected
 	if battalions.is_empty():
 		return
@@ -1331,6 +1465,8 @@ func reinforce() -> void:
 
 
 func form_regiment(from: Array[Unit] = []) -> Regiment:
+	if from.is_empty() and _relay("form_regiment"):
+		return null
 	var list: Array[Unit] = selected_units if from.is_empty() else from
 	var r := Regiment.raise(list)
 	if r == null:
@@ -1340,6 +1476,7 @@ func form_regiment(from: Array[Unit] = []) -> Regiment:
 			say("Een bataljon vraagt %d tot %d musketiers, een officier en een tamboer; een regiment cavalerie %d tot %d ruiters van één soort en een officier te paard." % [
 				Regiment.MIN_MEN, Regiment.MAX_MEN, Regiment.CAV_MIN, Regiment.CAV_MAX])
 		return null
+	r.id = _new_id()
 	regiments.append(r)
 	if commanded(r.side):
 		say("%s gevormd met %d man." % [r.name, r.men.size()], r.side)
@@ -1360,6 +1497,8 @@ func count_of(side: String, item: String) -> int:
 
 
 func train(type: String) -> void:
+	if _relay("train", [type]):
+		return
 	var b := selected_building
 	if b == null or not queue_unit(b, type):
 		return
@@ -1371,6 +1510,8 @@ func train(type: String) -> void:
 ## Strengthen a finished tower to its next level, as the web game: the cost
 ## now, the garrison keeps firing while it builds.
 func upgrade_tower(b: Building) -> bool:
+	if _relay("upgrade_tower"):
+		return false
 	if b == null or not b.can_upgrade() or result != "":
 		return false
 	var next := Rules.tower_level(b.tower_level + 1)
@@ -1473,6 +1614,9 @@ func lay_out(side: String, type: String, at: Vector2, builders: Array[Unit]) -> 
 
 
 func place(at: Vector2) -> void:
+	if _relay("build_at", [placing, at]):
+		placing = ""
+		return
 	var builders: Array[Unit] = []
 	for u in selected_units:
 		if u.type == "worker":

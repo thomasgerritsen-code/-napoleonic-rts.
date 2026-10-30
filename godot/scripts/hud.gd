@@ -97,7 +97,12 @@ func _process(_delta: float) -> void:
 		battle.territories_held(battle.me), battle.territories_held("britain" if battle.me == "france" else "france"),
 		DayNight.clock_text(battle.clock) + ("  ·  " + battle.weather.label() if battle.weather != null else "")]
 	_status.text = battle.status
-	_plan.text = "Britse bevelhebber: %s" % battle.ai.plan
+	if battle.net_role == "":
+		_plan.text = "Britse bevelhebber: %s" % battle.ai.plan
+	else:
+		var link_up := battle.sync != null and battle.sync.link.connected
+		_plan.text = "Online · u speelt %s · %s" % ["Frankrijk" if battle.me == "france" else "Groot-Brittannië",
+			"verbonden" if link_up else "geen verbinding"]
 	_info.text = _describe()
 	_result.text = ""
 	if battle.result != "" and _end == null:

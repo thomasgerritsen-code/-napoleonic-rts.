@@ -68,6 +68,12 @@ var _path: Array[Vector2] = []
 var _goal := Vector2(INF, INF)
 var _prefix := "fr"
 var _anim := ""
+## The last animation state played and how often one was restarted (online:
+## the client plays the same).
+var anim_state := ""
+var anim_seq := 0
+## Online, on the client: where the host last had this man.
+var net_target := Vector2.INF
 var _clock := 0.0
 var _look := 0.0
 
@@ -501,6 +507,52 @@ func hit(damage: float) -> void:
 		regiment.lost(self)
 
 
+## Online: what the client needs to show this man.
+func net_state() -> Array:
+	return [id, side, type, troop, roundi(world.x), roundi(world.y), snappedf(facing, 0.01), snappedf(hp, 0.1), max_hp,
+		anim_state, anim_seq, state == State.DEAD, regiment.id if regiment != null else 0, wound,
+		roundi(morale), roundi(stamina), shot, ammo["round"], ammo["grape"], task, snappedf(modulate.a, 0.01)]
+
+
+## Online, on the client: take on the host's state for this man.
+func net_apply(a: Array) -> void:
+	var to := Vector2(a[4], a[5])
+	if net_target == Vector2.INF or to.distance_to(world) > 220.0:
+		world = to
+	net_target = to
+	facing = a[6]
+	var hurt := not is_equal_approx(hp, a[7])
+	hp = a[7]
+	max_hp = a[8]
+	wound = a[13]
+	morale = a[14]
+	stamina = a[15]
+	shot = a[16]
+	ammo["round"] = a[17]
+	ammo["grape"] = a[18]
+	task = a[19]
+	modulate.a = a[20]
+	if a[11] and state != State.DEAD:
+		state = State.DEAD
+		selected = false
+		z_index = -1
+		if not _sprite.sprite_frames.has_animation("die_e"):
+			_wear(["%s_iso_infantry", "%s_iso_fallen"])
+		hurt = true
+	if a[9] != "" and (a[9] != anim_state or a[10] != anim_seq):
+		_play(a[9], a[10] != anim_seq)
+		anim_seq = a[10]
+	if hurt:
+		queue_redraw()
+
+
+## Online, on the client: glide towards the host's position between snapshots.
+func net_glide(delta: float) -> void:
+	if net_target != Vector2.INF and state != State.DEAD:
+		world = world.lerp(net_target, minf(1.0, delta * 10.0))
+	position = Iso.to_screen(world)
+
+
 ## A hit shakes the man, and a little those beside him in the ranks.
 func _shaken(amount: float) -> void:
 	morale = maxf(0.0, morale - amount)
@@ -583,6 +635,9 @@ func _crew_play(state_name: String) -> void:
 
 
 func _play(state_name: String, restart := false) -> void:
+	if state_name != anim_state or restart:
+		anim_seq += 1
+	anim_state = state_name
 	_crew_play(state_name)
 	var anim := "%s_%s" % [state_name, Iso.direction(facing)]
 	if not _sprite.sprite_frames.has_animation(anim):
