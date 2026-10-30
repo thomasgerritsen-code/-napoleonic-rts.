@@ -276,10 +276,10 @@ func _initialize() -> void:
 	battle.spawn_trained(depot, "infantry")
 	var newest: Unit = battle.units[battle.units.size() - 1]
 	_check(newest.slot.distance_to(depot.rally) < 60.0, "a trained man goes to the rally point")
-	var gathered: Array[Unit] = [newest]
+	var barracks_men: Array[Unit] = [newest]
 	for i in 11:
-		gathered.append(battle.add_unit("france", "infantry", depot.rally + Vector2(i * 14, 30)))
-	gathered.append(battle.add_unit("france", "officer", depot.rally + Vector2(0, 60)))
+		barracks_men.append(battle.add_unit("france", "infantry", depot.rally + Vector2(i * 14, 30)))
+	barracks_men.append(battle.add_unit("france", "officer", depot.rally + Vector2(0, 60)))
 	_check(not battle.quick_plan(depot)["ok"] and battle.quick_plan(depot)["missing"]["drummer"] == 1, "the barracks names what is missing (a drummer)")
 	battle.economy["france"]["food"] += 500.0
 	battle.economy["france"]["wood"] += 500.0
@@ -323,6 +323,36 @@ func _initialize() -> void:
 
 	print("GODOT_SMOKE ", JSON.stringify({"food": gathered, "economy": battle.economy, "fallen": fallen,
 		"pop": {"france": battle.pop_used("france"), "britain": battle.pop_used("britain")}, "plan": battle.ai.plan}))
+	# Winning: by holding all three territories for two minutes...
+	for t in battle.territories:
+		t["owner"] = "france"
+		t["claim"] = ""
+		t["contested"] = false
+	for i in 119:
+		battle._check_result(1.0)
+	_check(battle.result == "", "holding all three territories does not win before two minutes")
+	for i in 3:
+		battle._check_result(1.0)
+	_check(battle.winner == "france" and battle.end_reason == "territories", "but does after two minutes (%s)" % battle.result)
+	# ...or by taking the headquarters and destroying every fighting man.
+	battle.result = ""
+	battle.winner = ""
+	for t in battle.territories:
+		t["owner"] = ""
+	battle.town_centre("britain").hit(100000.0)
+	battle._check_result(0.1)
+	var british_soldiers := 0
+	for u in battle.units:
+		if u.side == "britain" and u.alive() and u.type != "worker":
+			british_soldiers += 1
+	_check((battle.result == "") == (british_soldiers > 0), "a fallen headquarters alone does not end it while soldiers fight on")
+	for u in battle.units:
+		if u.side == "britain" and u.type != "worker":
+			u.hit(100000.0)
+	battle._check_result(0.1)
+	_check(battle.winner == "france" and battle.end_reason == "elimination" and battle.side_stats("britain")["buildings_lost"] >= 1,
+		"the battle is won with no British headquarters and no British soldiers left (%s)" % battle.side_stats("britain"))
+	await process_frame
 	battle.queue_free()
 	await process_frame
 
