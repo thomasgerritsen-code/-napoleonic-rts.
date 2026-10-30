@@ -13,6 +13,7 @@ extends Node2D
 const SIDES := ["france", "britain"]
 const LAB_BATTALIONS := 4    # a side on the test field
 const LAB_MEN := 36
+const QUICK_REACH := 520.0  # how far around a barracks its men are gathered
 
 ## "campaign" (the full game) or "lab" (the test field), chosen in the menu.
 static var mode := "campaign"
@@ -158,6 +159,7 @@ func _process(delta: float) -> void:
 	if _woods_clock <= 0.0:
 		_woods_clock = 0.5
 		woods.update()
+		_auto_regiments()
 	ai.update(delta)
 	_tidy_selection()
 	_check_result()
@@ -637,6 +639,14 @@ func spawn_trained(b: Building, type: String) -> void:
 	var out := b.world + Vector2((1.0 if b.side == "france" else -1.0) * b.size.x * 0.75, b.size.y * 0.55)
 	var u := add_unit(b.side, Rules.item_type(type), out + Vector2(randf_range(-14, 14), randf_range(-10, 10)), Rules.item_troop(type))
 	u.slot = u.world + Vector2((1.0 if b.side == "france" else -1.0) * 40.0, randf_range(-20, 20))
+	if b.rally != null:
+		# To the rally point; a peasant sent to a resource goes to work there.
+		var to: Vector2 = b.rally
+		var supply := _supply_at(to)
+		if u.type == "worker" and supply != null and supply.usable_by(b.side):
+			u.set_task("gather", supply)
+		else:
+			u.move_to(to + Vector2(randf_range(-30, 30), randf_range(-20, 20)))
 	if b.side == "france":
 		say("%s is klaar." % Rules.label(type))
 		if _hud != null:
@@ -885,6 +895,13 @@ func _tidy_selection() -> void:
 
 
 func order(at: Vector2, face: Variant = null) -> void:
+	var b := selected_building
+	if b != null and b.side == "france" and b.complete and not Rules.trained_at(b.type, "france").is_empty():
+		b.rally = at
+		say("Verzamelpunt van %s gezet." % Rules.label(b.type).to_lower())
+		if _overlay != null:
+			_overlay.mark(Iso.to_screen(at))
+		return
 	if selected_units.is_empty():
 		return
 	var foe := _thing_at(at, true)
@@ -1024,6 +1041,133 @@ func skirmish() -> void:
 	if not list.is_empty():
 		say("Tirailleurs: verspreid, vuren naar believen en verder, moeilijk te raken, maar kwetsbaar voor ruiterij." if on else "Gesloten orde: de gelederen sluiten.")
 	refresh_hud()
+
+
+## Halt: the battalions stand where they are, the free men stop.
+func halt() -> void:
+	for r in selected:
+		r.order_move(r.centroid(), r.facing)
+	for u in selected_units:
+		if u.regiment == null:
+			u.task = ""
+			u.move_to(u.world)
+	if not selected_units.is_empty():
+		say("Halt.")
+
+
+## Where a barracks gathers its men: its rally point, else before its door.
+func muster_point(b: Building) -> Vector2:
+	if b.rally != null:
+		return b.rally
+	return b.world + Vector2(0, b.size.y)
+
+
+## The free men near a barracks that would make up a battalion now: the
+## musketeers of the kind most of them are (up to 36), an officer on foot and
+## a drummer, and what is missing (the web game's quick regiment).
+func quick_plan(b: Building) -> Dictionary:
+	var at := muster_point(b)
+	var near: Array[Unit] = []
+	for u in units:
+		if u.side == b.side and u.alive() and u.regiment == null and u.world.distance_to(at) <= QUICK_REACH:
+			near.append(u)
+	near.sort_custom(func(a: Unit, c: Unit) -> bool: return a.world.distance_to(at) < c.world.distance_to(at))
+	var kinds := {}
+	for u in near:
+		if u.type == "infantry":
+			kinds[u.troop] = kinds.get(u.troop, 0) + 1
+	var kind := ""
+	var most := 0
+	for k: String in kinds:
+		if kinds[k] > most:
+			most = kinds[k]
+			kind = k
+	var men: Array[Unit] = []
+	var officer: Unit = null
+	var drummer: Unit = null
+	for u in near:
+		if u.type == "infantry" and u.troop == kind and men.size() < Regiment.MAX_MEN:
+			men.append(u)
+		elif u.type == "officer" and u.troop != "mounted" and officer == null:
+			officer = u
+		elif u.type == "drummer" and drummer == null:
+			drummer = u
+	var missing := {"infantry": maxi(0, Regiment.MIN_MEN - men.size()), "officer": 0 if officer != null else 1, "drummer": 0 if drummer != null else 1}
+	if officer != null:
+		men.append(officer)
+	if drummer != null:
+		men.append(drummer)
+	return {"men": men, "kind": kind, "missing": missing,
+		"ok": missing["infantry"] == 0 and missing["officer"] == 0 and missing["drummer"] == 0}
+
+
+func quick_regiment(b: Building = null) -> Regiment:
+	b = b if b != null else selected_building
+	if b == null or b.type != "barracks":
+		return null
+	var plan := quick_plan(b)
+	if not plan["ok"]:
+		if b.side == "france":
+			say("Nog nodig voor een bataljon: %s. Kies 'Train ontbrekende'." % _missing_text(plan["missing"]))
+		return null
+	var r := form_regiment(plan["men"])
+	if r != null:
+		var at := muster_point(b)
+		var foe := town_centre("britain" if b.side == "france" else "france")
+		r.order_move(at, (foe.world - at).angle() if foe != null else r.facing)
+	return r
+
+
+func _missing_text(missing: Dictionary) -> String:
+	var parts: Array[String] = []
+	if missing["infantry"] > 0:
+		parts.append("%d musketiers" % missing["infantry"])
+	if missing["officer"] > 0:
+		parts.append("een officier")
+	if missing["drummer"] > 0:
+		parts.append("een tamboer")
+	return ", ".join(parts)
+
+
+## Train what the barracks lacks for a battalion (men already queued count),
+## and let it form the battalion itself once they are ready.
+func train_missing(b: Building = null) -> int:
+	b = b if b != null else selected_building
+	if b == null or b.type != "barracks":
+		return 0
+	var plan := quick_plan(b)
+	var kind: String = plan["kind"]
+	var musket := "infantry" if kind == "" else "infantry:" + kind
+	var n := 0
+	for item: String in ["officer", "drummer", musket]:
+		var want: int = plan["missing"][Rules.item_type(item)]
+		for q in b.queue:
+			if q == item:
+				want -= 1
+		for i in want:
+			if queue_unit(b, item):
+				n += 1
+	b.auto_regiment = true
+	say("%d man in opleiding; de kazerne vormt het bataljon zodra ze klaar zijn (Auto-bataljon aan)." % n if n > 0
+		else "Niets te trainen (of te weinig grondstoffen of ruimte).")
+	refresh_hud()
+	return n
+
+
+func toggle_auto_regiment() -> void:
+	var b := selected_building
+	if b != null and b.type == "barracks":
+		b.auto_regiment = not b.auto_regiment
+		say("Auto-bataljon %s." % ("aan" if b.auto_regiment else "uit"))
+		refresh_hud()
+
+
+func _auto_regiments() -> void:
+	for b in buildings:
+		if b.type == "barracks" and b.side == "france" and b.auto_regiment and b.complete and b.standing() and quick_plan(b)["ok"]:
+			var r := quick_regiment(b)
+			if r != null:
+				say("%s gevormd bij de kazerne (Auto-bataljon)." % r.name)
 
 
 func upgrade_trench() -> void:
@@ -1253,6 +1397,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				hold()
 			KEY_T:
 				skirmish()
+			KEY_H:
+				halt()
 			KEY_F:
 				form_regiment()
 			KEY_M:

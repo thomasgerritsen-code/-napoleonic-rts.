@@ -24,6 +24,10 @@ var queue: Array[String] = []
 var production := 0.0        # share of the first in the queue done
 var crop := 0.0              # grain standing on a field
 var tower_level := 1
+## Where trained men go (right click with the building selected), or null.
+var rally: Variant = null
+## A barracks forms a battalion by itself once enough men are free near it.
+var auto_regiment := false
 var upgrade_to := 0          # the level a tower is being strengthened to
 var upgrade_progress := 0.0
 var selected := false:

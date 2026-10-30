@@ -120,11 +120,13 @@ func _describe() -> String:
 			lines.append("%s · niveau %d/3 · bereik %d · %d schoten van %d" % [level["label"], b.tower_level, level["range"], level["shots"], level["damage"]])
 			if b.upgrade_to != 0:
 				lines.append("Versterken… niveau %d/3 · %d%%" % [b.upgrade_to, int(b.upgrade_progress * 100)])
+		if b.complete and not Rules.trained_at(b.type, b.side).is_empty() and b.side == "france":
+			lines.append("Rechtsklik zet het verzamelpunt%s." % (" (gezet)" if b.rally != null else ""))
 		if b.type == "farm":
 			lines.append("Graan: %d  ·  %d boeren" % [b.crop, battle.farmers_on(b)])
 		return "\n".join(lines)
 	if battle.selected_units.is_empty():
-		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · G stelling · T tirailleurs · F bataljon vormen · WASD/wieltje: camera"
+		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · G stelling · T tirailleurs · H halt · F bataljon vormen · WASD/wieltje: camera"
 	var count := {}
 	for u in battle.selected_units:
 		count[u.type] = count.get(u.type, 0) + 1
@@ -163,6 +165,13 @@ func _rebuild() -> void:
 		if b.complete and b.side == "france":
 			for item in Rules.trained_at(b.type, "france"):
 				_button("%s\n%s" % [Rules.label(item), Rules.cost_text(Rules.item_cost(item))], battle.train.bind(item))
+			if b.type == "barracks":
+				var plan := battle.quick_plan(b)
+				var m: Dictionary = plan["missing"]
+				_button("Snel bataljon\n%d/12 musk. · off. %s · tamb. %s" % [Regiment.MIN_MEN - int(m["infantry"]),
+					"ja" if m["officer"] == 0 else "nee", "ja" if m["drummer"] == 0 else "nee"], func() -> void: battle.quick_regiment()).disabled = not plan["ok"]
+				_button("Train ontbrekende\nvoor een bataljon", func() -> void: battle.train_missing())
+				_button("Auto-bataljon\n%s" % ("aan" if b.auto_regiment else "uit"), battle.toggle_auto_regiment)
 			if b.type == "tower":
 				var next := Rules.tower_level(b.tower_level + 1)
 				if b.upgrade_to != 0:
@@ -189,6 +198,7 @@ func _rebuild() -> void:
 		if has_free_soldiers:
 			_button("Aanvullen\nlosse musketiers erbij", battle.reinforce)
 		_button("Charge (C)", battle.charge)
+		_button("Halt (H)", battle.halt)
 		var holding := false
 		var trench: Variant = null
 		for r in battle.selected:

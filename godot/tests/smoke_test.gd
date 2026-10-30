@@ -243,6 +243,27 @@ func _initialize() -> void:
 		squadron.set_formation("square")
 		_check(squadron.formation != "square" and squadron.morale() > 75.0, "horse forms no square, and misses no drummer")
 
+	# The barracks: a rally point, a quick battalion from the men around it,
+	# and what is missing trained with Auto-bataljon on.
+	var depot := battle.add_building("france", "barracks", home + Vector2(-350, 900), true)
+	depot.rally = depot.world + Vector2(120, 160)
+	for i in 6:
+		battle.add_building("france", "house", depot.world + Vector2(-200, i * 70 - 200), true)
+	battle.spawn_trained(depot, "infantry")
+	var newest: Unit = battle.units[battle.units.size() - 1]
+	_check(newest.slot.distance_to(depot.rally) < 60.0, "a trained man goes to the rally point")
+	var gathered: Array[Unit] = [newest]
+	for i in 11:
+		gathered.append(battle.add_unit("france", "infantry", depot.rally + Vector2(i * 14, 30)))
+	gathered.append(battle.add_unit("france", "officer", depot.rally + Vector2(0, 60)))
+	_check(not battle.quick_plan(depot)["ok"] and battle.quick_plan(depot)["missing"]["drummer"] == 1, "the barracks names what is missing (a drummer)")
+	battle.economy["france"]["food"] += 500.0
+	battle.economy["france"]["wood"] += 500.0
+	_check(battle.train_missing(depot) >= 1 and depot.auto_regiment, "and trains it, with Auto-bataljon on")
+	var before_count := battle.regiments.size()
+	_run(battle, 12.0)
+	_check(battle.regiments.size() == before_count + 1, "the barracks forms the battalion by itself once the drummer is ready")
+
 	# An order takes a moment to reach a battalion.
 	var ordered: Array[Regiment] = [shaken]
 	var goal_spot := shaken.centroid() + Vector2(120, 0)
