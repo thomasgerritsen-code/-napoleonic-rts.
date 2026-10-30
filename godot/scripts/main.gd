@@ -70,6 +70,7 @@ var _drag_start: Variant = null
 var _order_start: Variant = null
 var _river: Array = []
 var _woods_list: Array = []
+var _orders: Array[Dictionary] = []   # orders on their way to the battalions
 
 
 func _ready() -> void:
@@ -140,6 +141,7 @@ func _exit_tree() -> void:
 
 func _process(delta: float) -> void:
 	clock += delta
+	_deliver_orders()
 	for r in regiments:
 		r.update(delta, regiments)
 	for u in units:
@@ -953,10 +955,38 @@ func _order_battalions(list: Array[Regiment], to: Vector2, face: Variant) -> voi
 	line_up.sort_custom(func(a: Regiment, b: Regiment) -> bool:
 		return a.centroid().dot(right) < b.centroid().dot(right))
 	var offset := -total / 2.0
+	var delay := order_delay(from, list[0].side)
 	for r: Regiment in line_up:
 		var w: float = widths[r]
-		r.order_move(to + right * (offset + w / 2.0), facing)
+		_orders.append({"at": clock + delay, "regiment": r, "to": to + right * (offset + w / 2.0), "facing": facing})
 		offset += w
+	say("Order onderweg (%.1f s)" % delay)
+
+
+## How long an order takes to reach the battalions, as the web game: a
+## courier from the town centre (0.75 s and a second for every 1100 px),
+## sooner with an officer close by (within 260, or 430 px for half), never
+## under 0.35 s.
+func order_delay(at: Vector2, side: String) -> float:
+	var tc := town_centre(side)
+	var distance := tc.world.distance_to(at) if tc != null else 0.0
+	var nearest := INF
+	for u in units:
+		if u.side == side and u.alive() and u.type == "officer" and (u.regiment == null or not u.regiment.routing):
+			nearest = minf(nearest, u.world.distance_to(at))
+	var bonus := 1.0 if nearest <= 260.0 else (0.5 if nearest <= 430.0 else 0.0)
+	return maxf(0.35, 0.75 + distance / 1100.0 - bonus * 0.35)
+
+
+func _deliver_orders() -> void:
+	for i in range(_orders.size() - 1, -1, -1):
+		var o: Dictionary = _orders[i]
+		if clock < o["at"]:
+			continue
+		var r: Regiment = o["regiment"]
+		if not r.destroyed() and not r.routing:
+			r.order_move(o["to"], o["facing"])
+		_orders.remove_at(i)
 
 
 func set_formation(kind: String) -> void:

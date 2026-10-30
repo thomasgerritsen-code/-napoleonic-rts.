@@ -243,6 +243,14 @@ func _initialize() -> void:
 		squadron.set_formation("square")
 		_check(squadron.formation != "square" and squadron.morale() > 75.0, "horse forms no square, and misses no drummer")
 
+	# An order takes a moment to reach a battalion.
+	var ordered: Array[Regiment] = [shaken]
+	var goal_spot := shaken.centroid() + Vector2(120, 0)
+	battle._order_battalions(ordered, goal_spot, 0.0)
+	_check(shaken.destination.distance_to(goal_spot) > 50.0, "an order is on its way, not there at once")
+	_run(battle, battle.order_delay(shaken.centroid(), "france") + 0.2)
+	_check(shaken.destination.distance_to(goal_spot) < 50.0, "and reaches the battalion")
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0
