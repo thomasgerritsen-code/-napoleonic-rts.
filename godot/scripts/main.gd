@@ -1654,7 +1654,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key != null and key.pressed and not key.echo:
 		match key.physical_keycode:
 			KEY_R:
-				if result != "":
+				if result != "" and net_role == "":
 					get_tree().reload_current_scene()
 			KEY_F10:
 				get_tree().change_scene_to_file("res://scenes/menu.tscn")

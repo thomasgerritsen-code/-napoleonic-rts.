@@ -40,5 +40,14 @@ slepen zet de richting van een bataljon. Toetsen: 1 linie, 2 colonne, 3 carré, 
 F bataljon vormen, Escape annuleert een bouwplan; WASD/pijltjes, middelste
 muisknop en wieltje voor de camera, R voor een nieuwe slag na afloop.
 
+**Online spelen** (twee spelers, elk met het spel): de een kiest in het menu
+*Online: een slag hosten* en speelt Frankrijk; het menu toont zijn adres. De
+ander vult dat adres in bij *Meedoen* en speelt Groot-Brittannië. De slag
+begint zodra beiden verbonden zijn. De host rekent de slag door en stuurt de
+stand tien keer per seconde; de bevelen van de ander gaan naar de host. Op
+hetzelfde netwerk werkt het direct; over internet moet de host UDP-poort
+47300 in zijn router doorsturen (of gebruik samen een VPN zoals Tailscale of
+ZeroTier).
+
 GitHub controleert het project bij elke wijziging (`tests/smoke_test.gd`,
 headless) en maakt een Windows-`.exe` (workflow *Godot*).

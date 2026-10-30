@@ -288,11 +288,12 @@ func _show_end() -> void:
 			table.add_child(c)
 	var buttons := HBoxContainer.new()
 	box.add_child(buttons)
-	var again := Button.new()
-	again.text = "Nieuwe slag (R)"
-	again.custom_minimum_size = Vector2(170, 44)
-	again.pressed.connect(func() -> void: battle.get_tree().reload_current_scene())
-	buttons.add_child(again)
+	if battle.net_role == "":
+		var again := Button.new()
+		again.text = "Nieuwe slag (R)"
+		again.custom_minimum_size = Vector2(170, 44)
+		again.pressed.connect(func() -> void: battle.get_tree().reload_current_scene())
+		buttons.add_child(again)
 	var menu := Button.new()
 	menu.text = "Hoofdmenu (F10)"
 	menu.custom_minimum_size = Vector2(170, 44)

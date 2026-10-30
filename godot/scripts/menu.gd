@@ -1,9 +1,20 @@
 extends Control
-## The start menu, as the web game's: a battle against the computer, or the
-## test field where two large armies meet without economy.
+## The start menu, as the web game's: a battle against the computer, the
+## test field where two large armies meet without economy, or a battle
+## online against another player: one hosts (France) and waits, the other
+## joins with the host's address (Britain); it starts once both are there.
+
+var _online_note: Label
+var _address: LineEdit
 
 
 func _ready() -> void:
+	# Back from an online battle: the line is closed.
+	var old := NetLink.find(get_tree())
+	if old != null:
+		old.close()
+		old.queue_free()
+	Battle.online_role = ""
 	var meta: Dictionary = Iso.read_json("res://assets/map/ground.json")
 	var ground := TextureRect.new()
 	ground.texture = load("res://assets/map/" + String(meta["image"]))
@@ -27,6 +38,7 @@ func _ready() -> void:
 	box.add_child(title)
 	_choice(box, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
 	_choice(box, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
+	_online(box)
 	var quit_button := Button.new()
 	quit_button.text = "Afsluiten"
 	quit_button.custom_minimum_size = Vector2(420, 44)
@@ -43,3 +55,77 @@ func _choice(box: VBoxContainer, text: String, note: String, mode: String) -> vo
 		Battle.mode = mode
 		get_tree().change_scene_to_file("res://scenes/main.tscn"))
 	box.add_child(button)
+
+
+func _online(box: VBoxContainer) -> void:
+	var host_button := Button.new()
+	host_button.text = "Online: een slag hosten\nU speelt Frankrijk; de ander doet mee met uw adres (poort %d)." % NetLink.PORT
+	host_button.custom_minimum_size = Vector2(420, 64)
+	host_button.add_theme_font_size_override("font_size", 15)
+	host_button.pressed.connect(_host)
+	box.add_child(host_button)
+	var row := HBoxContainer.new()
+	box.add_child(row)
+	_address = LineEdit.new()
+	_address.placeholder_text = "adres van de host, bv. 192.168.1.20"
+	_address.custom_minimum_size = Vector2(270, 44)
+	row.add_child(_address)
+	var join_button := Button.new()
+	join_button.text = "Meedoen (Brits)"
+	join_button.custom_minimum_size = Vector2(146, 44)
+	join_button.pressed.connect(_join)
+	row.add_child(join_button)
+	_online_note = Label.new()
+	_online_note.custom_minimum_size = Vector2(420, 0)
+	_online_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_online_note.add_theme_color_override("font_color", Color(0.96, 0.93, 0.82))
+	_online_note.add_theme_color_override("font_outline_color", Color(0.06, 0.07, 0.05))
+	_online_note.add_theme_constant_override("outline_size", 4)
+	box.add_child(_online_note)
+
+
+func _host() -> void:
+	var link := NetLink.make(get_tree())
+	var err := link.host()
+	if err != OK:
+		_online_note.text = "Hosten lukt niet (poort %d bezet?)." % NetLink.PORT
+		return
+	var mine: Array[String] = []
+	for ip in IP.get_local_addresses():
+		if ip.count(".") == 3 and not ip.begins_with("127.") and not ip.begins_with("169.254."):
+			mine.append(ip)
+	_online_note.text = "Wachten op een tegenstander… Uw adres: %s (poort %d). Over internet moet de poort in de router doorgestuurd zijn." % [
+		", ".join(mine) if not mine.is_empty() else "onbekend", NetLink.PORT]
+	link.joined.connect(func() -> void:
+		_online_note.text = "Tegenstander verbonden: de slag begint."
+		link.start())
+	link.started.connect(_go.bind("host"))
+
+
+func _join() -> void:
+	var address := _address.text.strip_edges()
+	if address == "":
+		_online_note.text = "Vul het adres van de host in."
+		return
+	var link := NetLink.make(get_tree())
+	if link.join(address) != OK:
+		_online_note.text = "Verbinden met %s lukt niet." % address
+		return
+	_online_note.text = "Verbinden met %s…" % address
+	link.joined.connect(func() -> void: _online_note.text = "Verbonden: wachten tot de host begint.")
+	link.left.connect(func() -> void: _online_note.text = "Geen verbinding met %s." % address)
+	link.started.connect(_go.bind("client"))
+
+
+func _go(role: String) -> void:
+	# The menu goes; its listeners on the link go with it.
+	var link := NetLink.find(get_tree())
+	if link != null:
+		for sig: String in ["joined", "left", "started"]:
+			for c: Dictionary in link.get_signal_connection_list(sig):
+				var callable: Callable = c["callable"]
+				if callable.get_object() == self:
+					link.disconnect(sig, callable)
+	Battle.mode = "campaign"
+	Battle.online_role = role
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
