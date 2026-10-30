@@ -231,7 +231,10 @@ func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
 	world += way.limit_length(speed * pace * delta)
 	facing = way.angle()
 	state = State.MOVE
-	_play("walk" if troop == "mounted" else MOVE_ANIM.get(type, "march"))
+	if regiment != null and regiment.charging != null and (type == "cavalry" or troop == "mounted"):
+		_play("gallop")
+	else:
+		_play("walk" if troop == "mounted" else MOVE_ANIM.get(type, "march"))
 	return false
 
 

@@ -1008,10 +1008,14 @@ func reinforce() -> void:
 
 
 func form_regiment(from: Array[Unit] = []) -> Regiment:
-	var r := Regiment.raise(selected_units if from.is_empty() else from)
+	var list: Array[Unit] = selected_units if from.is_empty() else from
+	var r := Regiment.raise(list)
+	if r == null:
+		r = Regiment.raise_cavalry(list)
 	if r == null:
 		if from.is_empty():
-			say("Een bataljon vraagt %d tot %d musketiers, een officier en een tamboer." % [Regiment.MIN_MEN, Regiment.MAX_MEN])
+			say("Een bataljon vraagt %d tot %d musketiers, een officier en een tamboer; een regiment cavalerie %d tot %d ruiters van één soort en een officier te paard." % [
+				Regiment.MIN_MEN, Regiment.MAX_MEN, Regiment.CAV_MIN, Regiment.CAV_MAX])
 		return null
 	regiments.append(r)
 	if r.side == "france":

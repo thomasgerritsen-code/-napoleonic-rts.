@@ -181,7 +181,7 @@ func _rebuild() -> void:
 		for type in Rules.BUILDABLE:
 			_button("%s\n%s" % [Rules.label(type), Rules.cost_text(Rules.cost_of(type))], battle.start_placing.bind(type))
 	if has_free_soldiers:
-		_button("Bataljon vormen (F)\n12-36 musk. + off. + tamb.", func() -> void: battle.form_regiment())
+		_button("Regiment vormen (F)\nmusk.+off.+tamb. of 4+ ruiters+off. te paard", func() -> void: battle.form_regiment())
 	if not battle.selected.is_empty():
 		_button("Linie (1)", battle.set_formation.bind("line"))
 		_button("Colonne (2)", battle.set_formation.bind("column"))

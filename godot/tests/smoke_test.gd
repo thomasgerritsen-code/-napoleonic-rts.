@@ -223,6 +223,17 @@ func _initialize() -> void:
 	_check(spread_out > closed * 1.8 and hp_before - target_man.hp < 7.5, "tirailleurs spread out (%d to %d px) and are harder to hit" % [closed, spread_out])
 	shaken.set_skirmish(false)
 
+	# A regiment of horse: hussars and an officer on horseback, no drummer.
+	var riders: Array[Unit] = []
+	for i in 6:
+		riders.append(battle.add_unit("france", "cavalry", quiet + Vector2(i * 30, 200), "hussar"))
+	riders.append(battle.add_unit("france", "officer", quiet + Vector2(90, 240), "mounted"))
+	var squadron := battle.form_regiment(riders)
+	_check(squadron != null and squadron.kind == "cavalry" and squadron.strength() == 7, "six hussars and a mounted officer form a regiment of horse")
+	if squadron != null:
+		squadron.set_formation("square")
+		_check(squadron.formation != "square" and squadron.morale() > 75.0, "horse forms no square, and misses no drummer")
+
 	# The computer.
 	_run(battle, 120.0)
 	var british_buildings := 0

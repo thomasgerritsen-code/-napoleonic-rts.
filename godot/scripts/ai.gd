@@ -264,6 +264,16 @@ func _form() -> void:
 		if r != null:
 			r.order_move(_muster(), (Iso.WORLD / 2.0 - _home).angle())
 			plan = "%s gevormd" % r.name
+	# Riders and a mounted officer make a regiment of horse.
+	var horse: Array[Unit] = []
+	for u in _mine():
+		if u.regiment == null and (u.type == "cavalry" or u.troop == "mounted") and u.world.distance_to(_home) < 900.0:
+			horse.append(u)
+	if Regiment.eligible_cavalry(horse):
+		var r := battle.form_regiment(horse)
+		if r != null:
+			r.order_move(_muster() + Vector2(0, 140), (Iso.WORLD / 2.0 - _home).angle())
+			plan = "%s gevormd" % r.name
 
 
 func _command() -> void:
@@ -288,6 +298,9 @@ func _command() -> void:
 		# Defending its base, a battalion holds its ground and digs in.
 		r.hold = threat != null and r.centroid().distance_to(_home) < DEFEND_REACH
 		if r.charging != null:
+			continue
+		if r.kind == "cavalry":
+			_lead_horse(r, goal)
 			continue
 		# Horse close by: form square until it has gone.
 		var horse := _horse_near(r.centroid())
@@ -378,6 +391,23 @@ func _choose_stance(mine: Array[Regiment], threat: Variant) -> void:
 		"hergroeperen":
 			if morale > 60.0 and age > 8.0:
 				_set_stance("verdedigen")
+
+
+## A regiment of horse rides with the army and charges any battalion within
+## reach that is not in square.
+func _lead_horse(r: Regiment, goal: Variant) -> void:
+	if r.charge(battle.regiments):
+		plan = "%s chargeert" % r.name
+		return
+	if goal == null or r.moving():
+		return
+	var here := r.centroid()
+	var there: Vector2 = goal
+	if here.distance_to(there) < Regiment.CAV_CHARGE_REACH * 0.8:
+		return
+	r.set_formation("column" if here.distance_to(there) > 900.0 else "line")
+	var stand := there + (here - there).normalized() * (Regiment.CAV_CHARGE_REACH * 0.7) + Vector2(0, 160)
+	r.order_move(here + (stand - here).limit_length(900.0), (there - here).angle())
 
 
 ## The nearest Frenchman come too close to home, if any.

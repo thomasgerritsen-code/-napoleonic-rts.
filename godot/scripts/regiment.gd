@@ -26,9 +26,18 @@ const MELEE_KILL := 0.7
 const MELEE_LOSS := 0.4
 
 static var _numbers := {"france": 0, "britain": 0}
+static var _squadrons := {"france": 0, "britain": 0}
+const CAV_MIN := 4
+const CAV_MAX := 12
+const CAV_FILE_GAP := 29.0
+const CAV_RANK_GAP := 31.0
+const CAV_CHARGE_REACH := 520.0
 
 var name := ""
 var side := "france"
+## "infantry" (a battalion) or "cavalry" (a regiment of horse: riders of one
+## kind and an officer on horseback, no drummer).
+var kind := "infantry"
 var men: Array[Unit] = []
 var facing := 0.0
 var formation := "line"
@@ -99,6 +108,69 @@ static func raise(units: Array[Unit]) -> Regiment:
 	return r
 
 
+## The kind most of the free riders among `units` are.
+static func _main_kind(units: Array[Unit]) -> String:
+	var count := {}
+	for u in units:
+		if u.alive() and u.regiment == null and u.type == "cavalry":
+			count[u.troop] = count.get(u.troop, 0) + 1
+	var best := ""
+	var most := 0
+	for k: String in count:
+		if count[k] > most:
+			most = count[k]
+			best = k
+	return best
+
+
+static func eligible_cavalry(units: Array[Unit]) -> bool:
+	var riders := 0
+	var officer := false
+	var kind_ := _main_kind(units)
+	for u in units:
+		if not u.alive() or u.regiment != null:
+			continue
+		if u.type == "cavalry" and u.troop == kind_:
+			riders += 1
+		elif u.type == "officer" and u.troop == "mounted":
+			officer = true
+	return riders >= CAV_MIN and officer
+
+
+## A regiment of horse from the free riders of the commonest kind and a
+## mounted officer among `units` (null if there are too few).
+static func raise_cavalry(units: Array[Unit]) -> Regiment:
+	if units.is_empty() or not eligible_cavalry(units):
+		return null
+	var side_: String = units[0].side
+	var kind_ := _main_kind(units)
+	_squadrons[side_] += 1
+	var title: String = ("%de Cavalerie" if side_ == "france" else "%dth Dragoons") % _squadrons[side_]
+	var r := Regiment.new(title, side_)
+	r.kind = "cavalry"
+	var officer := false
+	var riders := 0
+	for u in units:
+		if not u.alive() or u.regiment != null or u.side != side_:
+			continue
+		if u.type == "cavalry" and u.troop == kind_ and riders < CAV_MAX:
+			riders += 1
+		elif u.type == "officer" and u.troop == "mounted" and not officer:
+			officer = true
+		else:
+			continue
+		u.regiment = r
+		u.ordered = false
+		u.target = null
+		r.men.append(u)
+	r._start = r.men.size()
+	r._break_base = r._start
+	all.append(r)
+	r.facing = 0.0 if side_ == "france" else PI
+	r.order_move(r.centroid(), r.facing)
+	return r
+
+
 func _init(name_: String, side_: String) -> void:
 	name = name_
 	side = side_
@@ -159,6 +231,8 @@ func set_formation(kind: String) -> void:
 	if kind == formation or routing:
 		return
 	if kind == "square":
+		if self.kind == "cavalry":
+			return
 		skirmish = false
 	formation = kind
 	_form(destination)
@@ -193,13 +267,17 @@ func reinforce(units: Array[Unit]) -> int:
 		return 0
 	var added := 0
 	var infantry := 0
+	var line_type := "cavalry" if kind == "cavalry" else "infantry"
+	var line_troop := ""
 	for u in living():
-		if u.type == "infantry":
+		if u.type == line_type:
 			infantry += 1
+			line_troop = u.troop
+	var most := CAV_MAX if kind == "cavalry" else MAX_MEN
 	for u in units:
-		if infantry >= MAX_MEN:
+		if infantry >= most:
 			break
-		if u.alive() and u.side == side and u.regiment == null and u.type == "infantry":
+		if u.alive() and u.side == side and u.regiment == null and u.type == line_type and (kind != "cavalry" or u.troop == line_troop):
 			u.regiment = self
 			u.ordered = false
 			u.target = null
@@ -235,7 +313,8 @@ func take_back(u: Unit) -> bool:
 
 func shape(count: int) -> Vector2i:
 	if formation == "column":
-		return Vector2i(mini(COLUMN_FILES, count), ceili(float(count) / COLUMN_FILES))
+		var files_ := 3 if kind == "cavalry" else COLUMN_FILES
+		return Vector2i(mini(files_, count), ceili(float(count) / files_))
 	return Vector2i(ceili(float(count) / RANKS), mini(RANKS, count))
 
 
@@ -246,11 +325,13 @@ func _form(at: Vector2) -> void:
 	var forward := Vector2.from_angle(facing)
 	var right := forward.orthogonal() * -1.0
 	var rank_and_file: Array[Unit] = []
+	var file_gap := CAV_FILE_GAP if kind == "cavalry" else FILE_GAP
+	var rank_gap := CAV_RANK_GAP if kind == "cavalry" else RANK_GAP
 	for u in living():
-		if u.type == "infantry":
+		if u.type == "infantry" or u.type == "cavalry":
 			rank_and_file.append(u)
 		elif u.type == "officer":
-			u.slot = at + forward * (0.0 if formation == "square" else 22.0)
+			u.slot = at + forward * (0.0 if formation == "square" else (34.0 if kind == "cavalry" else 22.0))
 		else:
 			u.slot = at + right * 12.0 if formation == "square" else at - forward * (RANK_GAP * 2.0 + 14.0) + right * 10.0
 	if rank_and_file.is_empty():
@@ -270,10 +351,10 @@ func _form(at: Vector2) -> void:
 		group.sort_custom(func(a: Unit, b: Unit) -> bool:
 			return (a.world - at).dot(forward) > (b.world - at).dot(forward))
 		for r in group.size():
-			var lateral := (file - (files - 1) / 2.0) * FILE_GAP
-			var depth := r * RANK_GAP
+			var lateral := (file - (files - 1) / 2.0) * file_gap
+			var depth := r * rank_gap
 			if formation == "column":
-				depth -= (grid.y - 1) * RANK_GAP / 2.0
+				depth -= (grid.y - 1) * rank_gap / 2.0
 			if skirmish:
 				# Spread out, each man a little off his file.
 				var u := group[r]
@@ -323,7 +404,8 @@ func morale() -> float:
 		sum += u.morale
 		officer = officer or u.type == "officer"
 		drummer = drummer or u.type == "drummer"
-	return clampf(sum / list.size() + (5.0 if officer else -20.0) + (5.0 if drummer else -8.0), 0.0, 100.0)
+	var drum := 0.0 if kind == "cavalry" else (5.0 if drummer else -8.0)
+	return clampf(sum / list.size() + (5.0 if officer else -20.0) + drum, 0.0, 100.0)
 
 
 func morale_label() -> String:
@@ -354,7 +436,7 @@ func _nerve(delta: float) -> void:
 		_lost_officer = true
 		for u in list:
 			u.morale = maxf(0.0, u.morale - 25.0)
-	if not drummer and not _lost_drummer:
+	if not drummer and not _lost_drummer and kind != "cavalry":
 		_lost_drummer = true
 		for u in list:
 			u.morale = maxf(0.0, u.morale - 10.0)
@@ -435,10 +517,13 @@ func charge(regiments: Array[Regiment]) -> bool:
 	if routing:
 		return false
 	var here := centroid()
-	var best := CHARGE_REACH
+	var best := CAV_CHARGE_REACH if kind == "cavalry" else CHARGE_REACH
 	var target: Regiment = null
 	for other in regiments:
 		if other.side == side or other.routing or other.destroyed():
+			continue
+		# Horse does not ride at a square's bayonets of its own accord.
+		if kind == "cavalry" and other.formation == "square":
 			continue
 		var d := other.centroid().distance_to(here)
 		if d < best:
@@ -471,6 +556,8 @@ func update(delta: float, regiments: Array[Regiment]) -> void:
 	_pace = (0.7 + 0.3 * sum / list.size()) * wind / list.size()
 	if charging != null:
 		_melee(delta)
+		return
+	if kind == "cavalry":
 		return
 	var here := centroid()
 	if enemy != null and (enemy.destroyed() or enemy.routing or enemy.centroid().distance_to(here) > RANGE * 1.15):
@@ -508,9 +595,17 @@ func _melee(delta: float) -> void:
 		u.slot = nearest.world
 		if best < MELEE_REACH * MELEE_REACH:
 			contact = true
-			if randf() < MELEE_KILL * u.stat("melee") * damage_factor() * delta:
+			var kill := MELEE_KILL * u.stat("melee") * damage_factor()
+			var loss := MELEE_LOSS / nearest.stat("melee")
+			if u.type == "cavalry":
+				# The shock of horse: hard on men in the open, broken on a square.
+				kill *= 1.5 * u.stat("charge") * (u.stat("vsCavalry") if nearest.type == "cavalry" else u.stat("vsInfantry"))
+				if foe.formation == "square":
+					kill *= 0.2
+					loss *= 3.0
+			if randf() < kill * delta:
 				nearest.hit(1000.0)
-			elif randf() < MELEE_LOSS / nearest.stat("melee") * delta:
+			elif randf() < loss * delta:
 				u.hit(1000.0)
 		if routing:
 			return
