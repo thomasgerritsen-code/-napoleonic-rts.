@@ -311,11 +311,9 @@ func _load_opening() -> void:
 	woods.plant(self, _units_layer, woods_map)
 	_woods_list = woods_map["woods"]
 	for data: Dictionary in start["buildings"]:
-		var b := add_building(String(data["side"]), String(data["type"]), Vector2(data["x"], data["y"]), true)
-		b.id = int(data["id"])
+		var b := add_building(String(data["side"]), String(data["type"]), Vector2(data["x"], data["y"]), true, int(data["id"]))
 	for data: Dictionary in start["units"]:
-		var u := add_unit(String(data["side"]), String(data["type"]), Vector2(data["x"], data["y"]))
-		u.id = int(data["id"])
+		var u := add_unit(String(data["side"]), String(data["type"]), Vector2(data["x"], data["y"]), "", int(data["id"]))
 
 
 ## The test field: four full battalions a side face each other on the open
