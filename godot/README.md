@@ -25,13 +25,18 @@ stelling houdt (G) zet zich schrap en graaft in linie een loopgraaf, die met
 hout en ijzer bekleed en versterkt kan worden. Moreel: treffers en vallende
 kameraden schokken de mannen, officier en tamboer houden ze bijeen; een
 bataljon dat breekt slaat op de vlucht en verzamelt zich buiten gevaar weer.
+Vuur in flank of rug treft harder; tirailleurs (T) staan verspreid en zijn
+moeilijk te raken, maar kwetsbaar voor ruiterij. Kogels en granaten slaan
+kraters en beschadigen loopgraven en torens. Marcheren en chargeren vermoeit.
+De Britse computer valt aan in golven, breekt een verloren aanval af en
+hergroepeert.
 
 De beginsituatie en de plaatjes komen uit de webversie via
 `node scripts/export-godot-scenario.js` (met het spel lokaal geserveerd).
 
 Besturing: klik of sleep om te selecteren (Shift voegt toe), rechtsklik voor
 een opdracht (lopen, aanvallen, verzamelen, bouwen, op de akker werken), rechts
-slepen zet de richting van een bataljon. Toetsen: 1 linie, 2 colonne, 3 carré, C charge, G stelling houden,
+slepen zet de richting van een bataljon. Toetsen: 1 linie, 2 colonne, 3 carré, C charge, G stelling houden, T tirailleurs,
 F bataljon vormen, Escape annuleert een bouwplan; WASD/pijltjes, middelste
 muisknop en wieltje voor de camera, R voor een nieuwe slag na afloop.
 
