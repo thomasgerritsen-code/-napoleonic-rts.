@@ -21,6 +21,8 @@ var _pixels := PackedByteArray()
 var _image: Image
 var _texture: ImageTexture
 var _clock := 0.0
+## Rows of the ground's relief strip above the map, in fog cells.
+var _strip := 0.0
 
 
 func _ready() -> void:
@@ -36,7 +38,16 @@ func _ready() -> void:
 	scale = Vector2(CELL, CELL * Iso.SQ)
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	z_index = 15
+	var meta: Dictionary = Iso.read_json("res://assets/map/ground.json")
+	_strip = float(meta.get("padTop", 0.0)) / (float(meta["pxPerM"]) / float(meta["gamePxPerM"])) / (CELL * Iso.SQ)
 	refresh()
+
+
+## The strip of ground above the map (the relief's top) lies under the same
+## cloud as the map's top row.
+func _draw() -> void:
+	if _strip > 0.0 and texture != null:
+		draw_texture_rect_region(texture, Rect2(0.0, -_strip, _cols, _strip), Rect2(0.0, 0.0, _cols, 1.0))
 
 
 func vision(node: Node2D) -> float:
