@@ -149,6 +149,21 @@ func _initialize() -> void:
 	var before := regiment.strength()
 	_check(regiment.reinforce(recruits) == 6 and regiment.strength() == before + 6, "six recruits fill the battalion's ranks")
 	_run(battle, 10.0)
+	# Marching as a body: formed up, the whole battalion steps off together,
+	# keeps its ranks on the way and arrives as one.
+	var march_from := regiment.centroid()
+	var march_to := march_from + Vector2(0, 320)
+	regiment.order_move(march_to, regiment.facing)
+	_run(battle, 4.0)
+	var straggle := 0.0
+	for u in regiment.living():
+		straggle = maxf(straggle, u.world.distance_to(u.slot))
+	var gone := regiment.centroid().distance_to(march_from)
+	_check(regiment.marching() and straggle < 30.0 and gone > 30.0, "a battalion marches as a body, its men in their places (%.0f px out, %.0f px on)" % [straggle, gone])
+	_run(battle, 20.0)
+	_check(not regiment.moving() and regiment.centroid().distance_to(march_to) < 25.0, "and arrives formed where it was sent")
+	regiment.order_move(march_from, regiment.facing)
+	_run(battle, 20.0)
 
 	# Troop kinds: their factors and their own coats.
 	var grenadier := battle.add_unit("france", "infantry", home + Vector2(600, 500), "grenadier")

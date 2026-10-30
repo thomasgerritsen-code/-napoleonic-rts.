@@ -271,6 +271,12 @@ func _step_in_regiment(delta: float) -> void:
 	var r := regiment
 	if not walk(slot, delta, r.speed_factor() if not r.routing else 1.4):
 		return
+	if r.marching() and not r.routing:
+		# In his place in the marching body: in step with it, the way it goes.
+		facing = r.heading
+		state = State.MOVE
+		_play("walk" if troop == "mounted" else MOVE_ANIM.get(type, "march"))
+		return
 	if r.routing or type != "infantry":
 		facing = r.facing
 		idle()

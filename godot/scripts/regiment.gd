@@ -32,6 +32,15 @@ const CAV_MAX := 12
 const CAV_FILE_GAP := 29.0
 const CAV_RANK_GAP := 31.0
 const CAV_CHARGE_REACH := 520.0
+## Marching as a body: a battalion sent further than this first forms up
+## facing the way it goes, then the whole formation advances at the pace of
+## its slowest man (a little under it, so the files keep up), wheels round
+## bends and onto a bridge, and at the end turns to face as ordered.
+const MARCH_MIN := 70.0
+const MARCH_PACE := 0.85
+const WHEEL_RATE := 0.9      # rad per second a marching body turns
+const FORMED := 0.8          # share of the men in their places before it steps off
+const WHEEL_MAX := 1.05      # rad: further off its front a line keeps it and steps aside
 
 var id := 0                  # online: the same battalion on both ends
 var name := ""
@@ -62,6 +71,15 @@ var still_seconds := 0
 var _lost_officer := false
 var _lost_drummer := false
 var _safe_for := 0.0         # seconds a routing battalion has been out of danger
+## On the march: the way still to go, where the body is now, the facing it
+## takes on arrival, and each man's place in the body (along, out).
+var _march: Array[Vector2] = []
+var _anchor := Vector2.ZERO
+var _end_face := 0.0
+var _forming := false
+var _places := {}            # Unit -> Vector2(right, forward) offset
+var _wheel := false          # the body turns with its way (else slides, keeping its front)
+var heading := 0.0           # the way the body goes, as the men face while they march
 const RALLY_MORALE := 62.0
 const RALLY_SAFE := 235.0
 
@@ -214,6 +232,8 @@ func centroid() -> Vector2:
 
 
 func moving() -> bool:
+	if not _march.is_empty():
+		return true
 	for u in living():
 		if u.world.distance_to(u.slot) > 6.0:
 			return true
@@ -224,6 +244,7 @@ func order_move(to: Vector2, face: Variant = null) -> void:
 	if routing:
 		return
 	var from := centroid()
+	var was := facing
 	if face != null:
 		facing = float(face)
 	elif to.distance_to(from) > 4.0:
@@ -231,7 +252,89 @@ func order_move(to: Vector2, face: Variant = null) -> void:
 	destination = to
 	enemy = null
 	charging = null
-	_form(to)
+	_march.clear()
+	if to.distance_to(from) < MARCH_MIN or formation == "square" or living().is_empty():
+		_form(to)
+		return
+	# Form up where it stands, facing the way, then march as a body.
+	_end_face = facing
+	_march = Nav.route(from, to)
+	_anchor = from
+	heading = (_march[0] - from).angle()
+	# A column, or a line going (nearly) the way it faces, turns to its way
+	# and wheels along it; a line sent aside or back keeps its front and
+	# steps that way, as in a flank march.
+	_wheel = formation == "column" or absf(angle_difference(was, heading)) <= WHEEL_MAX
+	facing = heading if _wheel else was
+	_forming = true
+	_place()
+
+
+## Whether it is marching as a body to its destination.
+func marching() -> bool:
+	return not _march.is_empty()
+
+
+## The men to their places: in the marching body, or at the destination.
+func _place() -> void:
+	if _march.is_empty():
+		_form(destination)
+		return
+	_form(_anchor)
+	var forward := Vector2.from_angle(facing)
+	var right := forward.orthogonal() * -1.0
+	_places.clear()
+	for u in living():
+		var d := u.slot - _anchor
+		_places[u] = Vector2(d.dot(right), d.dot(forward))
+
+
+## The body steps on: first formed up, then forward along its way at the
+## pace of its slowest man, wheeling where the way bends.
+func _advance(delta: float) -> void:
+	if _march.is_empty():
+		return
+	var list := living()
+	if _forming:
+		var ready := 0
+		for u in list:
+			if u.world.distance_to(u.slot) < 10.0:
+				ready += 1
+		if ready < FORMED * list.size():
+			return
+		_forming = false
+	var pace := INF
+	var weather: Weather = list[0].battle.weather if list[0].battle != null else null
+	for u in list:
+		var p := u.speed
+		if weather != null:
+			p *= weather.pace(u.type)
+		pace = minf(pace, p)
+	pace *= speed_factor() * MARCH_PACE
+	var next := _march[0]
+	heading = (next - _anchor).angle()
+	var step := pace * delta
+	if _wheel:
+		# A wide turn is made nearly on the spot, slowly; a slight one on the move.
+		var turn := angle_difference(facing, heading)
+		facing = rotate_toward(facing, heading, WHEEL_RATE * delta)
+		if absf(turn) > 0.35:
+			step *= 0.25
+	if _anchor.distance_to(next) <= step:
+		_anchor = next
+		_march.pop_front()
+		if _march.is_empty():
+			facing = _end_face
+			_form(destination)
+			return
+	else:
+		_anchor += (next - _anchor).normalized() * step
+	var forward := Vector2.from_angle(facing)
+	var right := forward.orthogonal() * -1.0
+	for u in list:
+		if _places.has(u):
+			var o: Vector2 = _places[u]
+			u.slot = _anchor + right * o.x + forward * o.y
 
 
 func set_formation(kind: String) -> void:
@@ -242,7 +345,9 @@ func set_formation(kind: String) -> void:
 			return
 		skirmish = false
 	formation = kind
-	_form(destination)
+	if kind == "square":
+		_march.clear()
+	_place()
 
 
 func set_skirmish(on: bool) -> void:
@@ -251,7 +356,7 @@ func set_skirmish(on: bool) -> void:
 	skirmish = on
 	if on and formation == "square":
 		formation = "line"
-	_form(destination)
+	_place()
 
 
 func speed_factor() -> float:
@@ -294,7 +399,7 @@ func reinforce(units: Array[Unit]) -> int:
 	if added > 0:
 		_start = maxi(_start, strength())
 		_break_base = maxi(_break_base, strength())
-		_form(destination)
+		_place()
 	return added
 
 
@@ -314,7 +419,7 @@ func take_back(u: Unit) -> bool:
 	u.regiment = self
 	u.ordered = false
 	men.append(u)
-	_form(destination)
+	_place()
 	return true
 
 
@@ -505,7 +610,7 @@ func lost(_unit: Unit) -> void:
 	elif strength() < _break_base * BREAK_AT:
 		rout()
 	else:
-		_form(destination)
+		_place()
 
 
 func rout() -> void:
@@ -515,6 +620,7 @@ func rout() -> void:
 	routing = true
 	enemy = null
 	charging = null
+	_march.clear()
 	var home_x := 120.0 if side == "france" else Iso.WORLD.x - 120.0
 	for u in living():
 		u.slot = Vector2(home_x, u.world.y + randf_range(-160.0, 160.0))
@@ -540,6 +646,7 @@ func charge(regiments: Array[Regiment]) -> bool:
 		return false
 	charging = target
 	enemy = null
+	_march.clear()
 	# The cheer of a charge.
 	for u in living():
 		u.morale = minf(100.0, u.morale + 8.0)
@@ -553,6 +660,7 @@ func update(delta: float, regiments: Array[Regiment]) -> void:
 	_nerve(delta)
 	if routing:
 		return
+	_advance(delta)
 	# The battalion keeps together at the pace its wounded can go.
 	var list := living()
 	var sum := 0.0
