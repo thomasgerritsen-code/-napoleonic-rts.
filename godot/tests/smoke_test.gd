@@ -210,10 +210,10 @@ func _initialize() -> void:
 	var width := func(r: Regiment) -> float:
 		var lo := INF
 		var hi := -INF
-		var across := Vector2.from_angle(r.facing).orthogonal()
+		var sideways := Vector2.from_angle(r.facing).orthogonal()
 		for u in r.living():
-			lo = minf(lo, u.slot.dot(across))
-			hi = maxf(hi, u.slot.dot(across))
+			lo = minf(lo, u.slot.dot(sideways))
+			hi = maxf(hi, u.slot.dot(sideways))
 		return hi - lo
 	var closed: float = width.call(shaken)
 	shaken.set_skirmish(true)
