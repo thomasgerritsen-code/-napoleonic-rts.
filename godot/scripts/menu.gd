@@ -1,10 +1,12 @@
 extends Control
-## The start menu, as the web game's: a battle against the computer, the
-## test field where two large armies meet without economy, or a battle
-## online against another player: one hosts (as France or Britain) and
-## waits, the other joins with the host's address and plays the other side;
-## it starts once both are there. A player who left can join again while the
-## host's battle runs.
+## The start menu: first a choice between Singleplayer, Multiplayer and
+## Updates, each on its own page with a way back.
+## - Singleplayer: a battle against the computer, or the test field where two
+##   large armies meet without economy (as the web game's menu).
+## - Multiplayer: one hosts (as France or Britain) and waits, the other joins
+##   with the host's address and plays the other side; it starts once both are
+##   there. A player who left can join again while the host's battle runs.
+## - Updates: this version, and the newest on GitHub to update to.
 
 var _online_note: Label
 var _address: LineEdit
@@ -12,6 +14,9 @@ var _updater: Updater
 var _update_note: Label
 var _update_button: Button
 var _remote: Dictionary = {}
+var _pages := {}                 # name -> VBoxContainer
+var _updates_button: Button
+var _version_line: Label
 
 
 func _ready() -> void:
@@ -28,12 +33,12 @@ func _ready() -> void:
 	ground.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	ground.modulate = Color(0.55, 0.55, 0.5)
 	add_child(ground)
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	box.grow_vertical = Control.GROW_DIRECTION_BOTH
-	box.add_theme_constant_override("separation", 14)
-	add_child(box)
+	var frame := VBoxContainer.new()
+	frame.set_anchors_preset(Control.PRESET_CENTER)
+	frame.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	frame.grow_vertical = Control.GROW_DIRECTION_BOTH
+	frame.add_theme_constant_override("separation", 18)
+	add_child(frame)
 	var title := Label.new()
 	title.text = "NAPOLEONIC RTS"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -41,16 +46,95 @@ func _ready() -> void:
 	title.add_theme_color_override("font_color", Color(0.96, 0.9, 0.7))
 	title.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.06))
 	title.add_theme_constant_override("outline_size", 8)
-	box.add_child(title)
-	_choice(box, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
-	_choice(box, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
-	_online(box)
-	_update_row(box)
+	frame.add_child(title)
+	for page in ["start", "single", "multi", "updates"]:
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 14)
+		box.custom_minimum_size = Vector2(420, 0)
+		frame.add_child(box)
+		_pages[page] = box
+
+	var start: VBoxContainer = _pages["start"]
+	_page_button(start, "Singleplayer\nTegen de computer, of het testveld", "single")
+	_page_button(start, "Multiplayer\nOnline tegen een andere speler", "multi")
+	_updates_button = _page_button(start, "Updates\nVersie en bijwerken", "updates")
 	var quit_button := Button.new()
 	quit_button.text = "Afsluiten"
 	quit_button.custom_minimum_size = Vector2(420, 44)
 	quit_button.pressed.connect(func() -> void: get_tree().quit())
-	box.add_child(quit_button)
+	start.add_child(quit_button)
+	_version_line = _note(start)
+	_version_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_version_line.text = "Versie: %s" % Updater.label(Updater.current())
+
+	var single: VBoxContainer = _pages["single"]
+	_heading(single, "Singleplayer")
+	_choice(single, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
+	_choice(single, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
+	_back(single)
+
+	var multi: VBoxContainer = _pages["multi"]
+	_heading(multi, "Multiplayer")
+	_online(multi)
+	_back(multi)
+
+	var updates: VBoxContainer = _pages["updates"]
+	_heading(updates, "Updates")
+	_update_row(updates)
+	_back(updates)
+	_show("start")
+
+
+func _show(page: String) -> void:
+	for key: String in _pages:
+		(_pages[key] as Control).visible = key == page
+
+
+func _page_button(box: VBoxContainer, text: String, page: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(420, 64)
+	button.add_theme_font_size_override("font_size", 17)
+	button.pressed.connect(_show.bind(page))
+	box.add_child(button)
+	return button
+
+
+func _heading(box: VBoxContainer, text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 26)
+	label.add_theme_color_override("font_color", Color(0.96, 0.9, 0.7))
+	label.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.06))
+	label.add_theme_constant_override("outline_size", 6)
+	box.add_child(label)
+
+
+## Back to the start; a host still waiting stops waiting.
+func _back(box: VBoxContainer) -> void:
+	var button := Button.new()
+	button.text = "Terug"
+	button.custom_minimum_size = Vector2(420, 40)
+	button.pressed.connect(func() -> void:
+		var link := NetLink.find(get_tree())
+		if link != null and box == _pages["multi"]:
+			link.close()
+			link.queue_free()
+			_online_note.text = ""
+		_show("start"))
+	box.add_child(button)
+
+
+func _note(box: VBoxContainer) -> Label:
+	var label := Label.new()
+	label.custom_minimum_size = Vector2(420, 0)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", Color(0.96, 0.93, 0.82))
+	label.add_theme_color_override("font_outline_color", Color(0.06, 0.07, 0.05))
+	label.add_theme_constant_override("outline_size", 4)
+	box.add_child(label)
+	return label
 
 
 func _choice(box: VBoxContainer, text: String, note: String, mode: String) -> void:
@@ -86,13 +170,7 @@ func _online(box: VBoxContainer) -> void:
 	join_button.custom_minimum_size = Vector2(146, 44)
 	join_button.pressed.connect(_join)
 	row.add_child(join_button)
-	_online_note = Label.new()
-	_online_note.custom_minimum_size = Vector2(420, 0)
-	_online_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_online_note.add_theme_color_override("font_color", Color(0.96, 0.93, 0.82))
-	_online_note.add_theme_color_override("font_outline_color", Color(0.06, 0.07, 0.05))
-	_online_note.add_theme_constant_override("outline_size", 4)
-	box.add_child(_online_note)
+	_online_note = _note(box)
 
 
 func _host(side: String) -> void:
@@ -156,22 +234,13 @@ func _update_row(box: VBoxContainer) -> void:
 	_updater.failed.connect(func(text: String) -> void:
 		_update_note.text = text
 		_update_button.disabled = false)
-	var row := HBoxContainer.new()
-	box.add_child(row)
-	_update_note = Label.new()
-	_update_note.custom_minimum_size = Vector2(270, 44)
-	_update_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_update_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_update_note.add_theme_color_override("font_color", Color(0.96, 0.93, 0.82))
-	_update_note.add_theme_color_override("font_outline_color", Color(0.06, 0.07, 0.05))
-	_update_note.add_theme_constant_override("outline_size", 4)
+	_update_note = _note(box)
 	_update_note.text = "Versie: %s · zoeken naar updates…" % Updater.label(Updater.current())
-	row.add_child(_update_note)
 	_update_button = Button.new()
 	_update_button.text = "Zoek updates"
-	_update_button.custom_minimum_size = Vector2(146, 44)
+	_update_button.custom_minimum_size = Vector2(420, 48)
 	_update_button.pressed.connect(_on_update_pressed)
-	row.add_child(_update_button)
+	box.add_child(_update_button)
 	_updater.check()
 
 
@@ -183,7 +252,9 @@ func _on_checked(remote: Dictionary) -> void:
 		_update_button.text = "Zoek updates"
 	elif Updater.newer(remote, mine):
 		_update_note.text = "Versie: %s · nieuw: %s." % [Updater.label(mine), Updater.label(remote)]
-		_update_button.text = "Bijwerken"
+		_update_button.text = "Bijwerken naar %s" % Updater.label(remote)
+		_updates_button.text = "Updates\nNieuwe versie beschikbaar!"
+		_version_line.text = "Versie: %s · nieuw: %s" % [Updater.label(mine), Updater.label(remote)]
 	else:
 		_update_note.text = "Versie: %s · dit is de nieuwste." % Updater.label(mine)
 		_update_button.text = "Zoek updates"

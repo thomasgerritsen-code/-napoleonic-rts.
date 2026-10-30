@@ -13,6 +13,21 @@ var _failures: Array[String] = []
 
 
 func _initialize() -> void:
+	# The menu: a start page with Singleplayer, Multiplayer and Updates, each
+	# opening its own page with a way back.
+	var menu: Control = load("res://scenes/menu.tscn").instantiate()
+	root.add_child(menu)
+	await process_frame
+	await process_frame
+	var pages: Dictionary = menu.get("_pages")
+	_check(pages.size() == 4 and (pages["start"] as Control).visible and not (pages["single"] as Control).visible,
+		"the menu opens on its start page")
+	menu.call("_show", "multi")
+	_check((pages["multi"] as Control).visible and not (pages["start"] as Control).visible, "and Multiplayer opens its own page")
+	menu.call("_show", "start")
+	menu.queue_free()
+	await process_frame
+
 	var battle: Battle = load("res://scenes/main.tscn").instantiate()
 	root.add_child(battle)
 	# The scene is set up once the main loop runs its first frame.
