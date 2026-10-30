@@ -422,6 +422,49 @@ func _initialize() -> void:
 	for link in links:
 		link.queue_free()
 	await process_frame
+
+	# And over real ENet on this machine: a command up, a snapshot down.
+	var host_branch := Node.new()
+	host_branch.name = "EnetHost"
+	root.add_child(host_branch)
+	var client_branch := Node.new()
+	client_branch.name = "EnetClient"
+	root.add_child(client_branch)
+	set_multiplayer(SceneMultiplayer.new(), host_branch.get_path())
+	set_multiplayer(SceneMultiplayer.new(), client_branch.get_path())
+	var enet_host := NetLink.new()
+	enet_host.name = "Net"
+	host_branch.add_child(enet_host)
+	var enet_client := NetLink.new()
+	enet_client.name = "Net"
+	client_branch.add_child(enet_client)
+	var hosted := enet_host.host(NetLink.PORT + 1)
+	var dialled := enet_client.join("127.0.0.1", NetLink.PORT + 1)
+	var commands_in: Array[Dictionary] = []
+	var snapshots_in: Array[Dictionary] = []
+	enet_host.command_received.connect(func(d: Dictionary) -> void: commands_in.append(d))
+	enet_client.snapshot_received.connect(func(d: Dictionary) -> void: snapshots_in.append(d))
+	for i in 300:
+		if enet_host.connected and enet_client.connected:
+			break
+		await process_frame
+	enet_client.send_command({"name": "halt", "args": [], "units": [10001, 10002], "building": 0})
+	for i in 300:
+		if not commands_in.is_empty() and not snapshots_in.is_empty():
+			break
+		# Snapshots go unreliably: send until one arrives.
+		if i % 10 == 0:
+			enet_host.send_snapshot({"clock": 1.5, "supplies": PackedFloat32Array([3.0, 4.0])})
+		await process_frame
+	_check(hosted == OK and dialled == OK and enet_client.connected, "two programs can connect over ENet")
+	_check(not commands_in.is_empty() and commands_in[0]["units"] == [10001, 10002]
+		and not snapshots_in.is_empty() and is_equal_approx(snapshots_in[0]["clock"], 1.5),
+		"a command reaches the host and a snapshot the client over ENet")
+	enet_client.close()
+	enet_host.close()
+	host_branch.queue_free()
+	client_branch.queue_free()
+	await process_frame
 	AtlasLibrary.clear()
 	for failure in _failures:
 		printerr("FAILED: ", failure)
