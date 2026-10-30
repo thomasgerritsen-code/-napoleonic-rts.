@@ -8,6 +8,10 @@ extends Control
 
 var _online_note: Label
 var _address: LineEdit
+var _updater: Updater
+var _update_note: Label
+var _update_button: Button
+var _remote: Dictionary = {}
 
 
 func _ready() -> void:
@@ -41,6 +45,7 @@ func _ready() -> void:
 	_choice(box, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
 	_choice(box, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
 	_online(box)
+	_update_row(box)
 	var quit_button := Button.new()
 	quit_button.text = "Afsluiten"
 	quit_button.custom_minimum_size = Vector2(420, 44)
@@ -138,3 +143,57 @@ func _go(role: String, side: String) -> void:
 	Battle.online_role = role
 	Battle.online_side = side
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+## The version, and updating from the menu (see Updater).
+func _update_row(box: VBoxContainer) -> void:
+	Updater.clean_up()
+	_updater = Updater.new()
+	add_child(_updater)
+	_updater.checked.connect(_on_checked)
+	_updater.progress.connect(func(share: float) -> void:
+		_update_note.text = "Nieuwe versie downloaden… %d%%" % int(share * 100))
+	_updater.failed.connect(func(text: String) -> void:
+		_update_note.text = text
+		_update_button.disabled = false)
+	var row := HBoxContainer.new()
+	box.add_child(row)
+	_update_note = Label.new()
+	_update_note.custom_minimum_size = Vector2(270, 44)
+	_update_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_update_note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_update_note.add_theme_color_override("font_color", Color(0.96, 0.93, 0.82))
+	_update_note.add_theme_color_override("font_outline_color", Color(0.06, 0.07, 0.05))
+	_update_note.add_theme_constant_override("outline_size", 4)
+	_update_note.text = "Versie: %s · zoeken naar updates…" % Updater.label(Updater.current())
+	row.add_child(_update_note)
+	_update_button = Button.new()
+	_update_button.text = "Zoek updates"
+	_update_button.custom_minimum_size = Vector2(146, 44)
+	_update_button.pressed.connect(_on_update_pressed)
+	row.add_child(_update_button)
+	_updater.check()
+
+
+func _on_checked(remote: Dictionary) -> void:
+	_remote = remote
+	var mine := Updater.current()
+	if remote.is_empty():
+		_update_note.text = "Versie: %s · geen verbinding met GitHub." % Updater.label(mine)
+		_update_button.text = "Zoek updates"
+	elif Updater.newer(remote, mine):
+		_update_note.text = "Versie: %s · nieuw: %s." % [Updater.label(mine), Updater.label(remote)]
+		_update_button.text = "Bijwerken"
+	else:
+		_update_note.text = "Versie: %s · dit is de nieuwste." % Updater.label(mine)
+		_update_button.text = "Zoek updates"
+
+
+func _on_update_pressed() -> void:
+	if not _remote.is_empty() and Updater.newer(_remote, Updater.current()):
+		_update_button.disabled = true
+		_update_note.text = "Nieuwe versie downloaden…"
+		_updater.install()
+	else:
+		_update_note.text = "Zoeken naar updates…"
+		_updater.check()

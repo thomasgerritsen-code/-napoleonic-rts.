@@ -40,6 +40,11 @@ func _initialize() -> void:
 	battle.wildlife.alarm(startled["world"])
 	_check(startled["state"] == "run", "gunfire sends them running")
 
+	# The updater: a higher build is newer; a copy not built by GitHub is a development copy.
+	_check(Updater.newer({"build": 41}, {"build": 40}) and not Updater.newer({"build": 40}, {"build": 40})
+		and Updater.label({"build": 0}) == "ontwikkelversie" and Updater.label({"build": 7, "date": "2026-10-30"}) == "build 7 (2026-10-30)",
+		"the updater tells a newer build from this one")
+
 	battle.fog.refresh()
 	_check(battle.fog.sees(battle.town_centre("france").world), "France sees its own base")
 	_check(not battle.fog.sees(battle.town_centre("britain").world) and not battle.town_centre("britain").visible,

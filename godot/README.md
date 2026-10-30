@@ -52,5 +52,11 @@ hetzelfde netwerk werkt het direct; over internet moet de host UDP-poort
 47300 in zijn router doorsturen (of gebruik samen een VPN zoals Tailscale of
 ZeroTier).
 
+**Bijwerken:** het menu toont de versie en zoekt bij het openen naar een
+nieuwere. Is die er, dan haalt *Bijwerken* de nieuwe `NapoleonicRTS.exe` van
+de GitHub-release *Godot-versie (nieuwste)*, zet die op de plaats van de oude
+en start het spel opnieuw. Zet het spel daarvoor in een map waarin het mag
+schrijven (bijvoorbeeld Documenten of het Bureaublad).
+
 GitHub controleert het project bij elke wijziging (`tests/smoke_test.gd`,
 headless) en maakt een Windows-`.exe` (workflow *Godot*).

@@ -1,7 +1,10 @@
 name: Godot
 
 # The Godot version of the game (godot/): imports the project, runs the
-# headless battle check, and exports a Windows .exe kept with the run.
+# headless battle check, and exports a Windows .exe kept with the run. A
+# passing build from this repository is also put on the release
+# "godot-latest" with its version.json, where the game's in-game updater
+# (godot/scripts/updater.gd) finds it.
 on:
   workflow_dispatch:
   push:
@@ -11,7 +14,7 @@ on:
     paths: ["godot/**", ".github/workflows/godot.yml"]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: godot-${{ github.ref }}
@@ -68,6 +71,13 @@ jobs:
           unzip -q -j templates.tpz "templates/windows_release_x86_64.exe" "templates/version.txt" -d "$dir"
           rm templates.tpz
 
+      - name: Stamp the build number
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          printf '{"build": %s, "commit": "%s", "date": "%s"}\n' "${{ github.run_number }}" "${HEAD_SHA::7}" "$(date -u +%Y-%m-%d)" > godot/version.json
+          cat godot/version.json
+
       - name: Export Windows .exe
         run: |
           mkdir -p godot/build
@@ -82,3 +92,17 @@ jobs:
           path: godot/build/NapoleonicRTS.exe
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish for the in-game updater
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: godot-latest
+          name: Godot-versie (nieuwste)
+          target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
+          body: De Godot-versie van Napoleonic RTS voor Windows, na elke geslaagde controle bijgewerkt. Download NapoleonicRTS.exe en start het; het spel werkt zichzelf daarna bij via het menu.
+          prerelease: false
+          make_latest: false
+          files: |
+            godot/build/NapoleonicRTS.exe
+            godot/version.json

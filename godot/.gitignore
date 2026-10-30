@@ -2,3 +2,5 @@
 .godot/
 build/
 *.tmp
+# Written by the CI with the build number (the in-game updater reads it)
+version.json
