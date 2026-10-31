@@ -187,6 +187,13 @@ func _initialize() -> void:
 		and String(pacer._sprite.animation).begins_with("idle"), "a man's steps follow the ground he covers, and he stands once he stops (%s, %d frames, %.2f)" % [walking_look, frames_seen.size(), cycle])
 	pacer.queue_free()
 	battle.units.erase(pacer)
+	# Smoke, earth and dust as particles worked out on the graphics card.
+	var fx_before: int = battle.effects.emitted
+	battle.call("_puff", home + Vector2(300, 600), 0.55, 2.6, Vector2(1, 0))
+	battle.call("_earth", home + Vector2(320, 600), 1.0)
+	battle.effects.dust(Iso.to_screen(home + Vector2(340, 600)))
+	_check(battle.effects.emitted == fx_before + 2 and battle.effects.alive("smoke") > 0 and battle.effects.alive("earth") > 0
+		and battle.effects.alive("dust") > 0, "a shot leaves smoke, a strike throws up earth, a horse raises dust")
 
 	# Troop kinds: their factors and their own coats.
 	var grenadier := battle.add_unit("france", "infantry", home + Vector2(600, 500), "grenadier")

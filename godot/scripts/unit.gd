@@ -102,6 +102,7 @@ var _step_phase := 0.0         # 0..1 through the step cycle
 var _shown_dir := -1           # 0..7, east round to north-east
 var _turn_wait := 0.0
 var _gait := "walk"            # for horses: walk, trot or gallop
+var _dust_clock := 0.0
 
 
 func setup(battle_: Battle, side_: String, type_: String, at: Vector2, troop_ := "") -> void:
@@ -764,6 +765,13 @@ func present(delta: float) -> void:
 			_gait = "trot"
 		else:
 			_gait = "walk"
+	# Horses at the trot or gallop kick up dust; wet ground hardly any.
+	if _horse() and _striding and _gait != "walk" and battle != null and battle.effects != null:
+		_dust_clock -= delta
+		if _dust_clock <= 0.0:
+			_dust_clock = 0.05 if _gait == "gallop" else 0.11
+			var wet := battle.weather.wetness if battle.weather != null else 0.0
+			battle.effects.dust(position + Vector2(0.0, 1.0), 1.0 - 0.8 * clampf(wet, 0.0, 1.0))
 	var stride := STRIDE
 	if _horse():
 		stride = {"gallop": 3.6, "trot": 2.8}.get(_gait, 2.4)

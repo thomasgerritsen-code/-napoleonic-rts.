@@ -94,6 +94,8 @@ var _walls := {}
 var _walls_dirty := true
 var _units_layer: Node2D
 var _effects: Node2D
+## Smoke, flying earth and dust (particles worked out on the graphics card).
+var effects: Effects
 var _overlay: Overlay
 var camera: BattleCamera
 var _hud: Hud
@@ -130,6 +132,9 @@ func _ready() -> void:
 	_effects = Node2D.new()
 	_effects.z_index = 10
 	add_child(_effects)
+	effects = Effects.new()
+	effects.battle = self
+	_effects.add_child(effects)
 	fog = Fog.new()
 	fog.battle = self
 	add_child(fog)
@@ -489,7 +494,9 @@ func replay_fx(e: Array) -> void:
 	var kind: String = e[0]
 	var at := Vector2(e[1], e[2])
 	if kind == "p":
-		_puff(at, e[3], e[4])
+		_puff(at, e[3], 0.0, Vector2.from_angle(e[4]) if e.size() > 4 and float(e[4]) < 90.0 else Vector2.ZERO)
+	elif kind == "e":
+		_earth(at, e[3])
 	elif kind.begins_with("s:"):
 		sounds.play(kind.substr(2), at)
 
@@ -914,7 +921,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			return
 	if u.type != "cavalry":
 		play_sound("cannon" if u.type == "artillery" else "musket", u.world)
-		_puff(u.muzzle(), 1.3 if u.type == "artillery" else 0.55, 3.2 if u.type == "artillery" else 2.6)
+		_puff(u.muzzle(), 1.3 if u.type == "artillery" else 0.55, 3.2 if u.type == "artillery" else 2.6, spot(target) - u.world)
 	wildlife.alarm(u.world)
 	if not is_foe(target, u.side):
 		return
@@ -951,7 +958,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			for other in units:
 				if other.alive() and other.side != u.side and other.world.distance_to(impact) < 26.0:
 					strike(other, damage * randf_range(0.6, 1.3), u.world, lobbed)
-			_puff(impact, 0.8, 1.6)
+			_earth(impact, 1.0)
 		_:
 			var chance := clampf(0.45 - distance / 600.0, 0.06, 0.4)
 			if u.regiment != null:
@@ -967,7 +974,7 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 ## the line of fire, hardest close by (the web game: 24 at the muzzle).
 func _grapeshot(u: Unit, target: Node2D) -> void:
 	play_sound("cannon", u.world)
-	_puff(u.muzzle(), 1.5, 2.6)
+	_puff(u.muzzle(), 1.5, 2.6, spot(target) - u.world)
 	wildlife.alarm(u.world)
 	var aim := (spot(target) - u.world).angle()
 	for other in units:
@@ -1024,27 +1031,30 @@ func throw_grenade(thrower: Unit, at: Vector2) -> void:
 
 func _burst(side: String, at: Vector2, radius: float, damage: float) -> void:
 	play_sound("cannon", at)
-	_puff(at, 1.0, 1.8)
+	_earth(at, 1.2)
 	wildlife.alarm(at)
 	for u in units:
 		if u.alive() and u.side != side and u.world.distance_to(at) < radius:
 			u.hit(damage * randf_range(0.7, 1.3))
 
 
-func _puff(world_at: Vector2, size: float, life: float) -> void:
+## Powder smoke at `world_at`, blown out along `way` (a direction in the
+## world; none for a puff that just hangs). How long it hangs is the
+## particles' own; `_life` stays for the callers.
+func _puff(world_at: Vector2, size: float, _life: float, way := Vector2.ZERO) -> void:
 	if sync != null and net_role == "host":
-		sync.fx("p", world_at, size, life)
-	var puff := Sprite2D.new()
-	puff.texture = _smoke
-	puff.position = Iso.to_screen(world_at) + Vector2(0.0, -10.0)
-	puff.scale = Vector2.ONE * size * 0.4
-	puff.modulate = Color(0.93, 0.92, 0.88, 0.85)
-	_effects.add_child(puff)
-	var tween := puff.create_tween().set_parallel(true)
-	tween.tween_property(puff, "scale", Vector2.ONE * size * 1.6, life)
-	tween.tween_property(puff, "position", puff.position + Vector2(randf_range(4.0, 14.0), -16.0), life)
-	tween.tween_property(puff, "modulate:a", 0.0, life).set_ease(Tween.EASE_IN)
-	tween.chain().tween_callback(puff.queue_free)
+		sync.fx("p", world_at, size, way.angle() if way != Vector2.ZERO else 99.0)
+	if effects != null:
+		var out := Vector2(way.x, way.y * Iso.SQ) if way != Vector2.ZERO else Vector2.ZERO
+		effects.smoke(Iso.to_screen(world_at) + Vector2(0.0, -10.0), size, out)
+
+
+## Earth thrown up where a ball or shell strikes.
+func _earth(world_at: Vector2, size: float) -> void:
+	if sync != null and net_role == "host":
+		sync.fx("e", world_at, size)
+	if effects != null:
+		effects.earth(Iso.to_screen(world_at), size)
 
 
 func _puff_texture() -> Texture2D:
