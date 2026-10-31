@@ -212,6 +212,37 @@ func _initialize() -> void:
 	regiment.order_move(march_from, 0.0)
 	_run(battle, 15.0)
 	battle.select_units([] as Array[Unit])
+	# Over the river, as the British commander sends his battalions: a leg of
+	# at most 900 px whenever it stands. A line crosses the bridge in column
+	# and forms line beyond; nobody stays standing on the bridge.
+	# (At the bridge furthest from the French, so it fights nobody.)
+	var crossing := Nav.bridges()[0]
+	for b in Nav.bridges():
+		if Vector2(b["west"]).distance_to(home) > Vector2(crossing["west"]).distance_to(home):
+			crossing = b
+	var far_bank: Vector2 = Vector2(crossing["east"]) + Vector2(300, 60)
+	var redcoats: Array[Unit] = []
+	for i in 24:
+		redcoats.append(battle.add_unit("britain", "infantry", far_bank + Vector2((i % 12) * 15, (i / 12) * 19)))
+	redcoats.append(battle.add_unit("britain", "officer", far_bank + Vector2(90, -30)))
+	redcoats.append(battle.add_unit("britain", "drummer", far_bank + Vector2(90, 50)))
+	var wading := battle.form_regiment(redcoats)
+	var across_to: Vector2 = Vector2(crossing["west"]) + Vector2(-350, 40)
+	var columned := false
+	for second in 80:
+		if not wading.moving():
+			var here_now := wading.centroid()
+			wading.order_move(here_now + (across_to - here_now).limit_length(900.0), (across_to - here_now).angle())
+		columned = columned or wading.formation == "column"
+		_run(battle, 1.0)
+	var left_behind := 0
+	for u in wading.living():
+		if Nav.bank(u.world) > 0 or Nav.on_bridge(u.world):
+			left_behind += 1
+	_check(wading.centroid().distance_to(across_to) < 60.0 and left_behind == 0 and columned and wading.formation == "line",
+		"a battalion crosses the bridge in column and forms line beyond it (%.0f px off, %d left behind)" % [wading.centroid().distance_to(across_to), left_behind])
+	for u in wading.living():
+		u.hit(100000.0)
 	# Smoke, earth and dust as particles worked out on the graphics card.
 	var fx_before: int = battle.effects.emitted
 	battle.call("_puff", home + Vector2(300, 600), 0.55, 2.6, Vector2(1, 0))

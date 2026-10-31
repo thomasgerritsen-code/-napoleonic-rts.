@@ -80,6 +80,7 @@ var _forming := false
 var _places := {}            # Unit -> Vector2(right, forward) offset
 var _wheel := false          # the body turns with its way (else slides, keeping its front)
 var heading := 0.0           # the way the body goes, as the men face while they march
+var _line_after := false     # a line crossing the river in column, to form line again beyond it
 const RALLY_MORALE := 62.0
 const RALLY_SAFE := 235.0
 
@@ -235,7 +236,7 @@ func moving() -> bool:
 	if not _march.is_empty():
 		return true
 	for u in living():
-		if u.world.distance_to(u.slot) > 6.0:
+		if u.slot_gap > 6.0 and not u.stuck:
 			return true
 	return false
 
@@ -249,10 +250,17 @@ func order_move(to: Vector2, face: Variant = null) -> void:
 		facing = float(face)
 	elif to.distance_to(from) > 4.0:
 		facing = (to - from).angle()
+	# Not into the river: to the bank beyond it (or this side's, if it is ours).
+	if Nav.in_water(to):
+		var side := 1.0 if to.x > Nav.river_x(to.y) else -1.0
+		to = Nav.dry(Vector2(Nav.river_x(to.y) + side * 1000.0, to.y), to)
 	destination = to
 	enemy = null
 	charging = null
 	_march.clear()
+	if _line_after:
+		_line_after = false
+		formation = "line"
 	if to.distance_to(from) < MARCH_MIN or formation == "square" or living().is_empty():
 		_form(to)
 		return
@@ -260,6 +268,10 @@ func order_move(to: Vector2, face: Variant = null) -> void:
 	_end_face = facing
 	_march = Nav.route(from, to)
 	_anchor = from
+	# A line crosses a bridge in column and forms line again beyond it.
+	if _march.size() > 1 and formation == "line" and not skirmish:
+		formation = "column"
+		_line_after = true
 	heading = (_march[0] - from).angle()
 	# A column, or a line going (nearly) the way it faces, turns to its way
 	# and wheels along it; a line sent aside or back keeps its front and
@@ -298,7 +310,7 @@ func _advance(delta: float) -> void:
 	if _forming:
 		var ready := 0
 		for u in list:
-			if u.world.distance_to(u.slot) < 10.0:
+			if u.world.distance_to(u.slot) < 10.0 or u.stuck:
 				ready += 1
 		if ready < FORMED * list.size():
 			return
@@ -325,6 +337,9 @@ func _advance(delta: float) -> void:
 		_march.pop_front()
 		if _march.is_empty():
 			facing = _end_face
+			if _line_after:
+				_line_after = false
+				formation = "line"
 			_form(destination)
 			return
 	else:
@@ -338,6 +353,7 @@ func _advance(delta: float) -> void:
 
 
 func set_formation(kind: String) -> void:
+	_line_after = false
 	if kind == formation or routing:
 		return
 	if kind == "square":

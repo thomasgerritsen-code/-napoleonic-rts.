@@ -103,6 +103,16 @@ var _shown_dir := -1           # 0..7, east round to north-east
 var _turn_wait := 0.0
 var _gait := "walk"            # for horses: walk, trot or gallop
 var _dust_clock := 0.0
+## A man in a battalion who has made no way towards his place for a second
+## (it lies in a house, in the water, or the crowd holds him) is stuck: the
+## battalion does not wait for him.
+var stuck := false
+## How far from his place he is after his own step (before the crowd jostles him).
+var slot_gap := 0.0
+var _stuck_clock := 0.0
+var _stuck_from := INF
+var _detour := Vector2.ZERO     # a step aside round what holds him
+var _detour_left := 0.0
 
 
 func setup(battle_: Battle, side_: String, type_: String, at: Vector2, troop_ := "") -> void:
@@ -215,6 +225,7 @@ func step(delta: float) -> void:
 	var was := world
 	if regiment != null:
 		_step_in_regiment(delta)
+		_watch_stuck(delta)
 	elif type == "worker":
 		_step_worker(delta)
 	else:
@@ -258,6 +269,9 @@ func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
 		_path = Nav.route(world, Nav.dry(world, to))
 	var next: Vector2 = _path[0] if not _path.is_empty() else to
 	var way := next - world
+	if _detour_left > 0.0:
+		_detour_left -= delta
+		way = _detour * 24.0 + way.normalized() * 6.0
 	if way.length() <= 3.0:
 		if _path.size() > 1:
 			_path.pop_front()
@@ -277,6 +291,22 @@ func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
 	else:
 		_play("walk" if troop == "mounted" else MOVE_ANIM.get(type, "march"))
 	return false
+
+
+func _watch_stuck(delta: float) -> void:
+	slot_gap = world.distance_to(slot)
+	_stuck_clock += delta
+	if _stuck_clock < 1.0:
+		return
+	_stuck_clock = 0.0
+	var d := world.distance_to(slot)
+	var was := stuck
+	stuck = d > 3.0 and d > _stuck_from - 3.0
+	_stuck_from = d
+	# Held fast: a step to one side, to come round the house or the crowd.
+	if stuck and not was and d > 12.0:
+		_detour = (slot - world).normalized().orthogonal() * (1.0 if Battle.hash01(id, int(battle.clock)) < 0.5 else -1.0)
+		_detour_left = 1.2
 
 
 func idle() -> void:

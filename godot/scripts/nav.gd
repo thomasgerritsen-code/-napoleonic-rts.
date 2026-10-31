@@ -67,7 +67,20 @@ static func in_water(p: Vector2) -> bool:
 ## Waypoints from `from` to `to`; just [to] when no water lies between.
 static func route(from: Vector2, to: Vector2) -> Array[Vector2]:
 	var way: Array[Vector2] = []
-	if _bridges.is_empty() or bank(from) == bank(to) or on_bridge(from) or on_bridge(to):
+	# On a bridge: off it at the end on the bank where `to` lies.
+	if on_bridge(from) and not on_bridge(to):
+		for b in _bridges:
+			var a: Vector2 = b["west"]
+			var e: Vector2 = b["east"]
+			if Geometry2D.get_closest_point_to_segment(from, a, e).distance_to(from) < float(b["width"]) / 2.0:
+				# (Once at the end, straight on: else he turns back to it.)
+				var off := e if bank(to) > 0 else a
+				if from.distance_to(off) > 10.0:
+					way.append(off)
+				break
+		way.append(to)
+		return way
+	if _bridges.is_empty() or bank(from) == bank(to) or on_bridge(to):
 		way.append(to)
 		return way
 	var best: Dictionary = {}
