@@ -664,6 +664,56 @@ func _initialize() -> void:
 	await process_frame
 	Battle.mode = "campaign"
 
+	# The battle in 3D: the same battle drawn with the Blender models; a click
+	# on a man selects his battalion, a right click sends it; F3 back to 2D.
+	Battle.view_3d = true
+	var deep: Battle = load("res://scenes/main.tscn").instantiate()
+	root.add_child(deep)
+	await process_frame
+	await process_frame
+	deep.ai.set("_next_wave", 1.0e9)
+	var line_men: Array[Unit] = []
+	var stand := deep.town_centre("france").world + Vector2(500, 260)
+	for i in 24:
+		line_men.append(deep.add_unit("france", "infantry", stand + Vector2((i % 12) * 15, (i / 12) * 19)))
+	line_men.append(deep.add_unit("france", "officer", stand + Vector2(90, -30)))
+	line_men.append(deep.add_unit("france", "drummer", stand + Vector2(90, 50)))
+	var line := deep.form_regiment(line_men)
+	for i in 10:
+		deep._process(0.1)
+		await process_frame
+	deep.view3d.view(line.centroid(), 0.0, 50.0, 60.0)
+	await process_frame
+	var shown3d := deep.view3d.men_shown()
+	var hidden_2d: bool = not deep.get("_units_layer").visible
+	var at_man := deep.view3d.camera.unproject_position(View3D.at(line_men[5].world) + Vector3.UP * 0.9)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = at_man
+	root.push_input(click, true)
+	var click_up := click.duplicate() as InputEventMouseButton
+	click_up.pressed = false
+	root.push_input(click_up, true)
+	var picked_line := deep.selected.has(line)
+	var goal3d := line.centroid() + Vector2(0, 200)
+	var send := InputEventMouseButton.new()
+	send.button_index = MOUSE_BUTTON_RIGHT
+	send.pressed = true
+	send.position = deep.view3d.camera.unproject_position(View3D.at(goal3d))
+	root.push_input(send, true)
+	var send_up := send.duplicate() as InputEventMouseButton
+	send_up.pressed = false
+	root.push_input(send_up, true)
+	for i in 12:
+		deep._process(1.0)
+	_check(shown3d >= 26 and hidden_2d and picked_line and line.centroid().distance_to(goal3d) < 60.0,
+		"in 3D the battle is drawn (%d men), a click selects a battalion and a right click sends it (%.0f px off)" % [shown3d, line.centroid().distance_to(goal3d)])
+	deep.set_view_3d(false)
+	_check(deep.view3d == null and deep.get("_units_layer").visible, "F3 goes back to the 2D field")
+	deep.queue_free()
+	Battle.view_3d = false
+	await process_frame
 	# The graphics proofs: the richer 2D look lights and sways the props; the
 	# 3D proof builds its piece of the map from the Blender models.
 	Battle.fancy = true

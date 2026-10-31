@@ -71,8 +71,13 @@ func _ready() -> void:
 	var single: VBoxContainer = _pages["single"]
 	_heading(single, "Singleplayer")
 	Battle.fancy = false
+	Battle.view_3d = false
 	_choice(single, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
 	_choice(single, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
+	_proof_button(single, "Veldslag in 3D", "De veldslag tegen de computer in 3D (F3 wisselt tijdens het spel tussen 2D en 3D).", func() -> void:
+		Battle.view_3d = true
+		Battle.mode = "campaign"
+		get_tree().change_scene_to_file("res://scenes/main.tscn"))
 	_proof_button(single, "Proef: verbeterd 2D", "Zon die met het uur meedraait, bewegend water, wuivende bomen, wolkenschaduw.", func() -> void:
 		Battle.fancy = true
 		Battle.mode = "campaign"

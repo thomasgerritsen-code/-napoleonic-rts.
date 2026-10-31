@@ -74,6 +74,7 @@ func _ready() -> void:
 	_touch_button("Naar selectie", func() -> void: battle.focus_selection())
 	_box_button = _touch_button("Kader", func() -> void: battle.toggle_box_mode())
 	_touch_button("Niets selecteren", func() -> void: battle.deselect())
+	_touch_button("2D / 3D", func() -> void: battle.set_view_3d(battle.view3d == null))
 	_touch_button("Geluid", func() -> void:
 		battle.sounds.enabled = not battle.sounds.enabled
 		battle.say("Geluid %s." % ("aan" if battle.sounds.enabled else "uit")))
@@ -169,7 +170,7 @@ func _describe() -> String:
 	if battle.selected_units.is_empty() and _by_touch():
 		return "Niets geselecteerd.\nTik op een eigen soldaat of gebouw om te selecteren, of zet Kader aan en sleep.\nMet troepen geselecteerd: tik op de grond voor een order, of druk en sleep voor de frontrichting.\nTwee vingers: kaart verschuiven en inzoomen."
 	if battle.selected_units.is_empty():
-		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · G stelling · T tirailleurs · H halt · K kartets\nF regiment vormen · Tab volgend bataljon · Spatie: naar selectie · WASD/wieltje: camera · F5 opslaan · F9 laden"
+		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · G stelling · T tirailleurs · H halt · K kartets\nF regiment vormen · Tab volgend bataljon · Spatie: naar selectie · WASD/wieltje: camera · F3 2D/3D · F5 opslaan · F9 laden"
 	var count := {}
 	for u in battle.selected_units:
 		count[u.type] = count.get(u.type, 0) + 1

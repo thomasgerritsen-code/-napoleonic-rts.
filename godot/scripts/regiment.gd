@@ -85,6 +85,14 @@ const RALLY_MORALE := 62.0
 const RALLY_SAFE := 235.0
 
 
+## 1st, 2nd, 3rd, 4th ... 11th, 12th, 13th, 21st: the British numbering.
+static func ordinal(n: int) -> String:
+	var tail := "th"
+	if n % 100 < 11 or n % 100 > 13:
+		tail = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+	return "%d%s" % [n, tail]
+
+
 static func eligible(units: Array[Unit]) -> bool:
 	var count := {"infantry": 0, "officer": 0, "drummer": 0}
 	for u in units:
@@ -99,7 +107,7 @@ static func raise(units: Array[Unit]) -> Regiment:
 		return null
 	var side_: String = units[0].side
 	_numbers[side_] += 1
-	var title: String = ("%de Ligne" if side_ == "france" else "%dth Foot") % _numbers[side_]
+	var title: String = ("%de Ligne" % _numbers[side_]) if side_ == "france" else "%s Foot" % Regiment.ordinal(_numbers[side_])
 	var r := Regiment.new(title, side_)
 	var officer := false
 	var drummer := false
@@ -165,7 +173,7 @@ static func raise_cavalry(units: Array[Unit]) -> Regiment:
 	var side_: String = units[0].side
 	var kind_ := _main_kind(units)
 	_squadrons[side_] += 1
-	var title: String = ("%de Cavalerie" if side_ == "france" else "%dth Dragoons") % _squadrons[side_]
+	var title: String = ("%de Cavalerie" % _squadrons[side_]) if side_ == "france" else "%s Dragoons" % Regiment.ordinal(_squadrons[side_])
 	var r := Regiment.new(title, side_)
 	r.kind = "cavalry"
 	var officer := false

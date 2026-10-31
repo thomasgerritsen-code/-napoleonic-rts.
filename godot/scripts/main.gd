@@ -116,6 +116,9 @@ static var touched := false
 ## The richer 2D look on trial (menu: Proef: verbeterd 2D): see Fancy.
 static var fancy := false
 var fancy_look: Fancy = null
+## The same battle seen in 3D (F3 switches; the menu's "Veldslag in 3D"): see View3D.
+static var view_3d := false
+var view3d: View3D = null
 var box_mode := false
 var _river: Array = []
 var _woods_list: Array = []
@@ -191,6 +194,8 @@ func _ready() -> void:
 	add_child(_hud)
 	say("%s met boeren op struiken voor voedsel; bouw een houthakkerskamp bij het bos voor hout." % (
 		"Tik" if touched or OS.has_feature("mobile") else "Rechtsklik"))
+	if view_3d:
+		set_view_3d(true)
 	if fancy:
 		fancy_look = Fancy.new()
 		fancy_look.battle = self
@@ -205,6 +210,24 @@ func _ready() -> void:
 		SaveGame.restore(self, saved)
 		camera.focus(Iso.to_screen(town_centre(me).world + Vector2(260, 60)) if town_centre(me) != null else camera.position)
 		say("Opgeslagen slag geladen (%s)." % saved.get("saved_at", ""))
+
+
+## The battle in 3D, or back in 2D: the field's own pictures are hidden while
+## the 3D view shows it (the screen's layers, HUD and menus, stay).
+func set_view_3d(on: bool) -> void:
+	view_3d = on
+	if on and view3d == null:
+		view3d = View3D.new()
+		view3d.battle = self
+		add_child(view3d)
+	elif not on and view3d != null:
+		view3d.queue_free()
+		view3d = null
+		camera.make_current()
+	for child in get_children():
+		if child is CanvasItem and child != view3d:
+			(child as CanvasItem).visible = not on
+	refresh_hud()
 
 
 ## F5: this battle to disk (one at a time; again overwrites it).
@@ -1768,6 +1791,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					get_tree().reload_current_scene()
 			KEY_F10:
 				get_tree().change_scene_to_file("res://scenes/menu.tscn")
+			KEY_F3:
+				set_view_3d(view3d == null)
+				say("3D-weergave." if view3d != null else "2D-weergave.")
 			KEY_F5:
 				save_battle()
 			KEY_F9:
