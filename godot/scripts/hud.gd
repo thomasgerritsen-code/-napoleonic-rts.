@@ -22,6 +22,10 @@ var _group: GridContainer = null
 var _dirty := true
 var _end: Panel = null
 var _minimap: Minimap
+## By touch, the keys' work on buttons: menu, save, load, the next battalion,
+## to the selection, a selection box, nothing selected, sound.
+var _touchbar: HBoxContainer
+var _box_button: Button
 
 
 func _ready() -> void:
@@ -57,6 +61,23 @@ func _ready() -> void:
 	_minimap.offset_left = -Minimap.SIZE.x - 14
 	_minimap.offset_top = 74
 	add_child(_minimap)
+	_touchbar = HBoxContainer.new()
+	_touchbar.position = Vector2(14, 72)
+	_touchbar.add_theme_constant_override("separation", 6)
+	add_child(_touchbar)
+	_touch_button("Menu", func() -> void: battle.get_tree().change_scene_to_file("res://scenes/menu.tscn"))
+	_touch_button("Opslaan", func() -> void: battle.save_battle())
+	_touch_button("Laden", func() -> void:
+		if not Battle.load_saved(battle.get_tree()):
+			battle.say("Er is nog geen opgeslagen slag."))
+	_touch_button("Volgend bataljon", func() -> void: battle.cycle_regiment(false))
+	_touch_button("Naar selectie", func() -> void: battle.focus_selection())
+	_box_button = _touch_button("Kader", func() -> void: battle.toggle_box_mode())
+	_touch_button("Niets selecteren", func() -> void: battle.deselect())
+	_touch_button("Geluid", func() -> void:
+		battle.sounds.enabled = not battle.sounds.enabled
+		battle.say("Geluid %s." % ("aan" if battle.sounds.enabled else "uit")))
+	_touchbar.visible = _by_touch()
 	_result = _label(self, Vector2.ZERO, 30)
 	_result.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_result.offset_top = 110
@@ -120,6 +141,8 @@ func _process(_delta: float) -> void:
 	if _dirty:
 		_dirty = false
 		_rebuild()
+		_touchbar.visible = _by_touch()
+		_box_button.text = "Kader: aan" if battle.box_mode else "Kader"
 
 
 func _describe() -> String:
@@ -143,6 +166,8 @@ func _describe() -> String:
 		if b.type == "farm":
 			lines.append("Graan: %d  ·  %d boeren" % [b.crop, battle.farmers_on(b)])
 		return "\n".join(lines)
+	if battle.selected_units.is_empty() and _by_touch():
+		return "Niets geselecteerd.\nTik op een eigen soldaat of gebouw om te selecteren, of zet Kader aan en sleep.\nMet troepen geselecteerd: tik op de grond voor een order, of druk en sleep voor de frontrichting.\nTwee vingers: kaart verschuiven en inzoomen."
 	if battle.selected_units.is_empty():
 		return "Niets geselecteerd.\nKlik of sleep om te selecteren; rechtsklik geeft een opdracht.\n1 linie · 2 colonne · 3 carré · C charge · G stelling · T tirailleurs · H halt · K kartets\nF regiment vormen · Tab volgend bataljon · Spatie: naar selectie · WASD/wieltje: camera · F5 opslaan · F9 laden"
 	var count := {}
@@ -171,7 +196,7 @@ func _describe() -> String:
 		lines.append("%s: %d man in %s, %s" % [r.name, r.strength(), shape, state])
 	var workers: int = count.get("worker", 0)
 	if workers > 0:
-		lines.append("Boeren: rechtsklik op struiken, bomen bij een kamp, ijzer bij een mijn, of een akker.")
+		lines.append("Boeren: %s op struiken, bomen bij een kamp, ijzer bij een mijn, of een akker." % ("tik" if _by_touch() else "rechtsklik"))
 	return "\n".join(lines)
 
 
@@ -277,6 +302,27 @@ func _rebuild() -> void:
 			single and shapes.has("square"))
 		_button("Tirailleurs", "T · " + ("aan" if open_order else "verspreid"), battle.skirmish,
 			"Open orde: verspreid vuren, minder kwetsbaar voor kanonnen." if not open_order else "Terug naar gesloten orde.", open_order)
+
+
+## Played by touch: on a phone or tablet, or once a finger has been used.
+func _by_touch() -> bool:
+	return Battle.touched or OS.has_feature("mobile") or OS.has_feature("ios") or OS.has_feature("android")
+
+
+func _touch_button(text: String, action: Callable) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(0, 40)
+	button.add_theme_font_size_override("font_size", 14)
+	button.focus_mode = Control.FOCUS_NONE
+	for state: String in ["normal", "hover", "pressed"]:
+		var style := _style(Color(0.55, 0.5, 0.36), state, false)
+		style.content_margin_left = 10
+		style.content_margin_right = 10
+		button.add_theme_stylebox_override(state, style)
+	button.pressed.connect(action)
+	_touchbar.add_child(button)
+	return button
 
 
 ## A new group of buttons under a coloured heading, `columns` wide.

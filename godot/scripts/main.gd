@@ -106,6 +106,14 @@ var _next_id := 10000
 var _drag_start: Variant = null
 var _order_start: Variant = null
 const AIM_DRAG := 25.0               # world px of right-drag before it sets the front
+## Played by touch (a tablet or phone, as Xogot on the iPad): there is no
+## right button and no keys. With men selected one finger gives the order (a
+## tap, or press and drag for the way the front faces, as the web game on the
+## phone); a tap on our own man or building selects it; two fingers pan and
+## pinch the map (BattleCamera); the toolbar does what the keys do, and
+## "Kader" makes the next drag a selection box. A real mouse is not affected.
+static var touched := false
+var box_mode := false
 var _river: Array = []
 var _woods_list: Array = []
 var _orders: Array[Dictionary] = []   # orders on their way to the battalions
@@ -178,7 +186,8 @@ func _ready() -> void:
 	_hud = Hud.new()
 	_hud.battle = self
 	add_child(_hud)
-	say("Rechtsklik met boeren op struiken voor voedsel; bouw een houthakkerskamp bij het bos voor hout.")
+	say("%s met boeren op struiken voor voedsel; bouw een houthakkerskamp bij het bos voor hout." % (
+		"Tik" if touched or OS.has_feature("mobile") else "Rechtsklik"))
 	var link := NetLink.find(get_tree())
 	if net_role != "" and link != null:
 		go_online(link)
@@ -1800,16 +1809,31 @@ func _unhandled_input(event: InputEvent) -> void:
 	if button == null:
 		return
 	var canvas_at := get_viewport().get_canvas_transform().affine_inverse() * button.position
+	var finger := button.device == InputEvent.DEVICE_ID_EMULATION
+	if finger and not touched:
+		touched = true
+		refresh_hud()
 	if button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
+			if camera.fingers() >= 2:
+				return
 			if placing != "":
 				place(Iso.to_world(canvas_at))
 				return
+			# A finger with men selected gives orders, unless it touches our own.
+			if finger and not box_mode and not selected_units.is_empty() and _thing_at(Iso.to_world(canvas_at), false) == null:
+				_order_start = Iso.to_world(canvas_at)
+				return
 			_drag_start = canvas_at
+		elif _order_start != null:
+			_finish_order(canvas_at)
 		elif _drag_start != null:
 			var box := Rect2(_drag_start, Vector2.ZERO).expand(canvas_at)
 			_drag_start = null
 			_overlay.box = Rect2()
+			if box_mode and box.size.length() >= 6.0:
+				box_mode = false
+				refresh_hud()
 			_select_in(box, button.shift_pressed)
 	elif button.button_index == MOUSE_BUTTON_RIGHT:
 		if placing != "":
@@ -1819,16 +1843,47 @@ func _unhandled_input(event: InputEvent) -> void:
 		if button.pressed:
 			_order_start = Iso.to_world(canvas_at)
 		elif _order_start != null:
-			var to: Vector2 = _order_start
-			var end := Iso.to_world(canvas_at)
-			_order_start = null
-			var dragged := end.distance_to(to) > AIM_DRAG
-			if dragged and not selected.is_empty():
-				_drag_aim(end, to)
-				_overlay.aim_done()
-			else:
-				_overlay.aim_cancel()
-			order(to, (end - to).angle() if dragged else null)
+			_finish_order(canvas_at)
+
+
+## Let go of an order being dragged out: given, with the front the way it
+## was dragged if it was dragged far enough.
+func _finish_order(canvas_at: Vector2) -> void:
+	var to: Vector2 = _order_start
+	var end := Iso.to_world(canvas_at)
+	_order_start = null
+	var dragged := end.distance_to(to) > AIM_DRAG
+	if dragged and not selected.is_empty():
+		_drag_aim(end, to)
+		_overlay.aim_done()
+	else:
+		_overlay.aim_cancel()
+	order(to, (end - to).angle() if dragged else null)
+
+
+## A second finger came down: whatever the first one began (a box, an order)
+## is let go; the fingers move the map now.
+func cancel_pointer() -> void:
+	_drag_start = null
+	_order_start = null
+	if _overlay != null:
+		_overlay.box = Rect2()
+		_overlay.aim_cancel()
+
+
+## Touch: the next drag draws a selection box (the toolbar's "Kader").
+func toggle_box_mode() -> void:
+	box_mode = not box_mode
+	say("Sleep een kader om troepen te selecteren." if box_mode else "Kader uit.")
+	refresh_hud()
+
+
+## Touch: nothing selected any more (and no building being placed).
+func deselect() -> void:
+	placing = ""
+	select_units([] as Array[Unit])
+	select_building(null)
+	refresh_hud()
 
 
 ## Dragging out an order for the selected battalions: the golden arrow from

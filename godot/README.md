@@ -31,6 +31,27 @@ kraters en beschadigen loopgraven en torens. Marcheren en chargeren vermoeit.
 De Britse computer valt aan in golven, breekt een verloren aanval af en
 hergroepeert.
 
+## Op de iPad (Xogot)
+
+Xogot is Godot voor iPad en iPhone (Godot 4.7, net als dit project).
+
+1. Open in Safari op de iPad
+   `https://github.com/thomasgerritsen-code/-napoleonic-rts./releases/download/godot-latest/NapoleonicRTS-project.zip`
+   (na elke geslaagde controle bijgewerkt).
+2. Tik in de Bestanden-app op de zip: hij pakt uit tot een map `NapoleonicRTS`.
+3. Open die map in Xogot en druk op afspelen. De eerste keer importeert Xogot
+   de plaatjes; dat duurt even.
+
+Wie liever met git werkt: kloon de repository (bijvoorbeeld met Working Copy) en
+open daarin de map `godot/`.
+
+Bediening met de vingers: tik op een eigen soldaat of gebouw om te selecteren;
+met troepen geselecteerd tik je op de grond voor een order, of druk je en sleep
+je voor de frontrichting (de gouden pijl). Twee vingers verschuiven de kaart,
+knijpen zoomt in en uit. Een werkbalk bovenin doet wat op de computer de
+toetsen doen: menu, opslaan, laden, volgend bataljon, naar de selectie, Kader
+(de volgende veeg trekt een selectiekader), niets selecteren en geluid.
+
 De beginsituatie en de plaatjes komen uit de webversie via
 `node scripts/export-godot-scenario.js` (met het spel lokaal geserveerd).
 

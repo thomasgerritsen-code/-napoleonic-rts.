@@ -196,19 +196,66 @@ func _initialize() -> void:
 	press.button_index = MOUSE_BUTTON_RIGHT
 	press.pressed = true
 	press.position = to_view * Iso.to_screen(drag_from)
-	root.push_input(press)
+	root.push_input(press, true)
 	var sweep := InputEventMouseMotion.new()
 	sweep.position = to_view * Iso.to_screen(drag_from + Vector2(0, 140))
-	root.push_input(sweep)
+	root.push_input(sweep, true)
 	var aimed: bool = battle.get("_overlay").get("_aim_at") != Vector2.INF
 	var let_go := InputEventMouseButton.new()
 	let_go.button_index = MOUSE_BUTTON_RIGHT
 	let_go.pressed = false
 	let_go.position = sweep.position
-	root.push_input(let_go)
+	root.push_input(let_go, true)
 	_run(battle, 14.0)
 	_check(aimed and absf(angle_difference(regiment.facing, PI / 2.0)) < 0.05 and regiment.centroid().distance_to(drag_from) < 30.0,
 		"a dragged order sends the battalion there, its front the way it was dragged (facing %.2f)" % regiment.facing)
+	regiment.order_move(march_from, 0.0)
+	_run(battle, 15.0)
+	# By touch (Xogot on the iPad): one finger with the battalion selected
+	# presses and drags out the order; two fingers pinch the map closer.
+	battle.select_units(regiment.living())
+	var finger_from := regiment.centroid() + Vector2(0, -120)
+	to_view = battle.get_viewport().get_canvas_transform()
+	var touch_down := InputEventMouseButton.new()
+	touch_down.device = InputEvent.DEVICE_ID_EMULATION
+	touch_down.button_index = MOUSE_BUTTON_LEFT
+	touch_down.pressed = true
+	touch_down.position = to_view * Iso.to_screen(finger_from)
+	root.push_input(touch_down, true)
+	var touch_sweep := InputEventMouseMotion.new()
+	touch_sweep.device = InputEvent.DEVICE_ID_EMULATION
+	touch_sweep.position = to_view * Iso.to_screen(finger_from + Vector2(-140, 0))
+	root.push_input(touch_sweep, true)
+	var touch_up := InputEventMouseButton.new()
+	touch_up.device = InputEvent.DEVICE_ID_EMULATION
+	touch_up.button_index = MOUSE_BUTTON_LEFT
+	touch_up.pressed = false
+	touch_up.position = touch_sweep.position
+	root.push_input(touch_up, true)
+	_run(battle, 14.0)
+	_check(Battle.touched and absf(angle_difference(regiment.facing, PI)) < 0.05 and regiment.centroid().distance_to(finger_from) < 30.0,
+		"by touch a finger drags out the order and the front (facing %.2f)" % regiment.facing)
+	var zoom_was := battle.camera.zoom.x
+	for i in 2:
+		var down := InputEventScreenTouch.new()
+		down.index = i
+		down.pressed = true
+		down.position = Vector2(600 + i * 100, 400)
+		root.push_input(down, true)
+	var two := battle.camera.fingers()
+	var spread := InputEventScreenDrag.new()
+	spread.index = 1
+	spread.position = Vector2(800, 400)
+	root.push_input(spread, true)
+	for i in 2:
+		var up := InputEventScreenTouch.new()
+		up.index = i
+		up.pressed = false
+		root.push_input(up, true)
+	_check(two == 2 and battle.camera.zoom.x > zoom_was * 1.3 and battle.camera.fingers() == 0,
+		"two fingers pinch the map closer (zoom %.2f → %.2f)" % [zoom_was, battle.camera.zoom.x])
+	battle.camera.zoom = Vector2.ONE * zoom_was
+	Battle.touched = false
 	regiment.order_move(march_from, 0.0)
 	_run(battle, 15.0)
 	battle.select_units([] as Array[Unit])

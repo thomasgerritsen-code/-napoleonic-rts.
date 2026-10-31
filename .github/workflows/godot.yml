@@ -107,6 +107,14 @@ jobs:
           ls -la godot/build
           test -s godot/build/NapoleonicRTS.exe
 
+      - name: Zip the project for Xogot (Godot on the iPad)
+        run: |
+          # The Godot project alone, in a folder of its own, to open in Xogot.
+          rm -rf /tmp/xogot && mkdir -p /tmp/xogot/NapoleonicRTS
+          rsync -a --exclude build --exclude .godot --exclude '*.import' --exclude '*.uid' godot/ /tmp/xogot/NapoleonicRTS/
+          (cd /tmp/xogot && zip -qr "$GITHUB_WORKSPACE/godot/build/NapoleonicRTS-project.zip" NapoleonicRTS)
+          ls -la godot/build/NapoleonicRTS-project.zip
+
       - name: Keep the .exe with this run
         uses: actions/upload-artifact@v5
         with:
@@ -122,9 +130,10 @@ jobs:
           tag_name: godot-latest
           name: Godot-versie (nieuwste)
           target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
-          body: De Godot-versie van Napoleonic RTS voor Windows, na elke geslaagde controle bijgewerkt. Download NapoleonicRTS.exe en start het; het spel werkt zichzelf daarna bij via het menu.
+          body: De Godot-versie van Napoleonic RTS, na elke geslaagde controle bijgewerkt. Windows - download NapoleonicRTS.exe en start het; het spel werkt zichzelf daarna bij via het menu. iPad (Xogot) - download NapoleonicRTS-project.zip, pak het uit in de Bestanden-app en open de map NapoleonicRTS in Xogot.
           prerelease: false
           make_latest: false
           files: |
             godot/build/NapoleonicRTS.exe
+            godot/build/NapoleonicRTS-project.zip
             godot/version.json
