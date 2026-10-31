@@ -105,6 +105,7 @@ var _smoke: Texture2D
 var _next_id := 10000
 var _drag_start: Variant = null
 var _order_start: Variant = null
+const AIM_DRAG := 25.0               # world px of right-drag before it sets the front
 var _river: Array = []
 var _woods_list: Array = []
 var _orders: Array[Dictionary] = []   # orders on their way to the battalions
@@ -1792,10 +1793,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and _drag_start != null:
 		_overlay.box = Rect2(_drag_start, Vector2.ZERO).expand(get_global_mouse_position())
 		return
+	if event is InputEventMouseMotion and _order_start != null:
+		_drag_aim(Iso.to_world(get_viewport().get_canvas_transform().affine_inverse() * (event as InputEventMouseMotion).position))
+		return
 	var button := event as InputEventMouseButton
 	if button == null:
 		return
-	var canvas_at := get_global_mouse_position()
+	var canvas_at := get_viewport().get_canvas_transform().affine_inverse() * button.position
 	if button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
 			if placing != "":
@@ -1818,7 +1822,27 @@ func _unhandled_input(event: InputEvent) -> void:
 			var to: Vector2 = _order_start
 			var end := Iso.to_world(canvas_at)
 			_order_start = null
-			order(to, (end - to).angle() if end.distance_to(to) > 25.0 else null)
+			var dragged := end.distance_to(to) > AIM_DRAG
+			if dragged and not selected.is_empty():
+				_drag_aim(end, to)
+				_overlay.aim_done()
+			else:
+				_overlay.aim_cancel()
+			order(to, (end - to).angle() if dragged else null)
+
+
+## Dragging out an order for the selected battalions: the golden arrow from
+## where they go towards the way their front will face, the bar as wide as
+## their line(s) will stand.
+func _drag_aim(end: Vector2, from: Variant = null) -> void:
+	var at: Vector2 = from if from != null else _order_start
+	if selected.is_empty() or end.distance_to(at) <= AIM_DRAG:
+		_overlay.aim_cancel()
+		return
+	var width := 0.0
+	for r in selected:
+		width += ceilf(float(r.strength()) / Regiment.RANKS) * Regiment.FILE_GAP + 40.0
+	_overlay.aim(at, end - at, width - 40.0)
 
 
 func _select_in(box: Rect2, add: bool) -> void:

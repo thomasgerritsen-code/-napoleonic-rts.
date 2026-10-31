@@ -187,6 +187,31 @@ func _initialize() -> void:
 		and String(pacer._sprite.animation).begins_with("idle"), "a man's steps follow the ground he covers, and he stands once he stops (%s, %d frames, %.2f)" % [walking_look, frames_seen.size(), cycle])
 	pacer.queue_free()
 	battle.units.erase(pacer)
+	# Dragging an order out with the right button sets where the battalion
+	# goes and the way its front faces; a golden arrow shows it meanwhile.
+	battle.select_units(regiment.living())
+	var drag_from := regiment.centroid() + Vector2(0, 120)
+	var to_view := battle.get_viewport().get_canvas_transform()
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_RIGHT
+	press.pressed = true
+	press.position = to_view * Iso.to_screen(drag_from)
+	root.push_input(press)
+	var sweep := InputEventMouseMotion.new()
+	sweep.position = to_view * Iso.to_screen(drag_from + Vector2(0, 140))
+	root.push_input(sweep)
+	var aimed: bool = battle.get("_overlay").get("_aim_at") != Vector2.INF
+	var let_go := InputEventMouseButton.new()
+	let_go.button_index = MOUSE_BUTTON_RIGHT
+	let_go.pressed = false
+	let_go.position = sweep.position
+	root.push_input(let_go)
+	_run(battle, 14.0)
+	_check(aimed and absf(angle_difference(regiment.facing, PI / 2.0)) < 0.05 and regiment.centroid().distance_to(drag_from) < 30.0,
+		"a dragged order sends the battalion there, its front the way it was dragged (facing %.2f)" % regiment.facing)
+	regiment.order_move(march_from, 0.0)
+	_run(battle, 15.0)
+	battle.select_units([] as Array[Unit])
 	# Smoke, earth and dust as particles worked out on the graphics card.
 	var fx_before: int = battle.effects.emitted
 	battle.call("_puff", home + Vector2(300, 600), 0.55, 2.6, Vector2(1, 0))
@@ -489,9 +514,8 @@ func _initialize() -> void:
 			working_now += 1
 	SaveGame.pending = SaveGame.read()
 	var again: Battle = load("res://scenes/main.tscn").instantiate()
+	# Counted as soon as it is laid out, before the battle runs on.
 	root.add_child(again)
-	await process_frame
-	await process_frame
 	var living_again := 0
 	var working_again := 0
 	for u in again.units:
@@ -505,6 +529,8 @@ func _initialize() -> void:
 		and again.trenches.list.size() == battle.trenches.list.size() and working_again == working_now
 		and again.ai.plan == battle.ai.plan,
 		"and loaded again as it was (%d/%d men, %d/%d at work, %d battalions)" % [living_again, living_now, working_again, working_now, again.regiments.size()])
+	await process_frame
+	await process_frame
 	_run(again, 3.0)
 	_check(again.result == "", "the loaded battle goes on")
 	again.queue_free()

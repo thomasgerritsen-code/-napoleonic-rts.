@@ -3,6 +3,12 @@ extends CanvasLayer
 ## The screen over the battle: stocks and population along the top, the
 ## selection and its buttons (build, train, form a battalion, formation)
 ## along the bottom, the last message, the computer's plan and the outcome.
+##
+## The buttons stand in groups, as the web game's bar: each group under a
+## coloured heading (orders red, formation blue, battalion gold, work green,
+## building brown), each button with its name large and its key, cost or
+## state small beneath, a longer explanation when the mouse rests on it, and
+## the formation or stance in force lit in gold.
 
 var battle: Battle
 
@@ -11,7 +17,8 @@ var _status: Label
 var _info: Label
 var _plan: Label
 var _result: Label
-var _buttons: GridContainer
+var _buttons: HBoxContainer
+var _group: GridContainer = null
 var _dirty := true
 var _end: Panel = null
 var _minimap: Minimap
@@ -31,18 +38,17 @@ func _ready() -> void:
 	_plan.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	var panel := _panel(Vector2.ZERO, Vector2.ZERO)
 	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	panel.offset_top = -132
-	_info = _label(panel, Vector2(14, 10), 14)
-	_info.size = Vector2(520, 110)
-	_buttons = GridContainer.new()
-	_buttons.columns = 5
+	panel.offset_top = -150
+	_info = _label(panel, Vector2(14, 10), 13)
+	_info.size = Vector2(430, 130)
+	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_buttons = HBoxContainer.new()
 	_buttons.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_buttons.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_buttons.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_buttons.offset_right = -12
-	_buttons.offset_bottom = -12
-	_buttons.add_theme_constant_override("h_separation", 6)
-	_buttons.add_theme_constant_override("v_separation", 6)
+	_buttons.offset_bottom = -10
+	_buttons.add_theme_constant_override("separation", 14)
 	add_child(_buttons)
 	_minimap = Minimap.new()
 	_minimap.battle = battle
@@ -169,29 +175,48 @@ func _describe() -> String:
 	return "\n".join(lines)
 
 
+const ORDERS := Color(0.78, 0.33, 0.25)
+const FORMATION := Color(0.32, 0.5, 0.78)
+const BATTALION := Color(0.8, 0.64, 0.3)
+const WORK := Color(0.4, 0.66, 0.32)
+const BUILD := Color(0.63, 0.48, 0.3)
+const TRAIN := Color(0.55, 0.45, 0.72)
+
+
 func _rebuild() -> void:
 	for child in _buttons.get_children():
 		child.queue_free()
+	_group = null
 	var b := battle.selected_building
 	if b != null:
 		if b.complete and b.side == battle.me:
-			for item in Rules.trained_at(b.type, battle.me):
-				_button("%s\n%s" % [Rules.label(item), Rules.cost_text(Rules.item_cost(item))], battle.train.bind(item))
+			var items := Rules.trained_at(b.type, battle.me)
+			if not items.is_empty():
+				_start_group("Opleiden", TRAIN, mini(items.size(), 4))
+				for item in items:
+					_button(Rules.label(item), Rules.cost_text(Rules.item_cost(item)), battle.train.bind(item),
+						"%s opleiden voor %s." % [Rules.label(item), Rules.cost_text(Rules.item_cost(item))])
 			if b.type == "barracks":
 				var plan := battle.quick_plan(b)
 				var m: Dictionary = plan["missing"]
-				_button("Snel bataljon\n%d/12 musk. · off. %s · tamb. %s" % [Regiment.MIN_MEN - int(m["infantry"]),
-					"ja" if m["officer"] == 0 else "nee", "ja" if m["drummer"] == 0 else "nee"], func() -> void: battle.quick_regiment()).disabled = not plan["ok"]
-				_button("Train ontbrekende\nvoor een bataljon", func() -> void: battle.train_missing())
-				_button("Auto-bataljon\n%s" % ("aan" if b.auto_regiment else "uit"), battle.toggle_auto_regiment)
+				_start_group("Bataljon", BATTALION, 2)
+				_button("Snel bataljon", "%d/12 musk. · off. %s · tamb. %s" % [Regiment.MIN_MEN - int(m["infantry"]),
+					"ja" if m["officer"] == 0 else "nee", "ja" if m["drummer"] == 0 else "nee"], func() -> void: battle.quick_regiment(),
+					"Vormt meteen een bataljon uit de musketiers, officier en tamboer bij deze kazerne.").disabled = not plan["ok"]
+				_button("Train ontbrekende", "voor een bataljon", func() -> void: battle.train_missing(),
+					"Zet precies de mannen in de wachtrij die nog ontbreken voor een volledig bataljon.")
+				_button("Auto-bataljon", "aan" if b.auto_regiment else "uit", battle.toggle_auto_regiment,
+					"Vormt vanzelf een bataljon zodra er genoeg mannen zijn.", b.auto_regiment)
 			if b.type == "tower":
 				var next := Rules.tower_level(b.tower_level + 1)
+				_start_group("Toren", BUILD, 1)
 				if b.upgrade_to != 0:
-					_button("Versterken…\nniveau %d/3" % b.upgrade_to, func() -> void: pass).disabled = true
+					_button("Versterken…", "niveau %d/3" % b.upgrade_to, func() -> void: pass).disabled = true
 				elif next.is_empty():
-					_button("Zwaar versterkte toren\nniveau 3/3 · maximaal", func() -> void: pass).disabled = true
+					_button("Zwaar versterkt", "niveau 3/3 · maximaal", func() -> void: pass).disabled = true
 				else:
-					_button("Upgrade → niveau %d/3\n%s · %d s" % [b.tower_level + 1, Rules.cost_text(next["cost"]), next["seconds"]], battle.upgrade_tower.bind(b))
+					_button("Upgrade → %d/3" % (b.tower_level + 1), "%s · %d s" % [Rules.cost_text(next["cost"]), next["seconds"]],
+						battle.upgrade_tower.bind(b), "Meer leven, verder bereik en verder zicht.")
 		return
 	var has_workers := false
 	var has_free_soldiers := false
@@ -202,39 +227,76 @@ func _rebuild() -> void:
 		has_workers = has_workers or u.type == "worker"
 		has_free_soldiers = has_free_soldiers or (u.military() and u.regiment == null)
 	if has_workers:
-		_button("Naar de akkers\n3 boeren per akker", battle.assign_workers.bind("farm"))
-		_button("Houthakken\nbij een eigen kamp", battle.assign_workers.bind("wood"))
-		_button("IJzer winnen\nbij een eigen mijn", battle.assign_workers.bind("iron"))
-		_button("Bouw verder\nonafgemaakte gebouwen", battle.assign_workers.bind("build"))
+		_start_group("Werk", WORK, 2)
+		_button("Akkers", "3 boeren per akker", battle.assign_workers.bind("farm"), "Stuurt de boeren naar de graanakkers.")
+		_button("Hout", "bij een eigen kamp", battle.assign_workers.bind("wood"), "Hout kappen binnen bereik van een eigen houthakkerskamp.")
+		_button("IJzer", "bij een eigen mijn", battle.assign_workers.bind("iron"), "IJzer winnen bij een eigen mijn op de afzetting.")
+		_button("Bouw verder", "onafgemaakt", battle.assign_workers.bind("build"), "Bouwt onafgemaakte gebouwen verder af.")
+		_start_group("Bouwen", BUILD, 5)
 		for type in Rules.BUILDABLE:
-			_button("%s\n%s" % [Rules.label(type), Rules.cost_text(Rules.cost_of(type))], battle.start_placing.bind(type))
+			_button(Rules.label(type), Rules.cost_text(Rules.cost_of(type)), battle.start_placing.bind(type),
+				"%s bouwen voor %s; klik waar het moet komen." % [Rules.label(type), Rules.cost_text(Rules.cost_of(type))])
 	if gun != null:
-		_button("%s (K)\nronde kogel %d · kartets %d" % ["Ronde kogel laden" if gun.shot == "grape" else "Kartets laden", gun.ammo["round"], gun.ammo["grape"]], battle.toggle_shot)
+		_start_group("Kanon", ORDERS, 1)
+		_button("Kartets laden" if gun.shot == "round" else "Ronde kogel", "K · kogel %d · kartets %d" % [gun.ammo["round"], gun.ammo["grape"]],
+			battle.toggle_shot, "Kartets: een waaier van kogels op korte afstand. Ronde kogel: ver en door de rijen heen.")
 	if has_free_soldiers:
-		_button("Regiment vormen (F)\nmusk.+off.+tamb. of 4+ ruiters+off. te paard", func() -> void: battle.form_regiment())
+		_start_group("Regiment", BATTALION, 1)
+		_button("Regiment vormen", "F", func() -> void: battle.form_regiment(),
+			"Musketiers met een officier en tamboer, of 4+ ruiters met een officier te paard, worden één regiment.")
+		if not battle.selected.is_empty():
+			_button("Aanvullen", "losse musketiers erbij", battle.reinforce, "Voegt de losse musketiers toe aan het geselecteerde bataljon.")
 	if not battle.selected.is_empty():
-		_button("Linie (1)", battle.set_formation.bind("line"))
-		_button("Colonne (2)", battle.set_formation.bind("column"))
-		_button("Carré (3)\ntegen cavalerie", battle.set_formation.bind("square"))
-		if has_free_soldiers:
-			_button("Aanvullen\nlosse musketiers erbij", battle.reinforce)
-		_button("Charge (C)", battle.charge)
-		_button("Halt (H)", battle.halt)
 		var holding := false
+		var open_order := false
 		var trench: Variant = null
+		var shapes := {}
 		for r in battle.selected:
 			holding = holding or r.hold
+			open_order = open_order or r.skirmish
+			shapes[r.formation] = true
 			if r.trench != null and r.trench["progress"] >= 1.0:
 				trench = r.trench
-		var open_order := false
-		for r in battle.selected:
-			open_order = open_order or r.skirmish
-		_button("Gesloten orde (T)" if open_order else "Tirailleurs (T)\nverspreid vuren", battle.skirmish)
-		_button("Stelling loslaten (G)" if holding else "Stelling houden (G)\nschrap zetten, ingraven", battle.hold)
+		_start_group("Bevel", ORDERS, 2)
+		_button("Halt", "H", battle.halt, "Staakt de mars; het bataljon blijft staan waar het is.")
+		_button("Charge", "C · bajonet", battle.charge, "Stormt met de bajonet op de dichtstbijzijnde vijand af.")
+		_button("Stelling", "G · " + ("houdt stand" if holding else "schrap, ingraven"), battle.hold,
+			"Schrap zetten (30% minder verlies); na een tijd graaft het bataljon een loopgraaf." if not holding else "De stelling loslaten.", holding)
 		if trench != null:
 			var next := Rules.trench_level(int(trench["level"]) + 1)
 			if not next.is_empty() and trench["upgrade_to"] == 0:
-				_button("%s\n%s · %d s" % [next["label"], Rules.cost_text(next["cost"]), next["seconds"]], battle.upgrade_trench)
+				_button(next["label"], "%s · %d s" % [Rules.cost_text(next["cost"]), next["seconds"]], battle.upgrade_trench,
+					"De loopgraaf versterken: betere dekking.")
+		_start_group("Formatie", FORMATION, 2)
+		var single := shapes.size() == 1
+		_button("Linie", "1 · vuurkracht", battle.set_formation.bind("line"), "Twee rijen breed: de meeste musketten vuren.",
+			single and shapes.has("line") and not open_order)
+		_button("Colonne", "2 · snel", battle.set_formation.bind("column"), "Smal en diep: marcheert snel, vuurt weinig.",
+			single and shapes.has("column"))
+		_button("Carré", "3 · tegen ruiters", battle.set_formation.bind("square"), "Een vierkant naar alle kanten: ruiters breken erop.",
+			single and shapes.has("square"))
+		_button("Tirailleurs", "T · " + ("aan" if open_order else "verspreid"), battle.skirmish,
+			"Open orde: verspreid vuren, minder kwetsbaar voor kanonnen." if not open_order else "Terug naar gesloten orde.", open_order)
+
+
+## A new group of buttons under a coloured heading, `columns` wide.
+func _start_group(title: String, colour: Color, columns: int) -> void:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	var head := Label.new()
+	head.text = title.to_upper()
+	head.add_theme_font_size_override("font_size", 11)
+	head.add_theme_color_override("font_color", colour.lightened(0.25))
+	head.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.04))
+	head.add_theme_constant_override("outline_size", 3)
+	box.add_child(head)
+	_group = GridContainer.new()
+	_group.columns = columns
+	_group.add_theme_constant_override("h_separation", 5)
+	_group.add_theme_constant_override("v_separation", 5)
+	_group.set_meta("colour", colour)
+	box.add_child(_group)
+	_buttons.add_child(box)
 
 
 ## The end of the battle, as the web game shows it: the outcome, why, how
@@ -311,12 +373,66 @@ func _show_end() -> void:
 	buttons.add_child(menu)
 
 
-func _button(text: String, action: Callable) -> Button:
+## A button in the current group: its name, a small line beneath (key,
+## cost or state), an explanation for the tooltip, and lit when in force.
+func _button(title: String, note: String, action: Callable, tip := "", active := false) -> Button:
+	if _group == null:
+		_start_group("", BATTALION, 4)
+	var colour: Color = _group.get_meta("colour", BATTALION)
 	var button := Button.new()
-	button.text = text
-	button.custom_minimum_size = Vector2(132, 46)
-	button.add_theme_font_size_override("font_size", 12)
+	button.custom_minimum_size = Vector2(112, 50)
 	button.focus_mode = Control.FOCUS_NONE
+	button.tooltip_text = tip if tip != "" else title
+	for state: String in ["normal", "hover", "pressed", "disabled"]:
+		button.add_theme_stylebox_override(state, _style(colour, state, active))
 	button.pressed.connect(action)
-	_buttons.add_child(button)
+	var lines := VBoxContainer.new()
+	lines.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lines.alignment = BoxContainer.ALIGNMENT_CENTER
+	lines.add_theme_constant_override("separation", 0)
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(lines)
+	var name_ := Label.new()
+	name_.text = title
+	name_.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_.add_theme_font_size_override("font_size", 14 if title.length() <= 12 else 12)
+	name_.add_theme_color_override("font_color", Color(1.0, 0.93, 0.7) if active else Color(0.97, 0.95, 0.88))
+	name_.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lines.add_child(name_)
+	var small := Label.new()
+	small.text = note
+	small.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	small.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	small.add_theme_font_size_override("font_size", 10)
+	small.add_theme_color_override("font_color", Color(0.78, 0.76, 0.66))
+	small.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lines.add_child(small)
+	button.set_meta("labels", [name_, small])
+	button.draw.connect(func() -> void:
+		var dim := button.disabled
+		name_.modulate.a = 0.45 if dim else 1.0
+		small.modulate.a = 0.45 if dim else 1.0)
+	_group.add_child(button)
 	return button
+
+
+## A button's face: dark, a stripe of its group's colour along the top;
+## lighter under the mouse, darker pressed, grey when it cannot be used, and
+## framed in gold when what it stands for is in force.
+func _style(colour: Color, state: String, active: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = {"normal": Color(0.15, 0.15, 0.12, 0.96), "hover": Color(0.24, 0.23, 0.18, 0.98),
+		"pressed": Color(0.1, 0.1, 0.08, 1.0), "disabled": Color(0.13, 0.13, 0.12, 0.7)}[state]
+	if active and state != "disabled":
+		style.bg_color = style.bg_color.lerp(Color(0.45, 0.36, 0.14), 0.45)
+	style.border_color = Color(0.98, 0.8, 0.32) if active else Color(colour, 0.45 if state == "disabled" else 0.9)
+	style.border_width_top = 3
+	style.border_width_left = 2 if active else 1
+	style.border_width_right = 2 if active else 1
+	style.border_width_bottom = 2 if active else 1
+	if not active:
+		style.border_color = Color(colour, 0.9 if state != "disabled" else 0.4)
+	style.set_corner_radius_all(5)
+	style.content_margin_left = 4
+	style.content_margin_right = 4
+	return style
