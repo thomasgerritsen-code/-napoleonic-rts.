@@ -164,6 +164,29 @@ func _initialize() -> void:
 	_check(not regiment.moving() and regiment.centroid().distance_to(march_to) < 25.0, "and arrives formed where it was sent")
 	regiment.order_move(march_from, regiment.facing)
 	_run(battle, 20.0)
+	# The feet go with the ground covered, as in the web game: a step cycle
+	# every 1.5 m, standing again once he stops; a slight turn does not
+	# change the way he is shown.
+	var pacer := battle.add_unit("france", "worker", home + Vector2(300, 640))
+	pacer.facing = 0.0
+	pacer.present(0.02)
+	var frames_seen := {}
+	for i in 50:
+		pacer.world += Vector2(1.35, 0.0)
+		pacer.present(0.02)
+		frames_seen[pacer._sprite.frame] = true
+	var cycle: float = pacer.get("_step_phase")
+	var striding: bool = pacer.get("_striding")
+	var walking_look := String(pacer._sprite.animation)
+	pacer.facing = 0.45
+	pacer.present(0.02)
+	var kept := pacer.shown_direction()
+	for i in 20:
+		pacer.present(0.02)
+	_check(striding and walking_look == "march_e" and frames_seen.size() >= 5 and kept == "e"
+		and String(pacer._sprite.animation).begins_with("idle"), "a man's steps follow the ground he covers, and he stands once he stops (%s, %d frames, %.2f)" % [walking_look, frames_seen.size(), cycle])
+	pacer.queue_free()
+	battle.units.erase(pacer)
 
 	# Troop kinds: their factors and their own coats.
 	var grenadier := battle.add_unit("france", "infantry", home + Vector2(600, 500), "grenadier")

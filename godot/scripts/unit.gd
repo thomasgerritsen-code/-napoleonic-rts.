@@ -87,6 +87,21 @@ void fragment() { if (local_y > cut_y) { discard; } }
 static var _cut_shader: Shader = null
 var _clock := 0.0
 var _look := 0.0
+## How he is shown, as the web iso view's unit presentation: the feet driven
+## by the ground he covers (a full step cycle every stride), walking or
+## standing by his smoothed speed (with some give, so a short pause or a
+## slow shuffle does not flicker), and turning one of the eight directions at
+## a time, only once his way is well past the one he shows.
+const STRIDE := 1.5            # m per step cycle (on foot)
+const SECTOR := PI / 4.0
+const GAITS := ["march", "walk", "trot", "gallop", "roll"]
+var _seen := Vector2.INF
+var _ground_speed := 0.0       # m/s, smoothed
+var _striding := false
+var _step_phase := 0.0         # 0..1 through the step cycle
+var _shown_dir := -1           # 0..7, east round to north-east
+var _turn_wait := 0.0
+var _gait := "walk"            # for horses: walk, trot or gallop
 
 
 func setup(battle_: Battle, side_: String, type_: String, at: Vector2, troop_ := "") -> void:
@@ -211,6 +226,7 @@ func step(delta: float) -> void:
 			drain = 4.5 if type == "cavalry" else 2.8
 		stamina = clampf(stamina - drain * delta, 0.0, 100.0)
 	position = Iso.to_screen(world)
+	present(delta)
 
 
 func wind() -> float:
@@ -568,6 +584,7 @@ func net_glide(delta: float) -> void:
 	if net_target != Vector2.INF and state != State.DEAD:
 		world = world.lerp(net_target, minf(1.0, delta * 10.0))
 	position = Iso.to_screen(world)
+	present(delta)
 
 
 ## Dressed by the trench he stands in: drawn `offset` lower (sunk, or moved
@@ -657,7 +674,7 @@ func _crew_play(state_name: String) -> void:
 		return
 	var forward := Vector2.from_angle(facing)
 	var right := forward.orthogonal()
-	var dir := Iso.direction(facing)
+	var dir := shown_direction()
 	for i in _crew.size():
 		var man := _crew[i]
 		var place := -forward * (20.0 + (i % 2) * 9.0) + right * (float(i) - 1.0) * 14.0
@@ -683,16 +700,91 @@ func _play(state_name: String, restart := false) -> void:
 	if state_name != anim_state or restart:
 		anim_seq += 1
 	anim_state = state_name
-	_crew_play(state_name)
-	var anim := "%s_%s" % [state_name, Iso.direction(facing)]
+	_show(restart)
+
+
+## The direction he is shown facing (see present).
+func shown_direction() -> String:
+	if _shown_dir < 0:
+		return Iso.direction(facing)
+	return Iso.DIRECTIONS[_shown_dir]
+
+
+func _horse() -> bool:
+	return type == "cavalry" or troop == "mounted"
+
+
+## Put up the picture for his state: on the move only while he is really
+## going, standing while he is not; the feet of a moving one are set by
+## present, from the ground covered.
+func _show(restart := false) -> void:
+	var shown := anim_state
+	if state != State.DEAD:
+		if shown in GAITS and not _striding:
+			shown = "idle"
+		elif shown == "idle" and _striding:
+			shown = MOVE_ANIM.get(type, "march")
+		if _horse() and shown in GAITS:
+			shown = "gallop" if regiment != null and regiment.charging != null else _gait
+	var dir := shown_direction()
+	_crew_play(shown)
+	var anim := "%s_%s" % [shown, dir]
 	if not _sprite.sprite_frames.has_animation(anim):
-		anim = "idle_" + Iso.direction(facing)
+		anim = "walk_" + dir if shown in GAITS and _sprite.sprite_frames.has_animation("walk_" + dir) else "idle_" + dir
 		if not _sprite.sprite_frames.has_animation(anim):
 			return
 	if anim == _anim and not restart:
 		return
 	_anim = anim
 	_sprite.play(anim)
+
+
+## Every frame, after he has moved: his smoothed speed, the step cycle, the
+## direction he shows and the picture.
+func present(delta: float) -> void:
+	if state == State.DEAD or _sprite == null:
+		return
+	delta = clampf(delta, 0.0, 0.1)
+	if _seen == Vector2.INF:
+		_seen = world
+		_step_phase = Battle.hash01(id, 31) * 0.35
+		_shown_dir = posmod(roundi(facing / SECTOR), 8)
+	var covered := world.distance_to(_seen)
+	_seen = world
+	# A jump (a snapshot catching up) is no stride.
+	var jumped := covered > 80.0
+	var ppm := Iso.PPM
+	var velocity := covered / ppm / delta if delta > 0.0 and not jumped else 0.0
+	_ground_speed += (velocity - _ground_speed) * (1.0 - exp(-delta / 0.075)) if delta > 0.0 else 0.0
+	_striding = _ground_speed > (0.17 if _striding else 0.34)
+	if _horse():
+		if _ground_speed > (4.05 if _gait == "gallop" else 4.65):
+			_gait = "gallop"
+		elif _ground_speed > (2.15 if _gait == "trot" else 2.65):
+			_gait = "trot"
+		else:
+			_gait = "walk"
+	var stride := STRIDE
+	if _horse():
+		stride = {"gallop": 3.6, "trot": 2.8}.get(_gait, 2.4)
+	elif type == "artillery":
+		stride = 1.2
+	elif regiment != null and regiment.routing:
+		stride = 1.6
+	if not jumped:
+		_step_phase = fmod(_step_phase + covered / ppm / stride, 1.0)
+	# One sector at a time, and only once well past it.
+	_turn_wait = maxf(0.0, _turn_wait - delta)
+	var off := angle_difference(_shown_dir * SECTOR, facing)
+	if absf(off) > SECTOR / 2.0 + 0.12 and _turn_wait <= 0.0:
+		_shown_dir = posmod(_shown_dir + (1 if off > 0.0 else -1), 8)
+		_turn_wait = 0.085 if _horse() else 0.06
+	_show()
+	if _striding and String(_sprite.animation).get_slice("_", 0) in GAITS:
+		var count := _sprite.sprite_frames.get_frame_count(_sprite.animation)
+		if _sprite.is_playing():
+			_sprite.pause()
+		_sprite.frame = int(_step_phase * count) % count
 
 
 func _draw() -> void:
