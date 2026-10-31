@@ -113,6 +113,9 @@ const AIM_DRAG := 25.0               # world px of right-drag before it sets the
 ## pinch the map (BattleCamera); the toolbar does what the keys do, and
 ## "Kader" makes the next drag a selection box. A real mouse is not affected.
 static var touched := false
+## The richer 2D look on trial (menu: Proef: verbeterd 2D): see Fancy.
+static var fancy := false
+var fancy_look: Fancy = null
 var box_mode := false
 var _river: Array = []
 var _woods_list: Array = []
@@ -188,6 +191,10 @@ func _ready() -> void:
 	add_child(_hud)
 	say("%s met boeren op struiken voor voedsel; bouw een houthakkerskamp bij het bos voor hout." % (
 		"Tik" if touched or OS.has_feature("mobile") else "Rechtsklik"))
+	if fancy:
+		fancy_look = Fancy.new()
+		fancy_look.battle = self
+		add_child(fancy_look)
 	var link := NetLink.find(get_tree())
 	if net_role != "" and link != null:
 		go_online(link)

@@ -738,7 +738,33 @@ def world_points():
 YAW = {"lumbercamp_fr": 28, "lumbercamp_br": -28, "tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
 
 
-def render_prop(kind: str, out: Path, samples: int) -> dict:
+def normal_override() -> bpy.types.Material:
+    """A material that shows each surface's direction as seen by the camera:
+    x to the right, y up the screen, z towards the viewer, as 0..1 colour (the
+    normal map Godot lights a 2D sprite by)."""
+    mat = bpy.data.materials.new("screen_normal")
+    tree = mat.node_tree
+    tree.nodes.clear()
+    geo = tree.nodes.new("ShaderNodeNewGeometry")
+    turn = tree.nodes.new("ShaderNodeVectorTransform")
+    turn.vector_type = "NORMAL"
+    turn.convert_from = "WORLD"
+    turn.convert_to = "CAMERA"
+    # Blender's camera looks along -z: z towards the viewer is +z already.
+    half = tree.nodes.new("ShaderNodeVectorMath")
+    half.operation = "MULTIPLY_ADD"
+    half.inputs[1].default_value = (0.5, 0.5, 0.5)
+    half.inputs[2].default_value = (0.5, 0.5, 0.5)
+    emit = tree.nodes.new("ShaderNodeEmission")
+    out = tree.nodes.new("ShaderNodeOutputMaterial")
+    tree.links.new(geo.outputs["Normal"], turn.inputs["Vector"])
+    tree.links.new(turn.outputs["Vector"], half.inputs[0])
+    tree.links.new(half.outputs["Vector"], emit.inputs["Color"])
+    tree.links.new(emit.outputs["Emission"], out.inputs["Surface"])
+    return mat
+
+
+def render_prop(kind: str, out: Path, samples: int, normals: bool = False) -> dict:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     setup_render(samples)
     root = empty("root", rot=(0, 0, YAW.get(kind, 0)))
@@ -760,6 +786,20 @@ def render_prop(kind: str, out: Path, samples: int) -> dict:
     h = math.ceil((max(su) - min(su)) * ppm) + 4
     pivot = (round(-min(sx) * ppm) + 2, round(max(su) * ppm) + 2)
     camera(w, h, ppm, pivot)
+    if normals:
+        # The same frame, each surface's direction instead of its colour; no
+        # shadow catcher (the ground is not lit by it).
+        bpy.data.objects["ground"].hide_render = True
+        bpy.context.view_layer.material_override = normal_override()
+        scene = bpy.context.scene
+        scene.cycles.samples = 4
+        scene.cycles.use_denoising = False
+        scene.view_settings.view_transform = "Standard"
+        scene.view_settings.look = "None"
+        path = out / f"{kind}_n.png"
+        scene.render.filepath = str(path)
+        bpy.ops.render.render(write_still=True)
+        return {"normals": path.name}
     path = out / f"{kind}.png"
     bpy.context.scene.render.filepath = str(path)
     bpy.ops.render.render(write_still=True)
@@ -807,7 +847,15 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--out", default="graphics-lab/assets/iso/props")
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--samples", type=int, default=64)
+    ap.add_argument("--normals", action="store_true",
+                    help="render only each prop's normal map (<kind>_n.png), for lit 2D sprites")
     args = ap.parse_args(argv)
+    if args.normals:
+        out = Path(args.out).resolve()
+        out.mkdir(parents=True, exist_ok=True)
+        for kind in args.only or list(BUILDERS):
+            print(kind, render_prop(kind, out, args.samples, normals=True))
+        return 0
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     manifest_path = out / "props.json"

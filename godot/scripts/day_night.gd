@@ -16,6 +16,7 @@ const TWILIGHT_OPACITY := 0.18
 ## that its lights tell.
 const NIGHT_DEPTH := 1.8
 const RAIN_GREY := 0.14
+const FANCY_DIM := 0.8
 const NAMES := {"morning": "Ochtend", "day": "Dag", "evening": "Avond", "night": "Nacht"}
 
 var battle: Battle
@@ -83,4 +84,9 @@ static func light_at(seconds: float, wetness := 0.0) -> Color:
 
 func _process(_delta: float) -> void:
 	if battle != null and _light != null:
-		_light.color = light_at(battle.clock, battle.weather.wetness if battle.weather != null else 0.0)
+		var light := light_at(battle.clock, battle.weather.wetness if battle.weather != null else 0.0)
+		if Battle.fancy:
+			# The richer look's sun gives back the light by day, from its side.
+			light *= lerpf(1.0, FANCY_DIM, 1.0 - darkness_at(battle.clock))
+			light.a = 1.0
+		_light.color = light

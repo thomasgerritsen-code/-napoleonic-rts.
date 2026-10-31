@@ -70,8 +70,15 @@ func _ready() -> void:
 
 	var single: VBoxContainer = _pages["single"]
 	_heading(single, "Singleplayer")
+	Battle.fancy = false
 	_choice(single, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
 	_choice(single, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
+	_proof_button(single, "Proef: verbeterd 2D", "Zon die met het uur meedraait, bewegend water, wuivende bomen, wolkenschaduw.", func() -> void:
+		Battle.fancy = true
+		Battle.mode = "campaign"
+		get_tree().change_scene_to_file("res://scenes/main.tscn"))
+	_proof_button(single, "Proef: 3D-graphics", "Een stuk van de kaart in 3D met de Blender-modellen: draai en kantel de camera.", func() -> void:
+		get_tree().change_scene_to_file("res://proof3d/proof_3d.tscn"))
 	_load_button = Button.new()
 	_load_button.custom_minimum_size = Vector2(420, 64)
 	_load_button.add_theme_font_size_override("font_size", 15)
@@ -97,6 +104,15 @@ func _show_saved() -> void:
 	var when := SaveGame.describe()
 	_load_button.disabled = when == ""
 	_load_button.text = "Opgeslagen slag laden\n%s" % (when if when != "" else "nog niets opgeslagen (F5 in een slag)")
+
+
+func _proof_button(box: VBoxContainer, text: String, note: String, action: Callable) -> void:
+	var button := Button.new()
+	button.text = "%s\n%s" % [text, note]
+	button.custom_minimum_size = Vector2(420, 56)
+	button.add_theme_font_size_override("font_size", 13)
+	button.pressed.connect(action)
+	box.add_child(button)
 
 
 func _show(page: String) -> void:

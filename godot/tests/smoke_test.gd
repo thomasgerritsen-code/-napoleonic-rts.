@@ -664,6 +664,26 @@ func _initialize() -> void:
 	await process_frame
 	Battle.mode = "campaign"
 
+	# The graphics proofs: the richer 2D look lights and sways the props; the
+	# 3D proof builds its piece of the map from the Blender models.
+	Battle.fancy = true
+	var rich: Battle = load("res://scenes/main.tscn").instantiate()
+	root.add_child(rich)
+	await process_frame
+	await process_frame
+	_check(rich.fancy_look != null and rich.fancy_look.lit > 50 and rich.fancy_look.swaying > 50,
+		"the richer 2D look lights %d pictures by their normal maps and sways %d" % [rich.fancy_look.lit if rich.fancy_look else 0, rich.fancy_look.swaying if rich.fancy_look else 0])
+	rich.queue_free()
+	await process_frame
+	Battle.fancy = false
+	var proof: Node3D = load("res://proof3d/proof_3d.tscn").instantiate()
+	root.add_child(proof)
+	await process_frame
+	var models := proof.find_children("*", "MeshInstance3D", true, false).size()
+	_check(models > 100, "the 3D proof builds its piece of the map (%d meshes)" % models)
+	proof.queue_free()
+	await process_frame
+
 	# Online: a host and a client in this program, over a loopback link.
 	var links := NetLink.pair(self)
 	Battle.online_role = "host"

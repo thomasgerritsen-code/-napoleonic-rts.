@@ -69,6 +69,8 @@ jobs:
           mkdir -p shots
           SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1600x900x24" \
             "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --resolution 1600x900 --script res://tests/screenshot.gd 2>&1 | tail -20
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1600x900x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --resolution 1600x900 --script res://tests/proof_shots.gd 2>&1 | tail -10
           ls -la shots
 
       - name: Publish the screenshots
