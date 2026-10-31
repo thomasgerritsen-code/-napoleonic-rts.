@@ -95,7 +95,8 @@ func _process(delta: float) -> void:
 
 
 func refresh() -> void:
-	visible = enabled
+	# (In 3D the fog is drawn by the 3D view from this grid; this sheet stays hidden.)
+	visible = enabled and (battle == null or battle.view3d == null)
 	if battle == null or not enabled:
 		return
 	_visible.fill(0)

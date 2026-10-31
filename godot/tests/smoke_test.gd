@@ -709,6 +709,16 @@ func _initialize() -> void:
 		deep._process(1.0)
 	_check(shown3d >= 26 and hidden_2d and picked_line and line.centroid().distance_to(goal3d) < 60.0,
 		"in 3D the battle is drawn (%d men), a click selects a battalion and a right click sends it (%.0f px off)" % [shown3d, line.centroid().distance_to(goal3d)])
+	# In 3D too: smoke and earth, the fog drawn by the 3D view (the 2D sheet
+	# stays hidden), the territories marked.
+	deep.call("_puff", line.centroid(), 0.55, 2.6, Vector2(1, 0))
+	deep.call("_earth", line.centroid() + Vector2(80, 0), 1.0)
+	deep.fog.enabled = true
+	deep.fog.refresh()
+	var ground_fogged := (deep.view3d.find_children("*", "MeshInstance3D", false, false)[0] as MeshInstance3D).material_override is ShaderMaterial
+	_check(deep.view3d.fx.alive("smoke") > 0 and deep.view3d.fx.alive("earth") > 0 and not deep.fog.visible and ground_fogged
+		and deep.view3d.field.get("_posts").size() == deep.territories.size(),
+		"in 3D a shot smokes, a strike throws up earth, the fog lies on the ground and the territories are marked")
 	deep.set_view_3d(false)
 	_check(deep.view3d == null and deep.get("_units_layer").visible, "F3 goes back to the 2D field")
 	deep.queue_free()

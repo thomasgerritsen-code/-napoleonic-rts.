@@ -7,7 +7,8 @@ extends Node3D
 ## The ground is the map's relief with the ground picture laid over it; the
 ## houses, trees, buildings, soldiers, horsemen and guns are the Blender
 ## models the sprites come from (scripts/export-godot-3d.py), the men playing
-## the same animations the sprites were drawn from. A sun goes round with the
+## the same animations the sprites were drawn from; trenches, fog, territories,
+## smoke and dust as in 2D (Field3D, Smoke3D). A sun goes round with the
 ## hour and casts real shadows; at night the light falls and the windows
 ## glow. The camera: WASD or the arrows (or the middle button) to move, Q/E
 ## to turn, the wheel to zoom; by touch two fingers move and pinch. Select
@@ -50,10 +51,20 @@ var _spread := 0.0
 var _cam2d_seen := Vector2.INF
 var _sync_clock := 0.0
 var _box: Panel
+## The trenches, fog, territories and placing (Field3D); smoke, earth and dust (Smoke3D).
+var field: Field3D
+var fx: Smoke3D
 
 
 func _ready() -> void:
 	_environment()
+	field = Field3D.new()
+	field.battle = battle
+	field.view = self
+	add_child(field)
+	fx = Smoke3D.new()
+	fx.battle = battle
+	add_child(fx)
 	add_child(_ground())
 	camera = Camera3D.new()
 	camera.fov = 42.0
@@ -163,14 +174,10 @@ func _ground() -> MeshInstance3D:
 			st.add_index(i + cols + 1)
 			st.add_index(i + cols)
 	st.generate_normals()
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = tex
-	mat.albedo_color = Color(0.8, 0.8, 0.78)
-	mat.roughness = 1.0
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = st.commit()
-	mesh.material_override = mat
+	# The picture has its light and shade already: less of the sun's; the fog over it.
+	mesh.material_override = field.fogged(tex, Color(0.8, 0.8, 0.78))
 	return mesh
 
 
@@ -239,6 +246,9 @@ func _scenery_from_sprites() -> void:
 				_scenery.append([list[i][0], mm, i, list[i][1]])
 		var node := MultiMeshInstance3D.new()
 		node.multimesh = mm
+		var source := mesh.surface_get_material(0) as StandardMaterial3D
+		if source != null and source.albedo_texture != null:
+			node.material_override = field.fogged(source.albedo_texture, source.albedo_color)
 		add_child(node)
 
 
@@ -350,7 +360,7 @@ func _sync_units(delta: float) -> void:
 		node.visible = seen
 		if not seen:
 			continue
-		node.position = at(u.world)
+		node.position = at(u.world) - Vector3.UP * field.sink(u)
 		node.rotation.y = lerp_angle(node.rotation.y, turn(u.facing), minf(1.0, delta * 10.0))
 		var ring: MeshInstance3D = m["ring"]
 		ring.visible = u.selected
@@ -467,6 +477,7 @@ func _sync_buildings() -> void:
 			node.scale = Vector3.ONE * float(spec[1])
 			node.set_meta("model", model)
 			add_child(node)
+			field.fog_model(node)
 			_halls[b] = node
 		# A farm shows its crop; a site goes up as it is built; a ruin sinks.
 		if b.type == "farm" and String(b.get("_shown_field")) != "" and String(node.get_meta("model")) != String(b.get("_shown_field")):

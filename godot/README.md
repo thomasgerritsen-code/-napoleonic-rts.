@@ -31,6 +31,19 @@ kraters en beschadigen loopgraven en torens. Marcheren en chargeren vermoeit.
 De Britse computer valt aan in golven, breekt een verloren aanval af en
 hergroepeert.
 
+## In 3D
+
+Dezelfde veldslag kan ook in 3D gespeeld worden: F3 in een slag (of de knop
+"2D / 3D" bij aanraakbediening), of Singleplayer → *Veldslag in 3D*. De regels,
+de Britse bevelhebber, opslaan en online spelen blijven gelijk; alleen het beeld
+en de camera verschillen. In 3D: het reliëf van de kaart met de grondafbeelding,
+de Blender-modellen van de plaatjes (de mannen met dezelfde animaties), loopgraven
+met wal en schanskorven, kraters, kruitdamp, aarde en stof, de mist van de
+oorlog, de gebieden, een zon met echte schaduwen die met het uur meedraait.
+Camera: WASD/pijltjes of de middelste muisknop verschuift, Q/E draait, het wieltje
+zoomt; twee vingers verschuiven en knijpen. De modellen komen uit
+`scripts/export-godot-3d.py` (Blender; zie de uitleg bovenin dat script).
+
 ## Op de iPad (Xogot)
 
 Xogot is Godot voor iPad en iPhone (Godot 4.7, net als dit project).

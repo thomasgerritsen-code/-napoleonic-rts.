@@ -802,6 +802,8 @@ func present(delta: float) -> void:
 			_dust_clock = 0.05 if _gait == "gallop" else 0.11
 			var wet := battle.weather.wetness if battle.weather != null else 0.0
 			battle.effects.dust(position + Vector2(0.0, 1.0), 1.0 - 0.8 * clampf(wet, 0.0, 1.0))
+			if battle.view3d != null:
+				battle.view3d.fx.dust(world, 1.0 - 0.8 * clampf(wet, 0.0, 1.0))
 	var stride := STRIDE
 	if _horse():
 		stride = {"gallop": 3.6, "trot": 2.8}.get(_gait, 2.4)

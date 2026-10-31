@@ -1117,6 +1117,8 @@ func _burst(side: String, at: Vector2, radius: float, damage: float) -> void:
 func _puff(world_at: Vector2, size: float, _life: float, way := Vector2.ZERO) -> void:
 	if sync != null and net_role == "host":
 		sync.fx("p", world_at, size, way.angle() if way != Vector2.ZERO else 99.0)
+	if view3d != null:
+		view3d.fx.smoke(world_at, size, way)
 	if effects != null:
 		var out := Vector2(way.x, way.y * Iso.SQ) if way != Vector2.ZERO else Vector2.ZERO
 		effects.smoke(Iso.to_screen(world_at) + Vector2(0.0, -10.0), size, out)
@@ -1129,6 +1131,8 @@ func _puff(world_at: Vector2, size: float, _life: float, way := Vector2.ZERO) ->
 func _earth(world_at: Vector2, size: float) -> void:
 	if sync != null and net_role == "host":
 		sync.fx("e", world_at, size)
+	if view3d != null:
+		view3d.fx.earth(world_at, size)
 	if effects != null:
 		effects.earth(Iso.to_screen(world_at), size)
 	if lights != null:
