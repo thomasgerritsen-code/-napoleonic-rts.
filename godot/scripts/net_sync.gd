@@ -107,6 +107,14 @@ func fx(kind: String, at: Vector2, a := 0.0, b := 0.0) -> void:
 
 
 func snapshot() -> Dictionary:
+	var data := NetSync.capture(battle)
+	data["fx"] = _fx
+	_fx = []
+	return data
+
+
+## The battle as it stands (what a snapshot and a saved game hold).
+static func capture(battle: Battle) -> Dictionary:
 	var men: Array = []
 	for u in battle.units:
 		men.append(u.net_state())
@@ -132,15 +140,13 @@ func snapshot() -> Dictionary:
 		var copy: Dictionary = t.duplicate()
 		copy.erase("upgrader")
 		works.append(copy)
-	var fx_now := _fx
-	_fx = []
 	return {"clock": battle.clock, "units": men, "buildings": built, "regiments": battalions, "economy": battle.economy,
 		"supplies": stock, "territories": posts, "trenches": works, "craters": battle.trenches.craters,
 		"raining": battle.weather.raining if battle.weather != null else false,
 		"wetness": battle.weather.wetness if battle.weather != null else 0.0,
 		"result": battle.result, "winner": battle.winner, "end_reason": battle.end_reason, "ended_at": battle.ended_at,
 		"stats": battle.stats, "hold_side": battle.hold_side, "held_seconds": battle.held_seconds,
-		"teams": battle.medics.net_teams(), "fx": fx_now}
+		"teams": battle.medics.net_teams()}
 
 
 ## Host: carry out a client's order with its own selection and side.
@@ -169,6 +175,19 @@ func run_command(data: Dictionary) -> void:
 ## Client: show the host's battle.
 func apply(data: Dictionary) -> void:
 	snapshots += 1
+	NetSync.restore(battle, data)
+	for e: Array in data["fx"]:
+		battle.replay_fx(e)
+	if data["result"] != "" and battle.result == "":
+		battle.winner = data["winner"]
+		battle.end_reason = data["end_reason"]
+		battle.ended_at = data["ended_at"]
+		battle.end_for_client()
+
+
+## Take on a captured battle: the men and buildings in it (made where
+## missing), its battalions, supplies, posts, trenches, weather and books.
+static func restore(battle: Battle, data: Dictionary) -> void:
 	battle.clock = float(data["clock"])
 	battle.economy = data["economy"]
 	for a: Array in data["units"]:
@@ -181,7 +200,7 @@ func apply(data: Dictionary) -> void:
 		if b == null:
 			b = battle.add_building(a[1], a[2], Vector2(a[3], a[4]), bool(a[7]), int(a[0]))
 		b.net_apply(a)
-	_apply_regiments(data["regiments"], data["trenches"])
+	NetSync._apply_regiments(battle, data["regiments"], data["trenches"])
 	var stock: PackedFloat32Array = data["supplies"]
 	for i in mini(stock.size(), battle.supplies.size()):
 		var s := battle.supplies[i]
@@ -202,19 +221,12 @@ func apply(data: Dictionary) -> void:
 		battle.weather.raining = data["raining"]
 		battle.weather.wetness = data["wetness"]
 	battle.medics.apply_net_teams(data.get("teams", []))
-	for e: Array in data["fx"]:
-		battle.replay_fx(e)
 	battle.stats = data["stats"]
 	battle.hold_side = data["hold_side"]
 	battle.held_seconds = data["held_seconds"]
-	if data["result"] != "" and battle.result == "":
-		battle.winner = data["winner"]
-		battle.end_reason = data["end_reason"]
-		battle.ended_at = data["ended_at"]
-		battle.end_for_client()
 
 
-func _apply_regiments(list: Array, works: Array) -> void:
+static func _apply_regiments(battle: Battle, list: Array, works: Array) -> void:
 	battle.trenches.list.assign(works)
 	var by_id := {}
 	for r in battle.regiments:

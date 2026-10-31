@@ -17,6 +17,7 @@ var _remote: Dictionary = {}
 var _pages := {}                 # name -> VBoxContainer
 var _updates_button: Button
 var _version_line: Label
+var _load_button: Button
 
 
 func _ready() -> void:
@@ -71,6 +72,12 @@ func _ready() -> void:
 	_heading(single, "Singleplayer")
 	_choice(single, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
 	_choice(single, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
+	_load_button = Button.new()
+	_load_button.custom_minimum_size = Vector2(420, 64)
+	_load_button.add_theme_font_size_override("font_size", 15)
+	_load_button.pressed.connect(func() -> void: Battle.load_saved(get_tree()))
+	single.add_child(_load_button)
+	_show_saved()
 	_back(single)
 
 	var multi: VBoxContainer = _pages["multi"]
@@ -83,6 +90,13 @@ func _ready() -> void:
 	_update_row(updates)
 	_back(updates)
 	_show("start")
+
+
+## The saved battle, if there is one, to take up again (F5 in a battle saves it).
+func _show_saved() -> void:
+	var when := SaveGame.describe()
+	_load_button.disabled = when == ""
+	_load_button.text = "Opgeslagen slag laden\n%s" % (when if when != "" else "nog niets opgeslagen (F5 in een slag)")
 
 
 func _show(page: String) -> void:

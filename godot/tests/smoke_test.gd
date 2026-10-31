@@ -476,6 +476,40 @@ func _initialize() -> void:
 
 	print("GODOT_SMOKE ", JSON.stringify({"food": gathered, "economy": battle.economy, "fallen": fallen,
 		"pop": {"france": battle.pop_used("france"), "britain": battle.pop_used("britain")}, "plan": battle.ai.plan}))
+	# Saved and taken up again: the same men, buildings, battalions, stores
+	# and hour, the men at their work.
+	_check(SaveGame.save(battle) == OK and SaveGame.exists() and SaveGame.describe() != "", "the battle is saved (%s)" % SaveGame.describe())
+	var living_now := 0
+	for u in battle.units:
+		if u.alive():
+			living_now += 1
+	var working_now := 0
+	for u in battle.units:
+		if u.alive() and u.type == "worker" and u.task_target != null:
+			working_now += 1
+	SaveGame.pending = SaveGame.read()
+	var again: Battle = load("res://scenes/main.tscn").instantiate()
+	root.add_child(again)
+	await process_frame
+	await process_frame
+	var living_again := 0
+	var working_again := 0
+	for u in again.units:
+		if u.alive():
+			living_again += 1
+			if u.type == "worker" and u.task_target != null:
+				working_again += 1
+	_check(living_again == living_now and again.buildings.size() == battle.buildings.size()
+		and again.regiments.size() == battle.regiments.size() and is_equal_approx(again.clock, battle.clock)
+		and is_equal_approx(float(again.economy["france"]["wood"]), float(battle.economy["france"]["wood"]))
+		and again.trenches.list.size() == battle.trenches.list.size() and working_again == working_now
+		and again.ai.plan == battle.ai.plan,
+		"and loaded again as it was (%d/%d men, %d/%d at work, %d battalions)" % [living_again, living_now, working_again, working_now, again.regiments.size()])
+	_run(again, 3.0)
+	_check(again.result == "", "the loaded battle goes on")
+	again.queue_free()
+	await process_frame
+	Battle.current = battle
 	# Winning: by holding all three territories for two minutes...
 	for t in battle.territories:
 		t["owner"] = "france"

@@ -181,6 +181,34 @@ func _ready() -> void:
 	var link := NetLink.find(get_tree())
 	if net_role != "" and link != null:
 		go_online(link)
+	elif not SaveGame.pending.is_empty():
+		# A saved battle, taken up again.
+		var saved := SaveGame.pending
+		SaveGame.pending = {}
+		SaveGame.restore(self, saved)
+		camera.focus(Iso.to_screen(town_centre(me).world + Vector2(260, 60)) if town_centre(me) != null else camera.position)
+		say("Opgeslagen slag geladen (%s)." % saved.get("saved_at", ""))
+
+
+## F5: this battle to disk (one at a time; again overwrites it).
+func save_battle() -> void:
+	if not SaveGame.can_save(self):
+		say("Opslaan kan alleen in een lopende slag tegen de computer.")
+		return
+	var err := SaveGame.save(self)
+	say("Slag opgeslagen (F9 laadt hem weer)." if err == OK else "Opslaan mislukt (%s)." % error_string(err))
+
+
+## F9: the saved battle in place of this one.
+static func load_saved(tree: SceneTree) -> bool:
+	var data := SaveGame.read()
+	if data.is_empty():
+		return false
+	SaveGame.pending = data
+	mode = data.get("mode", "campaign")
+	online_role = ""
+	tree.change_scene_to_file("res://scenes/main.tscn")
+	return true
 
 
 func _exit_tree() -> void:
@@ -1723,6 +1751,13 @@ func _unhandled_input(event: InputEvent) -> void:
 					get_tree().reload_current_scene()
 			KEY_F10:
 				get_tree().change_scene_to_file("res://scenes/menu.tscn")
+			KEY_F5:
+				save_battle()
+			KEY_F9:
+				if net_role != "":
+					say("Laden kan niet in een online slag.")
+				elif not Battle.load_saved(get_tree()):
+					say("Er is nog geen opgeslagen slag.")
 			KEY_ESCAPE:
 				placing = ""
 			KEY_1:
