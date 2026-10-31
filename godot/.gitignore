@@ -4,3 +4,5 @@ build/
 *.tmp
 # Written by the CI with the build number (the in-game updater reads it)
 version.json
+# Textures Godot takes out of the glTF models when it imports them.
+proof3d/models/*_albedo.png
