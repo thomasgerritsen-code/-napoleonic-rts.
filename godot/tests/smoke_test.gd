@@ -194,6 +194,21 @@ func _initialize() -> void:
 	battle.effects.dust(Iso.to_screen(home + Vector2(340, 600)))
 	_check(battle.effects.emitted == fx_before + 2 and battle.effects.alive("smoke") > 0 and battle.effects.alive("earth") > 0
 		and battle.effects.alive("dust") > 0, "a shot leaves smoke, a strike throws up earth, a horse raises dust")
+	# Light: a shot flashes; by night the field darkens and the windows glow.
+	var flashes_before: int = battle.lights.flashed
+	battle.call("_puff", home + Vector2(300, 600), 0.55, 2.6, Vector2(1, 0))
+	var day_clock := battle.clock
+	var day_light := DayNight.light_at(60.0)
+	battle.clock = 330.0
+	var night_light := DayNight.light_at(battle.clock)
+	battle.lights.call("_tend_lamps")
+	var lit := battle.lights.lamps()
+	battle.clock = 60.0
+	battle.lights.call("_tend_lamps")
+	var unlit := battle.lights.lamps()
+	battle.clock = day_clock
+	_check(battle.lights.flashed == flashes_before + 1 and night_light.v < day_light.v * 0.7 and lit >= 3
+		and unlit == 0, "a shot flashes; at night the field darkens and %d windows glow" % lit)
 
 	# Troop kinds: their factors and their own coats.
 	var grenadier := battle.add_unit("france", "infantry", home + Vector2(600, 500), "grenadier")

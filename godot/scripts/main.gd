@@ -96,6 +96,8 @@ var _units_layer: Node2D
 var _effects: Node2D
 ## Smoke, flying earth and dust (particles worked out on the graphics card).
 var effects: Effects
+## Muzzle flashes and lit windows, shining out of the dark of the hour.
+var lights: Lights
 var _overlay: Overlay
 var camera: BattleCamera
 var _hud: Hud
@@ -135,6 +137,9 @@ func _ready() -> void:
 	effects = Effects.new()
 	effects.battle = self
 	_effects.add_child(effects)
+	lights = Lights.new()
+	lights.battle = self
+	_effects.add_child(lights)
 	fog = Fog.new()
 	fog.battle = self
 	add_child(fog)
@@ -1047,6 +1052,9 @@ func _puff(world_at: Vector2, size: float, _life: float, way := Vector2.ZERO) ->
 	if effects != null:
 		var out := Vector2(way.x, way.y * Iso.SQ) if way != Vector2.ZERO else Vector2.ZERO
 		effects.smoke(Iso.to_screen(world_at) + Vector2(0.0, -10.0), size, out)
+	# A shot (blown out of a muzzle) lights up its surroundings.
+	if lights != null and way != Vector2.ZERO:
+		lights.flash(Iso.to_screen(world_at) + Vector2(0.0, -10.0), size)
 
 
 ## Earth thrown up where a ball or shell strikes.
@@ -1055,6 +1063,8 @@ func _earth(world_at: Vector2, size: float) -> void:
 		sync.fx("e", world_at, size)
 	if effects != null:
 		effects.earth(Iso.to_screen(world_at), size)
+	if lights != null:
+		lights.flash(Iso.to_screen(world_at), size * 1.2)
 
 
 func _puff_texture() -> Texture2D:

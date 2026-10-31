@@ -3,23 +3,30 @@ extends CanvasLayer
 ## The web game's day: ten minutes from 8 in the morning round the clock,
 ## warm light at sunrise and sunset, blue moonlight at night. Only the look
 ## changes; sight and fighting stay the same.
+##
+## The world is lit, not painted over: the light of the hour (and the grey of
+## rain) multiplies the whole field, so lamps and muzzle flashes (Lights) can
+## shine out of the dark; the screen's own layers (HUD, menus) stay as they are.
 
 const CYCLE := 600.0
 const START_HOUR := 8.0
 const NIGHT_OPACITY := 0.34
 const TWILIGHT_OPACITY := 0.18
+## How much darker than the old painted-over night the lit night goes, so
+## that its lights tell.
+const NIGHT_DEPTH := 1.8
+const RAIN_GREY := 0.14
 const NAMES := {"morning": "Ochtend", "day": "Dag", "evening": "Avond", "night": "Nacht"}
 
 var battle: Battle
-var _shade: ColorRect
+var _light: CanvasModulate
 
 
 func _ready() -> void:
 	layer = 1
-	_shade = ColorRect.new()
-	_shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_shade)
+	_light = CanvasModulate.new()
+	_light.name = "Daylight"
+	get_parent().add_child.call_deferred(_light)
 
 
 static func _smooth(a: float, b: float, x: float) -> float:
@@ -56,6 +63,24 @@ static func tint_at(seconds: float) -> Color:
 	return Color(mix.r, mix.g, mix.b, alpha)
 
 
+## How dark it is: 0 by day, 1 in the depth of the night.
+static func darkness_at(seconds: float) -> float:
+	var hour := hour_at(seconds)
+	return 1.0 - _smooth(5.0, 8.0, hour) * (1.0 - _smooth(17.0, 20.0, hour))
+
+
+## The light the field is multiplied by at this hour (and wetness): as the
+## old tint laid over it, but deeper at night.
+static func light_at(seconds: float, wetness := 0.0) -> Color:
+	var tint := tint_at(seconds)
+	var a := minf(0.85, tint.a * (1.0 + (NIGHT_DEPTH - 1.0) * darkness_at(seconds)))
+	var c := Color(1.0 - a + tint.r * a, 1.0 - a + tint.g * a, 1.0 - a + tint.b * a)
+	var grey := RAIN_GREY * clampf(wetness, 0.0, 1.0)
+	var mean := (c.r + c.g + c.b) / 3.0
+	return Color(lerpf(c.r, mean, grey * 1.5) * (1.0 - grey), lerpf(c.g, mean, grey * 1.5) * (1.0 - grey),
+		lerpf(c.b, mean, grey * 1.5) * (1.0 - grey))
+
+
 func _process(_delta: float) -> void:
-	if battle != null:
-		_shade.color = tint_at(battle.clock)
+	if battle != null and _light != null:
+		_light.color = light_at(battle.clock, battle.weather.wetness if battle.weather != null else 0.0)
