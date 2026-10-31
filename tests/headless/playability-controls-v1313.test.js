@@ -8,7 +8,7 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '../..');
 const read = relative => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 const source = read('src/systems/input/playability-controls-v1.js');
-const html = read('index.html');
+const html = read('play.html');
 const version = read('src/foundation/version.js');
 const packageVersion = JSON.parse(read('package.json')).version;
 

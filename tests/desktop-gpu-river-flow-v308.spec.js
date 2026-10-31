@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const {test,expect}=require('@playwright/test');
 
 test('v308 GPU renders true 2D river flow while retaining bend dynamics and bridge eddies',async({page})=>{
@@ -22,7 +23,7 @@ test('v308 GPU renders true 2D river flow while retaining bend dynamics and brid
       navRenders:window.__RIVER_BANKS_2D_V298__?.twoDOnly,
       geometry:window.__RIVER_SURFACE_V297__?.sharedGeometry};
   });
-  expect(r.version).toBe('1.3.56');
+  expect(r.version).toBe(currentReleaseVersion);
   expect(r.navRenders).toBe(true);
   expect(r.geometry).toBe(true);
   expect(r.speeds.center).toBeGreaterThan(r.speeds.shore*1.5);

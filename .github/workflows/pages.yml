@@ -61,6 +61,9 @@ jobs:
         with:
           node-version: lts/*
 
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
       - name: Audit complete JavaScript codebase and run headless simulation tests
         run: npm run test:fast
 
@@ -370,6 +373,9 @@ jobs:
 
       - name: Stamp unique published build version
         run: node scripts/stamp-deployment.js
+
+      - name: Bundle play.html scripts
+        run: node scripts/bundle-play.js
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v4

@@ -6,6 +6,10 @@
 
   const stats={passingPairs:0,bridgePriorityYields:0,cohesionSlowdowns:0,overlapCorrections:0};
   const PASS_TTL=.72;
+  const passOffsets=new WeakMap();
+  // A deployed gun (about a ton and a half) is not shoved aside by passing men:
+  // they step round it. Shoving it kept the battery limbering up, never firing.
+  const anchored=x=>(x.type==='worker'&&x.resourceExhaustedStop)||(x.type==='artillery'&&!x.batteryMovingV061);
 
   function regFor(u){return u?.regimentId?getRegiment(u.regimentId):null;}
   function bridgeInfo(reg){
@@ -46,10 +50,15 @@
     const bias=reg?.formationTrafficV132;
     const info=bridgeInfo(reg);
     const bridgeYield=Boolean(bias?.reason==='bridge-yield'&&info&&['queued','waiting','approach'].includes(info.state));
-    if(bias&&(!info||bridgeYield)){
-      centerX+=bias.x;
-      centerY+=bias.y;
-    }
+    const wanted=bias&&(!info||bridgeYield)?bias:null;
+    let offset=passOffsets.get(reg);
+    if(!offset||elapsed<offset.at){offset={x:0,y:0,at:elapsed-1/60};passOffsets.set(reg,offset);}
+    const dt=Math.max(0,Math.min(.1,elapsed-offset.at));offset.at=elapsed;
+    const dx=(wanted?.x||0)-offset.x,dy=(wanted?.y||0)-offset.y,d=Math.hypot(dx,dy);
+    const step=Math.min(1,90*dt/(d||1));offset.x+=dx*step;offset.y+=dy*step;
+    // Enter and leave the passing lane at walking speed. Instantly adding and
+    // removing 58 pixels made all followers brake and reverse at each contact.
+    centerX+=offset.x;centerY+=offset.y;
     return previousApplyFormationTargets(reg,centerX,centerY,offsets,facing,phase);
   };
 
@@ -101,12 +110,14 @@
   }
 
   resolveUnitOverlaps=function resolveUnitOverlapsFormationTrafficV132(){
-    const visited=new Set();
+    const visited=new Set(),near=[];
     for(const u of units){
       if(!u||u.dead)continue;
-      for(const other of nearbyNavUnits(u)){
+      for(const other of (typeof nearbyNavUnitsInto==='function'?nearbyNavUnitsInto(u,near):nearbyNavUnits(u))){
         if(!other||other.dead||other===u)continue;
-        const pair=u.id<other.id?`${u.id}:${other.id}`:`${other.id}:${u.id}`;
+        // One number per pair (ids stay far below 2^26): the same pairs as the
+        // 'low:high' strings, without building a string for every neighbour.
+        const pair=u.id<other.id?u.id*67108864+other.id:other.id*67108864+u.id;
         if(visited.has(pair))continue;
         visited.add(pair);
         let dx=other.x-u.x,dy=other.y-u.y;
@@ -144,8 +155,9 @@
             const cross=Math.abs(dirA.x*dirB.y-dirA.y*dirB.x);
             if(dot<.55||cross>.42){
               setPassBias(regA,dirA);setPassBias(regB,dirB);stats.passingPairs++;
-              u.x-=nx*overlap*.08;u.y-=ny*overlap*.08;
-              other.x+=nx*overlap*.08;other.y+=ny*overlap*.08;
+              const fixedU=anchored(u),fixedOther=anchored(other);
+              if(!fixedU){const k=fixedOther?.16:.08;u.x-=nx*overlap*k;u.y-=ny*overlap*k;}
+              if(!fixedOther){const k=fixedU?.16:.08;other.x+=nx*overlap*k;other.y+=ny*overlap*k;}
               stats.overlapCorrections++;
               continue;
             }
@@ -155,8 +167,7 @@
         const softCombat=u.side!==other.side&&!!(regA?.engagementV069||regB?.engagementV069);
         const bothSettled=u.arrivedAtTarget&&other.arrivedAtTarget;
         const correction=overlap*(softCombat ? 0.10 : bothSettled ? 0.12 : 0.24);
-        const stoppedU=u.type==='worker'&&u.resourceExhaustedStop;
-        const stoppedOther=other.type==='worker'&&other.resourceExhaustedStop;
+        const stoppedU=anchored(u),stoppedOther=anchored(other);
         if(stoppedU&&!stoppedOther){
           other.x+=nx*correction*2;other.y+=ny*correction*2;
         }else if(stoppedOther&&!stoppedU){

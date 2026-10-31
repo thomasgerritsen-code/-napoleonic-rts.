@@ -2,6 +2,7 @@
 // ---------- v0.5 navigation / collision ----------
 const NAV_CELL = 52;
 const navBuckets = new Map();
+const navColumns = new Map();
 let navStats = { buckets: 0, overlapCorrections: 0 };
 
 function navKey(x, y) {
@@ -10,27 +11,40 @@ function navKey(x, y) {
 
 function rebuildSpatialHash() {
   navBuckets.clear();
+  navColumns.clear();
   for (const u of units) {
     if (u.dead) continue;
-    const key = navKey(u.x, u.y);
-    if (!navBuckets.has(key)) navBuckets.set(key, []);
-    navBuckets.get(key).push(u);
+    const cx = Math.floor(u.x / NAV_CELL), cy = Math.floor(u.y / NAV_CELL);
+    let column = navColumns.get(cx);
+    if (!column) { column = new Map(); navColumns.set(cx, column); }
+    let bucket = column.get(cy);
+    if (!bucket) { bucket = []; column.set(cy, bucket); navBuckets.set(`${cx},${cy}`, bucket); }
+    bucket.push(u);
   }
   navStats.buckets = navBuckets.size;
   navStats.overlapCorrections = 0;
 }
 
 function nearbyNavUnits(u) {
+  return nearbyNavUnitsInto(u, []);
+}
+
+// The same neighbours in the same order, written into an array the caller
+// keeps and reuses: the hot loops ask this for every man every step.
+function nearbyNavUnitsInto(u, result) {
+  result.length = 0;
   const cx = Math.floor(u.x / NAV_CELL), cy = Math.floor(u.y / NAV_CELL);
-  const result = [];
   for (let ox = -1; ox <= 1; ox++) {
+    const column = navColumns.get(cx + ox);
+    if (!column) continue;
     for (let oy = -1; oy <= 1; oy++) {
-      const bucket = navBuckets.get(`${cx + ox},${cy + oy}`);
-      if (bucket) result.push(...bucket);
+      const bucket = column.get(cy + oy);
+      if (bucket) for (let i = 0; i < bucket.length; i++) result.push(bucket[i]);
     }
   }
   return result;
 }
+const NAV_VECTOR_NEAR = [];
 
 function navigationVector(u, tx, ty) {
   let dx = tx - u.x, dy = ty - u.y;
@@ -39,17 +53,39 @@ function navigationVector(u, tx, ty) {
 
   // Local separation: prevents large groups from collapsing into a single point.
   let sx = 0, sy = 0;
-  for (const other of nearbyNavUnits(u)) {
+  for (const other of nearbyNavUnitsInto(u, NAV_VECTOR_NEAR)) {
     if (other === u || other.dead) continue;
     const ox = u.x - other.x, oy = u.y - other.y;
     const od = Math.hypot(ox, oy);
     const desired = TYPES[u.type].radius + TYPES[other.type].radius + (u.regimentId && u.regimentId === other.regimentId ? 2 : 7);
+    // Pick a shared right-hand convention BEFORE a head-on encounter. Pure
+    // radial repulsion has no lateral solution on the centreline: both men stop,
+    // then repeated collision impulses push them backwards into the same spot.
+    if(u.side===other.side&&(!u.regimentId||u.regimentId!==other.regimentId)){
+      const oxTarget=(other.targetX??other.x)-other.x,oyTarget=(other.targetY??other.y)-other.y;
+      const remaining=Math.hypot(oxTarget,oyTarget),otherSpeed=remaining>5?TYPES[other.type].speed:0;
+      const rvx=(remaining?oxTarget/remaining:0)*otherSpeed-vx*TYPES[u.type].speed;
+      const rvy=(remaining?oyTarget/remaining:0)*otherSpeed-vy*TYPES[u.type].speed;
+      const rx=-ox,ry=-oy,relativeSpeed2=rvx*rvx+rvy*rvy;
+      const time=relativeSpeed2>1?Math.max(0,Math.min(1.1,-(rx*rvx+ry*rvy)/relativeSpeed2)):0;
+      const closest=Math.hypot(rx+rvx*time,ry+rvy*time),ahead=rx*vx+ry*vy;
+      if(ahead>-desired*.3&&closest<desired+5&&od<desired+65){
+        const weight=Math.min(1,(desired+5-closest)/(desired+5))*Math.min(1,(desired+65-od)/35);
+        sx+=-vy*weight*1.65;sy+=vx*weight*1.65;
+        continue;
+      }
+    }
     if (od > 0.01 && od < desired * 1.35) {
       const weight = (desired * 1.35 - od) / (desired * 1.35);
       sx += ox / od * weight;
       sy += oy / od * weight;
     }
   }
+
+  // Separation may slow a man or send him sideways, but must not reverse his
+  // intended walk every frame when several friendly neighbours are close.
+  const backwards=sx*vx+sy*vy;
+  if(backwards<-.65){sx-=vx*(backwards+.65);sy-=vy*(backwards+.65);}
 
   // Steer around completed buildings instead of walking through them.
   let ax = 0, ay = 0;

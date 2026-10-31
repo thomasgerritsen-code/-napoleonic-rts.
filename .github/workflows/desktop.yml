@@ -1,0 +1,76 @@
+name: Windows program
+
+# Builds Napoleonic RTS as a Windows program (an installer and a portable .exe)
+# from the current game. Every run keeps both files as a download on the run's
+# page; a push to main also puts them on the "Windows-versie" release.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+  pull_request:
+    paths: ["desktop/**", "scripts/bundle-play.js", ".github/workflows/desktop.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Build Windows program
+    # Built on Linux: the repository's name ends in a dot, a folder name Windows
+    # cannot create, so a Windows runner cannot even check it out. Wine runs the
+    # Windows tools electron-builder needs; it builds in a plainly named folder.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Wine
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq wine64 wine32:i386
+
+      - name: Install Electron and the builder
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: Copy the game into the program
+        working-directory: desktop
+        run: npm run site
+
+      - name: Build the program
+        env:
+          WINEDEBUG: -all
+        run: |
+          cp -r desktop "$RUNNER_TEMP/nrts-desktop"
+          cd "$RUNNER_TEMP/nrts-desktop"
+          npx electron-builder --win --x64 --publish never
+          mkdir -p "$GITHUB_WORKSPACE/desktop-dist"
+          cp dist/*.exe "$GITHUB_WORKSPACE/desktop-dist/"
+
+      - name: Keep the program with this run
+        uses: actions/upload-artifact@v5
+        with:
+          name: Napoleonic-RTS-Windows
+          path: desktop-dist/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish on the Windows release
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-latest
+          name: Windows-versie
+          body: Napoleonic RTS voor Windows, gebouwd van de laatste versie op main. Kies Napoleonic-RTS-Setup-…exe om te installeren, of Napoleonic-RTS-…exe om zonder installatie te spelen.
+          prerelease: false
+          files: desktop-dist/*.exe

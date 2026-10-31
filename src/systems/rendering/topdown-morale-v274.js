@@ -45,15 +45,16 @@
       const regrouping=rally?.phase==='regrouping';
       const withdrawing=rally?.phase==='withdrawing';
       const ready=rally?.phase==='ready'&&elapsed-(rally.readyAt||0)<4;
-      if(reg.destroyed||!(reg.morale<49||regrouping||withdrawing||ready))continue;
+      const cohesionMessage=root.__BATTLE_COHESION_V1__?.label(reg);
+      if(reg.destroyed||!(reg.morale<49||regrouping||withdrawing||ready||cohesionMessage))continue;
       const soldiers=regimentMembers(reg).filter(u=>!u.dead);
       if(!soldiers.length)continue;
       const p=centroid(soldiers);
       if(!isWorldVisible(p.x,p.y,110))continue;
       const routed=soldiers.filter(u=>u.routing).length;
-      const message=regrouping?'HERGROEPT':withdrawing?'TERUGVAL':ready?'GEREED':
+      const message=cohesionMessage||(regrouping?'HERGROEPT':withdrawing?'TERUGVAL':ready?'GEREED':
         routed>=Math.max(2,soldiers.length*.35)?'VLUCHT':
-        reg.morale<26?'PANIEK':'ONRUST';
+        reg.morale<26?'PANIEK':'ONRUST');
       ctx.fillStyle=message==='GEREED'?'#a3d0a2':
         message==='HERGROEPT'?'#e6ce8b':
         message==='TERUGVAL'?'#e2a477':

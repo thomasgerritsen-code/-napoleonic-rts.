@@ -1,0 +1,10 @@
+{
+  "buildCommand": "node scripts/bundle-play.js --out public",
+  "outputDirectory": "public",
+  "headers": [
+    {
+      "source": "/bundle/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
+  ]
+}

@@ -25,10 +25,12 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: 
 .resources { display: flex; gap: 8px; font-size: .9rem; white-space: nowrap; }
 .resources span { background: rgba(255,255,255,.055); padding: 7px 9px; border-radius: 7px; }
 #status { text-align: center; opacity: .9; font-size: .88rem; }
-button {
+button, .game-menu-link {
   border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
   color: inherit; border-radius: 8px; padding: 8px 11px; font-weight: 650; cursor: pointer;
 }
+.game-menu-link{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;min-height:40px;font-size:.8rem}
+.game-menu-link:focus-visible{outline:2px solid #f4d86d;outline-offset:2px}
 button:hover { background: rgba(255,255,255,.16); }
 button:focus-visible {
   background: rgba(255,255,255,.16);
@@ -193,4 +195,13 @@ button small { opacity: .72; font-size: .68rem; font-weight: 500; }
     padding: 3px 5px;
     white-space: nowrap;
   }
+}
+
+/* The existing phone Menu reveals a single navigation action; the desktop
+   help panel keeps the link in its normal flow. */
+@media (pointer:coarse),(max-width:860px) {
+  .help { display:none; }
+  body.mobile-menu-open .help { display:flex;left:auto;right:10px;top:158px;width:110px;padding:0;border:0;background:none;box-shadow:none;backdrop-filter:none;z-index:42; }
+  body.mobile-menu-open .help > :not(#mainMenuButton) { display:none; }
+  body.mobile-menu-open #mainMenuButton { width:100%;min-height:44px;background:#202720; }
 }

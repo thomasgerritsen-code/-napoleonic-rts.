@@ -5,13 +5,19 @@
   if (!nrts) throw new Error('NRTS foundation runtime must load before large-army performance authority.');
 
   const CELL = 160;
-  const MAX_2D_DPR = 1.5;
+  // The iso view (NRTS_CONFIG.render, open map only) may draw sharper.
+  const MAX_2D_DPR = Math.max(1.5, global.NRTS_CONFIG?.render?.mobileDprCap || 0, global.NRTS_CONFIG?.render?.desktopDprCap || 0);
   const LOD_UNIT_THRESHOLD = 360;
   const LOD_ZOOM_THRESHOLD = 0.82;
   const STATIC_TERRAIN_REFRESH_MS = 1000;
   const combatGrid = { france: new Map(), britain: new Map() };
+  const combatBounds = Object.fromEntries(['france','britain'].map(side=>[side,{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity}]));
   const regimentById = new Map();
   const membersByRegiment = new Map();
+  // Where each unit stands in units this step (dead ones too: units are never
+  // removed during a battle), and each regiment's living members as last found.
+  const unitSlot = new Map(), regimentSlot = new Map();
+  let memberMemo = new WeakMap(), frameNo = 0;
   const getRegimentBeforePerformanceV12 = getRegiment;
   const regimentMembersBeforePerformanceV12 = regimentMembers;
   const renderStats = {
@@ -41,11 +47,19 @@
   function prepareFrameIndexes() {
     combatGrid.france.clear();
     combatGrid.britain.clear();
+    for(const bounds of Object.values(combatBounds)){
+      bounds.minX=bounds.minY=Infinity;bounds.maxX=bounds.maxY=-Infinity;
+    }
     regimentById.clear();
     membersByRegiment.clear();
     livingUnitCount = 0;
+    unitSlot.clear(); frameNo++;
+    for (let i = 0; i < units.length; i++) unitSlot.set(units[i].id, i);
 
-    for (const reg of regiments) {
+    regimentSlot.clear();
+    for (let i = 0; i < regiments.length; i++) {
+      const reg = regiments[i];
+      regimentSlot.set(reg, i);
       if (!reg.destroyed) regimentById.set(reg.id, reg);
     }
 
@@ -61,6 +75,9 @@
       const sideGrid = combatGrid[unit.side];
       if (!sideGrid) continue;
       const key = cellKey(unit.x, unit.y);
+      const bounds=combatBounds[unit.side],cx=Math.floor(unit.x/CELL),cy=Math.floor(unit.y/CELL);
+      bounds.minX=Math.min(bounds.minX,cx);bounds.maxX=Math.max(bounds.maxX,cx);
+      bounds.minY=Math.min(bounds.minY,cy);bounds.maxY=Math.max(bounds.maxY,cy);
       let bucket = sideGrid.get(key);
       if (!bucket) sideGrid.set(key, bucket = []);
       bucket.push(unit);
@@ -72,29 +89,50 @@
   nrts.events.on('game:reset', () => {
     regimentById.clear();
     membersByRegiment.clear();
+    unitSlot.clear(); regimentSlot.clear(); memberMemo = new WeakMap();
     combatGrid.france.clear();
     combatGrid.britain.clear();
     livingUnitCount = 0;
+    for(const bounds of Object.values(combatBounds)){
+      bounds.minX=bounds.minY=Infinity;bounds.maxX=bounds.maxY=-Infinity;
+    }
   });
 
   getRegiment = function getRegimentCached(id) {
     const reg = regimentById.get(id);
     // Guard commands executed between two simulation ticks after a reset.
-    if (reg && !reg.destroyed && regiments.includes(reg)) return reg;
+    // Still in the list where this step found it (else look it up as before).
+    if (reg && !reg.destroyed && (regiments[regimentSlot.get(reg)] === reg || regiments.includes(reg))) return reg;
     return getRegimentBeforePerformanceV12(id);
   };
 
+  // The living units whose ids are in the regiment's memberIds, in units order -
+  // exactly what core's regimentMembers returns. memberIds keeps the ids of the
+  // fallen, so the old check (as many living members as ids) failed for every
+  // regiment that had lost a man, and each call then walked all units. Now the
+  // members are looked up by id and kept for the step until one of them falls
+  // or memberIds changes; a unit created during the step falls back to the walk.
   regimentMembers = function regimentMembersCached(reg) {
     if (!reg || reg.destroyed) return [];
     // Frame indexes are snapshots, never authoritative for a newly formed or
     // modified group. Fall back to live units until the next frame rebuild.
     if (regimentById.get(reg.id) !== reg) return regimentMembersBeforePerformanceV12(reg);
-    const members = membersByRegiment.get(reg.id);
-    if (!members || members.length !== reg.memberIds.length ||
-        members.some(unit => unit.dead || unit.regimentId !== reg.id || !reg.memberIds.includes(unit.id))) {
-      return regimentMembersBeforePerformanceV12(reg);
+    const ids = reg.memberIds, memo = memberMemo.get(reg);
+    if (memo && memo.frame === frameNo && memo.ids === ids && memo.length === ids.length && memo.list.every(u => !u.dead)) return memo.list;
+    const slots = [];
+    for (const id of ids) {
+      const i = unitSlot.get(id);
+      if (i === undefined || units[i]?.id !== id) return regimentMembersBeforePerformanceV12(reg);
+      slots.push(i);
     }
-    return members;
+    slots.sort((a, b) => a - b);
+    const list = [];
+    for (let k = 0; k < slots.length; k++) {
+      if (k && slots[k] === slots[k - 1]) continue;
+      const u = units[slots[k]]; if (!u.dead) list.push(u);
+    }
+    memberMemo.set(reg, { frame: frameNo, ids, length: ids.length, list });
+    return list;
   };
 
   nearestEnemyEntity = function nearestEnemyEntitySpatial(unit, maxRange) {
@@ -102,10 +140,13 @@
     const grid = combatGrid[enemySide];
     let best = null;
     let bestD2 = maxRange * maxRange;
-    const minX = Math.floor((unit.x - maxRange) / CELL);
-    const maxX = Math.floor((unit.x + maxRange) / CELL);
-    const minY = Math.floor((unit.y - maxRange) / CELL);
-    const maxY = Math.floor((unit.y + maxRange) / CELL);
+    // Empty cells outside the enemy index cannot contain a candidate. Clip
+    // only the cell range: candidates and tie-breaking order stay identical.
+    const bounds=combatBounds[enemySide];
+    const minX = Math.max(Math.floor((unit.x - maxRange) / CELL),bounds.minX);
+    const maxX = Math.min(Math.floor((unit.x + maxRange) / CELL),bounds.maxX);
+    const minY = Math.max(Math.floor((unit.y - maxRange) / CELL),bounds.minY);
+    const maxY = Math.min(Math.floor((unit.y + maxRange) / CELL),bounds.maxY);
 
     for (let cy = minY; cy <= maxY; cy++) {
       for (let cx = minX; cx <= maxX; cx++) {

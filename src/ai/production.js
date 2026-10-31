@@ -90,7 +90,7 @@ function aiArmyReadiness(regs=activeRegiments('britain')){
 
 function aiTryFormRegiment() {
   const infantry = freeUnits('britain', 'infantry');
-  const officer = freeUnits('britain', 'officer')[0];
+  const officer = freeUnits('britain', 'officer').find(u => officerCanLead(u, 'infantry'));
   const drummer = freeUnits('britain', 'drummer')[0];
   if (infantry.length < 12 || !officer || !drummer) return null;
   const reg = createRegiment('britain', [...infantry.slice(0, 18), officer, drummer]);
@@ -165,7 +165,7 @@ function aiDevelop() {
     if(formed) return;
 
     const freeInfantry=freeUnits('britain','infantry').length;
-    const freeOfficers=freeUnits('britain','officer').length;
+    const freeOfficers=freeUnits('britain','officer').filter(u=>officerCanLead(u,'infantry')).length;
     const freeDrummers=freeUnits('britain','drummer').length;
     if (freeInfantry < 12) {
       if (aiQueue('infantry','barracks')) return;

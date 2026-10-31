@@ -1,6 +1,6 @@
 'use strict';
 (function initRtsVersion(root) {
-  const VERSION = '1.3.66';
+  const VERSION = '1.4.7';
   const deployment = root.RTS_DEPLOYMENT_INFO;
   const published = deployment &&
     /^[0-9a-f]{40}$/i.test(deployment.commit) &&
@@ -24,6 +24,10 @@
   };
   const finalizeBoot = () => {
     apply();
+    if (root.__ISO_ASSETS_READY__ === false) {
+      document.documentElement.dataset.runtimeReady = 'loading';
+      return;
+    }
     if (app) app.style.visibility = 'visible';
     document.documentElement.dataset.runtimeReady = 'true';
   };

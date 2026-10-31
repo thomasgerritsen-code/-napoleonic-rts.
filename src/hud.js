@@ -11,9 +11,10 @@
     const typeCounts = {};
     selected.forEach(u => typeCounts[u.type] = (typeCounts[u.type] || 0) + 1);
     const typePart = Object.entries(typeCounts).sort().map(([k,v]) => `${k}:${v}`).join(',');
+    const mountedPart = selected.filter(u => u.type === 'officer' && u.troop === 'mounted').map(u => u.id).sort().join(',');
     const regPart = [...new Set(selected.map(u => u.regimentId).filter(Boolean))].sort().join(',');
     const economyPart = `${Math.floor(economies.france.food)}:${Math.floor(economies.france.wood)}:${Math.floor(economies.france.iron)}:${elapsed>=120?'guns-open':'guns-locked'}:${populationUsed('france')}:${economies.france.popCap}`;
-    return `${buildingPart}|${typePart}|${regPart}|economy:${economyPart}`;
+    return `${buildingPart}|${typePart}|mounted:${mountedPart}|${regPart}|economy:${economyPart}`;
   }
 
   function makeDynamicButton(action, html, disabled = false) {
@@ -130,8 +131,10 @@
     const members = regimentMembers(reg).filter(u => !u.dead && !u.routing);
     if (!members.length) return { moving: false, distance: 0 };
     const c = centroid(members);
-    const dx = (reg.targetX ?? c.x) - c.x;
-    const dy = (reg.targetY ?? c.y) - c.y;
+    // Marching orders keep their destination in finalTarget (targetX is not set by them).
+    const goal = reg.finalTarget && Number.isFinite(reg.finalTarget.x) ? reg.finalTarget : { x: reg.targetX, y: reg.targetY };
+    const dx = (goal.x ?? c.x) - c.x;
+    const dy = (goal.y ?? c.y) - c.y;
     const distance = Math.hypot(dx, dy);
     return { moving: distance > 42, distance };
   }
@@ -260,6 +263,10 @@
       const b = selectedBuilding;
       setHudText(selectionTitleEl, BUILDINGS[b.type].label);
       if (!b.complete) setSelectionDetails(`In aanbouw · ${Math.floor(b.construction * 100)}%`);
+      else if (b.type === 'tower' && window.__WATCHTOWER_V1__) {
+        const level = window.__WATCHTOWER_V1__.levelOf(b);
+        setSelectionDetails(`Niveau ${b.towerLevel || 1}/3 · ${level.label} · ${Math.max(0, Math.floor(b.hp))}/${b.maxHp} HP · bereik ${level.range}${b.towerUpgradeTo ? ` · Upgrade ${Math.floor(b.towerUpgradeProgress * 100)}%` : ''}`);
+      }
       else if (b.queue.length) setSelectionDetails(`Productie: ${b.queue[0].label} · ${Math.floor(b.production * 100)}% · queue ${b.queue.length}`);
       else setSelectionDetails(`${Math.max(0, Math.floor(b.hp))}/${b.maxHp} HP`);
     } else if (selectedUnits.size) {
@@ -267,8 +274,10 @@
       const tactical = selectedRegs.length ? selectionTacticalState(selectedRegs) : null;
       const regSummary = tactical ? selectionRegimentSummaryV144(selectedRegs, tactical) : null;
       if (regSummary) {
-        setHudText(selectionTitleEl, selectedRegs.length === 1 ? selectedRegs[0].name : `${selectedRegs.length} regimenten`);
-        setSelectionDetails(regSummary, tactical.state);
+        const reg = selectedRegs[0], rank = selectedRegs.length === 1 && window.__REGIMENT_EXPERIENCE__?.rankOf(reg);
+        setHudText(selectionTitleEl, selectedRegs.length === 1 ? `${rank ? rank.label + ' · ' : ''}${reg.name}` : `${selectedRegs.length} regimenten`);
+        const honours = rank ? `${window.__REGIMENT_EXPERIENCE__.summary(reg)} · ` : '';
+        setSelectionDetails(honours + regSummary, tactical.state);
       } else {
         const workers = group.filter(u => u.type === 'worker').length;
         const inf = group.filter(u => u.type === 'infantry').length;
@@ -281,7 +290,7 @@
       }
     } else {
       setHudText(selectionTitleEl, 'Niets geselecteerd');
-      setSelectionDetails('Voor regiment: 12 musketiers + 1 officier + 1 drummer selecteren.');
+      setSelectionDetails(window.NRTS_CONFIG?.regimentOrders ? `Voor regiment: 12 tot ${window.NRTS_CONFIG.regimentOrders.maxInfantry} musketiers + 1 officier + 1 drummer selecteren.` : 'Voor regiment: 12 musketiers + 1 officier + 1 drummer selecteren.');
     }
 
     renderDynamicActions(forceActions);

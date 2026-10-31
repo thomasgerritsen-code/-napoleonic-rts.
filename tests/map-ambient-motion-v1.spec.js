@@ -15,7 +15,7 @@ test('Map Ambient Motion v1 stays visual-only and preserves terrain/navigation',
     const after=samples.map(p=>({terrain:terrainAtV06(p.x,p.y),road:Boolean(roadAtV064(p.x,p.y))}));
     return {version:api.version,features:[...api.features],visualOnly:api.visualOnly,meta,before,after,wind:api.wind};
   });
-  expect(result.version).toBe('map-ambient-motion-v1');
+  expect(result.version).toMatch(/^map-ambient-motion-v1(\.|$)/);
   expect(result.visualOnly).toBe(true);
   expect(result.meta?.phase).toBe('architecture-v2');
   expect(result.meta?.legacyBridge).toBe(false);

@@ -18,20 +18,26 @@ test('drummer remains committed to the battalion and clears the bridge',async({p
     const reg=getRegiment(id),drummer=units.find(u=>u.id===reg.drummerId);
     window.__RTS_DEBUG__.selectRegiment(id);
     window.__RTS_DEBUG__.orderSelectedWithFacing(corridor.clear.x+260,corridor.clear.y,0);
-    let crossed=false,everWater=false;
+    let crossed=false,everWater=false,maxGap=0;
     for(let i=0;i<1500;i++){
       window.RTS_SIM.step(.05);
       everWater=everWater||waterAtV067(drummer.x,drummer.y);
+      const rest=regimentMembers(reg).filter(u=>u!==drummer&&!u.dead),mid=centroid(rest);
+      maxGap=Math.max(maxGap,Math.hypot(drummer.x-mid.x,drummer.y-mid.y));
       const q=crossingLocalV068(c,drummer.x,drummer.y);
       if(q.along>c.length/2+45){crossed=true;break;}
     }
-    return{crossed,everWater,drummerType:drummer.type,regimentId:drummer.regimentId,stats:window.__COMMAND_ROLE_CROSSING_V1__.stats()};
+    return{crossed,everWater,maxGap,drummerType:drummer.type,regimentId:drummer.regimentId,stats:window.__COMMAND_ROLE_CROSSING_V1__.stats()};
   });
   expect(result.drummerType).toBe('drummer');
   expect(result.regimentId).toBeTruthy();
   expect(result.crossed).toBe(true);
   expect(result.everWater).toBe(false);
-  expect(result.stats.drummerCorrections).toBeGreaterThan(0);
+  // The crossing helper corrects a drummer only when he is left behind, off the
+  // lane or given an unsafe target; one that keeps up needs no correction. What
+  // matters is that he stays with his battalion (an earlier helper ran him
+  // hundreds of paces ahead).
+  expect(result.maxGap).toBeLessThan(90);
   expect(errors).toEqual([]);
 });
 

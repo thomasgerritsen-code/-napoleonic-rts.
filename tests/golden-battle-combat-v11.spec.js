@@ -57,7 +57,9 @@ test('Golden Battle V1.1 guarantees sustained musket, artillery and black-powder
     const batteryIds = [];
     for (const side of ['france', 'britain']) {
       const x = side === 'france' ? 1730 : 2070;
-      const y = side === 'france' ? 530 : 1370;
+      // The French gun stands just south of the wood (x 1320-1860, y 250-680): inside
+      // it the trees block its line of sight beyond ~70 px, so it saw no one.
+      const y = side === 'france' ? 705 : 1370;
       const facing = side === 'france' ? 0 : Math.PI;
       const cannonCandidate = createUnit(side, 'artillery', x, y);
       const crewCandidates = [

@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const {test,expect}=require('@playwright/test');
 
 test('v305 GPU soldiers retain one batch and march only after actual displacement',async({page})=>{
@@ -33,7 +34,7 @@ test('v305 GPU soldiers retain one batch and march only after actual displacemen
       currentVersion:window.RTS_VERSION,
       cameraZoom:camera.zoom};
   });
-  expect(result.currentVersion).toBe('1.3.53');
+  expect(result.currentVersion).toBe(currentReleaseVersion);
   expect(result.visible).toBeGreaterThan(10);
   expect(result.initial.enhancedUniforms).toBeUndefined();
   if(result.initial.active){

@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..', '..');
 const feedback = fs.readFileSync(path.join(root, 'src', 'systems', 'rendering', 'order-target-feedback-v1.js'), 'utf8');
-const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const index = fs.readFileSync(path.join(root, 'play.html'), 'utf8');
 const version = fs.readFileSync(path.join(root, 'src', 'foundation', 'version.js'), 'utf8');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 

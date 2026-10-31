@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const {test,expect}=require('@playwright/test');
 
 test('v310 desktop zoom reuses terrain GPU tiles instead of wiping cache every tiny wheel step',async({browser})=>{
@@ -33,7 +34,7 @@ test('v310 desktop zoom reuses terrain GPU tiles instead of wiping cache every t
         cameraZoom:camera.zoom,anchorError:Math.hypot(before.x-after.x,before.y-after.y),
         version:RTS_VERSION_INFO.version};
     });
-    expect(result.version).toBe('1.3.58');
+    expect(result.version).toBe(currentReleaseVersion);
     expect(result.start.misses).toBeGreaterThan(0);
     expect(result.smooth.misses).toBe(result.start.misses);
     expect(result.smooth.invalidations).toBe(result.start.invalidations);

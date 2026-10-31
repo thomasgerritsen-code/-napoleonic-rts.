@@ -63,7 +63,9 @@
     else if (action === 'artillery-mode') toggleArtillery();
   });
 
-  document.getElementById('resetBtn').addEventListener('click', resetGame);
+  // Later systems extend resetGame to clear their own battle state. Resolve
+  // the current function when clicked instead of capturing the early version.
+  document.getElementById('resetBtn').addEventListener('click', () => resetGame());
 
   // ---------- Test/debug hooks ----------
   const TEST_MANUAL_SIMULATION = new URLSearchParams(location.search).has('test');
@@ -130,6 +132,13 @@
       forceAIThink() { aiDevelop(); aiMilitaryOrder(); updateHud(true); },
       createRegimentDirect(side = 'france') {
         const candidates = [...freeUnits(side, 'infantry').slice(0, 12), ...freeUnits(side, 'officer').slice(0,1), ...freeUnits(side, 'drummer').slice(0,1)];
+        // Armies start with workers only: without free soldiers, raise a fresh
+        // regiment beside the side's own headquarters.
+        if (candidates.length < 14 && window.__RTS_DEBUG__?.createFreshInfantryRegiment) {
+          const hq = buildings.find(b => !b.dead && b.side === side && b.type === 'towncenter');
+          const x = hq ? hq.x + sideDir(side) * (hq.w / 2 + 140) : (side === 'france' ? 900 : WORLD.width - 900);
+          return window.__RTS_DEBUG__.createFreshInfantryRegiment(side, x, hq ? hq.y : WORLD.height / 2);
+        }
         return createRegiment(side, candidates)?.id || null;
       },
       worldToScreen
@@ -139,10 +148,15 @@
   // ---------- Loop ----------
   // Regression pages advance the simulation explicitly via tick()/RTS_SIM.step().
   // The top-down 2D renderer is the sole active battlefield display.
+  const ISO_VIEW_PENDING = () => /(?:^|[?&])view=iso(?:&|$)/.test(location.search) && !window.__ISO_VIEW_V1__;
   function frame(now) {
+    // The dedicated simulation is stepped by its server clock and never draws.
+    if (window.__NRTS_SERVER__) return;
+    const frameStartedAt = performance.now();
     const dt = Math.min(0.033, (now - lastTime) / 1000);
     lastTime = now;
-    if (!TEST_MANUAL_SIMULATION) update(dt);
+    if (window.__ONLINE_MATCH_V1__?.active) window.__ONLINE_MATCH_V1__.frame(now, dt);
+    else if (!window.__NRTS_LOBBY_ONLY__ && !TEST_MANUAL_SIMULATION && window.__ISO_ASSETS_READY__ !== false) update(dt);
     // v312: animation uses the interpolated render clock rather than the
     // 60 Hz simulation clock. Visual-only: no pathing, combat or speed changes.
     const fixedDt = typeof V071_FIXED_DT === 'number' ? V071_FIXED_DT : 1 / 60;
@@ -154,11 +168,14 @@
     };
     try {
       if (typeof window.renderStableFrameV1 === 'function') window.renderStableFrameV1(() => draw(), now);
-      else draw();
+      // With ?view=iso the iso view draws everything; until it has loaded, a 2D
+      // frame would only paint canvases it hides (its fog alone is ~150 ms).
+      else if (!ISO_VIEW_PENDING()) draw();
     } finally {
       // Direct draw() calls in deterministic regression tests still read elapsed.
       window.__NRTS_RENDER_CLOCK_V312__ = null;
     }
+    window.__FRAME_WORK_V1__?.flush(frameStartedAt);
     requestAnimationFrame(frame);
   }
 

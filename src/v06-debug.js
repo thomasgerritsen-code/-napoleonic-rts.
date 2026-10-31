@@ -69,5 +69,14 @@ if (window.__RTS_DEBUG__) {
   window.__RTS_DEBUG__.isExplored=(x,y)=>isExploredV06(x,y);
   window.__RTS_DEBUG__.terrainAt=(x,y)=>terrainAtV06(x,y);
   window.__RTS_DEBUG__.createFreshInfantryRegiment=function(side='france',x=1200,y=1050){const made=[];for(let i=0;i<12;i++)made.push(createUnit(side,'infantry',x+(i%6)*18,y+Math.floor(i/6)*20));made.push(createUnit(side,'officer',x,y-35));made.push(createUnit(side,'drummer',x+25,y-35));return createRegiment(side,made)?.id||null;};
-  window.__RTS_DEBUG__.orderSelectedWithFacing=function(x,y,degrees){issueMoveWithFacingV06(x,y,degrees*Math.PI/180);};
+  // Test lab orders command both armies. The command gateway admits only the
+  // player's own (French) units from input, and it wraps the order function on a
+  // one-second timer - so an order to British units was dropped or not depending
+  // on load timing. The lab is an authority: it goes through the authorized path.
+  window.__RTS_DEBUG__.orderSelectedWithFacing=function(x,y,degrees){
+    const facing=degrees*Math.PI/180, gateway=window.__COMMAND_GATEWAY_V1__;
+    const unitIds=[...selectedUnits].filter(u=>!u.dead).map(u=>u.id);
+    if(!gateway?.applyAuthorized||!unitIds.length){issueMoveWithFacingV06(x,y,facing);return;}
+    gateway.applyAuthorized({type:'move',unitIds,buildingId:null,data:{x,y,facing}});
+  };
 }
