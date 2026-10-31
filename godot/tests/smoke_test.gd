@@ -719,6 +719,17 @@ func _initialize() -> void:
 	_check(deep.view3d.fx.alive("smoke") > 0 and deep.view3d.fx.alive("earth") > 0 and not deep.fog.visible and ground_fogged
 		and deep.view3d.field.get("_posts").size() == deep.territories.size(),
 		"in 3D a shot smokes, a strike throws up earth, the fog lies on the ground and the territories are marked")
+	# As large as 2D draws it: a building's model scaled as its 2D picture is.
+	var tc := deep.town_centre("france")
+	var tc_look: Array = deep.view3d.call("_building_look", tc)
+	var tc_sprite: Sprite2D = tc.get("_sprite")
+	var menu_button: Button = null
+	for n in deep.find_children("*", "Button", true, false):
+		if (n as Button).text == "Hoofdmenu":
+			menu_button = n
+	_check(is_equal_approx(float(tc_look[1]), tc_sprite.scale.x / Iso.SPRITE_SCALE) and menu_button != null
+		and deep.get_viewport().get_visible_rect().encloses(menu_button.get_global_rect()),
+		"in 3D a building is as large as 2D draws it (x%.2f), and the main menu is a button away" % float(tc_look[1]))
 	deep.set_view_3d(false)
 	_check(deep.view3d == null and deep.get("_units_layer").visible, "F3 goes back to the 2D field")
 	deep.queue_free()

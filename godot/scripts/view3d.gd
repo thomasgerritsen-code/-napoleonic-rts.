@@ -34,7 +34,7 @@ var _env: Environment
 var _target := Vector3.ZERO
 var _yaw := 0.0
 var _pitch := deg_to_rad(52.0)
-var _distance := 70.0
+var _distance := 45.0
 var _scenes := {}            # model name -> PackedScene (or null)
 var _men := {}               # Unit -> {node, player, anim, ring}
 var _halls := {}             # Building -> Node3D
@@ -225,12 +225,24 @@ func _scenery_from_sprites() -> void:
 			places[name_] = []
 		var world := Iso.to_world(sprite.position)
 		places[name_].append([sprite, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * size), at(world))])
+	# The village houses: their pictures were drawn at VILLAGE_PPM and scaled
+	# by the house's own scale; the model as long as the 2D house is.
+	var village: Dictionary = Iso.read_json("res://assets/village/village.json")
+	var village_ppm := float(village.get("pxPerM", 20.6452))
+	var headings := int(village.get("headings", 16))
 	for h: Dictionary in battle.houses:
 		var model: String = HOUSES.get(h["kind"], "cottage")
+		var mesh := _mesh_of(model)
+		if mesh == null:
+			continue
+		var box := mesh.get_aabb().size
+		var length_m := float(village["kinds"][h["kind"]].get("lengthM", 8.0)) * village_ppm * float(h["scale"]) / Iso.PPM
+		var size := length_m / maxf(0.1, maxf(box.x, box.z))
 		if not places.has(model):
 			places[model] = []
 		var world := Vector2(h["x"], h["y"])
-		places[model].append([null, Transform3D(Basis(Vector3.UP, turn(int(h["heading"]) * PI / 4.0)).scaled(Vector3.ONE * float(h["scale"]) * 1.3), at(world))])
+		var facing := TAU * int(h["heading"]) / headings
+		places[model].append([null, Transform3D(Basis(Vector3.UP, turn(facing)).scaled(Vector3.ONE * size), at(world))])
 	for name_: String in places:
 		var mesh := _mesh_of(name_)
 		if mesh == null:
@@ -458,29 +470,46 @@ func _animate(u: Unit, m: Dictionary) -> void:
 
 # ---- buildings, scenery, colours over the battalions ----
 
+## The model and size of a building: the very picture the 2D field draws it
+## with, as large as 2D draws it beside the men (the 2D field fits each
+## building to its footprint, so sizes follow the game, not the model).
+func _building_look(b: Building) -> Array:
+	var sprite: Sprite2D = b.get("_sprite")
+	if sprite != null and sprite.texture != null and sprite.texture.resource_path.begins_with("res://assets/props/"):
+		var name_ := sprite.texture.resource_path.get_file().get_basename()
+		if _scene(name_) != null:
+			return [name_, sprite.scale.x / Iso.SPRITE_SCALE]
+	var spec: Array = BUILDINGS.get(b.type, ["cottage", 1.0])
+	var model := String(spec[0])
+	if "%s" in model:
+		model = model % ("fr" if b.side == "france" else "br")
+	# Drawn from another picture (a mine): as wide as its footprint, like 2D.
+	var mesh := _mesh_of(model)
+	var size := float(spec[1])
+	if mesh != null:
+		var box := mesh.get_aabb().size
+		size = b.size.x * 1.5 / Iso.PPM / maxf(0.1, maxf(box.x, box.z))
+	return [model, size]
+
+
 func _sync_buildings() -> void:
 	for b in battle.buildings:
 		var node: Node3D = _halls.get(b)
 		if node == null:
-			var spec: Array = BUILDINGS.get(b.type, ["cottage", 1.0])
-			var model := String(spec[0])
-			if "%s" in model:
-				model = model % ("fr" if b.side == "france" else "br")
-			if b.type == "farm":
-				model = String(b.get("_shown_field")) if String(b.get("_shown_field")) != "" else "field_young"
+			var look := _building_look(b)
+			var model: String = look[0]
 			var scene := _scene(model)
 			if scene == null:
 				continue
 			node = scene.instantiate()
 			node.position = at(b.world)
-			node.rotation.y = 0.3 if b.side == "france" else -0.3
-			node.scale = Vector3.ONE * float(spec[1])
+			node.scale = Vector3.ONE * float(look[1])
 			node.set_meta("model", model)
 			add_child(node)
 			field.fog_model(node)
 			_halls[b] = node
-		# A farm shows its crop; a site goes up as it is built; a ruin sinks.
-		if b.type == "farm" and String(b.get("_shown_field")) != "" and String(node.get_meta("model")) != String(b.get("_shown_field")):
+		# A farm shows its crop (its picture changes); a site goes up as it is built; a ruin sinks.
+		if b.type == "farm" and String(node.get_meta("model")) != String(_building_look(b)[0]):
 			node.queue_free()
 			_halls.erase(b)
 			continue

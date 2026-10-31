@@ -34,6 +34,21 @@ func _ready() -> void:
 	bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	bar.offset_bottom = 40
 	_top = _label(bar, Vector2(14, 9), 16)
+	# Back to the main menu, always at hand (F10 too).
+	var menu_button := Button.new()
+	menu_button.text = "Hoofdmenu"
+	menu_button.tooltip_text = "Terug naar het hoofdmenu (F10). Sla eerst op met F5 als je de slag wilt bewaren."
+	menu_button.focus_mode = Control.FOCUS_NONE
+	menu_button.anchor_left = 1.0
+	menu_button.anchor_right = 1.0
+	menu_button.offset_left = -118
+	menu_button.offset_right = -8
+	menu_button.offset_top = 4
+	menu_button.offset_bottom = 36
+	for state: String in ["normal", "hover", "pressed"]:
+		menu_button.add_theme_stylebox_override(state, _style(Color(0.55, 0.5, 0.36), state, false))
+	menu_button.pressed.connect(func() -> void: battle.get_tree().change_scene_to_file("res://scenes/menu.tscn"))
+	add_child(menu_button)
 	_status = _label(self, Vector2(14, 48), 14)
 	_plan = _label(self, Vector2(0, 48), 13)
 	_plan.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -65,7 +80,6 @@ func _ready() -> void:
 	_touchbar.position = Vector2(14, 72)
 	_touchbar.add_theme_constant_override("separation", 6)
 	add_child(_touchbar)
-	_touch_button("Menu", func() -> void: battle.get_tree().change_scene_to_file("res://scenes/menu.tscn"))
 	_touch_button("Opslaan", func() -> void: battle.save_battle())
 	_touch_button("Laden", func() -> void:
 		if not Battle.load_saved(battle.get_tree()):
