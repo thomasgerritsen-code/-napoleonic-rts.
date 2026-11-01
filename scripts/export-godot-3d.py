@@ -43,8 +43,9 @@ infantry = _load("render_iso_infantry", "render-iso-infantry.py")
 roles = _load("render_iso_roles", "render-iso-roles.py")
 cavalry = _load("render_iso_cavalry", "render-iso-cavalry.py")
 artillery = _load("render_iso_artillery", "render-iso-artillery.py")
+mine = _load("godot_mine", "godot_mine.py")
 
-STATIC = [k for k in props.BUILDERS]
+STATIC = [*props.BUILDERS, "mine"]
 SIDES = {"fr": "france", "br": "britain"}
 LOOPING = {"idle", "march", "walk", "trot", "gallop", "roll", "haul", "work", "command", "rest", "dig", "ready", "load"}
 FPS = 10
@@ -109,6 +110,7 @@ def bake(obj: bpy.types.Object, size: int) -> None:
     settings.margin = 4
     bpy.ops.object.bake(type="DIFFUSE")
     plain = bpy.data.materials.new(obj.name + "_baked")
+    plain.use_nodes = True  # Also supported by Blender 4.x (not enabled by default).
     tree = plain.node_tree
     bsdf = tree.nodes["Principled BSDF"]
     tex = tree.nodes.new("ShaderNodeTexImage")
@@ -220,7 +222,7 @@ def build_animated(name: str) -> None:
 def build_static(name: str) -> None:
     fresh()
     root = common.empty("root")
-    props.BUILDERS[name](root)
+    (mine.build_mine if name == "mine" else props.BUILDERS[name])(root)
     bpy.context.view_layer.update()
     obj = one_mesh(name)
     big = name.startswith(("barracks", "farmhouse", "tower", "hospital", "barn", "bridge", "lumbercamp", "field"))
@@ -254,4 +256,7 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    # Also run directly with Blender, without installing bpy into system Python:
+    # blender -b --python scripts/export-godot-3d.py -- --only mine
+    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
+    raise SystemExit(main(argv))

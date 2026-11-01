@@ -19,7 +19,7 @@ const MODELS := "res://assets3d/%s.glb"
 ## Building types to models (the side's own where there is one).
 const BUILDINGS := {"towncenter": ["farmhouse", 1.45], "house": ["cottage", 1.0], "barracks": ["barracks_%s", 1.0],
 	"stable": ["barn", 1.0], "foundry": ["barracks_%s", 0.85], "tower": ["tower_%s", 1.0], "hospital": ["hospital_%s", 1.0],
-	"lumbercamp": ["lumbercamp_%s", 1.0], "mine": ["well", 1.3], "farm": ["field_ripe", 1.0]}
+	"lumbercamp": ["lumbercamp_%s", 1.0], "mine": ["mine", 1.0], "farm": ["field_ripe", 1.0]}
 ## Village houses to models.
 const HOUSES := {"cottage": "cottage", "cottage2": "cottage", "farmhouse": "farmhouse", "farmhouse2": "farmhouse",
 	"chapel": "farmhouse", "inn": "farmhouse", "barn": "barn"}

@@ -730,6 +730,32 @@ func _initialize() -> void:
 	_check(is_equal_approx(float(tc_look[1]), tc_sprite.scale.x / Iso.SPRITE_SCALE) and menu_button != null
 		and deep.get_viewport().get_visible_rect().encloses(menu_button.get_global_rect()),
 		"in 3D a building is as large as 2D draws it (x%.2f), and the main menu is a button away" % float(tc_look[1]))
+	# The mine is its own Blender model, for both sides; no water-well stand-in.
+	# Use real Building nodes so the 2D artwork's fallback and footprint apply.
+	for side: String in ["france", "britain"]:
+		var mine := deep.add_building(side, "mine", tc.world + Vector2(300, 120), false)
+		var mine_look: Array = deep.view3d.call("_building_look", mine)
+		var mine_mesh: Mesh = deep.view3d.call("_mesh_of", String(mine_look[0]))
+		_check(String(mine_look[0]) == "mine" and mine_mesh != null,
+			"the %s mine uses the original Blender mine" % side)
+		if mine_mesh != null:
+			var bounds := mine_mesh.get_aabb()
+			var mine_width := maxf(bounds.size.x, bounds.size.z) * float(mine_look[1])
+			_check(is_equal_approx(mine_width, mine.size.x * 1.5 / Iso.PPM)
+				and bounds.size.y > 2.0 and mine_mesh.get_surface_count() == 1,
+				"the mine fits its footprint with one shared textured mesh")
+		deep.view3d.call("_sync_buildings")
+		var halls: Dictionary = deep.view3d.get("_halls")
+		var mine_node: Node3D = halls[mine]
+		var foundation_height := mine_node.scale.y
+		mine.complete = true
+		mine.progress = 1.0
+		deep.view3d.call("_sync_buildings")
+		_check(mine_node.scale.y > foundation_height and mine_node.get_meta("model") == "mine",
+			"the %s mine follows actual construction progress" % side)
+		mine.visible = false
+		deep.view3d.call("_sync_buildings")
+		_check(not mine_node.visible, "an unseen mine stays hidden in 3D")
 	deep.set_view_3d(false)
 	_check(deep.view3d == null and deep.get("_units_layer").visible, "F3 goes back to the 2D field")
 	deep.queue_free()

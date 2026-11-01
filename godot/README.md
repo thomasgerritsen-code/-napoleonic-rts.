@@ -44,6 +44,19 @@ Camera: WASD/pijltjes of de middelste muisknop verschuift, Q/E draait, het wielt
 zoomt; twee vingers verschuiven en knijpen. De modellen komen uit
 `scripts/export-godot-3d.py` (Blender; zie de uitleg bovenin dat script).
 
+De mijn heeft een eigen 3D-model: een gesteunde mijningang, een houten
+ertskar op houten rails, stortstenen, een pikhouweel en een materiaalschuurtje.
+Beide landen gebruiken hetzelfde model en dezelfde bouwvoortgang en zichtregels.
+De mijn bestaat uit één mesh met één 512×512-kleurtextuur; materialen en
+schaduwen reageren op de bestaande verlichting van de veldslag.
+Opnieuw maken met Blender (4.3 of nieuwer):
+
+```sh
+blender -b --python scripts/export-godot-3d.py -- --only mine
+```
+
+De bewerkbare modelbeschrijving staat in `scripts/godot_mine.py`.
+
 ## Op de iPad (Xogot)
 
 Xogot is Godot voor iPad en iPhone (Godot 4.7, net als dit project).
