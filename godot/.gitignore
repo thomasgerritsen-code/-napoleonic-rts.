@@ -2,6 +2,9 @@
 .godot/
 build/
 *.tmp
+# Editor sidecars are regenerated locally (also excluded by the Xogot export).
+*.import
+*.uid
 # Written by the CI with the build number (the in-game updater reads it)
 version.json
 # Textures Godot takes out of the glTF models when it imports them.

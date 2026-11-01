@@ -249,6 +249,7 @@ static func _apply_regiments(battle: Battle, list: Array, works: Array) -> void:
 			if u != null:
 				r.men.append(u)
 				u.regiment = r
+		r.invalidate_living()
 		r.victories = a[9]
 		r.facing = a[12]
 		r.trench = battle.trenches.list[a[13]] if a[13] >= 0 and a[13] < battle.trenches.list.size() else null

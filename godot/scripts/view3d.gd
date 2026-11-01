@@ -360,6 +360,9 @@ func view(world: Vector2, yaw_deg: float, pitch_deg: float, distance: float) -> 
 # ---- the men ----
 
 func _sync_units(delta: float) -> void:
+	# A generous screen margin keeps partially visible models animated.
+	# Simulation and mesh detail are unchanged outside the camera.
+	var screen := Rect2(Vector2(-256, -256), get_viewport().get_visible_rect().size + Vector2(512, 512))
 	for u in battle.units:
 		var m: Dictionary = _men.get(u, {})
 		if m.is_empty():
@@ -370,17 +373,44 @@ func _sync_units(delta: float) -> void:
 		var node: Node3D = m["node"]
 		var seen := u.visible and u.modulate.a > 0.05
 		node.visible = seen
+		var player: AnimationPlayer = m["player"]
 		if not seen:
+			_sleep_man(m)
 			continue
 		node.position = at(u.world) - Vector3.UP * field.sink(u)
 		node.rotation.y = lerp_angle(node.rotation.y, turn(u.facing), minf(1.0, delta * 10.0))
 		var ring: MeshInstance3D = m["ring"]
 		ring.visible = u.selected
-		_animate(u, m)
+		var on_screen := not camera.is_position_behind(node.position) and screen.has_point(camera.unproject_position(node.position + Vector3.UP))
+		if on_screen:
+			var waking := player != null and not player.active
+			if player != null:
+				player.active = true
+			_animate(u, m)
+			if waking and player.has_animation(String(m["anim"])):
+				var a := player.get_animation(String(m["anim"]))
+				if not u.alive():
+					player.seek(a.length, true)
+				elif STRIDES.has(String(m["anim"])):
+					player.seek(float(u.get("_step_phase")) * a.length, true)
+				elif String(m.get("sleep_anim", "")) == String(m["anim"]):
+					var elapsed := float(m.get("sleep_position", 0.0)) + maxf(0.0, battle.clock - float(m.get("sleep_at", battle.clock)))
+					player.seek(fmod(elapsed, a.length) if a.loop_mode != Animation.LOOP_NONE and a.length > 0.0 else minf(elapsed, a.length), true)
+		else:
+			_sleep_man(m)
 	for u: Variant in _men.keys():
 		if not is_instance_valid(u):
 			(_men[u]["node"] as Node3D).queue_free()
 			_men.erase(u)
+
+
+func _sleep_man(m: Dictionary) -> void:
+	var player: AnimationPlayer = m["player"]
+	if player != null and player.active:
+		m["sleep_at"] = battle.clock
+		m["sleep_anim"] = m["anim"]
+		m["sleep_position"] = player.current_animation_position if player.current_animation != "" else 0.0
+		player.active = false
 
 
 func _model_for(u: Unit) -> String:
@@ -455,9 +485,15 @@ func _animate(u: Unit, m: Dictionary) -> void:
 		want = "idle" if player.has_animation("idle") else ""
 	if want == "":
 		return
-	if want != m["anim"]:
+	if want != m["anim"] or u.anim_seq != int(m.get("sequence", -1)):
+		var repeat_pose: bool = want == m["anim"]
 		m["anim"] = want
+		m["sequence"] = u.anim_seq
 		player.play(want, 0.12)
+		# AnimationPlayer.play(same_name) resumes at its existing position;
+		# a new logical stroke with the same name must start at the beginning.
+		if repeat_pose:
+			player.seek(0.0, true)
 		if want == "fire" or want == "rfire" or want == "kfire":
 			_flash(u)
 	if STRIDES.has(want):

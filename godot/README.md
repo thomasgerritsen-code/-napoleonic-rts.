@@ -57,6 +57,18 @@ blender -b --python scripts/export-godot-3d.py -- --only mine
 
 De bewerkbare modelbeschrijving staat in `scripts/godot_mine.py`.
 
+## Prestaties en beweging
+
+Grote veldslagen gebruiken gedeelde zoekvakken voor doelen en een gezamenlijke
+routeplanner rond gebouwen en boomstammen. Bevriende troepen houden rechts bij
+het passeren; de bestaande brugroutes blijven behouden. Bij een charge blijven
+mannen op contactafstand staan voor bajonet- en sabelslagen.
+
+In 3D pauzeren verborgen spriteanimaties en animaties buiten de camera; de
+volledige Blender-modellen en grafische details blijven behouden. F3 herstelt
+de actuele 2D-weergave. Meetresultaten, regressies en reproduceerbare opdrachten
+staan in [prestaties en navigatie](../docs/godot-performance-navigation.md).
+
 ## Op de iPad (Xogot)
 
 Xogot is Godot voor iPad en iPhone (Godot 4.7, net als dit project).

@@ -92,6 +92,12 @@ var _drum_clock := 0.0
 const WALL_CELL := 80.0
 var _walls := {}
 var _walls_dirty := true
+var combat_space := BattleSpace.new()
+var navigation := GroundNavigation.new()
+var _simulating := false
+var _separation_grid := {}
+var _separation_active: Array[Vector2i] = []
+var _trunk_revision := -1
 var _units_layer: Node2D
 var _effects: Node2D
 ## Smoke, flying earth and dust (particles worked out on the graphics card).
@@ -227,6 +233,8 @@ func set_view_3d(on: bool) -> void:
 	for child in get_children():
 		if child is CanvasItem and child != view3d:
 			(child as CanvasItem).visible = not on
+	for u in units:
+		u.presentation_3d(on)
 	refresh_hud()
 
 
@@ -273,12 +281,21 @@ func _process(delta: float) -> void:
 	if result != "":
 		return
 	clock += delta
+	combat_space.rebuild(units)
 	_deliver_orders()
 	for r in regiments:
 		r.update(delta, regiments)
+	_simulating = true
 	for u in units:
 		u.step(delta)
 	_keep_apart()
+	_simulating = false
+	# Present the resolved positions, not the positions before crowd/wall
+	# corrections. Otherwise the model alternates between the two each frame.
+	for u in units:
+		if u.alive():
+			u.position = Iso.to_screen(u.world)
+			u.present(delta)
 	for b in buildings:
 		b.step(delta)
 	medics.update(delta)
@@ -290,6 +307,9 @@ func _process(delta: float) -> void:
 	if _woods_clock <= 0.0:
 		_woods_clock = 0.5
 		woods.update()
+		if woods.revision != _trunk_revision:
+			_trunk_revision = woods.revision
+			_walls_dirty = true
 		_auto_regiments()
 	if net_role == "":
 		ai.update(delta)
@@ -300,17 +320,27 @@ func _process(delta: float) -> void:
 ## Men do not stand in one another: pairs closer than a pace step apart.
 ## Neighbours are found through a grid of cells a pace wide.
 func _keep_apart() -> void:
-	const PACE := 10.0
-	var grid := {}
+	const PACE := 16.0
+	if _walls_dirty:
+		_build_walls()
+	for cell in _separation_active:
+		(_separation_grid[cell] as Array).clear()
+	_separation_active.clear()
+	if _separation_grid.size() > 4096:
+		_separation_grid.clear()
+	var grid := _separation_grid
 	for u in units:
 		if u.alive():
 			var cell := Vector2i(floori(u.world.x / PACE), floori(u.world.y / PACE))
 			if grid.has(cell):
+				if (grid[cell] as Array).is_empty():
+					_separation_active.append(cell)
 				grid[cell].append(u)
 			else:
 				grid[cell] = [u]
+				_separation_active.append(cell)
 	for u in units:
-		if not u.alive() or u.type == "artillery":
+		if not u.alive():
 			continue
 		var cell := Vector2i(floori(u.world.x / PACE), floori(u.world.y / PACE))
 		for dx in range(-1, 2):
@@ -320,18 +350,22 @@ func _keep_apart() -> void:
 						continue
 					var gap := other.world - u.world
 					var d := gap.length()
-					if d >= PACE or d < 0.01:
+					# Keep contact possible at the unchanged 18px melee reach.
+					var distance := 10.0 + (3.0 if u._horse() else 0.0) + (3.0 if other._horse() else 0.0)
+					if d >= distance:
 						continue
-					var push := gap / d * (PACE - d) * 0.5
-					u.world -= push
-					other.world += push
+					var direction := gap / d if d > 0.01 else Vector2.from_angle(hash01(u.id, other.id) * TAU)
+					var push := direction * (distance - d)
+					var share := 0.0 if u.type == "artillery" else (1.0 if other.type == "artillery" else 0.5)
+					u.world = navigation.nudge(u.world, u.world - push * share)
+					other.world = navigation.nudge(other.world, other.world + push * (1.0 - share))
 	_keep_out_of_walls()
 
 
 ## Nobody walks through a house or a building: a man inside one's walls is
 ## put back outside the nearest wall.
 func _keep_out_of_walls() -> void:
-	if _walls.is_empty() or _walls_dirty:
+	if _walls_dirty:
 		_build_walls()
 	for u in units:
 		if not u.alive():
@@ -345,13 +379,13 @@ func _keep_out_of_walls() -> void:
 				var bottom := wall.end.y - u.world.y
 				var least := minf(minf(left, right), minf(top, bottom))
 				if least == left:
-					u.world.x = wall.position.x - 0.5
+					u.world.x = wall.position.x - GroundNavigation.CLEARANCE - 0.5
 				elif least == right:
-					u.world.x = wall.end.x + 0.5
+					u.world.x = wall.end.x + GroundNavigation.CLEARANCE + 0.5
 				elif least == top:
-					u.world.y = wall.position.y - 0.5
+					u.world.y = wall.position.y - GroundNavigation.CLEARANCE - 0.5
 				else:
-					u.world.y = wall.end.y + 0.5
+					u.world.y = wall.end.y + GroundNavigation.CLEARANCE + 0.5
 
 
 func _build_walls() -> void:
@@ -364,6 +398,10 @@ func _build_walls() -> void:
 	for b in buildings:
 		if b.standing() and b.type != "farm":
 			rects.append(Rect2(b.world - b.size * 0.42, b.size * 0.84))
+	rects.append_array(woods.trunks())
+	for supply in supplies:
+		if supply.kind == "wood" and not supply.gone():
+			rects.append(Rect2(supply.world - Vector2(3.5, 3.5), Vector2(7, 7)))
 	for r in rects:
 		for x in range(floori(r.position.x / WALL_CELL), floori(r.end.x / WALL_CELL) + 1):
 			for y in range(floori(r.position.y / WALL_CELL), floori(r.end.y / WALL_CELL) + 1):
@@ -371,6 +409,14 @@ func _build_walls() -> void:
 				if not _walls.has(cell):
 					_walls[cell] = []
 				_walls[cell].append(r)
+	navigation.set_walls(rects)
+
+
+## Orders use the same bridge routing, with shared routes around buildings.
+func ground_route(from: Vector2, to: Vector2) -> Array[Vector2]:
+	if _walls_dirty:
+		_build_walls()
+	return navigation.route(from, to)
 
 
 # ---- the opening ----
@@ -484,6 +530,7 @@ func add_unit(side: String, type: String, at: Vector2, troop := "", id := 0) -> 
 	u.setup(self, side, type, at, troop)
 	u.fired.connect(_on_fired)
 	units.append(u)
+	combat_space.add(u, units.size() - 1)
 	_unit_index[u.id] = u
 	_units_layer.add_child(u)
 	return u
@@ -667,23 +714,13 @@ func near_trees(at: Vector2) -> bool:
 
 ## Whether enemy soldiers (not peasants, not men in flight) are within `reach`.
 func soldiers_near(at: Vector2, side: String, reach: float) -> bool:
-	for u in units:
-		if u.side != side and u.alive() and u.military() and (u.regiment == null or not u.regiment.routing) \
-				and u.world.distance_squared_to(at) < reach * reach:
-			return true
-	return false
+	return combat_space.nearest(at, side, reach, true) != null
 
 
 ## The nearest living enemy within `reach`; men before buildings.
 func nearest_foe(at: Vector2, side: String, reach: float) -> Node2D:
-	var best: Node2D = null
+	var best: Node2D = combat_space.nearest(at, side, reach)
 	var best_d := reach
-	for u in units:
-		if u.side != side and u.alive():
-			var d := u.world.distance_to(at)
-			if d < best_d:
-				best_d = d
-				best = u
 	if best != null:
 		return best
 	for b in buildings:

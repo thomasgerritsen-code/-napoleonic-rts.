@@ -49,6 +49,11 @@ var side := "france"
 ## kind and an officer on horseback, no drummer).
 var kind := "infantry"
 var men: Array[Unit] = []
+var _living_cache: Array[Unit] = []
+var _living_dirty := true
+var _living_count := -1
+var _melee_look := 0.0
+var _melee_targets := {}
 var facing := 0.0
 var formation := "line"
 var routing := false
@@ -205,11 +210,21 @@ func _init(name_: String, side_: String) -> void:
 
 
 func living() -> Array[Unit]:
-	var list: Array[Unit] = []
-	for u in men:
-		if u.alive():
-			list.append(u)
-	return list
+	if _living_dirty or _living_count != men.size():
+		# Replace rather than clear: a charge may lose a man while another
+		# loop is still reading the previous list.
+		var list: Array[Unit] = []
+		for u in men:
+			if u.alive():
+				list.append(u)
+		_living_cache = list
+		_living_count = men.size()
+		_living_dirty = false
+	return _living_cache
+
+
+func invalidate_living() -> void:
+	_living_dirty = true
 
 
 func strength() -> int:
@@ -274,7 +289,11 @@ func order_move(to: Vector2, face: Variant = null) -> void:
 		return
 	# Form up where it stands, facing the way, then march as a body.
 	_end_face = facing
-	_march = Nav.route(from, to)
+	var battle := living()[0].battle
+	_march = battle.ground_route(from, to) if battle != null else Nav.route(from, to)
+	if _march.is_empty():
+		_form(from)
+		return
 	_anchor = from
 	# A line crosses a bridge in column and forms line again beyond it.
 	if _march.size() > 1 and formation == "line" and not skirmish:
@@ -474,6 +493,7 @@ func _form(at: Vector2) -> void:
 		return
 	if formation == "square":
 		_form_square(at, rank_and_file)
+		_clear_slots()
 		return
 	var grid := shape(rank_and_file.size())
 	var files := grid.x
@@ -497,6 +517,16 @@ func _form(at: Vector2) -> void:
 				lateral = lateral * Battle.depth_rule_static("skirmishSpread", 2.3) + (Battle.hash01(u.id, 21) - 0.5) * 18.0
 				depth = depth * Battle.depth_rule_static("skirmishSpread", 2.3) + (Battle.hash01(u.id, 22) - 0.5) * 18.0
 			group[r].slot = at + right * lateral - forward * depth
+	_clear_slots()
+
+
+func _clear_slots() -> void:
+	for u in living():
+		u._route_revision = -1
+		if u.battle != null:
+			if u.battle._walls_dirty:
+				u.battle._build_walls()
+			u.slot = u.battle.navigation.goal(u.slot, u.world)
 
 
 ## A hollow square: the men on four faces looking out, officer and drummer
@@ -669,11 +699,14 @@ func charge(regiments: Array[Regiment]) -> bool:
 	if target == null:
 		return false
 	charging = target
+	_melee_targets.clear()
+	_melee_look = 0.0
 	enemy = null
 	_march.clear()
 	# The cheer of a charge.
 	for u in living():
 		u.morale = minf(100.0, u.morale + 8.0)
+		u._route_revision = -1
 	return true
 
 
@@ -720,19 +753,35 @@ func _melee(delta: float) -> void:
 		_form(destination)
 		return
 	var them := foe.living()
+	_melee_look -= delta
+	if _melee_look <= 0.0:
+		_melee_look = 0.2
+		_melee_targets.clear()
 	var contact := false
 	for u in living():
-		var nearest: Unit = null
-		var best := INF
-		for o in them:
-			var d := u.world.distance_squared_to(o.world)
-			if d < best:
-				best = d
-				nearest = o
+		if not u.alive():
+			continue
+		var nearest: Unit = _melee_targets.get(u)
+		if nearest == null or not nearest.alive():
+			nearest = null
+			var best := INF
+			for o in them:
+				if not o.alive():
+					continue
+				var d := u.world.distance_squared_to(o.world)
+				if d < best:
+					best = d
+					nearest = o
+			_melee_targets[u] = nearest
 		if nearest == null:
-			break
-		u.slot = nearest.world
-		if best < MELEE_REACH * MELEE_REACH:
+			continue
+		# Approach contact range, not the same point occupied by the victim.
+		# The target is kept briefly, avoiding left/right flips in a charge.
+		var away := (u.world - nearest.world).normalized()
+		if away == Vector2.ZERO:
+			away = Vector2.from_angle(u.facing + PI)
+		u.slot = nearest.world + away * 12.0
+		if u.world.distance_squared_to(nearest.world) < MELEE_REACH * MELEE_REACH:
 			contact = true
 			var kill := MELEE_KILL * u.stat("melee") * damage_factor()
 			var loss := MELEE_LOSS / nearest.stat("melee")

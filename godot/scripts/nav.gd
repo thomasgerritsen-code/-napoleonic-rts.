@@ -37,13 +37,20 @@ static func bridges() -> Array[Dictionary]:
 static func river_x(y: float) -> float:
 	if _points.size() < 2:
 		return -INF
-	for i in range(1, _points.size()):
-		var a := _points[i - 1]
-		var b := _points[i]
-		if y <= b.y or i == _points.size() - 1:
-			var t := 0.0 if is_equal_approx(b.y, a.y) else clampf((y - a.y) / (b.y - a.y), 0.0, 1.0)
-			return lerpf(a.x, b.x, t)
-	return _points[_points.size() - 1].x
+	# The map's 255 points are ordered north to south. Find exactly the
+	# same first upper endpoint as the old scan, including repeated y values.
+	var low := 1
+	var high := _points.size() - 1
+	while low < high:
+		var mid := (low + high) / 2
+		if y <= _points[mid].y:
+			high = mid
+		else:
+			low = mid + 1
+	var a := _points[low - 1]
+	var b := _points[low]
+	var t := 0.0 if is_equal_approx(b.y, a.y) else clampf((y - a.y) / (b.y - a.y), 0.0, 1.0)
+	return lerpf(a.x, b.x, t)
 
 
 ## -1 on the west (French) bank, +1 on the east.

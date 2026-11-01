@@ -62,6 +62,24 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" smoke.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_SMOKE" smoke.log
 
+      - name: Native movement and large-battle regression
+        run: |
+          set -o pipefail
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/navigation_test.gd 2>&1 | tee native-navigation.log
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/large_battle_benchmark.gd 2>&1 | tee native-benchmark.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-navigation.log native-benchmark.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_NAV" native-navigation.log
+          grep -q "GODOT_BENCH" native-benchmark.log
+
+      - name: Full-detail 3D animation regression
+        run: |
+          set -o pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb > /dev/null
+          timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/render_regression.gd 2>&1 | tee native-render.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-render.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_RENDER" native-render.log
+
       - name: Screenshots with a real renderer
         continue-on-error: true
         run: |

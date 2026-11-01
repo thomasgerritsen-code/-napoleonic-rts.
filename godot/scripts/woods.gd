@@ -15,6 +15,19 @@ const LINK := 260.0
 
 var _trees: Array[Dictionary] = []     # {sprite, supply, fall_at, down}
 var _others: Array[Sprite2D] = []      # undergrowth and trees without wood
+var revision := 0
+
+
+## Only trunks block feet; canopies and undergrowth remain traversable.
+func trunks() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for tree in _trees:
+		if not tree["down"]:
+			out.append(Rect2(Vector2(tree["at"]) - Vector2(3.5, 3.5), Vector2(7, 7)))
+	for sprite in _others:
+		if sprite.texture.resource_path.get_file().get_basename() in ["oak", "beech", "birch", "poplar", "pine", "spruce", "willow"]:
+			out.append(Rect2(Iso.to_world(sprite.position) - Vector2(3.5, 3.5), Vector2(7, 7)))
+	return out
 
 
 static func pick(table: Array, r: float) -> String:
@@ -114,6 +127,7 @@ func update() -> void:
 		var supply: Supply = tree["supply"]
 		if supply.amount < supply.full * float(tree["fall_at"]) or supply.gone():
 			tree["down"] = true
+			revision += 1
 			var sprite: Sprite2D = tree["sprite"]
 			var side := -1.0 if Battle.hash01(roundi(sprite.position.x), 3) < 0.5 else 1.0
 			var tween := sprite.create_tween()

@@ -70,6 +70,8 @@ func take(wanted: float) -> float:
 	var got := minf(wanted, amount)
 	amount -= got
 	if gone():
+		if kind == "wood":
+			battle._walls_dirty = true
 		_fall()
 	return got
 

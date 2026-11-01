@@ -40,13 +40,25 @@ var heal_until := 0.0
 var hospital: Building = null
 var battle: Battle
 var regiment: Regiment
-var world := Vector2.ZERO
+var world := Vector2.ZERO:
+	set(value):
+		world = value
+		if battle != null:
+			battle.combat_space.moved(self)
 var slot := Vector2.ZERO
 var facing := 0.0
 var hp := 100.0
 var max_hp := 100.0
 var speed := 57.0
-var state := State.IDLE
+var state := State.IDLE:
+	set(value):
+		var changed := (value == State.DEAD) != (state == State.DEAD)
+		state = value
+		if changed:
+			if regiment != null:
+				regiment.invalidate_living()
+			if battle != null:
+				battle.combat_space.state_changed(self)
 ## A peasant's work: "", "gather", "deliver", "build", "farm".
 var task := ""
 var task_target: Node2D = null
@@ -111,8 +123,12 @@ var stuck := false
 var slot_gap := 0.0
 var _stuck_clock := 0.0
 var _stuck_from := INF
-var _detour := Vector2.ZERO     # a step aside round what holds him
-var _detour_left := 0.0
+var _route_revision := -1
+var _route_wait := 0.0
+var _pass_clock := 0.0
+var _pass_bias := Vector2.ZERO
+var _neighbours: Array[Unit] = []
+var _melee_pose := 0.0
 
 
 func setup(battle_: Battle, side_: String, type_: String, at: Vector2, troop_ := "") -> void:
@@ -124,6 +140,7 @@ func setup(battle_: Battle, side_: String, type_: String, at: Vector2, troop_ :=
 	slot = at
 	facing = 0.0 if side == "france" else PI
 	_prefix = "fr" if side == "france" else "br"
+	_pass_clock = Battle.hash01(id, 47) * 0.1
 	var info := Rules.unit_type(type)
 	max_hp = float(info.get("hp", 100)) * stat("hp")
 	hp = max_hp
@@ -213,6 +230,8 @@ func pop() -> int:
 
 func move_to(at: Vector2) -> void:
 	slot = at
+	_route_revision = -1
+	_route_wait = 0.0
 	ordered = true
 	target = null
 
@@ -237,8 +256,9 @@ func step(delta: float) -> void:
 		elif world.distance_squared_to(was) > 0.0001:
 			drain = 4.5 if type == "cavalry" else 2.8
 		stamina = clampf(stamina - drain * delta, 0.0, 100.0)
-	position = Iso.to_screen(world)
-	present(delta)
+	if not battle._simulating:
+		position = Iso.to_screen(world)
+		present(delta)
 
 
 func wind() -> float:
@@ -264,14 +284,26 @@ func _grenade(delta: float) -> void:
 
 ## Walk towards `to`, by a bridge if the river lies between; true once there.
 func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
-	if to.distance_squared_to(_goal) > 1.0:
+	if battle._walls_dirty:
+		battle._build_walls()
+	_route_wait = maxf(0.0, _route_wait - delta)
+	var changed := to.distance_squared_to(_goal) > 24.0 * 24.0
+	if changed or _route_revision != battle.navigation.revision or _path.is_empty() and _route_wait <= 0.0:
 		_goal = to
-		_path = Nav.route(world, Nav.dry(world, to))
+		_path = battle.ground_route(world, to)
+		_route_revision = battle.navigation.revision
+		_route_wait = 0.4 if _path.is_empty() else 0.0
+	if _path.is_empty():
+		idle()
+		return world.distance_squared_to(to) < 9.0
+	# Follow small changes in a moving formation without planning its whole
+	# bridge/obstacle route again every frame.
+	if battle.navigation.walkable(to):
+		_path[-1] = to
+	while _path.size() > 1 and world.distance_squared_to(_path[0]) <= 9.0:
+		_path.pop_front()
 	var next: Vector2 = _path[0] if not _path.is_empty() else to
 	var way := next - world
-	if _detour_left > 0.0:
-		_detour_left -= delta
-		way = _detour * 24.0 + way.normalized() * 6.0
 	if way.length() <= 3.0:
 		if _path.size() > 1:
 			_path.pop_front()
@@ -283,14 +315,47 @@ func walk(to: Vector2, delta: float, pace := 1.0) -> bool:
 		pace *= injury() * wind()
 	if type == "cavalry" and not battle.trenches.list.is_empty() and battle.trenches.obstacle_at(world):
 		pace *= float(Rules.orders()["cavalryTrenchSpeed"])
-	world += way.limit_length(speed * pace * delta)
+	var walking := _pass(way, delta)
+	var before := world
+	world = battle.navigation.nudge(world, world + walking.limit_length(speed * pace * delta))
+	if world.distance_squared_to(before) < 0.0001 and way.length() > 6.0:
+		_route_revision = -1
 	facing = way.angle()
 	state = State.MOVE
 	if regiment != null and regiment.charging != null and (type == "cavalry" or troop == "mounted"):
 		_play("gallop")
+	elif regiment != null and regiment.charging != null:
+		_play("charge")
 	else:
 		_play("walk" if troop == "mounted" else MOVE_ANIM.get(type, "march"))
 	return false
+
+
+## Friendly traffic keeps right, beginning before bodies touch. The choice
+## persists briefly; no random left/right detours, and no steering away from
+## an enemy during a charge. A neighbour list is reused by each man.
+func _pass(way: Vector2, delta: float) -> Vector2:
+	if way.length_squared() < 18.0 * 18.0 or regiment != null and regiment.charging != null:
+		_pass_bias = Vector2.ZERO
+		return way
+	_pass_clock -= delta
+	if _pass_clock <= 0.0:
+		_pass_clock = 0.1
+		_pass_bias = Vector2.ZERO
+		var forward := way.normalized()
+		battle.combat_space.around(world, 36.0, _neighbours)
+		for other in _neighbours:
+			if other == self or other.side != side:
+				continue
+			if other.state == State.MOVE and forward.dot(Vector2.from_angle(other.facing)) > 0.65:
+				continue
+			var offset := other.world - world
+			var along := offset.dot(forward)
+			var gap := 10.0 + (3.0 if _horse() else 0.0) + (3.0 if other._horse() else 0.0)
+			if along > 0.0 and along < 34.0 and absf(offset.dot(forward.orthogonal())) < gap:
+				_pass_bias = forward.orthogonal() * 0.9
+				break
+	return (way.normalized() + _pass_bias).normalized() * way.length() if _pass_bias != Vector2.ZERO else way
 
 
 func _watch_stuck(delta: float) -> void:
@@ -303,10 +368,10 @@ func _watch_stuck(delta: float) -> void:
 	var was := stuck
 	stuck = d > 3.0 and d > _stuck_from - 3.0
 	_stuck_from = d
-	# Held fast: a step to one side, to come round the house or the crowd.
+	# Replan a blocked leg, rather than choosing a random side and bouncing
+	# against the same wall. Dynamic crowd passing is handled separately.
 	if stuck and not was and d > 12.0:
-		_detour = (slot - world).normalized().orthogonal() * (1.0 if Battle.hash01(id, int(battle.clock)) < 0.5 else -1.0)
-		_detour_left = 1.2
+		_route_revision = -1
 
 
 func idle() -> void:
@@ -316,6 +381,19 @@ func idle() -> void:
 
 func _step_in_regiment(delta: float) -> void:
 	var r := regiment
+	if r.charging != null:
+		var opponent: Unit = r._melee_targets.get(self)
+		if is_instance_valid(opponent) and opponent.alive() and world.distance_squared_to(opponent.world) < Regiment.MELEE_REACH * Regiment.MELEE_REACH:
+			# At contact, fight from here. Walking into the occupied target
+			# makes the crowd solver push the same pair apart every frame.
+			facing = (opponent.world - world).angle()
+			state = State.IDLE
+			_melee_pose -= delta
+			if _melee_pose <= 0.0:
+				_melee_pose = 0.7 + Battle.hash01(id, 51) * 0.25
+				_play("slash" if _horse() else "thrust", true)
+			return
+	_melee_pose = 0.0
 	if not walk(slot, delta, r.speed_factor() if not r.routing else 1.4):
 		return
 	if r.marching() and not r.routing:
@@ -437,6 +515,8 @@ func _step_worker(delta: float) -> void:
 
 
 func set_task(kind: String, on: Node2D) -> void:
+	_route_revision = -1
+	_route_wait = 0.0
 	task = kind
 	task_target = on
 	ordered = false
@@ -749,6 +829,8 @@ func _horse() -> bool:
 ## going, standing while he is not; the feet of a moving one are set by
 ## present, from the ground covered.
 func _show(restart := false) -> void:
+	if battle != null and battle.view3d != null:
+		return
 	var shown := anim_state
 	if state != State.DEAD:
 		if shown in GAITS and not _striding:
@@ -768,6 +850,17 @@ func _show(restart := false) -> void:
 		return
 	_anim = anim
 	_sprite.play(anim)
+
+
+## Hidden sprite animations need no engine updates while Blender models
+## render the battle. Switching back restores the actual current state.
+func presentation_3d(on: bool) -> void:
+	if on:
+		_sprite.pause()
+		for crew in _crew:
+			crew.pause()
+	else:
+		_show(true)
 
 
 ## Every frame, after he has moved: his smoothed speed, the step cycle, the
@@ -801,8 +894,9 @@ func present(delta: float) -> void:
 		if _dust_clock <= 0.0:
 			_dust_clock = 0.05 if _gait == "gallop" else 0.11
 			var wet := battle.weather.wetness if battle.weather != null else 0.0
-			battle.effects.dust(position + Vector2(0.0, 1.0), 1.0 - 0.8 * clampf(wet, 0.0, 1.0))
-			if battle.view3d != null:
+			if battle.view3d == null:
+				battle.effects.dust(position + Vector2(0.0, 1.0), 1.0 - 0.8 * clampf(wet, 0.0, 1.0))
+			else:
 				battle.view3d.fx.dust(world, 1.0 - 0.8 * clampf(wet, 0.0, 1.0))
 	var stride := STRIDE
 	if _horse():
@@ -819,6 +913,8 @@ func present(delta: float) -> void:
 	if absf(off) > SECTOR / 2.0 + 0.12 and _turn_wait <= 0.0:
 		_shown_dir = posmod(_shown_dir + (1 if off > 0.0 else -1), 8)
 		_turn_wait = 0.085 if _horse() else 0.06
+	if battle != null and battle.view3d != null:
+		return
 	_show()
 	if _striding and String(_sprite.animation).get_slice("_", 0) in GAITS:
 		var count := _sprite.sprite_frames.get_frame_count(_sprite.animation)
