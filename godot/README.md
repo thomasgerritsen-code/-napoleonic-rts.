@@ -57,6 +57,14 @@ blender -b --python scripts/export-godot-3d.py -- --only mine
 
 De bewerkbare modelbeschrijving staat in `scripts/godot_mine.py`.
 
+## Blender-modellen
+
+De 3D-gieterij, dorpskerk en herberg hebben eigen modellen. Speciale infanterie,
+kurassiers, lansiers, Scots Greys en bereden officieren dragen hun eigen
+uitrusting; gewone lijninfanterie heeft meerdere campagne-uiterlijken.
+De bestaande animaties en troepstatistieken blijven behouden. Herkomst,
+exportopdrachten en budgetten staan bij [de Blender-modellen](../docs/godot-blender-art-v3.md).
+
 ## Prestaties en beweging
 
 Grote veldslagen gebruiken gedeelde zoekvakken voor doelen en een gezamenlijke

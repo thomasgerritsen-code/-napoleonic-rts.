@@ -44,8 +44,9 @@ roles = _load("render_iso_roles", "render-iso-roles.py")
 cavalry = _load("render_iso_cavalry", "render-iso-cavalry.py")
 artillery = _load("render_iso_artillery", "render-iso-artillery.py")
 mine = _load("godot_mine", "godot_mine.py")
+architecture = _load("godot_architecture", "godot_architecture.py")
 
-STATIC = [*props.BUILDERS, "mine"]
+STATIC = [*props.BUILDERS, "mine", *architecture.BUILDERS]
 SIDES = {"fr": "france", "br": "britain"}
 LOOPING = {"idle", "march", "walk", "trot", "gallop", "roll", "haul", "work", "command", "rest", "dig", "ready", "load"}
 FPS = 10
@@ -55,6 +56,9 @@ def animated_names() -> list[str]:
     names = []
     for p in SIDES:
         names += [f"infantry_{p}", f"officer_{p}", f"drummer_{p}", f"worker_{p}", f"cavalry_{p}", f"gun_{p}", f"gunner_{p}"]
+        names += [f"infantry{v}_{p}" for v in (2, 3, 4, 5, 6)]
+        names += [f"mounted_{p}"]
+    names += ["infantry7_fr", "cuirassier_fr", "lancer_fr", "greys_br"]
     return names
 
 
@@ -195,17 +199,33 @@ def build_animated(name: str) -> None:
     kind, p = name.rsplit("_", 1)
     side = SIDES[p]
     fresh()
-    if kind == "infantry":
-        rig = infantry.build_soldier(side, 1)
+    # Animated native models end in plain coloured materials anyway. Build
+    # that palette directly (also works with Blender4's Noise/Fac socket).
+    def native_material(color, rough=0.8, metal=0.0, **_kwargs):
+        key = f"{color}-native-{rough}-{metal}"
+        mat = bpy.data.materials.get(key) or bpy.data.materials.new(key)
+        mat.use_nodes = True
+        bsdf = mat.node_tree.nodes["Principled BSDF"]
+        bsdf.inputs["Base Color"].default_value = common.linear(color)
+        bsdf.inputs["Roughness"].default_value = rough
+        bsdf.inputs["Metallic"].default_value = metal
+        return mat
+    for module in (infantry, roles, cavalry, artillery, roles.infantry, cavalry.infantry, artillery.infantry):
+        module.material = native_material
+    if kind.startswith("infantry"):
+        variant = int(kind[8:]) if kind[8:] else 1
+        rig = infantry.build_soldier(side, variant)
         rig["root"].rotation_euler = Euler((0, 0, 0))
         animate(infantry.STATES, lambda s, f, n: infantry.pose(rig, s, f, n, 0))
     elif kind in ("officer", "drummer", "worker"):
         rig = roles.build_role(side, kind)
         rig["root"].rotation_euler = Euler((0, 0, 0))
         animate(roles.ROLE_STATES.get(kind, roles.STATES), lambda s, f, n: roles.pose_role(rig, kind, s, f, n))
-    elif kind == "cavalry":
-        horse = cavalry.build_horse(side, 1)
-        rider = cavalry.build_rider(side, horse)
+    elif kind in ("cavalry", "mounted", "cuirassier", "lancer", "greys"):
+        role = "officer" if kind == "mounted" else "trooper"
+        breed = kind if kind in ("cuirassier", "lancer", "greys") else "light"
+        horse = cavalry.build_horse(side, 1, role=role, kind=breed)
+        rider = cavalry.build_rider(side, horse, role=role, kind=breed)
         horse["root"].rotation_euler = Euler((0, 0, 0))
         animate(cavalry.STATES, lambda s, f, n: cavalry.pose(horse, rider, s, f, n, 0))
     elif kind == "gun":
@@ -222,10 +242,11 @@ def build_animated(name: str) -> None:
 def build_static(name: str) -> None:
     fresh()
     root = common.empty("root")
-    (mine.build_mine if name == "mine" else props.BUILDERS[name])(root)
+    builder = mine.build_mine if name == "mine" else architecture.BUILDERS.get(name, props.BUILDERS.get(name))
+    builder(root)
     bpy.context.view_layer.update()
     obj = one_mesh(name)
-    big = name.startswith(("barracks", "farmhouse", "tower", "hospital", "barn", "bridge", "lumbercamp", "field"))
+    big = name.startswith(("barracks", "farmhouse", "tower", "hospital", "barn", "bridge", "lumbercamp", "field", "foundry", "chapel", "inn"))
     bake(obj, 1024 if big else 512)
 
 
@@ -240,8 +261,10 @@ def main(argv: list[str]) -> int:
     if len(names) > 1:
         # One process each: the builders keep materials from model to model.
         failed = []
+        command = ([bpy.app.binary_path, "-b", "-t", "2", "--python", __file__, "--"]
+                   if "--" in sys.argv else [sys.executable, __file__])
         for name in names:
-            if subprocess.run([sys.executable, __file__, "--out", str(out), "--only", name]).returncode != 0:
+            if subprocess.run([*command, "--out", str(out), "--only", name]).returncode != 0:
                 failed.append(name)
         print("failed:", failed)
         return 1 if failed else 0

@@ -18,11 +18,11 @@ extends Node3D
 const MODELS := "res://assets3d/%s.glb"
 ## Building types to models (the side's own where there is one).
 const BUILDINGS := {"towncenter": ["farmhouse", 1.45], "house": ["cottage", 1.0], "barracks": ["barracks_%s", 1.0],
-	"stable": ["barn", 1.0], "foundry": ["barracks_%s", 0.85], "tower": ["tower_%s", 1.0], "hospital": ["hospital_%s", 1.0],
+	"stable": ["barn", 1.0], "foundry": ["foundry_%s", 1.0], "tower": ["tower_%s", 1.0], "hospital": ["hospital_%s", 1.0],
 	"lumbercamp": ["lumbercamp_%s", 1.0], "mine": ["mine", 1.0], "farm": ["field_ripe", 1.0]}
 ## Village houses to models.
 const HOUSES := {"cottage": "cottage", "cottage2": "cottage", "farmhouse": "farmhouse", "farmhouse2": "farmhouse",
-	"chapel": "farmhouse", "inn": "farmhouse", "barn": "barn"}
+	"chapel": "chapel", "inn": "inn", "barn": "barn"}
 ## Animations that go with the ground covered (their length is a stride).
 const STRIDES := {"march": 1.5, "walk": 2.4, "trot": 2.8, "gallop": 3.6, "roll": 1.2, "charge": 1.5, "rout": 1.6}
 const RING := Color(1.0, 0.85, 0.35)
@@ -417,14 +417,20 @@ func _model_for(u: Unit) -> String:
 	var p := "fr" if u.side == "france" else "br"
 	match u.type:
 		"infantry":
-			return "infantry_" + p
+			var variant: String = {"grenadier": "4", "voltigeur": "5", "guard": "6", "rifle": "6", "sapper": "7"}.get(u.troop,
+				["", "2", "3"][int(Battle.hash01(u.id, 13) * 3)])
+			if variant == "7" and p != "fr":
+				variant = ""
+			return "infantry" + variant + "_" + p
 		"officer":
-			return ("cavalry_" if u.troop == "mounted" else "officer_") + p
+			return ("mounted_" if u.troop == "mounted" else "officer_") + p
 		"drummer":
 			return "drummer_" + p
 		"worker":
 			return "worker_" + p
 		"cavalry":
+			if u.troop in ["cuirassier", "lancer", "greys"]:
+				return u.troop + "_" + p
 			return "cavalry_" + p
 		"artillery":
 			return "gun_" + p
@@ -511,7 +517,7 @@ func _animate(u: Unit, m: Dictionary) -> void:
 ## building to its footprint, so sizes follow the game, not the model).
 func _building_look(b: Building) -> Array:
 	var sprite: Sprite2D = b.get("_sprite")
-	if sprite != null and sprite.texture != null and sprite.texture.resource_path.begins_with("res://assets/props/"):
+	if b.type != "foundry" and sprite != null and sprite.texture != null and sprite.texture.resource_path.begins_with("res://assets/props/"):
 		var name_ := sprite.texture.resource_path.get_file().get_basename()
 		if _scene(name_) != null:
 			return [name_, sprite.scale.x / Iso.SPRITE_SCALE]

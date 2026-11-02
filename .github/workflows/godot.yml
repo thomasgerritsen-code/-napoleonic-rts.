@@ -71,6 +71,13 @@ jobs:
           grep -q "GODOT_NAV" native-navigation.log
           grep -q "GODOT_BENCH" native-benchmark.log
 
+      - name: Original Blender art regression
+        run: |
+          set -o pipefail
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/native_art_test.gd 2>&1 | tee native-art.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-art.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_ART" native-art.log
+
       - name: Full-detail 3D animation regression
         run: |
           set -o pipefail
@@ -91,6 +98,8 @@ jobs:
             "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --resolution 1600x900 --script res://tests/proof_shots.gd 2>&1 | tail -10
           SHOT_DIR="$PWD/shots" timeout 180 xvfb-run -a -s "-screen 0 1600x900x24" \
             "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1600x900 --script res://tests/mine_shots.gd 2>&1 | tail -10
+          SHOT_DIR="$PWD/shots" timeout 180 xvfb-run -a -s "-screen 0 1600x900x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1600x900 --script res://tests/art_gallery.gd 2>&1 | tail -10
           ls -la shots
 
       - name: Publish the screenshots
