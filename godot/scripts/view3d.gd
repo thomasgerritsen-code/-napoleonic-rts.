@@ -59,6 +59,7 @@ var field: Field3D
 var fx: Smoke3D
 var atmosphere: Atmosphere3D
 var construction: Construction3D
+var bridges: Bridges3D
 
 
 func _ready() -> void:
@@ -104,6 +105,9 @@ func _ready() -> void:
 	_box.visible = false
 	layer.add_child(_box)
 	_scenery_from_sprites()
+	bridges = Bridges3D.new()
+	bridges.view = self
+	add_child(bridges)
 	var home := battle.town_centre(battle.me)
 	_target = at(home.world + Vector2(260, 60) if home != null else Iso.WORLD / 2.0)
 	_place_camera()
@@ -124,6 +128,10 @@ static func at(world: Vector2) -> Vector3:
 
 static func flat(p: Vector3) -> Vector2:
 	return Vector2(p.x * Iso.PPM, p.z * Iso.PPM)
+
+
+func surface_at(world: Vector2) -> Vector3:
+	return bridges.surface_at(world) if bridges != null else at(world)
 
 
 ## The turn of a model (made facing +y in Blender, -z here) to a heading in
@@ -237,8 +245,10 @@ func _scenery_from_sprites() -> void:
 			size = sprite.scale.x / Iso.SPRITE_SCALE
 		else:
 			continue
+		# Root-level 2D bridge sprites are hidden by F3. Static bridge models
+		# come from the map directly in Bridges3D, never their visibility flags.
 		if name_.begins_with("bridge"):
-			yaw = 0.0
+			continue
 		if not places.has(name_):
 			places[name_] = []
 		var world := Iso.to_world(sprite.position)
@@ -411,7 +421,7 @@ func _sync_units(delta: float) -> void:
 		if not seen:
 			_sleep_man(m)
 			continue
-		node.position = at(u.world) - Vector3.UP * field.sink(u)
+		node.position = surface_at(u.world) - Vector3.UP * field.sink(u)
 		node.rotation.y = lerp_angle(node.rotation.y, turn(u.facing), minf(1.0, delta * 10.0))
 		var ring: MeshInstance3D = m["ring"]
 		ring.visible = u.selected
@@ -669,7 +679,7 @@ func _sync_labels() -> void:
 func _flash(u: Unit) -> void:
 	var flash := _flash_pool[_flash_next]
 	_flash_next = (_flash_next + 1) % _flash_pool.size()
-	flash.position = at(u.world) + Vector3.UP * 1.4
+	flash.position = surface_at(u.world) + Vector3.UP * 1.4
 	flash.light_energy = 2.5 if u.type == "artillery" else 1.2
 	flash.visible = true
 	flash.set_meta("life", 0.12)
@@ -699,7 +709,7 @@ func ground_at(screen: Vector2) -> Vector2:
 			break
 		var t := (y - from.y) / way.y
 		hit = from + way * t
-		y = Iso.height_px(flat(hit)) / Iso.PPM
+		y = surface_at(flat(hit)).y
 	var world := flat(hit)
 	return Vector2(clampf(world.x, 0.0, Iso.WORLD.x), clampf(world.y, 0.0, Iso.WORLD.y))
 
@@ -773,7 +783,7 @@ func _man_at(screen: Vector2) -> Unit:
 	for u in battle.units:
 		if not u.alive() or u.side != battle.me:
 			continue
-		var p := at(u.world) + Vector3.UP * 0.9
+		var p := surface_at(u.world) + Vector3.UP * 0.9
 		if camera.is_position_behind(p):
 			continue
 		var d := camera.unproject_position(p).distance_to(screen)
@@ -807,7 +817,7 @@ func _select(from: Vector2, to: Vector2, add: bool) -> void:
 	for u in battle.units:
 		if not u.alive() or u.side != battle.me:
 			continue
-		var p := at(u.world) + Vector3.UP * 0.9
+		var p := surface_at(u.world) + Vector3.UP * 0.9
 		if not camera.is_position_behind(p) and box.has_point(camera.unproject_position(p)):
 			picked.append(u)
 			if u.military():

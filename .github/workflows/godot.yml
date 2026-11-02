@@ -94,6 +94,15 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-world.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_WORLD" native-world.log
 
+      - name: All five 3D bridges and F3 regression
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 600 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/bridge_regression.gd 2>&1 | tee native-bridges.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-bridges.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_BRIDGES" native-bridges.log
+
       - name: Visible 3D weather and seasonal render regression
         run: |
           set -o pipefail

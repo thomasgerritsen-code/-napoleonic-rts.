@@ -38,6 +38,20 @@ Steigermateriaal en gebouwen respecteren de bestaande mist van de oorlog.
 Kosten, werkers, bouwtijd, dekking en obstakels blijven door de simulatie bepaald.
 Deze weergave is ook bruikbaar na laden of na een online snapshot.
 
+## Bruggen
+
+De vijf kaartbruggen hebben twee vaste 3D-batches (hout en steen), rechtstreeks
+uit de oversteekgegevens. Ze hangen niet af van de zichtbaarheid van hun oude
+2D-plaatjes: F3 verbergt die plaatjes met opzet. Lengte, breedte en hoek volgen
+de kaart; de brugbasis volgt het hoogteverschil tussen de oevers. Soldaten,
+ruiters, schoten en selectie gebruiken de hoogte van het brugdek en de hellingen.
+De terreinmesh, rivier en bestaande routes veranderen hierdoor niet.
+
+`tests/bridge_regression.gd` controleert met een echte renderer alle vijf
+bruggen, daadwerkelijke brugpixels boven het water, actorhoogte, klikken op
+het dek en twee volledige F3-rondgangen. Deze verplichte controle reproduceerde
+vóór de reparatie de verdwenen 3D-bruggen. Ook brugbeelden worden gepubliceerd.
+
 ## Grenzen en prestaties
 
 De wereld voegt vier vaste batches toe: water, regen, sneeuw en sporen. Droge
