@@ -11,6 +11,8 @@ signal fired(unit: Unit, target: Node2D)
 enum State { IDLE, MOVE, AIM, FIRE, RELOAD, WORK, DEAD }
 
 const AIM_TIME := Vector2(0.6, 1.6)
+const TRENCH_SETTLE := 6.0
+const REST_BREATH_SECONDS := 3.2
 const LOOK_AROUND := 0.5     # seconds between looks for a target
 const SETS := {"infantry": ["%s_iso_infantry", "%s_iso_fallen"], "worker": ["%sw_iso_worker"],
 	"officer": ["%so_iso_officer"], "drummer": ["%sd_iso_drummer"],
@@ -365,6 +367,10 @@ func _watch_stuck(delta: float) -> void:
 		return
 	_stuck_clock = 0.0
 	var d := world.distance_to(slot)
+	if _settled_trench_slot():
+		stuck = false
+		_stuck_from = d
+		return
 	var was := stuck
 	stuck = d > 3.0 and d > _stuck_from - 3.0
 	_stuck_from = d
@@ -377,6 +383,13 @@ func _watch_stuck(delta: float) -> void:
 func idle() -> void:
 	state = State.IDLE
 	_play("idle")
+
+
+func _settled_trench_slot() -> bool:
+	var r := regiment
+	return r != null and not r.routing and r.charging == null and not r.marching() and r.trench != null \
+		and world.distance_squared_to(slot) < TRENCH_SETTLE*TRENCH_SETTLE \
+		and battle.trenches._inside(r.trench,world,0.0)
 
 
 func _step_in_regiment(delta: float) -> void:
@@ -394,7 +407,10 @@ func _step_in_regiment(delta: float) -> void:
 				_play("slash" if _horse() else "thrust", true)
 			return
 	_melee_pose = 0.0
-	if not walk(slot, delta, r.speed_factor() if not r.routing else 1.4):
+	# The fire-step already considers men within 6px settled. Pulling them
+	# back to the ordinary 3px walking threshold fights crowd separation and
+	# repeatedly switches the front rank between walking and resting.
+	if not _settled_trench_slot() and not walk(slot, delta, r.speed_factor() if not r.routing else 1.4):
 		return
 	if r.marching() and not r.routing:
 		# In his place in the marching body: in step with it, the way it goes.
@@ -849,6 +865,12 @@ func _show(restart := false) -> void:
 	if anim == _anim and not restart:
 		return
 	_anim = anim
+	if shown == "rest":
+		var frames := _sprite.sprite_frames.get_frame_count(anim)
+		var fps := _sprite.sprite_frames.get_animation_speed(anim)
+		_sprite.speed_scale = float(frames)/maxf(0.001,fps)/REST_BREATH_SECONDS
+	else:
+		_sprite.speed_scale = 1.0
 	_sprite.play(anim)
 
 

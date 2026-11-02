@@ -228,8 +228,10 @@ func _tri(st: SurfaceTool, points: Array, colour: Color) -> void:
 
 
 func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, ca: Color, cc: Color) -> void:
-	_tri(st, [a, b, c], ca)
-	_tri(st, [a, c, d], ca.lerp(cc, 0.5))
+	# These trench quads run along the trench, then across it. Godot uses
+	# clockwise front faces; the old order faced down into the terrain.
+	_tri(st, [a, c, b], ca)
+	_tri(st, [a, d, c], ca.lerp(cc, 0.5))
 
 
 ## A point of the trench's frame (u along, v out, px) `up` metres above the ground.

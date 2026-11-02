@@ -479,7 +479,7 @@ func _dress_men() -> void:
 		var p: float = minf(1.0, t["progress"])
 		var digging := u.type == "infantry" and (p < 1.0 or int(t.get("upgrade_to", 0)) != 0) and battle.clock - float(t.get("dug_at", -99.0)) < 2.0
 		var lean := not digging and p >= 1.0 and u.type == "infantry" and not u.regiment.routing \
-			and u.world.distance_to(u.slot) < 6.0 and v > float(front[tid]) - 8.0
+			and u.world.distance_to(u.slot) < Unit.TRENCH_SETTLE and v > float(front[tid]) - 8.0
 		var offset := Vector2.ZERO
 		var sink := TrenchArt.SINK * p
 		if lean:

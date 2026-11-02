@@ -78,6 +78,15 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-art.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_ART" native-art.log
 
+      - name: Recruitment spacing and stationary trench regression
+        run: |
+          set -o pipefail
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/recruitment_test.gd 2>&1 | tee native-recruits.log
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/trench_stationary_test.gd 2>&1 | tee native-trench-still.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-recruits.log native-trench-still.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_RECRUITS" native-recruits.log
+          grep -q "GODOT_TRENCH_STILL" native-trench-still.log
+
       - name: Full-detail 3D animation regression
         run: |
           set -o pipefail
@@ -142,6 +151,10 @@ jobs:
           SHOT_DIR="$PWD/shots" timeout 180 xvfb-run -a -s "-screen 0 1600x900x24" \
             "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1600x900 --script res://tests/art_gallery.gd 2>&1 | tail -10
           ls -la shots
+          SHOT_DIR="$PWD/shots" timeout 240 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/recruitment_test.gd 2>&1 | tail -12
+          SHOT_DIR="$PWD/shots" timeout 180 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/trench_stationary_test.gd 2>&1 | tail -12
 
       - name: Publish the screenshots
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}

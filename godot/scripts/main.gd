@@ -898,8 +898,13 @@ func spawn_trained(b: Building, type: String) -> void:
 	stats[b.side]["trained"] += 1
 	var out := b.world + Vector2((1.0 if b.side == "france" else -1.0) * b.size.x * 0.75, b.size.y * 0.55)
 	var u := add_unit(b.side, Rules.item_type(type), out + Vector2(randf_range(-14, 14), randf_range(-10, 10)), Rules.item_troop(type))
-	u.slot = u.world + Vector2((1.0 if b.side == "france" else -1.0) * 40.0, randf_range(-20, 20))
-	if b.rally != null:
+	if u.military() and commanded(b.side):
+		u.slot = RecruitAssembly.point(self,u,muster_point(b))
+		if b.rally != null:
+			u.move_to(u.slot)
+	elif u.type == "worker":
+		u.slot = u.world + Vector2((1.0 if b.side == "france" else -1.0) * 40.0, randf_range(-20, 20))
+	if b.rally != null and u.type == "worker":
 		# To the rally point; a peasant sent to a resource goes to work there.
 		var to: Vector2 = b.rally
 		var supply := _supply_at(to)

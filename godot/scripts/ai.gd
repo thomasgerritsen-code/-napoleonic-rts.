@@ -60,7 +60,7 @@ func on_trained(u: Unit) -> void:
 		_put_to_work(u)
 	else:
 		# Soldiers muster before the town centre.
-		u.move_to(_muster() + Vector2(randf_range(-60, 60), randf_range(-40, 40)))
+		u.move_to(RecruitAssembly.point(battle,u,_muster()))
 
 
 func _mine() -> Array[Unit]:

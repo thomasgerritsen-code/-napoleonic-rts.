@@ -550,6 +550,10 @@ func _animate(u: Unit, m: Dictionary) -> void:
 		var a := player.get_animation(want)
 		var speed: float = u.get("_ground_speed")
 		player.speed_scale = clampf(speed * a.length / float(STRIDES[want]), 0.0, 4.0)
+	elif want == "rest":
+		# The source has only two authored breathing frames. Play a calm breath,
+		# keeping recoil, reload clocks and all moving animations unchanged.
+		player.speed_scale = player.get_animation(want).length/Unit.REST_BREATH_SECONDS
 	else:
 		player.speed_scale = 1.0
 

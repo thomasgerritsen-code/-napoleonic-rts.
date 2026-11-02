@@ -79,6 +79,11 @@ Budgetten, beperkingen en controles staan bij [de 3D-wereld](../docs/godot-world
 
 ## Prestaties en beweging
 
+Nieuwe militairen verzamelen zich op afzonderlijke vrije plekken bij de kazerne
+of verzamelvlag. Een opgestelde loopgraafrij blijft rustig staan; rust ademt
+langzaam, terwijl schieten en nieuwe marsorders direct blijven reageren.
+Zie [verzamelplaatsen en loopgraven](../docs/godot-recruits-and-trenches.md).
+
 Grote veldslagen gebruiken gedeelde zoekvakken voor doelen en een gezamenlijke
 routeplanner rond gebouwen en boomstammen. Bevriende troepen houden rechts bij
 het passeren; de bestaande brugroutes blijven behouden. Bij een charge blijven
