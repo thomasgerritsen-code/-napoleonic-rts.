@@ -7,39 +7,7 @@ extends Node3D
 const RAIN_MAX := 1536
 const SNOW_MAX := 768
 const PRINT_MAX := 2048
-const WATER := """shader_type spatial;
-render_mode cull_disabled;
-uniform float now;
-uniform float snow;
-uniform float cloud;
-uniform float fog_on = 1.0;
-uniform sampler2D fog_tex : filter_linear;
-uniform vec2 map_m;
-uniform vec2 bridge0; uniform vec2 bridge1; uniform vec2 bridge2; uniform vec2 bridge3; uniform vec2 bridge4;
-varying vec3 world;
-void vertex() { world = (MODEL_MATRIX * vec4(VERTEX,1.0)).xyz; }
-void fragment() {
- float speed = mix(0.9,0.35,snow);
- float a = sin(world.z * 7.0 - now * speed * 3.0 + sin(world.x * 4.0));
- float b = sin(world.x * 10.0 + world.z * 3.0 - now * speed * 2.0);
- float edge = 1.0-smoothstep(0.0,0.16,min(UV.x,1.0-UV.x));
- float whirl = 0.0;
- vec2 points[5] = vec2[5](bridge0,bridge1,bridge2,bridge3,bridge4);
- for (int i=0;i<5;i++) {
-  float r=distance(world.xz,points[i]);
-  whirl += (1.0-smoothstep(0.3,3.5,r)) * (0.5+0.5*sin(r*10.0-now*2.5));
- }
- vec3 normal_world=normalize(vec3(a*0.08,1.0,b*0.06));
- NORMAL=normalize(mat3(VIEW_MATRIX)*normal_world);
- vec3 blue=mix(vec3(0.055,0.19,0.22),vec3(0.12,0.29,0.32),a*0.5+0.5);
- blue=mix(blue,vec3(0.45,0.59,0.62),edge*snow*0.85);
- blue+=vec3(0.1,0.12,0.12)*clamp(whirl*0.2+edge*0.16,0.0,0.25);
- float fog=texture(fog_tex,clamp(world.xz/map_m,vec2(0.0),vec2(1.0))).a*fog_on;
- ALBEDO=blue*(1.0-fog*0.9);
- ROUGHNESS=0.23+cloud*0.17+snow*0.15;
- SPECULAR=0.65;
-}
-"""
+const WATER := RiverSurface3D.SHADER
 const PRECIPITATION := """shader_type spatial;
 render_mode unshaded,blend_mix,depth_draw_never,cull_disabled,shadows_disabled;
 uniform float now; uniform float opacity; uniform float flake;
@@ -135,36 +103,7 @@ func _shader(code: String) -> ShaderMaterial:
 
 
 func _river() -> MeshInstance3D:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var points: PackedVector2Array = Nav._points
-	var length := 0.0
-	for i in points.size():
-		if i > 0:
-			length += points[i].distance_to(points[i - 1]) / Iso.PPM
-		var direction := (points[mini(i + 1, points.size() - 1)] - points[maxi(i - 1, 0)]).normalized()
-		var across := direction.orthogonal() * Nav._width * 0.47
-		for side in 2:
-			var world := points[i] + across * (-1.0 if side == 0 else 1.0)
-			st.set_uv(Vector2(side, length))
-			st.add_vertex(View3D.at(world) + Vector3.UP * 0.045)
-	for i in points.size() - 1:
-		var a := i * 2
-		for index in [a, a + 2, a + 1, a + 1, a + 2, a + 3]:
-			st.add_index(index)
-	st.generate_normals()
-	var node := MeshInstance3D.new()
-	node.mesh = st.commit()
-	var mat := _shader(WATER)
-	for i in 5:
-		var p := Vector2(-10000, -10000)
-		if i < Nav.bridges().size():
-			p = Vector2(Nav.bridges()[i]["centre"]) / Iso.PPM
-		mat.set_shader_parameter("bridge%d" % i, p)
-	node.material_override = mat
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return node
-
+	return RiverSurface3D.build(battle)
 
 func _batch(count: int, mat: ShaderMaterial, horizontal := false) -> MultiMeshInstance3D:
 	var quad := QuadMesh.new()

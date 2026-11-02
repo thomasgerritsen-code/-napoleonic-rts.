@@ -42,6 +42,11 @@ void vertex() {
 	world_normal = normalize(MODEL_NORMAL_MATRIX * NORMAL + vec3(0.0,0.00001,0.0));
 }
 float grain(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+float silt_grain(vec2 p) {
+	vec2 cell=floor(p), f=fract(p);
+	f=f*f*(3.0-2.0*f);
+	return mix(mix(grain(cell),grain(cell+vec2(1,0)),f.x),mix(grain(cell+vec2(0,1)),grain(cell+vec2(1,1)),f.x),f.y);
+}
 void fragment() {
 	if (build_progress < 0.9999 && wpos.y > build_base + max(0.18, build_height * build_progress)) { discard; }
 	vec4 c = texture(albedo_tex, UV) * tint;
@@ -64,8 +69,17 @@ void fragment() {
 		c.rgb = mix(c.rgb, c.rgb * vec3(1.14,0.93,0.73), autumn * leaf * 0.3);
 	}
 	float water = surface_kind == 1 ? step(c.r * 1.15,c.b) * step(c.g * 0.96,c.b) : 0.0;
+	float bank_tint = surface_kind == 1 ? smoothstep(0.92,1.3,c.b/max(0.001,c.r))
+		*smoothstep(0.6,0.92,c.b/max(0.001,c.g))*smoothstep(1.0,1.35,c.g/max(0.001,c.r)) : 0.0;
 	float settled = snow * smoothstep(0.25,0.8,world_normal.y) * (1.0 - water);
 	float detail = dot(c.rgb,vec3(0.3,0.59,0.11));
+	// The ground atlas contains the old cyan river and shore. The opaque
+	// water ribbon covers its centre; turn the exposed fringe into wet silt.
+	// Only ground water-coloured texels participate, not roofs or foliage.
+	if (bank_tint > 0.001 || water > 0.001) {
+		vec3 silt=mix(vec3(0.22,0.235,0.14),vec3(0.36,0.31,0.20),silt_grain(wpos.xz*1.8));
+		c.rgb=mix(c.rgb,silt*(0.75+detail*0.6),max(water,bank_tint)*0.92);
+	}
 	// Snow reflectance follows the calibrated daylight budget. Preserve
 	// cool white snow and terrain detail without the old blown highlights.
 	c.rgb = mix(c.rgb, vec3(0.72,0.80,0.88) * (0.8 + detail * 0.22), settled);
