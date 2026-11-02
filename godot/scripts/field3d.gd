@@ -31,6 +31,13 @@ uniform vec3 forge_origin = vec3(0.0);
 uniform float forge_radius = 0.0;
 uniform float night = 0.0;
 uniform float window_light_on = 1.0;
+uniform float bank_on = 0.0;
+uniform sampler2D bank_profile : filter_linear, repeat_disable;
+uniform vec2 bank_lookup;
+uniform float bank_rim;
+uniform vec4 bank_grass_rect;
+uniform vec4 bank_bridge0; uniform vec4 bank_bridge1; uniform vec4 bank_bridge2; uniform vec4 bank_bridge3; uniform vec4 bank_bridge4;
+uniform vec4 bank_bridge_widths; uniform float bank_bridge_width4;
 varying vec3 wpos;
 varying vec3 world_normal;
 void vertex() {
@@ -47,9 +54,45 @@ float silt_grain(vec2 p) {
 	f=f*f*(3.0-2.0*f);
 	return mix(mix(grain(cell),grain(cell+vec2(1,0)),f.x),mix(grain(cell+vec2(0,1)),grain(cell+vec2(1,1)),f.x),f.y);
 }
+vec3 bank_grass(vec2 world) {
+	vec2 p=world*0.16;
+	vec2 weights=sin(fract(p)*3.14159265); weights*=weights;
+	// Crossfade half-tile offsets so patch edges never form visible seams.
+	vec3 a=texture(albedo_tex,bank_grass_rect.xy+fract(p)*bank_grass_rect.zw).rgb;
+	vec3 b=texture(albedo_tex,bank_grass_rect.xy+fract(p+vec2(0.5,0))*bank_grass_rect.zw).rgb;
+	vec3 c=texture(albedo_tex,bank_grass_rect.xy+fract(p+vec2(0,0.5))*bank_grass_rect.zw).rgb;
+	vec3 d=texture(albedo_tex,bank_grass_rect.xy+fract(p+vec2(0.5))*bank_grass_rect.zw).rgb;
+	return mix(mix(d,c,weights.x),mix(b,a,weights.x),weights.y)*tint.rgb;
+}
 void fragment() {
 	if (build_progress < 0.9999 && wpos.y > build_base + max(0.18, build_height * build_progress)) { discard; }
 	vec4 c = texture(albedo_tex, UV) * tint;
+	float river_water = 0.0;
+	float bank_wet = 0.0;
+	if (surface_kind == 1 && bank_on > 0.5) {
+		vec4 profile=texture(bank_profile,vec2(clamp(wpos.z/map_m.y,0.0,1.0)*bank_lookup.x+bank_lookup.y,0.5));
+		float dx=wpos.x-profile.x;
+		float width=dx<0.0 ? profile.z : profile.w;
+		float edge=abs(dx)-width;
+		river_water=1.0-step(0.0,edge);
+		float irregular=(silt_grain(wpos.xz*1.3)-0.5)*0.3;
+		float blend=1.0-smoothstep(2.2,4.5,edge+irregular);
+		if (blend>0.001) {
+			vec3 grass=bank_grass(wpos.xz);
+			vec3 silt=mix(vec3(0.17,0.15,0.095),vec3(0.26,0.235,0.145),silt_grain(wpos.xz*1.8));
+			vec3 bank=mix(silt,grass,smoothstep(0.02,0.65,edge+irregular));
+			vec4 bridges[5]=vec4[5](bank_bridge0,bank_bridge1,bank_bridge2,bank_bridge3,bank_bridge4);
+			float widths[5]=float[5](bank_bridge_widths.x,bank_bridge_widths.y,bank_bridge_widths.z,bank_bridge_widths.w,bank_bridge_width4);
+			float road=0.0;
+			for (int i=0;i<5;i++) {
+				float d=abs(dot(wpos.xz-bridges[i].xy,bridges[i].zw));
+				road=max(road,1.0-smoothstep(widths[i]-0.1,widths[i]+0.7,d));
+			}
+			blend*=1.0-road*smoothstep(0.1,0.8,edge);
+			c.rgb=mix(c.rgb,bank,blend);
+			bank_wet=blend*(1.0-smoothstep(0.0,0.65,edge));
+		}
+	}
 	float glass = step(c.r*1.6,c.g)*step(c.r*1.3,c.b)*step(c.b,c.g*1.6);
 	glass *= (1.0-step(0.18,max(c.r,max(c.g,c.b))))*(1.0-step(0.35,abs(world_normal.y)));
 	if (surface_kind != 0) { glass=0.0; }
@@ -68,18 +111,9 @@ void fragment() {
 		c.rgb = mix(c.rgb, c.rgb * vec3(1.07,1.02,0.9), summer * 0.35);
 		c.rgb = mix(c.rgb, c.rgb * vec3(1.14,0.93,0.73), autumn * leaf * 0.3);
 	}
-	float water = surface_kind == 1 ? step(c.r * 1.15,c.b) * step(c.g * 0.96,c.b) : 0.0;
-	float bank_tint = surface_kind == 1 ? smoothstep(0.92,1.3,c.b/max(0.001,c.r))
-		*smoothstep(0.6,0.92,c.b/max(0.001,c.g))*smoothstep(1.0,1.35,c.g/max(0.001,c.r)) : 0.0;
+	float water = bank_on > 0.5 ? river_water : (surface_kind == 1 ? step(c.r * 1.15,c.b) * step(c.g * 0.96,c.b) : 0.0);
 	float settled = snow * smoothstep(0.25,0.8,world_normal.y) * (1.0 - water);
 	float detail = dot(c.rgb,vec3(0.3,0.59,0.11));
-	// The ground atlas contains the old cyan river and shore. The opaque
-	// water ribbon covers its centre; turn the exposed fringe into wet silt.
-	// Only ground water-coloured texels participate, not roofs or foliage.
-	if (bank_tint > 0.001 || water > 0.001) {
-		vec3 silt=mix(vec3(0.22,0.235,0.14),vec3(0.36,0.31,0.20),silt_grain(wpos.xz*1.8));
-		c.rgb=mix(c.rgb,silt*(0.75+detail*0.6),max(water,bank_tint)*0.92);
-	}
 	// Snow reflectance follows the calibrated daylight budget. Preserve
 	// cool white snow and terrain detail without the old blown highlights.
 	c.rgb = mix(c.rgb, vec3(0.72,0.80,0.88) * (0.8 + detail * 0.22), settled);
@@ -87,6 +121,7 @@ void fragment() {
 	float dark = texture(fog_tex, clamp(wpos.xz / map_m, vec2(0.0), vec2(1.0))).a * fog_on;
 	ALBEDO = c.rgb * (1.0 - dark * 0.9);
 	ROUGHNESS = mix(0.92, surface_kind == 1 ? 0.38 : 0.5, wetness * (1.0 - settled));
+	ROUGHNESS=mix(ROUGHNESS,0.7,bank_wet*(1.0-settled));
 	float coal = (1.0-smoothstep(forge_radius*0.45,max(0.0001,forge_radius),distance(wpos,forge_origin))) * step(0.7,world_normal.y);
 	EMISSION = vec3(0.8,0.19,0.025) * coal * forge_on * (1.0 - dark);
 	EMISSION += vec3(0.65,0.28,0.07) * glass * night * window_light_on * (1.0-dark);
@@ -98,6 +133,7 @@ const BED := Color(0.2, 0.15, 0.1)
 
 var battle: Battle
 var view: View3D
+var banks: RiverBanks3D
 var _fog_shader: Shader
 var _fog_materials: Array[WeakRef] = []
 var _climate_clock := 0.0
@@ -112,6 +148,7 @@ var _clock := 0.0
 
 
 func _ready() -> void:
+	banks = RiverBanks3D.new()
 	_fog_shader = Shader.new()
 	_fog_shader.code = FOG_SHADER
 	var mat := StandardMaterial3D.new()
@@ -151,6 +188,8 @@ func fogged(texture: Texture2D, tint := Color(1, 1, 1), kind := 0) -> ShaderMate
 	mat.set_shader_parameter("albedo_tex", texture)
 	mat.set_shader_parameter("tint", tint)
 	mat.set_shader_parameter("surface_kind", kind)
+	if kind == 1:
+		banks.configure(mat,texture)
 	mat.set_shader_parameter("map_m", Iso.WORLD / Iso.PPM)
 	if battle.fog != null:
 		mat.set_shader_parameter("fog_tex", battle.fog.get("_texture"))

@@ -176,31 +176,8 @@ func _environment() -> void:
 func _ground() -> MeshInstance3D:
 	var meta: Dictionary = Iso.read_json("res://assets/map/ground.json")
 	var tex: Texture2D = load("res://assets/map/" + String(meta["image"]))
-	var k := float(meta["pxPerM"]) / float(meta["gamePxPerM"])
-	var pad := float(meta["padTop"])
-	var step := 45.0
-	var cols := int(Iso.WORLD.x / step) + 1
-	var rows := int(Iso.WORLD.y / step) + 1
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for r in rows:
-		for c in cols:
-			var w := Vector2(c, r) * step
-			var screen := Iso.to_screen(w)
-			st.set_uv(Vector2(screen.x * k / tex.get_width(), (pad + screen.y * k) / tex.get_height()))
-			st.add_vertex(at(w))
-	for r in rows - 1:
-		for c in cols - 1:
-			var i := r * cols + c
-			st.add_index(i)
-			st.add_index(i + 1)
-			st.add_index(i + cols)
-			st.add_index(i + 1)
-			st.add_index(i + cols + 1)
-			st.add_index(i + cols)
-	st.generate_normals()
 	var mesh := MeshInstance3D.new()
-	mesh.mesh = st.commit()
+	mesh.mesh = field.banks.ground_mesh(meta,tex)
 	# The picture has its light and shade already: less of the sun's; the fog over it.
 	mesh.material_override = field.fogged(tex, Color(0.8, 0.8, 0.78), 1)
 	return mesh

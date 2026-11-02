@@ -47,8 +47,8 @@ func _initialize() -> void:
 	var stats := atmosphere.stats()
 	check(stats["rain_slots"] == 1536 and stats["snow_slots"] == 768 and stats["print_slots"] == 2048 and stats["batches"] == 4,
 		"rain, snow, footprints and water have fixed GPU budgets")
-	check(atmosphere.water.mesh.get_surface_count() == 1 and atmosphere.water.mesh.surface_get_array_len(0) == Nav._points.size() * 2,
-		"one water mesh follows the unchanged river centreline")
+	check(atmosphere.water.mesh.get_surface_count() == 1 and atmosphere.water.mesh.surface_get_array_len(0) == RiverBanks3D.SAMPLES * 2,
+		"one bounded water mesh follows the shared terrain and bank profile")
 	check((atmosphere.rain.material_override as ShaderMaterial).get_shader_parameter("relief") != null,
 		"precipitation follows the existing terrain height texture")
 	var mesh_id := atmosphere.rain.multimesh.get_instance_id()

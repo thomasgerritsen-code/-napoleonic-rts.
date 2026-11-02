@@ -9,6 +9,7 @@ render_mode cull_disabled;
 uniform float now;
 uniform float snow;
 uniform float cloud;
+uniform float wetness;
 uniform float fog_on = 1.0;
 uniform sampler2D fog_tex : filter_linear;
 uniform vec2 map_m;
@@ -57,36 +58,44 @@ void fragment() {
  float grains=noise2(vec2(flow.x,UV.y)*14.0);
  vec3 bed=mix(vec3(0.18,0.19,0.13),vec3(0.30,0.29,0.20),grains);
  vec3 colour=mix(deep,bed,shallow*0.72);
- // A narrow wet-earth margin softens the seam with the baked river bank.
- colour=mix(colour,vec3(0.22,0.225,0.155),smoothstep(0.91,1.0,side)*0.6);
- colour=mix(colour,vec3(0.43,0.49,0.50),snow*smoothstep(0.83,1.0,side)*0.75);
+ // Match the soil at the actual bank intersection, including its grain.
+ float margin=smoothstep(0.72,1.0,side);
+ vec3 silt=mix(vec3(0.17,0.15,0.095),vec3(0.26,0.235,0.145),noise2(world.xz*1.8));
+ colour=mix(colour,silt*(1.0-wetness*0.17),margin);
  float fresnel=pow(1.0-clamp(dot(NORMAL,VIEW),0.0,1.0),4.0);
- colour=mix(colour,vec3(0.20,0.26,0.28),fresnel*0.35);
+ colour=mix(colour,vec3(0.20,0.26,0.28),fresnel*0.35*(1.0-margin));
+ colour=mix(colour,vec3(0.72,0.80,0.88)*0.86,snow*margin);
  colour+=vec3(0.018,0.022,0.02)*wake*fine;
  float fog=texture(fog_tex,clamp(world.xz/map_m,vec2(0),vec2(1))).a*fog_on;
  ALBEDO=colour*(1.0-fog*0.9);
- ROUGHNESS=0.20+cloud*0.14+snow*0.12;
- SPECULAR=0.6;
+ ROUGHNESS=mix(0.20+cloud*0.14+snow*0.12,0.7,margin);
+ SPECULAR=mix(0.6,0.2,margin);
 }
 """
 
 
-static func build(battle: Battle) -> MeshInstance3D:
+static func build(battle: Battle,banks: RiverBanks3D) -> MeshInstance3D:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var points := Nav._points
 	var distance := 0.0
-	for i in points.size():
+	var last := Vector2.ZERO
+	for i in RiverBanks3D.SAMPLES:
+		var y := float(i)/(RiverBanks3D.SAMPLES-1)*Iso.WORLD.y/Iso.PPM
+		var p := banks.rows[i]
+		var centre := Vector2(p.x,y)
 		if i > 0:
-			distance += points[i].distance_to(points[i-1])/Iso.PPM
-		var along := (points[mini(i+1,points.size()-1)]-points[maxi(i-1,0)]).normalized()
-		var across := along.orthogonal()*Nav._width*0.5
+			distance += centre.distance_to(last)
+		last = centre
+		var before := banks.rows[maxi(i-1,0)]
+		var after := banks.rows[mini(i+1,RiverBanks3D.SAMPLES-1)]
+		var dz := float(mini(i+1,RiverBanks3D.SAMPLES-1)-maxi(i-1,0))/(RiverBanks3D.SAMPLES-1)*Iso.WORLD.y/Iso.PPM
+		var along := Vector2(after.x-before.x,dz).normalized()
 		for side in 2:
-			var world := points[i]+across*(-1.0 if side == 0 else 1.0)
+			var x := p.x+(-p.z if side==0 else p.w)
 			surface.set_color(Color(along.x*0.5+0.5,along.y*0.5+0.5,0,1))
 			surface.set_uv(Vector2(side,distance))
-			surface.add_vertex(View3D.at(world)+Vector3.UP*0.045)
-	for i in points.size()-1:
+			surface.add_vertex(Vector3(x,p.y+0.015,y))
+	for i in RiverBanks3D.SAMPLES-1:
 		var a := i*2
 		for index in [a,a+1,a+2,a+1,a+3,a+2]:
 			surface.add_index(index)

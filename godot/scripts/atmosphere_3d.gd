@@ -103,7 +103,7 @@ func _shader(code: String) -> ShaderMaterial:
 
 
 func _river() -> MeshInstance3D:
-	return RiverSurface3D.build(battle)
+	return RiverSurface3D.build(battle,view.field.banks)
 
 func _batch(count: int, mat: ShaderMaterial, horizontal := false) -> MultiMeshInstance3D:
 	var quad := QuadMesh.new()
@@ -151,6 +151,7 @@ func refresh() -> void:
 		mat.set_shader_parameter("fog_on", 1.0 if battle.fog.enabled else 0.0)
 	(water.material_override as ShaderMaterial).set_shader_parameter("snow", climate["snow"])
 	(water.material_override as ShaderMaterial).set_shader_parameter("cloud", climate["cloud"])
+	(water.material_override as ShaderMaterial).set_shader_parameter("wetness", climate["wetness"])
 	(prints.material_override as ShaderMaterial).set_shader_parameter("snow", climate["snow"])
 	(prints.material_override as ShaderMaterial).set_shader_parameter("wetness", climate["wetness"])
 	for key: Variant in _last_print.keys():

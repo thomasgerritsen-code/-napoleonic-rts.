@@ -77,8 +77,8 @@ de bestaande bouwvoortgang en het weer van de host.
 
 Budgetten, beperkingen en controles staan bij [de 3D-wereld](../docs/godot-world-v4.md).
 
-De rivier heeft subtiele stroming langs de bochten, dieptewerking en natuurlijke
-oevers binnen hetzelfde tekenbudget. Uitleg en de echte voor-en-na-controle
+De rivier ligt in een uitgewerkte bedding met oplopende oevers en een overgang
+naar de bestaande grastextuur, binnen hetzelfde aantal tekenlagen. Uitleg en de echte voor-en-na-controle
 staan bij [de rivier](../docs/godot-river.md).
 
 Het daglicht is afgestemd op de pc-renderer: lichte gevels, daken en uniformen
