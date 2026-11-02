@@ -31,11 +31,14 @@ var battle: Battle
 var camera: Camera3D
 var _sun: DirectionalLight3D
 var _env: Environment
+var _sky: ProceduralSkyMaterial
+var _sky_clock := 0.0
 var _target := Vector3.ZERO
 var _yaw := 0.0
 var _pitch := deg_to_rad(52.0)
 var _distance := 45.0
 var _scenes := {}            # model name -> PackedScene (or null)
+var _meshes := {}            # cached immutable static meshes
 var _men := {}               # Unit -> {node, player, anim, ring}
 var _halls := {}             # Building -> Node3D
 var _scenery: Array = []     # [sprite, MultiMesh, index, transform]
@@ -54,6 +57,8 @@ var _box: Panel
 ## The trenches, fog, territories and placing (Field3D); smoke, earth and dust (Smoke3D).
 var field: Field3D
 var fx: Smoke3D
+var atmosphere: Atmosphere3D
+var construction: Construction3D
 
 
 func _ready() -> void:
@@ -102,6 +107,14 @@ func _ready() -> void:
 	var home := battle.town_centre(battle.me)
 	_target = at(home.world + Vector2(260, 60) if home != null else Iso.WORLD / 2.0)
 	_place_camera()
+	atmosphere = Atmosphere3D.new()
+	atmosphere.battle = battle
+	atmosphere.view = self
+	add_child(atmosphere)
+	construction = Construction3D.new()
+	construction.battle = battle
+	construction.view = self
+	add_child(construction)
 
 
 ## A point of the map (game px) in 3D: metres, y up, on the ground.
@@ -121,16 +134,18 @@ static func turn(facing: float) -> float:
 
 func _environment() -> void:
 	var sky_mat := ProceduralSkyMaterial.new()
+	_sky = sky_mat
 	sky_mat.sky_top_color = Color(0.36, 0.52, 0.74)
 	sky_mat.sky_horizon_color = Color(0.74, 0.78, 0.8)
 	sky_mat.ground_horizon_color = Color(0.5, 0.5, 0.44)
 	sky_mat.ground_bottom_color = Color(0.25, 0.25, 0.2)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
+	sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
 	_env = Environment.new()
 	_env.background_mode = Environment.BG_SKY
 	_env.sky = sky
-	_env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	_env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	_env.ambient_light_energy = 0.4
 	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	_env.tonemap_exposure = 0.92
@@ -177,7 +192,7 @@ func _ground() -> MeshInstance3D:
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = st.commit()
 	# The picture has its light and shade already: less of the sun's; the fog over it.
-	mesh.material_override = field.fogged(tex, Color(0.8, 0.8, 0.78))
+	mesh.material_override = field.fogged(tex, Color(0.8, 0.8, 0.78), 1)
 	return mesh
 
 
@@ -190,6 +205,8 @@ func _scene(name_: String) -> PackedScene:
 
 ## The one mesh of a static model, for drawing many at once.
 func _mesh_of(name_: String) -> Mesh:
+	if _meshes.has(name_):
+		return _meshes[name_]
 	var scene := _scene(name_)
 	if scene == null:
 		return null
@@ -197,6 +214,7 @@ func _mesh_of(name_: String) -> Mesh:
 	var found: MeshInstance3D = node.find_children("*", "MeshInstance3D", true, false)[0] if not node.find_children("*", "MeshInstance3D", true, false).is_empty() else null
 	var mesh: Mesh = found.mesh if found != null else null
 	node.free()
+	_meshes[name_] = mesh
 	return mesh
 
 
@@ -260,13 +278,19 @@ func _scenery_from_sprites() -> void:
 		node.multimesh = mm
 		var source := mesh.surface_get_material(0) as StandardMaterial3D
 		if source != null and source.albedo_texture != null:
-			node.material_override = field.fogged(source.albedo_texture, source.albedo_color)
+			var kind := 0
+			if name_ in ["oak", "beech", "birch", "poplar", "willow", "hawthorn", "hazel"]:
+				kind = 2
+			elif name_ in ["spruce", "pine"]:
+				kind = 3
+			node.material_override = field.fogged(source.albedo_texture, source.albedo_color, kind)
 		add_child(node)
 
 
 func _process(delta: float) -> void:
 	if battle == null:
 		return
+	_sky_clock -= delta
 	_light()
 	_follow_2d_camera()
 	_keys(delta)
@@ -288,15 +312,25 @@ func _light() -> void:
 	var dark := DayNight.darkness_at(battle.clock)
 	var day := clampf((hour - 5.0) / 15.0, 0.0, 1.0)
 	_sun.rotation = Vector3(-deg_to_rad(18.0 + 50.0 * sin(day * PI)), deg_to_rad(90.0 - 180.0 * day), 0.0)
-	_sun.light_energy = 1.1 * (1.0 - dark) + 0.08
-	var tint := DayNight.light_at(battle.clock, battle.weather.wetness if battle.weather != null else 0.0)
-	# Warmer low in the sky, at morning and evening.
-	_sun.light_color = Color(1.0, 0.95, 0.86).lerp(Color(1.0, 0.72, 0.48), 1.0 - sin(day * PI))
-	_env.ambient_light_energy = 0.45 * (1.0 - dark) + 0.12
-	_env.ambient_light_color = tint
-	_env.background_energy_multiplier = 1.0 - 0.8 * dark
+	var state := atmosphere.climate if atmosphere != null and not atmosphere.climate.is_empty() else WorldClimate3D.sample(battle.clock, false, 0.0)
+	var cloud := atmosphere.cloud if atmosphere != null else 0.0
+	_sun.light_energy = lerpf(1.18, 0.12, dark) * (1.0 - cloud * 0.5)
+	_sun.light_color = state["sun_color"]
+	_sun.shadow_opacity = lerpf(0.9, 0.45, cloud)
+	_env.ambient_light_energy = state["ambient_energy"]
+	_env.ambient_light_color = state["ambient_color"]
+	_env.background_energy_multiplier = (1.0 - 0.8 * dark) * (1.0 - cloud * 0.3)
+	_env.fog_density = 0.0012 + cloud * 0.002
+	_env.fog_light_color = Color(0.72, 0.76, 0.8).lerp(Color(0.46, 0.51, 0.59), cloud).lerp(Color(0.055, 0.07, 0.12), dark)
+	if _sky_clock <= 0.0:
+		_sky_clock = 0.5
+		_sky.sky_top_color = Color(0.36, 0.52, 0.74).lerp(Color(0.27, 0.34, 0.42), cloud).lerp(Color(0.02, 0.03, 0.07), dark)
+		_sky.sky_horizon_color = Color(0.74, 0.78, 0.8).lerp(Color(0.47, 0.52, 0.59), cloud).lerp(Color(0.055, 0.07, 0.12), dark)
+		_sky.ground_horizon_color = _sky.sky_horizon_color
+		_sky.ground_bottom_color = Color(0.25, 0.25, 0.2).lerp(Color(0.025, 0.03, 0.045), dark)
 	for b: Variant in _lamps.keys():
 		var lamp: OmniLight3D = _lamps[b]
+		lamp.visible = is_instance_valid(b) and b.visible
 		lamp.light_energy = dark * (1.2 + 0.2 * sin(battle.clock * 7.0 + lamp.position.x))
 
 
@@ -549,6 +583,13 @@ func _sync_buildings() -> void:
 			node.set_meta("model", model)
 			add_child(node)
 			field.fog_model(node)
+			var materials: Array[ShaderMaterial] = []
+			for child: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
+				if child.material_override is ShaderMaterial:
+					materials.append(child.material_override)
+			node.set_meta("climate_materials", materials)
+			var mesh := _mesh_of(model)
+			node.set_meta("height", mesh.get_aabb().end.y * float(look[1]) if mesh != null else 3.0)
 			_halls[b] = node
 		# A farm shows its crop (its picture changes); a site goes up as it is built; a ruin sinks.
 		if b.type == "farm" and String(node.get_meta("model")) != String(_building_look(b)[0]):
@@ -556,10 +597,18 @@ func _sync_buildings() -> void:
 			_halls.erase(b)
 			continue
 		node.visible = b.visible
-		var up := 1.0 if b.complete else 0.25 + 0.75 * b.progress
+		var up := 1.0
 		if not b.standing():
 			up = 0.25
 		node.scale.y = node.scale.x * up
+		for material: ShaderMaterial in node.get_meta("climate_materials", []):
+			material.set_shader_parameter("window_light_on", 1.0 if b.complete and b.standing() else 0.0)
+			if b.type == "foundry":
+				material.set_shader_parameter("forge_on", 1.0 if b.complete and b.standing() else 0.0)
+				material.set_shader_parameter("forge_origin", node.position + Vector3(-2.4, 1.385, 3.55) * node.scale.x)
+				material.set_shader_parameter("forge_radius", 0.45 * node.scale.x)
+		if construction != null and b.type != "farm":
+			construction.watch(b, node, float(node.get_meta("height", 3.0)))
 		if b.standing() and b.complete and not _lamps.has(b) and b.type != "farm":
 			var lamp := OmniLight3D.new()
 			lamp.light_color = Color(1.0, 0.72, 0.38)

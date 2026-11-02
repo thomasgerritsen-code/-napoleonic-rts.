@@ -914,6 +914,8 @@ func present(delta: float) -> void:
 		_shown_dir = posmod(_shown_dir + (1 if off > 0.0 else -1), 8)
 		_turn_wait = 0.085 if _horse() else 0.06
 	if battle != null and battle.view3d != null:
+		if _striding and battle.view3d.atmosphere != null and type != "artillery":
+			battle.view3d.atmosphere.track(self)
 		return
 	_show()
 	if _striding and String(_sprite.animation).get_slice("_", 0) in GAITS:

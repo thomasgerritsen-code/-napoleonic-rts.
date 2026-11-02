@@ -748,11 +748,15 @@ func _initialize() -> void:
 		var halls: Dictionary = deep.view3d.get("_halls")
 		var mine_node: Node3D = halls[mine]
 		var foundation_height := mine_node.scale.y
+		var foundation_mesh: MeshInstance3D = mine_node.find_children("*", "MeshInstance3D", true, false)[0]
+		var foundation_material := foundation_mesh.material_override as ShaderMaterial
+		var foundation_progress := float(foundation_material.get_shader_parameter("build_progress"))
 		mine.complete = true
 		mine.progress = 1.0
 		deep.view3d.call("_sync_buildings")
-		_check(mine_node.scale.y > foundation_height and mine_node.get_meta("model") == "mine",
-			"the %s mine follows actual construction progress" % side)
+		_check(is_equal_approx(mine_node.scale.y, foundation_height) and foundation_progress < 0.1
+			and float(foundation_material.get_shader_parameter("build_progress")) == 1.0 and mine_node.get_meta("model") == "mine",
+			"the %s mine reveals its actual construction progress without stretching its geometry" % side)
 		mine.visible = false
 		deep.view3d.call("_sync_buildings")
 		_check(not mine_node.visible, "an unseen mine stays hidden in 3D")

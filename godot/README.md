@@ -65,6 +65,18 @@ uitrusting; gewone lijninfanterie heeft meerdere campagne-uiterlijken.
 De bestaande animaties en troepstatistieken blijven behouden. Herkomst,
 exportopdrachten en budgetten staan bij [de Blender-modellen](../docs/godot-blender-art-v3.md).
 
+## Weer en bouwwerk in 3D
+
+De rivier stroomt; regen, sneeuw en voet- en hoefsporen worden in vaste GPU-batches
+getekend. Natte grond en daken veranderen mee. De vier seizoenen lopen vloeiend
+over: herfstbladeren, kale loofbomen en besneeuwde grond in de winter. Zon,
+maanlicht, bewolking en verlichte ramen volgen de bestaande spelklok. Tijdens
+het bouwen verschijnen fundering, muren en dak op hun echte hoogte, met houten
+steigers die bij voltooiing verdwijnen. Opslaan, laden en online spelen gebruiken
+de bestaande bouwvoortgang en het weer van de host.
+
+Budgetten, beperkingen en controles staan bij [de 3D-wereld](../docs/godot-world-v4.md).
+
 ## Prestaties en beweging
 
 Grote veldslagen gebruiken gedeelde zoekvakken voor doelen en een gezamenlijke

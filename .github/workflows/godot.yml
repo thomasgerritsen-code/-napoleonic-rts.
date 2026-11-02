@@ -87,6 +87,22 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-render.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_RENDER" native-render.log
 
+      - name: Native climate and construction regression
+        run: |
+          set -o pipefail
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/world_3d_test.gd 2>&1 | tee native-world.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-world.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_WORLD" native-world.log
+
+      - name: Visible 3D weather and seasonal render regression
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 600 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/world_3d_shots.gd 2>&1 | tee native-world-render.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-world-render.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_WORLD_RENDER" native-world-render.log
+
       - name: Screenshots with a real renderer
         continue-on-error: true
         run: |
