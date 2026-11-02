@@ -89,6 +89,12 @@ volledige Blender-modellen en grafische details blijven behouden. F3 herstelt
 de actuele 2D-weergave. Meetresultaten, regressies en reproduceerbare opdrachten
 staan in [prestaties en navigatie](../docs/godot-performance-navigation.md).
 
+Zichtbare manschappen gebruiken een gedeelde, samengevoegde GPU-skin per model.
+Alle oorspronkelijke onderdelen, animaties, materialen en afstandsdetails
+blijven beschikbaar; de duizenden losse mesh-nodes verdwijnen. Zie
+[grote zichtbare legers](../docs/godot-visible-army-performance.md) voor de
+metingen en de vergelijking met de oorspronkelijke Blender-rigs.
+
 ## Op de iPad (Xogot)
 
 Xogot is Godot voor iPad en iPhone (Godot 4.7, net als dit project).

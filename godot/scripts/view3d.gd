@@ -482,7 +482,7 @@ func _model_for(u: Unit) -> String:
 
 
 func _make_man(u: Unit) -> Dictionary:
-	var scene := _scene(_model_for(u))
+	var scene := ActorSkin3D.scene(_scene(_model_for(u)))
 	if scene == null:
 		return {}
 	var node: Node3D = scene.instantiate()
@@ -495,7 +495,7 @@ func _make_man(u: Unit) -> Dictionary:
 				"mine", "build", "dig", "rest", "command", "charge", "rout", "haul", "look", "adjust"] else Animation.LOOP_NONE
 	if u.type == "artillery":
 		# The gun's crew stand by it.
-		var crew := _scene("gunner_" + ("fr" if u.side == "france" else "br"))
+		var crew := ActorSkin3D.scene(_scene("gunner_" + ("fr" if u.side == "france" else "br")))
 		if crew != null:
 			for i in 2:
 				var man: Node3D = crew.instantiate()

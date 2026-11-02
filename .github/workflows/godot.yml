@@ -87,6 +87,22 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-render.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_RENDER" native-render.log
 
+      - name: GPU actor geometry and animation equivalence
+        run: |
+          set -o pipefail
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/skin_regression.gd 2>&1 | tee native-skins.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-skins.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_SKINS" native-skins.log
+
+      - name: GPU actor appearance regression
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/skin_visual_test.gd 2>&1 | tee native-skin-pixels.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-skin-pixels.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_SKIN_PIXELS" native-skin-pixels.log
+
       - name: Native climate and construction regression
         run: |
           set -o pipefail

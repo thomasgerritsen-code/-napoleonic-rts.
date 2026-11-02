@@ -39,6 +39,12 @@ func _initialize() -> void:
 	var active := _active(men)
 	var full := men.size()
 	check(full == 400 and active > 200, "400 complete Blender actors load and the visible army animates (%d active)" % active)
+	var meshes := 0
+	for model: Dictionary in men.values():
+		meshes += (model["node"] as Node).find_children("*", "MeshInstance3D", true, false).size()
+	var draws := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	check(meshes <= 1000 and draws < 5000,
+		"400 detailed actors stay within the mesh and draw-call budget (%d meshes, %d draws)" % [meshes, draws])
 	var sprite_playing := 0
 	for u in battle.units:
 		if u._sprite.is_playing():
@@ -83,7 +89,8 @@ func _initialize() -> void:
 		if u.alive() and u._sprite.is_playing():
 			restored += 1
 	check(restored == 399, "switching back restores all 399 living 2D animations")
-	print("GODOT_RENDER ", JSON.stringify({"models": full, "army_active": active, "base_active": resting, "failures": failures}))
+	print("GODOT_RENDER ", JSON.stringify({"models": full, "army_active": active, "base_active": resting,
+		"actor_meshes":meshes,"draw_calls":draws,"failures": failures}))
 	battle.queue_free()
 	Battle.view_3d = false
 	await process_frame
