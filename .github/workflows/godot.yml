@@ -81,10 +81,14 @@ jobs:
       - name: Recruitment spacing and stationary trench regression
         run: |
           set -o pipefail
-          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/recruitment_test.gd 2>&1 | tee native-recruits.log
+          : > native-recruits.log
+          for spawn_seed in 0 1 2 3 4 5 6 7; do
+            RTS_RECRUIT_SEED="$spawn_seed" timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/recruitment_test.gd 2>&1 | tee -a native-recruits.log
+          done
           timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/trench_stationary_test.gd 2>&1 | tee native-trench-still.log
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-recruits.log native-trench-still.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_RECRUITS" native-recruits.log
+          test "$(grep -c GODOT_RECRUITS native-recruits.log)" -eq 8
           grep -q "GODOT_TRENCH_STILL" native-trench-still.log
 
       - name: Full-detail 3D animation regression

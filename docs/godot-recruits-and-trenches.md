@@ -18,6 +18,15 @@ Bij een afgesloten verzamelgebied wordt ook ruimte buiten de uitgang gezocht.
 De zoekactie heeft een vaste limiet op routecontroles en gebruikt lokale
 bezettingsvakken. Dit gebeurt alleen wanneer een opleiding eindigt.
 
+Een wachtplek moet ook rondom voldoende vrije grond hebben. Alleen een geldig
+route-eindpunt was niet genoeg: vlak tegen een gebouwhoek kon de eerste
+aangekomen soldaat volgende rekruten ophouden. Vier lokale ruimtecontroles
+houden de doorgang langs muren vrij, zonder botsingen of loopgedrag te wijzigen.
+De verplichte controle gebruikt acht vaste variaties in de uitgangspositie;
+alle 36 gewone en 14 naar een geblokkeerde vlag gestuurde rekruten moeten in
+iedere variatie aankomen. De oorspronkelijke hoekopstelling faalde in vier
+van deze acht gevallen; met de ruimtecontrole slagen ze alle acht.
+
 De Britse computer gebruikt dezelfde verdeling bij zijn eigen verzamelpunt.
 Boeren blijven hun bestaande werk- en grondstoforders gebruiken. Automatisch
 bataljons vormen, officieren/tamboers en opleidingskosten blijven behouden.

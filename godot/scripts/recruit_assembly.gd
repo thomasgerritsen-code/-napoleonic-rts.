@@ -9,6 +9,7 @@ const FILES := 7
 const RANKS := 129
 const MARGIN := 4.0
 const ROUTE_CHECKS := 16
+const SIDES := [Vector2.LEFT,Vector2.RIGHT,Vector2.UP,Vector2.DOWN]
 
 
 static func radius(u: Unit) -> float:
@@ -52,7 +53,7 @@ static func _find(battle: Battle,occupied: Dictionary,origin: Vector2,anchor: Ve
 			# Leave the training exit clear, even if the rally flag is on it.
 			if at.distance_squared_to(origin)<gap*gap*2.25:
 				continue
-			if not battle.navigation.walkable(at) or not _free(occupied,at,size):
+			if not _standing_room(battle,at,size) or not _free(occupied,at,size):
 				continue
 			checked += 1
 			if not battle.ground_route(origin,at).is_empty():
@@ -60,6 +61,18 @@ static func _find(battle: Battle,occupied: Dictionary,origin: Vector2,anchor: Ve
 			if checked >= ROUTE_CHECKS:
 				return null
 	return null
+
+
+static func _standing_room(battle: Battle,at: Vector2,size: float) -> bool:
+	if not battle.navigation.walkable(at):
+		return false
+	# A valid path endpoint can be only 6px from a wall. A waiting soldier
+	# there blocks the corner for the next recruit. Keep a passage outside
+	# the building as well as a collision-free centre.
+	for side: Vector2 in SIDES:
+		if not battle.navigation.walkable(at+side*(size+MARGIN)):
+			return false
+	return true
 
 
 static func _offset(index: int) -> float:

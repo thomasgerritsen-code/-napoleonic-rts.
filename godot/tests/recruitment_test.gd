@@ -22,6 +22,9 @@ func _initialize() -> void:
 	battle.set_process(false)
 	battle.ai.set("_clock",1.0e9)
 	battle.weather.set_process(false)
+	# CI exercises several fixed spawn jitters, including the building-corner
+	# traffic jam found while validating the river release.
+	seed(int(OS.get_environment("RTS_RECRUIT_SEED")))
 	var depot := battle.add_building("france","barracks",Vector2(4600,1800),true)
 	var recruits: Array[Unit] = []
 	for i in 36:
