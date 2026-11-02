@@ -77,6 +77,10 @@ de bestaande bouwvoortgang en het weer van de host.
 
 Budgetten, beperkingen en controles staan bij [de 3D-wereld](../docs/godot-world-v4.md).
 
+Het daglicht is afgestemd op de pc-renderer: lichte gevels, daken en uniformen
+houden detail, met behoud van de bestaande nachtverlichting. De lichtbalans
+en pixelcontroles staan bij [de belichting](../docs/godot-lighting.md).
+
 ## Prestaties en beweging
 
 Nieuwe militairen verzamelen zich op afzonderlijke vrije plekken bij de kazerne

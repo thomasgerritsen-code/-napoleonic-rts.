@@ -96,6 +96,15 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-render.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_RENDER" native-render.log
 
+      - name: Daylight highlight and night readability regression
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/lighting_render_test.gd 2>&1 | tee native-lighting.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-lighting.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_LIGHTING" native-lighting.log
+
       - name: GPU actor geometry and animation equivalence
         run: |
           set -o pipefail

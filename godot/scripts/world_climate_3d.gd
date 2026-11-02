@@ -4,6 +4,16 @@ extends RefCounted
 ## never advances a season, consumes game randomness or changes wetness.
 
 const TRANSITION := 45.0
+## Calibrated with lit grey/white surfaces in the shipped GL renderer.
+## Leave highlight room instead of pushing several materials to flat white.
+const DAY_SUN := 0.65
+const NIGHT_SUN := 0.12
+const DAY_AMBIENT := 0.24
+const NIGHT_AMBIENT := 0.12
+
+
+static func sunlight_energy(dark: float, cloud: float) -> float:
+	return lerpf(DAY_SUN, NIGHT_SUN, dark) * (1.0 - 0.5 * cloud)
 
 
 static func sample(seconds: float, raining: bool, wetness: float) -> Dictionary:
@@ -27,6 +37,7 @@ static func sample(seconds: float, raining: bool, wetness: float) -> Dictionary:
 		"autumn": weights.z, "summer": weights.y, "wetness": clampf(wetness, 0.0, 1.0),
 		"rain": (1.0 - weights.w) if raining else 0.0, "snowfall": weights.w if raining else 0.0,
 		"dark": dark, "cloud": cloud, "sun_color": sunlight,
-		"sun_energy": lerpf(1.18, 0.12, dark) * (1.0 - 0.5 * cloud),
+		"sun_energy": sunlight_energy(dark, cloud),
 		"ambient_color": Color(1.0, 0.97, 0.91).lerp(Color(0.4, 0.52, 0.75), dark),
-		"ambient_energy": 0.45 * (1.0 - dark) + 0.12 + 0.05 * cloud * (1.0 - dark)}
+		"ambient_energy": lerpf(DAY_AMBIENT, NIGHT_AMBIENT, dark) + 0.03 * cloud * (1.0 - dark),
+		"exposure": lerpf(0.82, 0.92, dark), "white_point": lerpf(2.0, 1.0, dark)}

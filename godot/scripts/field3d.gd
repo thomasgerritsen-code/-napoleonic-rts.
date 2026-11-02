@@ -66,9 +66,9 @@ void fragment() {
 	float water = surface_kind == 1 ? step(c.r * 1.15,c.b) * step(c.g * 0.96,c.b) : 0.0;
 	float settled = snow * smoothstep(0.25,0.8,world_normal.y) * (1.0 - water);
 	float detail = dot(c.rgb,vec3(0.3,0.59,0.11));
-	// Shader constants are linear: leave headroom for sun + ambient light,
-	// otherwise snow clips to flat white in the Compatibility renderer.
-	c.rgb = mix(c.rgb, vec3(0.40,0.46,0.51) * (0.8 + detail * 0.22), settled);
+	// Snow reflectance follows the calibrated daylight budget. Preserve
+	// cool white snow and terrain detail without the old blown highlights.
+	c.rgb = mix(c.rgb, vec3(0.72,0.80,0.88) * (0.8 + detail * 0.22), settled);
 	c.rgb *= 1.0 - wetness * (surface_kind == 1 ? 0.17 : 0.08) * (1.0 - settled);
 	float dark = texture(fog_tex, clamp(wpos.xz / map_m, vec2(0.0), vec2(1.0))).a * fog_on;
 	ALBEDO = c.rgb * (1.0 - dark * 0.9);

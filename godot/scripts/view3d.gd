@@ -154,9 +154,10 @@ func _environment() -> void:
 	_env.background_mode = Environment.BG_SKY
 	_env.sky = sky
 	_env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	_env.ambient_light_energy = 0.4
+	_env.ambient_light_energy = WorldClimate3D.DAY_AMBIENT
 	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	_env.tonemap_exposure = 0.92
+	_env.tonemap_exposure = 0.82
+	_env.tonemap_white = 2.0
 	_env.fog_enabled = true
 	_env.fog_light_color = Color(0.72, 0.76, 0.8)
 	_env.fog_density = 0.0012
@@ -165,6 +166,7 @@ func _environment() -> void:
 	add_child(world)
 	_sun = DirectionalLight3D.new()
 	_sun.light_color = Color(1.0, 0.95, 0.86)
+	_sun.light_energy = WorldClimate3D.DAY_SUN
 	_sun.shadow_enabled = true
 	_sun.directional_shadow_max_distance = 180.0
 	add_child(_sun)
@@ -324,11 +326,13 @@ func _light() -> void:
 	_sun.rotation = Vector3(-deg_to_rad(18.0 + 50.0 * sin(day * PI)), deg_to_rad(90.0 - 180.0 * day), 0.0)
 	var state := atmosphere.climate if atmosphere != null and not atmosphere.climate.is_empty() else WorldClimate3D.sample(battle.clock, false, 0.0)
 	var cloud := atmosphere.cloud if atmosphere != null else 0.0
-	_sun.light_energy = lerpf(1.18, 0.12, dark) * (1.0 - cloud * 0.5)
+	_sun.light_energy = WorldClimate3D.sunlight_energy(dark, cloud)
 	_sun.light_color = state["sun_color"]
 	_sun.shadow_opacity = lerpf(0.9, 0.45, cloud)
 	_env.ambient_light_energy = state["ambient_energy"]
 	_env.ambient_light_color = state["ambient_color"]
+	_env.tonemap_exposure = state["exposure"]
+	_env.tonemap_white = state["white_point"]
 	_env.background_energy_multiplier = (1.0 - 0.8 * dark) * (1.0 - cloud * 0.3)
 	_env.fog_density = 0.0012 + cloud * 0.002
 	_env.fog_light_color = Color(0.72, 0.76, 0.8).lerp(Color(0.46, 0.51, 0.59), cloud).lerp(Color(0.055, 0.07, 0.12), dark)
