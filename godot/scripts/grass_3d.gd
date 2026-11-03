@@ -32,6 +32,7 @@ uniform vec2 bank_lookup;
 uniform float bank_rim;
 uniform sampler2D fog_tex : filter_linear;
 uniform vec2 map_m;
+uniform vec2 terrain_extent;
 uniform float fog_on=1.0;
 varying vec3 world;
 varying vec3 colour;
@@ -73,7 +74,7 @@ void vertex() {
 	colour=mix(colour,colour*vec3(1.15,1.02,0.76),summer*0.6+autumn*0.45);
 	VERTEX=world;
 	POSITION=PROJECTION_MATRIX*VIEW_MATRIX*vec4(world,1.0);
-	if(fade<0.015 || root.x<0.0 || root.y<0.0 || root.x>map_m.x || root.y>map_m.y) {
+	if(fade<0.015 || root.x<0.0 || root.y<0.0 || root.x>terrain_extent.x || root.y>terrain_extent.y) {
 		POSITION=vec4(0,0,2,1);
 	}
 }
@@ -122,6 +123,7 @@ func _ready() -> void:
 	material.set_shader_parameter("relief_size",Vector2(Iso._cols,Iso._rows))
 	material.set_shader_parameter("relief_cell",Iso._cell)
 	material.set_shader_parameter("map_m",Iso.WORLD/Iso.PPM)
+	material.set_shader_parameter("terrain_extent",Vector2(floorf(Iso.WORLD.x/RiverBanks3D.STEP),floorf(Iso.WORLD.y/RiverBanks3D.STEP))*RiverBanks3D.STEP/Iso.PPM)
 	material.set_shader_parameter("fog_tex",view.battle.fog.get("_texture"))
 	view.field.banks.configure(material)
 	var mm := MultiMesh.new()

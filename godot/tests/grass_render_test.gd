@@ -125,6 +125,23 @@ func _initialize() -> void:
 	check(energy(await probe_at(probe,field,0.6))<0.01,"new shell craters stay bare instead of sprouting blades")
 	battle.trenches.craters.clear()
 	grass.refresh()
+	# The mesh ends on complete 45px cells, before the logical map edge.
+	# Force otherwise valid grass so this probe tests actual GPU bounds,
+	# independently of cover/road mask accidents on the last map strip.
+	var white := Image.create(2,2,false,Image.FORMAT_RGBA8)
+	white.fill(Color.WHITE)
+	var black := Image.create(2,2,false,Image.FORMAT_RGBA8)
+	black.fill(Color.BLACK)
+	pm.set_shader_parameter("cover_tex",ImageTexture.create_from_image(white))
+	pm.set_shader_parameter("blocked_tex",ImageTexture.create_from_image(black))
+	pm.set_shader_parameter("road_field",ImageTexture.create_from_image(white))
+	var extent: Vector2 = grass.material.get_shader_parameter("terrain_extent")
+	var edge := Vector2((extent.x+0.78)*Iso.PPM,1200.0)
+	pm.set_shader_parameter("terrain_extent",Iso.WORLD/Iso.PPM)
+	var floating := energy(await probe_at(probe,edge,1.0))
+	pm.set_shader_parameter("terrain_extent",extent)
+	check(floating>1.0 and energy(await probe_at(probe,edge,1.0))<0.01,
+		"the GPU clips blades to actual terrain triangles rather than floating past the last mesh cell")
 	pm.set_shader_parameter("snow",1.0)
 	check(energy(await probe_at(probe,field,2.0))<0.01,"winter snow buries the grass geometry in the actual GPU shader")
 	view.view(field,0.0,45.0,130.0)

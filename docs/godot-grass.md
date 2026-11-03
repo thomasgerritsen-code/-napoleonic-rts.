@@ -21,6 +21,8 @@ te verplaatsen of buffers opnieuw te uploaden. Wind buigt de sprieten; aan
 de rand van het detailgebied en bij uitzoomen worden ze geleidelijk korter.
 Vanaf 95 m cameraafstand wordt de geometrie niet getekend. Sneeuw begraaft de
 sprieten. Regen en seizoenen beïnvloeden kleur en oppervlakteruwheid.
+Sprieten stoppen bij de werkelijke laatste terreintriangles, ook waar de
+logische kaart nog een gedeeltelijke cel verder doorloopt.
 
 Wortels gebruiken exact dezelfde twee grondtriangles per reliëfcel als het
 terrein, niet alleen een bilineair benaderde hoogte. Het bestaande
