@@ -118,6 +118,15 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-river.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_RIVER" native-river.log
 
+      - name: Buildings clear slopes and retain supported foundations
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/building_ground_test.gd 2>&1 | tee native-building-ground.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-building-ground.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_BUILDING_GROUND" native-building-ground.log
+
       - name: GPU actor geometry and animation equivalence
         run: |
           set -o pipefail

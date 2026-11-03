@@ -60,6 +60,7 @@ var fx: Smoke3D
 var atmosphere: Atmosphere3D
 var construction: Construction3D
 var bridges: Bridges3D
+var building_ground: BuildingGround3D
 
 
 func _ready() -> void:
@@ -68,6 +69,9 @@ func _ready() -> void:
 	field.battle = battle
 	field.view = self
 	add_child(field)
+	building_ground = BuildingGround3D.new()
+	building_ground.view = self
+	add_child(building_ground)
 	fx = Smoke3D.new()
 	fx.battle = battle
 	add_child(fx)
@@ -105,6 +109,7 @@ func _ready() -> void:
 	_box.visible = false
 	layer.add_child(_box)
 	_scenery_from_sprites()
+	building_ground.finish_villages()
 	bridges = Bridges3D.new()
 	bridges.view = self
 	add_child(bridges)
@@ -249,7 +254,8 @@ func _scenery_from_sprites() -> void:
 			places[model] = []
 		var world := Vector2(h["x"], h["y"])
 		var facing := TAU * int(h["heading"]) / headings
-		places[model].append([null, Transform3D(Basis(Vector3.UP, turn(facing)).scaled(Vector3.ONE * size), at(world))])
+		var pose := Transform3D(Basis(Vector3.UP, turn(facing)).scaled(Vector3.ONE * size), at(world))
+		places[model].append([null,building_ground.village(mesh,pose,model)])
 	for name_: String in places:
 		var mesh := _mesh_of(name_)
 		if mesh == null:
@@ -575,6 +581,8 @@ func _sync_buildings() -> void:
 			node = scene.instantiate()
 			node.position = at(b.world)
 			node.scale = Vector3.ONE * float(look[1])
+			if b.type != "farm":
+				node.transform = building_ground.fit(_mesh_of(model),node.transform)
 			node.set_meta("model", model)
 			add_child(node)
 			field.fog_model(node)
@@ -619,6 +627,7 @@ func _sync_buildings() -> void:
 		if not is_instance_valid(b) or not (b as Building).standing():
 			(_lamps[b] as OmniLight3D).queue_free()
 			_lamps.erase(b)
+	building_ground.sync_buildings(_halls)
 
 
 ## A felled tree, a stripped bush: gone here too.
@@ -795,7 +804,8 @@ func _select(from: Vector2, to: Vector2, add: bool) -> void:
 				picked.append(man)
 			battle.select_units(picked, add)
 			return
-		battle.select_building(battle.call("_thing_at", ground_at(to), false) as Building)
+		var building := building_ground.pick(to,_halls)
+		battle.select_building(building if building != null else battle.call("_thing_at", ground_at(to), false) as Building)
 		return
 	var picked: Array[Unit] = []
 	var soldiers: Array[Unit] = []

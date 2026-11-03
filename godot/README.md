@@ -59,6 +59,10 @@ De bewerkbare modelbeschrijving staat in `scripts/godot_mine.py`.
 
 ## Blender-modellen
 
+Dorpsgebouwen en nieuwe gebouwen staan met hun hele voet op het terrein,
+met een stenen fundering aan de lagere kant van een helling. Zie
+[gebouwplaatsing](../docs/godot-building-ground.md) voor de controles en vergelijking.
+
 De 3D-gieterij, dorpskerk en herberg hebben eigen modellen. Speciale infanterie,
 kurassiers, lansiers, Scots Greys en bereden officieren dragen hun eigen
 uitrusting; gewone lijninfanterie heeft meerdere campagne-uiterlijken.
