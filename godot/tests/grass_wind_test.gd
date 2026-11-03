@@ -110,7 +110,8 @@ func _initialize() -> void:
 			if i==0:
 				picture.save_png(out.path_join("grass_wind_comparison.png"))
 	check(differences(before_first,after_first)>200,"the new individual blades visibly improve the actual v79 scene")
-	check(differences(after_first,after_last)>200,"gusts visibly travel through the meadow in the actual game camera")
+	var gust_pixels := differences(after_first,after_last)
+	check(gust_pixels>200,"gusts visibly travel through the meadow in the actual game camera (%d pixels change)" % gust_pixels)
 	check(hash(grass.batch.multimesh.buffer)==buffer,"animated gusts never rebuild or upload the instance buffer")
 	check(JSON.stringify(NetSync.capture(battle))==authority,"wind animation leaves the entire authoritative battle unchanged")
 	figure["viewport"].queue_free()

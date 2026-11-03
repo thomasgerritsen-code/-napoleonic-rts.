@@ -97,6 +97,9 @@ void vertex() {
 	// The meadow's patches, as the ground under them; in a patch in bloom
 	// some blades carry a flower at the tip.
 	colour=meadow_tint(root,colour);
+	// A gust shows as a lighter wave running over the meadow: the bent
+	// blades turn their pale sides and catch the sky.
+	colour*=1.0+gust*min(strength,1.0)*height*0.55;
 	float bloom=meadow(root).z*(1.0-autumn);
 	colour=mix(colour,meadow_flower(root),step(hash(grid+vec2(5.0,9.0)),bloom*0.2)*smoothstep(0.7,0.95,height));
 	VERTEX=world;
