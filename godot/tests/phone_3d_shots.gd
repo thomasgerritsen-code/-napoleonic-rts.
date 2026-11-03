@@ -17,6 +17,9 @@ func _initialize() -> void:
 	for i in 4:
 		await process_frame
 	battle.ai.set("_next_wave", 1.0e9)
+	if OS.get_environment("NO_FOG") != "":
+		battle.fog.enabled = false
+		battle.fog.refresh()
 	var home := battle.town_centre(battle.me).world
 	var men: Array[Unit] = []
 	var spot := home + Vector2(380, 260)

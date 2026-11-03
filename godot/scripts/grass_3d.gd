@@ -93,6 +93,11 @@ void vertex() {
 	// lighter at the tip): the blades read as grass, not as dark specks.
 	colour=mix(vec3(0.21,0.29,0.075),vec3(0.44,0.52,0.17),height)*(0.86+jitter.x*0.28);
 	colour=mix(colour,colour*vec3(1.15,1.02,0.76),summer*0.6+autumn*0.45);
+	// The meadow's patches, as the ground under them; in a patch in bloom
+	// some blades carry a flower at the tip.
+	colour=meadow_tint(root,colour);
+	float bloom=meadow(root).z*(1.0-autumn);
+	colour=mix(colour,meadow_flower(root),step(hash(grid+vec2(5.0,9.0)),bloom*0.2)*smoothstep(0.7,0.95,height));
 	VERTEX=world;
 	POSITION=PROJECTION_MATRIX*VIEW_MATRIX*vec4(world,1.0);
 	// No blades on unknown ground: there the field is a grey haze.
@@ -139,7 +144,7 @@ func _ready() -> void:
 	_blocked_texture = ImageTexture.create_from_image(blocked)
 	material = ShaderMaterial.new()
 	var shader := Shader.new()
-	shader.code = SHADER
+	shader.code = SHADER.replace("float hash(vec2 p)", GrassSurface3D.MEADOW + "float hash(vec2 p)")
 	material.shader = shader
 	material.set_shader_parameter("cover_tex",cover_texture)
 	material.set_shader_parameter("blocked_tex",_blocked_texture)
