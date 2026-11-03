@@ -133,6 +133,7 @@ var _orders: Array[Dictionary] = []   # orders on their way to the battalions
 
 func _ready() -> void:
 	randomize()
+	Phone.setup(get_tree())
 	current = self
 	net_role = online_role
 	me = online_side if net_role != "" else "france"
@@ -1981,9 +1982,10 @@ func _drag_aim(end: Vector2, from: Variant = null) -> void:
 
 func _select_in(box: Rect2, add: bool) -> void:
 	var picked: Array[Unit] = []
-	if box.size.length() < 6.0:
+	# A tap (a fingertip wobbles more, and is broader than the mouse).
+	if box.size.length() < (14.0 if touched else 6.0):
 		var nearest: Unit = null
-		var best := 16.0
+		var best := 26.0 if touched else 16.0
 		for u in units:
 			if u.alive() and u.side == me:
 				var d := u.position.distance_to(box.position)

@@ -9,6 +9,11 @@ extends CanvasLayer
 ## building brown), each button with its name large and its key, cost or
 ## state small beneath, a longer explanation when the mouse rests on it, and
 ## the formation or stance in force lit in gold.
+##
+## On a phone (Phone.active) the same, compact: a short line of stocks, the
+## keys' buttons folded under "Meer", the map on request, the selection in a
+## line or two over its buttons, which stand in two rows (and scroll sideways
+## if they do not fit).
 
 var battle: Battle
 
@@ -18,33 +23,41 @@ var _info: Label
 var _plan: Label
 var _result: Label
 var _buttons: HBoxContainer
+## Phone: the buttons' strip (scrolls sideways) and the panel behind it.
+var _scroll: ScrollContainer
+var _bottom: Panel
+var _compact := false
+var _more: Button
+var _button_count := 0
 var _group: GridContainer = null
 var _dirty := true
 var _end: Panel = null
 var _minimap: Minimap
 ## By touch, the keys' work on buttons: menu, save, load, the next battalion,
 ## to the selection, a selection box, nothing selected, sound.
-var _touchbar: HBoxContainer
+var _touchbar: Container
 var _box_button: Button
 
 
 func _ready() -> void:
 	layer = 2
-	var bar := _panel(Vector2(0, 0), Vector2(0, 40))
+	_compact = Phone.active()
+	var bar_height := 32 if _compact else 40
+	var bar := _panel(Vector2(0, 0), Vector2(0, bar_height))
 	bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	bar.offset_bottom = 40
-	_top = _label(bar, Vector2(14, 9), 16)
+	bar.offset_bottom = bar_height
+	_top = _label(bar, Vector2(10, 7) if _compact else Vector2(14, 9), 14 if _compact else 16)
 	# Back to the main menu, always at hand (F10 too).
 	var menu_button := Button.new()
-	menu_button.text = "Hoofdmenu"
+	menu_button.text = "Menu" if _compact else "Hoofdmenu"
 	menu_button.tooltip_text = "Terug naar het hoofdmenu (F10). Sla eerst op met F5 als je de slag wilt bewaren."
 	menu_button.focus_mode = Control.FOCUS_NONE
 	menu_button.anchor_left = 1.0
 	menu_button.anchor_right = 1.0
-	menu_button.offset_left = -118
-	menu_button.offset_right = -8
-	menu_button.offset_top = 4
-	menu_button.offset_bottom = 36
+	menu_button.offset_left = -84 if _compact else -118
+	menu_button.offset_right = -6 if _compact else -8
+	menu_button.offset_top = 2 if _compact else 4
+	menu_button.offset_bottom = 30 if _compact else 36
 	for state: String in ["normal", "hover", "pressed"]:
 		menu_button.add_theme_stylebox_override(state, _style(Color(0.55, 0.5, 0.36), state, false))
 	menu_button.pressed.connect(func() -> void: battle.get_tree().change_scene_to_file("res://scenes/menu.tscn"))
@@ -58,27 +71,62 @@ func _ready() -> void:
 	var panel := _panel(Vector2.ZERO, Vector2.ZERO)
 	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	panel.offset_top = -150
-	_info = _label(panel, Vector2(14, 10), 13)
+	_bottom = panel
+	_info = _label(self if _compact else panel, Vector2(14, 10), 12 if _compact else 13)
 	_info.size = Vector2(430, 130)
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if _compact:
+		_info.max_lines_visible = 2
+		_info.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_buttons = HBoxContainer.new()
 	_buttons.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_buttons.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_buttons.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_buttons.offset_right = -12
 	_buttons.offset_bottom = -10
-	_buttons.add_theme_constant_override("separation", 14)
-	add_child(_buttons)
+	_buttons.add_theme_constant_override("separation", 10 if _compact else 14)
+	if _compact:
+		_scroll = ScrollContainer.new()
+		_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+		_scroll.scroll_deadzone = 12
+		add_child(_scroll)
+		_scroll.add_child(_buttons)
+	else:
+		add_child(_buttons)
 	_minimap = Minimap.new()
 	_minimap.battle = battle
 	_minimap.camera = battle.camera if battle != null else null
 	_minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_minimap.offset_left = -Minimap.SIZE.x - 14
-	_minimap.offset_top = 74
+	_minimap.offset_left = -Minimap.SIZE.x - (6 if _compact else 14)
+	_minimap.offset_top = 38 if _compact else 74
 	add_child(_minimap)
-	_touchbar = HBoxContainer.new()
-	_touchbar.position = Vector2(14, 72)
-	_touchbar.add_theme_constant_override("separation", 6)
+	if _compact:
+		# The keys' buttons folded away under "Meer", in two columns; the map
+		# shown on request.
+		_minimap.visible = false
+		_more = Button.new()
+		_more.text = "Meer"
+		_more.focus_mode = Control.FOCUS_NONE
+		_more.position = Vector2(6, 38)
+		_more.custom_minimum_size = Vector2(84, 40)
+		for state: String in ["normal", "hover", "pressed"]:
+			_more.add_theme_stylebox_override(state, _style(Color(0.55, 0.5, 0.36), state, false))
+		_more.pressed.connect(func() -> void:
+			_touchbar.visible = not _touchbar.visible
+			_more.text = "Minder" if _touchbar.visible else "Meer")
+		add_child(_more)
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 5)
+		grid.add_theme_constant_override("v_separation", 5)
+		grid.position = Vector2(6, 82)
+		_touchbar = grid
+	else:
+		_touchbar = HBoxContainer.new()
+		_touchbar.position = Vector2(14, 72)
+		_touchbar.add_theme_constant_override("separation", 6)
 	add_child(_touchbar)
 	_touch_button("Opslaan", func() -> void: battle.save_battle())
 	_touch_button("Laden", func() -> void:
@@ -92,7 +140,9 @@ func _ready() -> void:
 	_touch_button("Geluid", func() -> void:
 		battle.sounds.enabled = not battle.sounds.enabled
 		battle.say("Geluid %s." % ("aan" if battle.sounds.enabled else "uit")))
-	_touchbar.visible = _by_touch()
+	if _compact:
+		_touch_button("Kaart", func() -> void: _minimap.visible = not _minimap.visible)
+	_touchbar.visible = _by_touch() and not _compact
 	_result = _label(self, Vector2.ZERO, 30)
 	_result.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_result.offset_top = 110
@@ -134,6 +184,9 @@ func _process(_delta: float) -> void:
 	if battle == null:
 		return
 	var e: Dictionary = battle.economy[battle.me]
+	if _compact:
+		_compact_process(e)
+		return
 	_top.text = "NAPOLEONIC RTS   ·   %d voedsel   ·   %d hout   ·   %d ijzer   ·   %d/%d inwoners   ·   gebieden %d–%d   ·   %s" % [
 		e["food"], e["wood"], e["iron"], battle.pop_used(battle.me), battle.pop_cap(battle.me),
 		battle.territories_held(battle.me), battle.territories_held("britain" if battle.me == "france" else "france"),
@@ -156,8 +209,57 @@ func _process(_delta: float) -> void:
 	if _dirty:
 		_dirty = false
 		_rebuild()
-		_touchbar.visible = _by_touch()
+		if not _compact:
+			_touchbar.visible = _by_touch()
 		_box_button.text = "Kader: aan" if battle.box_mode else "Kader"
+
+
+## Phone: the same as _process, laid out small.
+func _compact_process(e: Dictionary) -> void:
+	_top.text = "%d voedsel · %d hout · %d ijzer · %d/%d · %s" % [e["food"], e["wood"], e["iron"],
+		battle.pop_used(battle.me), battle.pop_cap(battle.me), DayNight.clock_text(battle.clock)]
+	_status.text = battle.status
+	_plan.visible = false
+	var text := _describe()
+	if battle.selected_units.is_empty() and battle.selected_building == null:
+		text = "Tik op een eigen soldaat of gebouw. Twee vingers: kaart schuiven en zoomen."
+	_info.text = text
+	_result.text = ""
+	if battle.result != "" and _end == null:
+		_show_end()
+	if battle.result == "" and battle.hold_side != "":
+		_result.text = "%s beheerst alle gebieden · nog %d:%02d" % [
+			"Frankrijk" if battle.hold_side == "france" else "Groot-Brittannië", int(battle.hold_left()) / 60, int(battle.hold_left()) % 60]
+		_result.add_theme_font_size_override("font_size", 15)
+	if _dirty:
+		_dirty = false
+		_rebuild()
+		_box_button.text = "Kader: aan" if battle.box_mode else "Kader"
+	_layout_compact()
+
+
+## Phone: the buttons along the bottom (scrolling if too wide), their panel
+## just as high, the selection's line or two over it, the status under the top.
+func _layout_compact() -> void:
+	var screen := get_viewport().get_visible_rect().size
+	var want := _buttons.get_combined_minimum_size()
+	var shown := _button_count > 0
+	var height := want.y if shown else 0.0
+	var width := minf(want.x, screen.x - 12)
+	_scroll.visible = shown
+	_scroll.position = Vector2(screen.x - 6 - width, screen.y - 6 - height)
+	_scroll.size = Vector2(width, height)
+	_bottom.visible = shown
+	_bottom.offset_top = -(height + 12)
+	var info_bottom: float = screen.y - (height + 16.0 if shown else 6.0)
+	_info.size = Vector2(screen.x - 20, 34)
+	_info.position = Vector2(10, info_bottom - 34)
+	_status.position = Vector2(96, 44)
+	_status.size = Vector2(screen.x - 200, 20)
+	_status.add_theme_font_size_override("font_size", 12)
+	_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_status.clip_text = true
+	_result.offset_top = 70
 
 
 func _describe() -> String:
@@ -225,8 +327,19 @@ const TRAIN := Color(0.55, 0.45, 0.72)
 
 func _rebuild() -> void:
 	for child in _buttons.get_children():
+		_buttons.remove_child(child)
 		child.queue_free()
 	_group = null
+	_fill_buttons()
+	_button_count = 0
+	for box in _buttons.get_children():
+		var grid: GridContainer = box.get_child(1)
+		_button_count += grid.get_child_count()
+		if _compact:
+			grid.columns = maxi(1, ceili(grid.get_child_count() / 2.0))
+
+
+func _fill_buttons() -> void:
 	var b := battle.selected_building
 	if b != null:
 		if b.complete and b.side == battle.me:
@@ -327,7 +440,7 @@ func _by_touch() -> bool:
 func _touch_button(text: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(0, 40)
+	button.custom_minimum_size = Vector2(130, 40) if _compact else Vector2(0, 40)
 	button.add_theme_font_size_override("font_size", 14)
 	button.focus_mode = Control.FOCUS_NONE
 	for state: String in ["normal", "hover", "pressed"]:
@@ -376,6 +489,10 @@ func _show_end() -> void:
 	_end.offset_right = 310
 	_end.offset_top = -235
 	_end.offset_bottom = 235
+	if _compact:
+		# A phone's screen is 420 high: the same, three quarters the size.
+		_end.pivot_offset = Vector2(310, 235)
+		_end.scale = Vector2.ONE * 0.78
 	add_child(_end)
 	var box := VBoxContainer.new()
 	box.position = Vector2(24, 20)
@@ -441,7 +558,7 @@ func _button(title: String, note: String, action: Callable, tip := "", active :=
 		_start_group("", BATTALION, 4)
 	var colour: Color = _group.get_meta("colour", BATTALION)
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(112, 50)
+	button.custom_minimum_size = Vector2(98, 44) if _compact else Vector2(112, 50)
 	button.focus_mode = Control.FOCUS_NONE
 	button.tooltip_text = tip if tip != "" else title
 	for state: String in ["normal", "hover", "pressed", "disabled"]:
@@ -456,7 +573,7 @@ func _button(title: String, note: String, action: Callable, tip := "", active :=
 	var name_ := Label.new()
 	name_.text = title
 	name_.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_.add_theme_font_size_override("font_size", 14 if title.length() <= 12 else 12)
+	name_.add_theme_font_size_override("font_size", (13 if title.length() <= 11 else 11) if _compact else (14 if title.length() <= 12 else 12))
 	name_.add_theme_color_override("font_color", Color(1.0, 0.93, 0.7) if active else Color(0.97, 0.95, 0.88))
 	name_.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lines.add_child(name_)

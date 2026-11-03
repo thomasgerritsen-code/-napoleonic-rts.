@@ -21,6 +21,7 @@ var _load_button: Button
 
 
 func _ready() -> void:
+	Phone.setup(get_tree())
 	# Back from an online battle: the line is closed.
 	var old := NetLink.find(get_tree())
 	if old != null:
@@ -34,16 +35,23 @@ func _ready() -> void:
 	ground.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	ground.modulate = Color(0.55, 0.55, 0.5)
 	add_child(ground)
+	# Centred; on a small screen (a phone) the pages scroll up and down.
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.scroll_deadzone = 12
+	add_child(scroll)
+	var centre := CenterContainer.new()
+	centre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	centre.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(centre)
 	var frame := VBoxContainer.new()
-	frame.set_anchors_preset(Control.PRESET_CENTER)
-	frame.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	frame.grow_vertical = Control.GROW_DIRECTION_BOTH
-	frame.add_theme_constant_override("separation", 18)
-	add_child(frame)
+	frame.add_theme_constant_override("separation", 10 if Phone.active() else 18)
+	centre.add_child(frame)
 	var title := Label.new()
 	title.text = "NAPOLEONIC RTS"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 44)
+	title.add_theme_font_size_override("font_size", 30 if Phone.active() else 44)
 	title.add_theme_color_override("font_color", Color(0.96, 0.9, 0.7))
 	title.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.06))
 	title.add_theme_constant_override("outline_size", 8)
