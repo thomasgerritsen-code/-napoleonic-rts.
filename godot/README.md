@@ -144,6 +144,9 @@ tirailleurs, charge, stelling, halt); tik twee keer snel op een soldaat om
 alle bataljons van dat soort te selecteren; Pauze (of P) zet de slag stil
 terwijl je orders geeft. Nieuw? Begin met **Singleplayer → Leerslag**: in
 een paar minuten stap voor stap door het spel.
+**Singleplayer → Snelle slagen**: korte gevechten met één doel, zonder
+economie: *Houd de brug* (drie Britse golven, 6 minuten), *Verover het dorp*
+(10 minuten) en *Open veld* (verdrijf alle Britten).
 
 De beginsituatie en de plaatjes komen uit de webversie via
 `node scripts/export-godot-scenario.js` (met het spel lokaal geserveerd).

@@ -66,6 +66,15 @@ func _initialize() -> void:
 	for i in 6:
 		await process_frame
 	await _save(out.path_join("phone_tutorial.png"))
+	learning.queue_free()
+	await process_frame
+	Battle.mode = "quick"
+	Battle.quick_id = "brug"
+	var bridge: Battle = load("res://scenes/main.tscn").instantiate()
+	root.add_child(bridge)
+	for i in 6:
+		await process_frame
+	await _save(out.path_join("phone_quick.png"))
 	Battle.mode = "campaign"
 	print("SHOTS ", out)
 	quit(0)

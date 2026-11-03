@@ -56,7 +56,7 @@ func _ready() -> void:
 	title.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.06))
 	title.add_theme_constant_override("outline_size", 8)
 	frame.add_child(title)
-	for page in ["start", "single", "multi", "updates"]:
+	for page in ["start", "single", "quick", "multi", "updates"]:
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 14)
 		box.custom_minimum_size = Vector2(420, 0)
@@ -81,6 +81,12 @@ func _ready() -> void:
 	Battle.fancy = false
 	Battle.view_3d = false
 	_choice(single, "Leerslag (begin hier)", "In een paar minuten stap voor stap: boeren, bouwen, een bataljon en formaties.", "tutorial")
+	var quick_button := Button.new()
+	quick_button.text = "Snelle slagen\nKorte gevechten met één doel"
+	quick_button.custom_minimum_size = Vector2(420, 64)
+	quick_button.add_theme_font_size_override("font_size", 15)
+	quick_button.pressed.connect(func() -> void: _show("quick"))
+	single.add_child(quick_button)
 	_choice(single, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
 	_choice(single, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
 	_proof_button(single, "Veldslag in 3D", "De veldslag tegen de computer in 3D (F3 wisselt tijdens het spel tussen 2D en 3D).", func() -> void:
@@ -100,6 +106,22 @@ func _ready() -> void:
 	single.add_child(_load_button)
 	_show_saved()
 	_back(single)
+
+	var quick: VBoxContainer = _pages["quick"]
+	_heading(quick, "Snelle slagen")
+	for q: Dictionary in QuickBattle.LIST:
+		var id: String = q["id"]
+		var button := Button.new()
+		button.text = "%s\n%s" % [q["title"], q["note"]]
+		button.custom_minimum_size = Vector2(420, 64)
+		button.add_theme_font_size_override("font_size", 14)
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.pressed.connect(func() -> void:
+			Battle.mode = "quick"
+			Battle.quick_id = id
+			get_tree().change_scene_to_file("res://scenes/main.tscn"))
+		quick.add_child(button)
+	_back(quick)
 
 	var multi: VBoxContainer = _pages["multi"]
 	_heading(multi, "Multiplayer")
@@ -166,7 +188,7 @@ func _back(box: VBoxContainer) -> void:
 			link.close()
 			link.queue_free()
 			_online_note.text = ""
-		_show("start"))
+		_show("single" if box == _pages.get("quick") else "start"))
 	box.add_child(button)
 
 

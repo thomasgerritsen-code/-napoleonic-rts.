@@ -51,8 +51,17 @@ func _ready() -> void:
 
 
 func _build_card() -> void:
-	var hud: Node = battle.get("_hud")
-	_card = PanelContainer.new()
+	var parts := make_card(battle.get("_hud") if battle.get("_hud") != null else self)
+	_card = parts[0]
+	_count = parts[1]
+	_text = parts[2]
+
+
+## A card at the top of the screen, gold-edged: a small heading over a line
+## or two of text (the learning battle's steps, a quick battle's goal).
+## [card, heading label, text label].
+static func make_card(parent: Node) -> Array:
+	var card := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.12, 0.13, 0.09, 0.93)
 	style.border_color = Color(0.95, 0.78, 0.36)
@@ -62,25 +71,33 @@ func _build_card() -> void:
 	style.content_margin_right = 12
 	style.content_margin_top = 6
 	style.content_margin_bottom = 8
-	_card.add_theme_stylebox_override("panel", style)
-	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_theme_stylebox_override("panel", style)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var lines := VBoxContainer.new()
 	lines.add_theme_constant_override("separation", 2)
-	_card.add_child(lines)
-	_count = Label.new()
-	_count.add_theme_font_size_override("font_size", 11)
-	_count.add_theme_color_override("font_color", Color(0.95, 0.78, 0.36))
-	lines.add_child(_count)
-	_text = Label.new()
-	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_text.add_theme_font_size_override("font_size", 15)
-	_text.add_theme_color_override("font_color", Color(0.97, 0.94, 0.85))
-	_text.custom_minimum_size = Vector2(420, 0)
-	lines.add_child(_text)
-	if hud != null:
-		hud.add_child(_card)
-	else:
-		add_child(_card)
+	card.add_child(lines)
+	var heading := Label.new()
+	heading.add_theme_font_size_override("font_size", 11)
+	heading.add_theme_color_override("font_color", Color(0.95, 0.78, 0.36))
+	lines.add_child(heading)
+	var text := Label.new()
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.add_theme_font_size_override("font_size", 15)
+	text.add_theme_color_override("font_color", Color(0.97, 0.94, 0.85))
+	text.custom_minimum_size = Vector2(420, 0)
+	lines.add_child(text)
+	parent.add_child(card)
+	return [card, heading, text]
+
+
+## The card at the top, under the bar (on a phone right of the Meer button).
+static func place_card(card: Control, text: Label) -> void:
+	var screen := card.get_viewport().get_visible_rect().size
+	var compact := Phone.active()
+	var width := minf(520.0, screen.x - (200.0 if compact else 40.0))
+	text.custom_minimum_size.x = width - 24.0
+	card.size = Vector2(width, 0)
+	card.position = Vector2((screen.x - width) / 2.0 + (40.0 if compact else 0.0), 64.0 if compact else 84.0)
 
 
 func update(delta: float) -> void:
@@ -125,14 +142,8 @@ func _enter() -> void:
 	_place_card()
 
 
-## The card at the top, under the bar (on a phone right of the Meer button).
 func _place_card() -> void:
-	var screen := _card.get_viewport().get_visible_rect().size
-	var compact := Phone.active()
-	var width := minf(520.0, screen.x - (200.0 if compact else 40.0))
-	_text.custom_minimum_size.x = width - 24.0
-	_card.size = Vector2(width, 0)
-	_card.position = Vector2((screen.x - width) / 2.0 + (40.0 if compact else 0.0), 64.0 if compact else 84.0)
+	place_card(_card, _text)
 
 
 func _selected(type: String) -> bool:
