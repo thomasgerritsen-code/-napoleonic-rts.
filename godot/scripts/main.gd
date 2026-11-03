@@ -111,6 +111,16 @@ var _smoke: Texture2D
 var _next_id := 10000
 var _drag_start: Variant = null
 var _order_start: Variant = null
+## The battle stands still (P, or the Pauze button): orders can still be
+## given, to be carried out when it goes on. Not in an online battle.
+var paused := false
+## By touch: a finger held still on the field opens the order wheel (Hud);
+## two taps on a man select every battalion of his arm.
+const LONG_PRESS := 0.5            # seconds
+var _press_screen := Vector2.INF
+var _press_held := 0.0
+var _last_tap_ms := -10000
+var _last_tap_at := Vector2.INF
 const AIM_DRAG := 25.0               # world px of right-drag before it sets the front
 ## Played by touch (a tablet or phone, as Xogot on the iPad): there is no
 ## right button and no keys. With men selected one finger gives the order (a
@@ -269,6 +279,7 @@ func _exit_tree() -> void:
 
 func _process(delta: float) -> void:
 	current = self
+	_watch_long_press(delta)
 	if net_role == "client":
 		for u in units:
 			u.net_glide(delta)
@@ -280,6 +291,8 @@ func _process(delta: float) -> void:
 		if not sync.link.connected:
 			return
 	if result != "":
+		return
+	if paused:
 		return
 	clock += delta
 	combat_space.rebuild(units)
@@ -1243,6 +1256,7 @@ func order(at: Vector2, face: Variant = null) -> void:
 		return
 	if selected_units.is_empty():
 		return
+	buzz(15)
 	var foe := _thing_at(at, true)
 	var supply := _supply_at(at)
 	var own := _thing_at(at, false) as Building
@@ -1482,6 +1496,67 @@ func focus_selection() -> void:
 	for u in selected_units:
 		sum += u.world
 	camera.focus(Iso.to_screen(sum / selected_units.size()))
+
+
+## Stand the battle still, or let it go on (not online: the other player
+## would have to wait).
+func toggle_pause() -> void:
+	if net_role != "":
+		say("Pauzeren kan niet in een online slag.")
+		return
+	paused = not paused
+	say("Gepauzeerd: geef rustig je orders." if paused else "De slag gaat verder.")
+	buzz(25)
+	refresh_hud()
+
+
+## A short buzz of the phone under the thumb (only played by touch).
+static func buzz(ms: int) -> void:
+	if touched and OS.has_feature("mobile"):
+		Input.vibrate_handheld(ms)
+
+
+## A finger held still with battalions selected: the order wheel opens there,
+## and what the finger began (an order, a box) is let go.
+func _watch_long_press(delta: float) -> void:
+	if _press_screen == Vector2.INF:
+		return
+	_press_held += delta
+	if _press_held < LONG_PRESS:
+		return
+	var at := _press_screen
+	_press_screen = Vector2.INF
+	if selected.is_empty() or _hud == null or camera.fingers() >= 2:
+		return
+	_order_start = null
+	_drag_start = null
+	if _overlay != null:
+		_overlay.box = Rect2()
+		_overlay.aim_cancel()
+	buzz(30)
+	_hud.show_wheel(at)
+
+
+## Two quick taps on one of our men: every battalion of his arm (infantry,
+## cavalry, guns) selected. True when it was such a second tap.
+func _double_tap(at: Vector2, man: Unit) -> bool:
+	var now := Time.get_ticks_msec()
+	var again := touched and now - _last_tap_ms < 400 and at.distance_to(_last_tap_at) < 30.0
+	_last_tap_ms = now
+	_last_tap_at = at
+	if not again or man.regiment == null:
+		return false
+	_last_tap_ms = -10000
+	var all: Array[Unit] = []
+	var count := 0
+	for r in regiments:
+		if r.side == me and not r.destroyed() and not r.routing and r.living().size() > 0 and r.living()[0].type == man.type:
+			all.append_array(r.living())
+			count += 1
+	select_units(all)
+	say("Alle %d %s geselecteerd." % [count, "bataljons" if man.type == "infantry" else ("eskadrons" if man.type == "cavalry" else "batterijen")])
+	buzz(20)
+	return true
 
 
 ## Halt: the battalions stand where they are, the free men stop.
@@ -1878,7 +1953,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_V:
 				fog.enabled = not fog.enabled
 				fog.refresh()
+			KEY_P:
+				toggle_pause()
 		return
+	if event is InputEventMouseMotion and _press_screen != Vector2.INF \
+			and (event as InputEventMouseMotion).position.distance_to(_press_screen) > 12.0:
+		_press_screen = Vector2.INF
 	if event is InputEventMouseMotion and _drag_start != null:
 		_overlay.box = Rect2(_drag_start, Vector2.ZERO).expand(get_global_mouse_position())
 		return
@@ -1893,6 +1973,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if finger and not touched:
 		touched = true
 		refresh_hud()
+	if button.button_index == MOUSE_BUTTON_LEFT:
+		_press_screen = button.position if finger and button.pressed and camera.fingers() < 2 else Vector2.INF
+		_press_held = 0.0
 	if button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
 			if camera.fingers() >= 2:
@@ -1992,6 +2075,8 @@ func _select_in(box: Rect2, add: bool) -> void:
 				if d < best:
 					best = d
 					nearest = u
+		if nearest != null and not add and _double_tap(box.position, nearest):
+			return
 		if nearest != null:
 			# A man of a battalion selects his battalion.
 			if nearest.regiment != null and not nearest.regiment.routing:

@@ -28,6 +28,9 @@ var _scroll: ScrollContainer
 var _bottom: Panel
 var _compact := false
 var _more: Button
+## The battle stood still (P), and the order wheel a long press opens.
+var _pause_button: Button
+var _wheel: Control = null
 var _button_count := 0
 var _group: GridContainer = null
 var _dirty := true
@@ -62,6 +65,20 @@ func _ready() -> void:
 		menu_button.add_theme_stylebox_override(state, _style(Color(0.55, 0.5, 0.36), state, false))
 	menu_button.pressed.connect(func() -> void: battle.get_tree().change_scene_to_file("res://scenes/menu.tscn"))
 	add_child(menu_button)
+	_pause_button = Button.new()
+	_pause_button.text = "Pauze"
+	_pause_button.tooltip_text = "De slag stilzetten om rustig orders te geven (P)."
+	_pause_button.focus_mode = Control.FOCUS_NONE
+	_pause_button.anchor_left = 1.0
+	_pause_button.anchor_right = 1.0
+	_pause_button.offset_left = menu_button.offset_left - (80 if _compact else 90)
+	_pause_button.offset_right = menu_button.offset_left - 6
+	_pause_button.offset_top = menu_button.offset_top
+	_pause_button.offset_bottom = menu_button.offset_bottom
+	for state: String in ["normal", "hover", "pressed"]:
+		_pause_button.add_theme_stylebox_override(state, _style(Color(0.32, 0.5, 0.78), state, false))
+	_pause_button.pressed.connect(func() -> void: battle.toggle_pause())
+	add_child(_pause_button)
 	_status = _label(self, Vector2(14, 48), 14)
 	_plan = _label(self, Vector2(0, 48), 13)
 	_plan.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -144,10 +161,12 @@ func _ready() -> void:
 		_touch_button("Kaart", func() -> void: _minimap.visible = not _minimap.visible)
 	_touchbar.visible = _by_touch() and not _compact
 	_result = _label(self, Vector2.ZERO, 30)
-	_result.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_result.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_result.offset_left = 0
+	_result.offset_right = 0
 	_result.offset_top = 110
 	_result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_result.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_result.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 func _panel(at: Vector2, size: Vector2) -> Panel:
@@ -200,6 +219,7 @@ func _process(_delta: float) -> void:
 			"verbonden" if link_up else "geen verbinding"]
 	_info.text = _describe()
 	_result.text = ""
+	_show_pause()
 	if battle.result != "" and _end == null:
 		_show_end()
 	if battle.result == "" and battle.hold_side != "":
@@ -225,6 +245,7 @@ func _compact_process(e: Dictionary) -> void:
 		text = "Tik op een eigen soldaat of gebouw. Twee vingers: kaart schuiven en zoomen."
 	_info.text = text
 	_result.text = ""
+	_show_pause()
 	if battle.result != "" and _end == null:
 		_show_end()
 	if battle.result == "" and battle.hold_side != "":
@@ -236,6 +257,77 @@ func _compact_process(e: Dictionary) -> void:
 		_rebuild()
 		_box_button.text = "Kader: aan" if battle.box_mode else "Kader"
 	_layout_compact()
+
+
+## The pause button's word, and GEPAUZEERD over the field while it stands still.
+func _show_pause() -> void:
+	_pause_button.visible = battle.net_role == ""
+	_pause_button.text = "Verder" if battle.paused else "Pauze"
+	if battle.paused and battle.result == "":
+		_result.text = "GEPAUZEERD"
+		_result.add_theme_font_size_override("font_size", 24 if _compact else 30)
+
+
+## The order wheel: round the finger that was held down, the battalions'
+## orders; a tap on one gives it, a tap anywhere else closes the wheel.
+func show_wheel(at: Vector2) -> void:
+	close_wheel()
+	var screen := get_viewport().get_visible_rect().size
+	# An oval: the buttons are wider than high.
+	var radius := Vector2(125, 88)
+	var centre := Vector2(clampf(at.x, radius.x + 52, screen.x - radius.x - 52), clampf(at.y, radius.y + 24, screen.y - radius.y - 24))
+	_wheel = Control.new()
+	_wheel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_wheel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_wheel.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+			close_wheel())
+	add_child(_wheel)
+	var dot := Panel.new()
+	var round_style := StyleBoxFlat.new()
+	round_style.bg_color = Color(0.09, 0.1, 0.07, 0.55)
+	var half := radius + Vector2(62, 34)
+	round_style.set_corner_radius_all(int(half.y))
+	dot.add_theme_stylebox_override("panel", round_style)
+	dot.position = centre - half
+	dot.size = half * 2.0
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wheel.add_child(dot)
+	var items := [["Linie", FORMATION, func() -> void: battle.set_formation("line")],
+		["Colonne", FORMATION, func() -> void: battle.set_formation("column")],
+		["Carré", FORMATION, func() -> void: battle.set_formation("square")],
+		["Tirailleurs", FORMATION, func() -> void: battle.skirmish()],
+		["Charge", ORDERS, func() -> void: battle.charge()],
+		["Stelling", ORDERS, func() -> void: battle.hold()],
+		["Halt", ORDERS, func() -> void: battle.halt()]]
+	for i in items.size():
+		var item: Array = items[i]
+		var angle := -PI / 2.0 + TAU * i / items.size()
+		var button := Button.new()
+		button.text = item[0]
+		button.focus_mode = Control.FOCUS_NONE
+		button.size = Vector2(96, 38)
+		button.position = centre + Vector2.from_angle(angle) * radius - button.size / 2.0
+		button.add_theme_font_size_override("font_size", 14)
+		for state: String in ["normal", "hover", "pressed"]:
+			button.add_theme_stylebox_override(state, _style(item[1], state, false))
+		var action: Callable = item[2]
+		button.pressed.connect(func() -> void:
+			action.call()
+			Battle.buzz(15)
+			close_wheel())
+		_wheel.add_child(button)
+
+
+func close_wheel() -> void:
+	if _wheel != null:
+		_wheel.queue_free()
+		_wheel = null
+
+
+## Whether the order wheel is open: tests.
+func wheel_open() -> bool:
+	return _wheel != null
 
 
 ## Phone: the buttons along the bottom (scrolling if too wide), their panel

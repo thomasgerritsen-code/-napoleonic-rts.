@@ -273,6 +273,41 @@ func _initialize() -> void:
 	_check(two == 2 and battle.camera.zoom.x > zoom_was * 1.3 and battle.camera.fingers() == 0,
 		"two fingers pinch the map closer (zoom %.2f → %.2f)" % [zoom_was, battle.camera.zoom.x])
 	battle.camera.zoom = Vector2.ONE * zoom_was
+	# By touch: a finger held still opens the order wheel; two taps on a man
+	# select every battalion of his arm; the battle can stand still.
+	battle.select_units(regiment.living())
+	to_view = battle.get_viewport().get_canvas_transform()
+	var hold_down := InputEventMouseButton.new()
+	hold_down.device = InputEvent.DEVICE_ID_EMULATION
+	hold_down.button_index = MOUSE_BUTTON_LEFT
+	hold_down.pressed = true
+	hold_down.position = to_view * Iso.to_screen(regiment.centroid() + Vector2(0, -120))
+	root.push_input(hold_down, true)
+	_run(battle, 0.7)
+	var hud: Hud = battle.get("_hud")
+	var wheel := hud.wheel_open()
+	var hold_up := hold_down.duplicate() as InputEventMouseButton
+	hold_up.pressed = false
+	root.push_input(hold_up, true)
+	hud.close_wheel()
+	_check(wheel and battle.get("_order_start") == null, "by touch a finger held still opens the order wheel")
+	var infantry_regiments := 0
+	for r in battle.regiments:
+		if r.side == battle.me and not r.destroyed() and not r.routing and r.living().size() > 0 and r.living()[0].type == "infantry":
+			infantry_regiments += 1
+	var man := regiment.living()[0]
+	battle.select_units([] as Array[Unit])
+	battle._select_in(Rect2(man.position, Vector2.ZERO), false)
+	battle._select_in(Rect2(man.position, Vector2.ZERO), false)
+	_check(battle.selected.size() == infantry_regiments and infantry_regiments >= 1,
+		"two taps on a man select every battalion of his arm (%d of %d)" % [battle.selected.size(), infantry_regiments])
+	battle.toggle_pause()
+	var clock_was := battle.clock
+	_run(battle, 1.0)
+	var stood := battle.clock == clock_was
+	battle.toggle_pause()
+	_run(battle, 0.2)
+	_check(stood and battle.clock > clock_was, "the battle stands still while paused, and goes on")
 	Battle.touched = false
 	regiment.order_move(march_from, 0.0)
 	_run(battle, 15.0)

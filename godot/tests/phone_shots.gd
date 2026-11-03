@@ -39,6 +39,24 @@ func _initialize() -> void:
 		for i in 4:
 			await process_frame
 		await _save(out.path_join("phone_building.png"))
+	# A battalion: its buttons, the battle paused, and the order wheel.
+	var men: Array[Unit] = []
+	var spot := tc.world + Vector2(260, 160) if tc != null else Vector2(800, 800)
+	for i in 24:
+		men.append(battle.add_unit(battle.me, "infantry", spot + Vector2((i % 12) * 15, (i / 12) * 19)))
+	men.append(battle.add_unit(battle.me, "officer", spot + Vector2(90, -30)))
+	men.append(battle.add_unit(battle.me, "drummer", spot + Vector2(90, 50)))
+	var r := battle.form_regiment(men)
+	battle.select_units(r.living())
+	battle.camera.focus(Iso.to_screen(spot))
+	battle.toggle_pause()
+	for i in 4:
+		await process_frame
+	await _save(out.path_join("phone_battalion.png"))
+	(battle.get("_hud") as Hud).show_wheel(root.get_visible_rect().size / 2.0)
+	for i in 3:
+		await process_frame
+	await _save(out.path_join("phone_wheel.png"))
 	print("SHOTS ", out)
 	quit(0)
 
