@@ -7,14 +7,23 @@ extends Node
 ## one, moves the running one aside (Windows lets a running program be
 ## renamed, not overwritten), puts the new one in its place and starts it.
 ## The next start clears the old copy away.
+##
+## On a phone or tablet the game runs as a project in Xogot (Godot on iOS):
+## there updating downloads the project zip the build puts on the same
+## release and unpacks it over the project's own folder; started again,
+## Xogot opens the new version.
 
 signal checked(remote: Dictionary)   # {} when the check failed
 signal progress(share: float)
 signal failed(text: String)
+signal done(text: String)
 
 const RELEASE := "https://github.com/thomasgerritsen-code/-napoleonic-rts./releases/download/godot-latest/"
 const VERSION_URL := RELEASE + "version.json"
 const EXE_URL := RELEASE + "NapoleonicRTS.exe"
+const PROJECT_URL := RELEASE + "NapoleonicRTS-project.zip"
+const PROJECT_ZIP := "user://update-project.zip"
+const PROJECT_DIR := "NapoleonicRTS/"
 const MIN_EXE_BYTES := 10 * 1024 * 1024
 
 var _request: HTTPRequest
@@ -40,9 +49,40 @@ static func newer(remote: Dictionary, local: Dictionary) -> bool:
 	return int(remote.get("build", 0)) > int(local.get("build", 0))
 
 
-## Only the exported Windows program can replace itself.
+## The exported Windows program replaces itself; a project run in Xogot
+## on an iPhone or iPad (or another phone's Godot) has its files replaced.
 static func can_install() -> bool:
-	return OS.has_feature("template") and OS.get_name() == "Windows"
+	return (OS.has_feature("template") and OS.get_name() == "Windows") or project_mode()
+
+
+## Run as a project (not exported) on a phone or tablet: Xogot.
+static func project_mode() -> bool:
+	return not OS.has_feature("template") and OS.get_name() in ["iOS", "Android"]
+
+
+## The project zip's files (all under NapoleonicRTS/) over the folder `dest`.
+## "" when done, else what went wrong (and then nothing is written).
+static func unpack_project(zip_path: String, dest: String) -> String:
+	var zip := ZIPReader.new()
+	if zip.open(zip_path) != OK:
+		return "De download is geen geldig zip-bestand; probeer het opnieuw."
+	var files := zip.get_files()
+	if not files.has(PROJECT_DIR + "project.godot") or not files.has(PROJECT_DIR + "version.json"):
+		zip.close()
+		return "De download is niet compleet; probeer het opnieuw."
+	for name_: String in files:
+		if not name_.begins_with(PROJECT_DIR) or name_.ends_with("/") or ".." in name_:
+			continue
+		var target := dest.path_join(name_.trim_prefix(PROJECT_DIR))
+		DirAccess.make_dir_recursive_absolute(target.get_base_dir())
+		var out := FileAccess.open(target, FileAccess.WRITE)
+		if out == null:
+			zip.close()
+			return "De map van het spel is niet beschrijfbaar (%s)." % name_
+		out.store_buffer(zip.read_file(name_))
+		out.close()
+	zip.close()
+	return ""
 
 
 ## At start: the copy an update moved aside goes.
@@ -72,7 +112,15 @@ func check() -> void:
 
 func install() -> void:
 	if not can_install():
-		failed.emit("Bijwerken kan alleen in het Windows-programma (NapoleonicRTS.exe).")
+		failed.emit("Bijwerken kan alleen in het Windows-programma (NapoleonicRTS.exe) of in Xogot.")
+		return
+	if project_mode():
+		_fresh = PROJECT_ZIP
+		_downloading = true
+		_request.download_file = _fresh
+		_request.timeout = 0.0
+		if _request.request(PROJECT_URL) != OK:
+			failed.emit("Downloaden lukt niet.")
 		return
 	_fresh = OS.get_executable_path().get_base_dir().path_join("NapoleonicRTS.new.exe")
 	_downloading = true
@@ -96,7 +144,20 @@ func _on_completed(result: int, code: int, _headers: PackedStringArray, body: Pa
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		failed.emit("Downloaden mislukt (%s)." % (code if code != 0 else result))
 		return
+	if project_mode():
+		_unpack()
+		return
 	_swap_and_restart()
+
+
+## Xogot: the new project over this one; the player starts it again.
+func _unpack() -> void:
+	var error := unpack_project(_fresh, ProjectSettings.globalize_path("res://"))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(_fresh))
+	if error != "":
+		failed.emit(error)
+		return
+	done.emit("Bijgewerkt naar %s. Stop het spel (■) en start het opnieuw (▶︎) in Xogot." % label(current()))
 
 
 ## The new program in the old one's place, and started.

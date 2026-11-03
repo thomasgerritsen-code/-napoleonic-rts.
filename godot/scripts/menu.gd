@@ -269,6 +269,10 @@ func _update_row(box: VBoxContainer) -> void:
 	_updater.failed.connect(func(text: String) -> void:
 		_update_note.text = text
 		_update_button.disabled = false)
+	_updater.done.connect(func(text: String) -> void:
+		_update_note.text = text
+		_update_button.text = "Bijgewerkt"
+		_version_line.text = text)
 	_update_note = _note(box)
 	_update_note.text = "Versie: %s · zoeken naar updates…" % Updater.label(Updater.current())
 	_update_button = Button.new()

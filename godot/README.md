@@ -123,6 +123,11 @@ Xogot is Godot voor iPad en iPhone (Godot 4.7, net als dit project).
 3. Open die map in Xogot en druk op afspelen. De eerste keer importeert Xogot
    de plaatjes; dat duurt even.
 
+Bijwerken gaat daarna in het spel zelf: **Menu → Updates → Bijwerken** haalt
+de nieuwste zip op en pakt hem uit over de eigen map. Stop het spel (■) en
+start het opnieuw (▶︎); Xogot importeert dan wat er veranderd is. (Een
+git-kloon werk je bij met git, niet met deze knop.)
+
 Wie liever met git werkt: kloon de repository (bijvoorbeeld met Working Copy) en
 open daarin de map `godot/`.
 

@@ -63,6 +63,24 @@ func _initialize() -> void:
 	_check(Updater.newer({"build": 41}, {"build": 40}) and not Updater.newer({"build": 40}, {"build": 40})
 		and Updater.label({"build": 0}) == "ontwikkelversie" and Updater.label({"build": 7, "date": "2026-10-30"}) == "build 7 (2026-10-30)",
 		"the updater tells a newer build from this one")
+	# Xogot: the project zip is unpacked over a folder; an incomplete one writes nothing.
+	var zip_path := ProjectSettings.globalize_path("user://test-update.zip")
+	var unpack_dir := ProjectSettings.globalize_path("user://test-update")
+	var packer := ZIPPacker.new()
+	packer.open(zip_path)
+	for entry: Array in [["NapoleonicRTS/project.godot", "x"], ["NapoleonicRTS/version.json", "{\"build\": 99}"], ["NapoleonicRTS/scripts/a.gd", "pass"]]:
+		packer.start_file(entry[0])
+		packer.write_file((entry[1] as String).to_utf8_buffer())
+		packer.close_file()
+	packer.close()
+	var unpacked := Updater.unpack_project(zip_path, unpack_dir) == "" and FileAccess.get_file_as_string(unpack_dir.path_join("scripts/a.gd")) == "pass"
+	packer.open(zip_path)
+	packer.start_file("NapoleonicRTS/scripts/b.gd")
+	packer.write_file("pass".to_utf8_buffer())
+	packer.close_file()
+	packer.close()
+	var refused := Updater.unpack_project(zip_path, unpack_dir) != "" and not FileAccess.file_exists(unpack_dir.path_join("scripts/b.gd"))
+	_check(unpacked and refused and not Updater.project_mode(), "the Xogot update unpacks a whole project zip and refuses a broken one")
 
 	battle.fog.refresh()
 	_check(battle.fog.sees(battle.town_centre("france").world), "France sees its own base")
