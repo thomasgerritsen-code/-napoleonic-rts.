@@ -4,6 +4,16 @@ Twee assistenten werken tegelijk aan dit spel, op dezelfde branch
 (`claude/continue-updates-o6whr4`, PR #329). Deze afspraken houden het werk van
 de een heel als de ander pusht.
 
+## Waar het werk nu heen gaat (besluit van de eigenaar, 3 november 2026)
+
+- De webversie (JavaScript: `play.html`, `src/`) wordt niet verder gebouwd. Geen
+  nieuwe functies, graphics of tests meer voor de webversie; laat die code staan
+  zoals hij is.
+- Al het nieuwe werk gaat naar de Godot-versie (`godot/`), met de telefoon als
+  doel: spelen in Xogot op de iPhone (de compacte indeling van `Phone` en `Hud`).
+  Test nieuw werk ook op telefoonformaat (`godot/tests/phone_shots.gd`) en houd
+  het licht genoeg voor een telefoon.
+
 ## Voor je begint en voor je pusht
 
 1. Haal eerst de laatste stand op: `git fetch origin` en daarna
