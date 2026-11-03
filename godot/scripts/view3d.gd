@@ -727,6 +727,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var motion := event as InputEventMouseMotion
 	if motion != null:
+		battle.track_motion(motion.position)
 		if motion.button_mask & MOUSE_BUTTON_MASK_MIDDLE:
 			_pan(Vector2(-motion.relative.x, motion.relative.y) * _distance * 0.0016)
 			_place_camera()
@@ -750,6 +751,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_distance = minf(260.0, _distance * 1.12)
 			_place_camera()
 		MOUSE_BUTTON_LEFT:
+			# A finger held still opens the order wheel (Battle, Hud).
+			battle.track_press(button.position, finger and button.pressed and _touches.size() < 2)
 			if button.pressed:
 				if _touches.size() >= 2:
 					return
@@ -783,10 +786,11 @@ func _give_order(screen: Vector2) -> void:
 	battle.order(to, (end - to).angle() if end.distance_to(to) > Battle.AIM_DRAG else null)
 
 
-## The nearest of our men under a screen point (within 22 px).
+## The nearest of our men under a screen point (within 22 px; a fingertip
+## is broader: 32).
 func _man_at(screen: Vector2) -> Unit:
 	var best: Unit = null
-	var near := 22.0
+	var near := 32.0 if Battle.touched else 22.0
 	for u in battle.units:
 		if not u.alive() or u.side != battle.me:
 			continue
@@ -809,6 +813,9 @@ func _select(from: Vector2, to: Vector2, add: bool) -> void:
 		battle.refresh_hud()
 	if box.size.length() < 6.0:
 		var man := _man_at(to)
+		# Two quick taps on a man: every battalion of his arm.
+		if man != null and not add and battle.double_tap(to, man):
+			return
 		if man != null:
 			var picked: Array[Unit] = []
 			if man.regiment != null and not man.regiment.routing:
@@ -831,6 +838,13 @@ func _select(from: Vector2, to: Vector2, add: bool) -> void:
 			if u.military():
 				soldiers.append(u)
 	battle.select_units(soldiers if not soldiers.is_empty() else picked, add)
+
+
+## What a finger began (an order, a box) let go: the order wheel opened.
+func cancel_pointer() -> void:
+	_order_from = null
+	_box_from = null
+	_box.visible = false
 
 
 ## The selection box on the screen (the 2D overlay is hidden: a frame of our own).

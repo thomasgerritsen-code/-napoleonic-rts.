@@ -762,6 +762,42 @@ func _initialize() -> void:
 		deep._process(1.0)
 	_check(shown3d >= 26 and hidden_2d and picked_line and line.centroid().distance_to(goal3d) < 60.0,
 		"in 3D the battle is drawn (%d men), a click selects a battalion and a right click sends it (%.0f px off)" % [shown3d, line.centroid().distance_to(goal3d)])
+	# In 3D by touch: a finger held still opens the order wheel; two taps on
+	# a man select every battalion of his arm.
+	Battle.touched = true
+	deep.select_units(line.living())
+	var hold3d := InputEventMouseButton.new()
+	hold3d.device = InputEvent.DEVICE_ID_EMULATION
+	hold3d.button_index = MOUSE_BUTTON_LEFT
+	hold3d.pressed = true
+	hold3d.position = deep.view3d.camera.unproject_position(View3D.at(line.centroid() + Vector2(0, -160)))
+	root.push_input(hold3d, true)
+	for i in 7:
+		deep._process(0.1)
+	var hud3d: Hud = deep.get("_hud")
+	var wheel3d := hud3d.wheel_open() and deep.view3d.get("_order_from") == null
+	var hold3d_up := hold3d.duplicate() as InputEventMouseButton
+	hold3d_up.pressed = false
+	root.push_input(hold3d_up, true)
+	hud3d.close_wheel()
+	await process_frame
+	deep.select_units([] as Array[Unit])
+	var tap_at := deep.view3d.camera.unproject_position(View3D.at(line.living()[3].world) + Vector3.UP * 0.9)
+	for n in 2:
+		for down: bool in [true, false]:
+			var tap := InputEventMouseButton.new()
+			tap.device = InputEvent.DEVICE_ID_EMULATION
+			tap.button_index = MOUSE_BUTTON_LEFT
+			tap.pressed = down
+			tap.position = tap_at
+			root.push_input(tap, true)
+	var arm := 0
+	for r in deep.regiments:
+		if r.side == deep.me and not r.destroyed() and not r.routing and r.living().size() > 0 and r.living()[0].type == line.living()[0].type:
+			arm += 1
+	_check(wheel3d and deep.selected.size() == arm and arm >= 1,
+		"in 3D a finger held still opens the order wheel (%s), and two taps select every battalion of the arm (%d of %d)" % [wheel3d, deep.selected.size(), arm])
+	Battle.touched = false
 	# In 3D too: smoke and earth, the fog drawn by the 3D view (the 2D sheet
 	# stays hidden), the territories marked.
 	deep.call("_puff", line.centroid(), 0.55, 2.6, Vector2(1, 0))

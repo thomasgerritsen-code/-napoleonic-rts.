@@ -1536,6 +1536,19 @@ static func buzz(ms: int) -> void:
 		Input.vibrate_handheld(ms)
 
 
+## A finger came down (`down`) or went up on the screen: held still long
+## enough it opens the order wheel (2D and 3D alike).
+func track_press(screen: Vector2, down: bool) -> void:
+	_press_screen = screen if down else Vector2.INF
+	_press_held = 0.0
+
+
+## The finger moved: far enough, and it is a drag, not a long press.
+func track_motion(screen: Vector2) -> void:
+	if _press_screen != Vector2.INF and screen.distance_to(_press_screen) > 12.0:
+		_press_screen = Vector2.INF
+
+
 ## A finger held still with battalions selected: the order wheel opens there,
 ## and what the finger began (an order, a box) is let go.
 func _watch_long_press(delta: float) -> void:
@@ -1553,13 +1566,15 @@ func _watch_long_press(delta: float) -> void:
 	if _overlay != null:
 		_overlay.box = Rect2()
 		_overlay.aim_cancel()
+	if view3d != null:
+		view3d.cancel_pointer()
 	buzz(30)
 	_hud.show_wheel(at)
 
 
 ## Two quick taps on one of our men: every battalion of his arm (infantry,
 ## cavalry, guns) selected. True when it was such a second tap.
-func _double_tap(at: Vector2, man: Unit) -> bool:
+func double_tap(at: Vector2, man: Unit) -> bool:
 	var now := Time.get_ticks_msec()
 	var again := touched and now - _last_tap_ms < 400 and at.distance_to(_last_tap_at) < 30.0
 	_last_tap_ms = now
@@ -1976,9 +1991,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_P:
 				toggle_pause()
 		return
-	if event is InputEventMouseMotion and _press_screen != Vector2.INF \
-			and (event as InputEventMouseMotion).position.distance_to(_press_screen) > 12.0:
-		_press_screen = Vector2.INF
+	if event is InputEventMouseMotion:
+		track_motion((event as InputEventMouseMotion).position)
 	if event is InputEventMouseMotion and _drag_start != null:
 		_overlay.box = Rect2(_drag_start, Vector2.ZERO).expand(get_global_mouse_position())
 		return
@@ -1994,8 +2008,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		touched = true
 		refresh_hud()
 	if button.button_index == MOUSE_BUTTON_LEFT:
-		_press_screen = button.position if finger and button.pressed and camera.fingers() < 2 else Vector2.INF
-		_press_held = 0.0
+		track_press(button.position, finger and button.pressed and camera.fingers() < 2)
 	if button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
 			if camera.fingers() >= 2:
@@ -2095,7 +2108,7 @@ func _select_in(box: Rect2, add: bool) -> void:
 				if d < best:
 					best = d
 					nearest = u
-		if nearest != null and not add and _double_tap(box.position, nearest):
+		if nearest != null and not add and double_tap(box.position, nearest):
 			return
 		if nearest != null:
 			# A man of a battalion selects his battalion.

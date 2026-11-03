@@ -13,6 +13,10 @@ de een heel als de ander pusht.
   doel: spelen in Xogot op de iPhone (de compacte indeling van `Phone` en `Hud`).
   Test nieuw werk ook op telefoonformaat (`godot/tests/phone_shots.gd`) en houd
   het licht genoeg voor een telefoon.
+- Binnen Godot gaat alleen de 3D-weergave verder (`View3D`, `Field3D`,
+  `assets3d/`): geen nieuw grafisch werk meer voor de 2D-weergave. De 2D-kant
+  blijft bestaan als spelregels en als terugval (F3), maar wordt niet mooier
+  gemaakt.
 
 ## Voor je begint en voor je pusht
 
