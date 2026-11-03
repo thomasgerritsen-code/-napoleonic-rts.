@@ -89,10 +89,10 @@ void vertex() {
 	// Small leaves scatter skylight. An upward-biased aggregate normal also
 	// avoids ground-shadow acne on these sub-pixel blades at normal zoom.
 	NORMAL=normalize(vec3(turn*NORMAL.xz*0.25-direction*bend*height*0.45,0.0).xzy+vec3(0,1.0,0));
-	// Round the painted ground's own green: deeper at the root, the tip
-	// catching the light, so the blades read as grass (not dark specks) and
-	// a gust running through them shows.
-	colour=mix(vec3(0.15,0.22,0.05),vec3(0.52,0.60,0.21),height)*(0.86+jitter.x*0.28);
+	// A little deeper than the painted ground: lit on both faces (fragment)
+	// the blades read as tufts of green standing out from it, so a gust
+	// running through them shows; not the black specks of before.
+	colour=mix(vec3(0.12,0.19,0.04),vec3(0.31,0.38,0.12),height)*(0.86+jitter.x*0.28);
 	colour=mix(colour,colour*vec3(1.15,1.02,0.76),summer*0.6+autumn*0.45);
 	// The meadow's patches, as the ground under them; in a patch in bloom
 	// some blades carry a flower at the tip.
