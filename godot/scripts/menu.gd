@@ -80,6 +80,7 @@ func _ready() -> void:
 	_heading(single, "Singleplayer")
 	Battle.fancy = false
 	Battle.view_3d = false
+	_choice(single, "Leerslag (begin hier)", "In een paar minuten stap voor stap: boeren, bouwen, een bataljon en formaties.", "tutorial")
 	_choice(single, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
 	_choice(single, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
 	_proof_button(single, "Veldslag in 3D", "De veldslag tegen de computer in 3D (F3 wisselt tijdens het spel tussen 2D en 3D).", func() -> void:

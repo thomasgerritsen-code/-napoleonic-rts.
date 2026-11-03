@@ -138,6 +138,13 @@ knijpen zoomt in en uit. Een werkbalk bovenin doet wat op de computer de
 toetsen doen: menu, opslaan, laden, volgend bataljon, naar de selectie, Kader
 (de volgende veeg trekt een selectiekader), niets selecteren en geluid.
 
+Op de telefoon: houd je vinger een halve seconde stil op de grond (met een
+bataljon geselecteerd) voor het ordermenu (linie, colonne, carré,
+tirailleurs, charge, stelling, halt); tik twee keer snel op een soldaat om
+alle bataljons van dat soort te selecteren; Pauze (of P) zet de slag stil
+terwijl je orders geeft. Nieuw? Begin met **Singleplayer → Leerslag**: in
+een paar minuten stap voor stap door het spel.
+
 De beginsituatie en de plaatjes komen uit de webversie via
 `node scripts/export-godot-scenario.js` (met het spel lokaal geserveerd).
 

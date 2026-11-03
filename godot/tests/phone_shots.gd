@@ -57,6 +57,16 @@ func _initialize() -> void:
 	for i in 3:
 		await process_frame
 	await _save(out.path_join("phone_wheel.png"))
+	# The learning battle's first step.
+	battle.queue_free()
+	await process_frame
+	Battle.mode = "tutorial"
+	var learning: Battle = load("res://scenes/main.tscn").instantiate()
+	root.add_child(learning)
+	for i in 6:
+		await process_frame
+	await _save(out.path_join("phone_tutorial.png"))
+	Battle.mode = "campaign"
 	print("SHOTS ", out)
 	quit(0)
 

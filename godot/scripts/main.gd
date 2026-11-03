@@ -17,7 +17,9 @@ const QUICK_REACH := 520.0  # how far around a barracks its men are gathered
 const PEASANT_GAP := 22.0   # between peasants sent somewhere together
 const SOLDIER_GAP := 20.0   # between loose soldiers sent somewhere together
 
-## "campaign" (the full game) or "lab" (the test field), chosen in the menu.
+## "campaign" (the full game), "lab" (the test field) or "tutorial" (the
+## learning battle: the campaign with a guide and an idle British commander),
+## chosen in the menu.
 static var mode := "campaign"
 ## The battle being fought (for the battalions' sense of danger).
 static var current: Battle = null
@@ -114,6 +116,8 @@ var _order_start: Variant = null
 ## The battle stands still (P, or the Pauze button): orders can still be
 ## given, to be carried out when it goes on. Not in an online battle.
 var paused := false
+## The learning battle (mode "tutorial"): its steps on a card (Tutorial).
+var tutorial: Tutorial = null
 ## By touch: a finger held still on the field opens the order wheel (Hud);
 ## two taps on a man select every battalion of his arm.
 const LONG_PRESS := 0.5            # seconds
@@ -217,6 +221,10 @@ func _ready() -> void:
 		fancy_look = Fancy.new()
 		fancy_look.battle = self
 		add_child(fancy_look)
+	if mode == "tutorial" and net_role == "":
+		tutorial = Tutorial.new()
+		tutorial.battle = self
+		add_child(tutorial)
 	var link := NetLink.find(get_tree())
 	if net_role != "" and link != null:
 		go_online(link)
@@ -280,6 +288,8 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	current = self
 	_watch_long_press(delta)
+	if tutorial != null:
+		tutorial.update(delta)
 	if net_role == "client":
 		for u in units:
 			u.net_glide(delta)
@@ -325,7 +335,7 @@ func _process(delta: float) -> void:
 			_trunk_revision = woods.revision
 			_walls_dirty = true
 		_auto_regiments()
-	if net_role == "":
+	if net_role == "" and tutorial == null:
 		ai.update(delta)
 	_tidy_selection()
 	_check_result(delta)

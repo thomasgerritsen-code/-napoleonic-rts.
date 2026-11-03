@@ -72,6 +72,13 @@ jobs:
           grep -q "GODOT_NAV" native-navigation.log
           grep -q "GODOT_BENCH" native-benchmark.log
 
+      - name: Learning battle played through
+        run: |
+          set -o pipefail
+          timeout 300 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/tutorial_test.gd 2>&1 | tee tutorial.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" tutorial.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "TUTORIAL passed" tutorial.log
+
       - name: Original Blender art regression
         run: |
           set -o pipefail
