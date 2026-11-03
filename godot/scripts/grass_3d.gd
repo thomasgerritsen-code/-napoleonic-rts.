@@ -89,7 +89,9 @@ void vertex() {
 	// Small leaves scatter skylight. An upward-biased aggregate normal also
 	// avoids ground-shadow acne on these sub-pixel blades at normal zoom.
 	NORMAL=normalize(vec3(turn*NORMAL.xz*0.25-direction*bend*height*0.45,0.0).xzy+vec3(0,1.0,0));
-	colour=mix(vec3(0.10,0.16,0.035),vec3(0.24,0.30,0.10),height)*(0.86+jitter.x*0.28);
+	// Close to the painted ground's own green (a little deeper at the root,
+	// lighter at the tip): the blades read as grass, not as dark specks.
+	colour=mix(vec3(0.21,0.29,0.075),vec3(0.44,0.52,0.17),height)*(0.86+jitter.x*0.28);
 	colour=mix(colour,colour*vec3(1.15,1.02,0.76),summer*0.6+autumn*0.45);
 	VERTEX=world;
 	POSITION=PROJECTION_MATRIX*VIEW_MATRIX*vec4(world,1.0);
@@ -100,6 +102,10 @@ void vertex() {
 	}
 }
 void fragment() {
+	// Both faces of a blade are drawn; the back face's normal is turned
+	// down by Godot and would leave the blade black. A blade takes the sky's
+	// light on either face.
+	NORMAL=FRONT_FACING?NORMAL:-NORMAL;
 	float fog=texture(fog_tex,clamp(world.xz/map_m,vec2(0),vec2(1))).a*fog_on;
 	// Ground seen before: the blades fade into the same haze as the ground.
 	vec3 lit=colour*(1.0-wetness*0.17);
