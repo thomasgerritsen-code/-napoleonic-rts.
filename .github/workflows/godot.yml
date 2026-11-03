@@ -136,6 +136,15 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-roads.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_ROADS" native-roads.log
 
+      - name: Detailed houses retain footprints, batching and night windows
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/house_details_test.gd 2>&1 | tee native-houses.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-houses.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_HOUSES" native-houses.log
+
       - name: GPU actor geometry and animation equivalence
         run: |
           set -o pipefail

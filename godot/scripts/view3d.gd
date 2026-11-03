@@ -16,6 +16,7 @@ extends Node3D
 ## drag: the front; a finger with men selected: order).
 
 const MODELS := "res://assets3d/%s.glb"
+const DETAILED_HOUSES := ["cottage", "farmhouse", "barn", "inn", "chapel"]
 ## Building types to models (the side's own where there is one).
 const BUILDINGS := {"towncenter": ["farmhouse", 1.45], "house": ["cottage", 1.0], "barracks": ["barracks_%s", 1.0],
 	"stable": ["barn", 1.0], "foundry": ["foundry_%s", 1.0], "tower": ["tower_%s", 1.0], "hospital": ["hospital_%s", 1.0],
@@ -192,6 +193,8 @@ func _ground() -> MeshInstance3D:
 func _scene(name_: String) -> PackedScene:
 	if not _scenes.has(name_):
 		var path := MODELS % name_
+		if name_ in DETAILED_HOUSES:
+			path = "res://assets3d/houses/%s.glb" % name_
 		_scenes[name_] = load(path) if ResourceLoader.exists(path) else null
 	return _scenes[name_]
 

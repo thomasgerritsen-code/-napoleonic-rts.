@@ -166,3 +166,7 @@ headless) en maakt een Windows-`.exe` (workflow *Godot*).
 
 De native wegen hebben bestrating, grindbermen, karrensporen en regenreactie
 in de bestaande terreinpass. Zie [de wegdocumentatie](../docs/godot-roads.md).
+
+De woonhuizen, boerderijen, schuren, herbergen en kerken hebben meer detail in
+gevels, ramen en daken, met behoud van de bestaande funderingen en één mesh
+per model. Zie [de huizendocumentatie](../docs/godot-house-details.md).

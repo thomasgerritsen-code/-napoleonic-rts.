@@ -45,6 +45,7 @@ cavalry = _load("render_iso_cavalry", "render-iso-cavalry.py")
 artillery = _load("render_iso_artillery", "render-iso-artillery.py")
 mine = _load("godot_mine", "godot_mine.py")
 architecture = _load("godot_architecture", "godot_architecture.py")
+house_details = _load("godot_house_details", "godot_house_details.py")
 
 STATIC = [*props.BUILDERS, "mine", *architecture.BUILDERS]
 SIDES = {"fr": "france", "br": "britain"}
@@ -239,38 +240,48 @@ def build_animated(name: str) -> None:
     flatten_materials()
 
 
-def build_static(name: str) -> None:
+def build_static(name: str, detailed: bool = False) -> None:
     fresh()
+    if detailed:
+        # Native-only palette and details; the web sprite builders stay intact.
+        props.material = house_details.material
+        architecture.material = house_details.material
     root = common.empty("root")
     builder = mine.build_mine if name == "mine" else architecture.BUILDERS.get(name, props.BUILDERS.get(name))
     builder(root)
+    if detailed:
+        house_details.enrich(root,name)
     bpy.context.view_layer.update()
     obj = one_mesh(name)
     big = name.startswith(("barracks", "farmhouse", "tower", "hospital", "barn", "bridge", "lumbercamp", "field", "foundry", "chapel", "inn"))
-    bake(obj, 1024 if big else 512)
+    bake(obj, 1024 if big or detailed else 512)
 
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="godot/assets3d")
     ap.add_argument("--only", nargs="*")
+    ap.add_argument("--house-details", action="store_true", help="native house detail pass; retain original models for comparison")
     args = ap.parse_args(argv)
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     names = args.only or (STATIC + animated_names())
+    if args.house_details and any(name not in house_details.MODELS for name in names):
+        ap.error("--house-details requires --only cottage farmhouse barn inn chapel (or a subset)")
     if len(names) > 1:
         # One process each: the builders keep materials from model to model.
         failed = []
         command = ([bpy.app.binary_path, "-b", "-t", "2", "--python", __file__, "--"]
                    if "--" in sys.argv else [sys.executable, __file__])
         for name in names:
-            if subprocess.run([*command, "--out", str(out), "--only", name]).returncode != 0:
+            if subprocess.run([*command, "--out", str(out), "--only", name,
+                               *(["--house-details"] if args.house_details else [])]).returncode != 0:
                 failed.append(name)
         print("failed:", failed)
         return 1 if failed else 0
     name = names[0]
     if name in STATIC:
-        build_static(name)
+        build_static(name,args.house_details)
         export(out / f"{name}.glb", False)
     else:
         build_animated(name)
