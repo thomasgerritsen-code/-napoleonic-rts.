@@ -66,6 +66,7 @@ var bridges: Bridges3D
 var building_ground: BuildingGround3D
 var chimneys: ChimneySmoke3D
 var grass: Grass3D
+var meadow: Meadow3D
 
 
 func _ready() -> void:
@@ -137,6 +138,10 @@ func _ready() -> void:
 	grass = Grass3D.new()
 	grass.view = self
 	add_child(grass)
+	# Bushes, ferns and stones over the open grass (scenery only).
+	meadow = Meadow3D.new()
+	meadow.view = self
+	add_child(meadow)
 
 
 ## A point of the map (game px) in 3D: metres, y up, on the ground.

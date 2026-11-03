@@ -762,6 +762,19 @@ func _initialize() -> void:
 		deep._process(1.0)
 	_check(shown3d >= 26 and hidden_2d and picked_line and line.centroid().distance_to(goal3d) < 60.0,
 		"in 3D the battle is drawn (%d men), a click selects a battalion and a right click sends it (%.0f px off)" % [shown3d, line.centroid().distance_to(goal3d)])
+	# The meadows: bushes, ferns and stones on open grass, none in water or
+	# on a building.
+	var meadow: Meadow3D = deep.view3d.meadow
+	var misplaced := 0
+	for piece: Array in meadow.pieces:
+		var spot: Vector2 = piece[1]
+		if Nav.in_water(spot):
+			misplaced += 1
+		for b in deep.buildings:
+			if absf(b.world.x - spot.x) < b.size.x / 2.0 and absf(b.world.y - spot.y) < b.size.y / 2.0:
+				misplaced += 1
+	_check(meadow.count("bush") > 60 and meadow.count("fern") > 30 and meadow.count("stone") > 40 and misplaced == 0,
+		"in 3D the meadows have bushes, ferns and stones (%d, %d, %d), none in water or on a building" % [meadow.count("bush"), meadow.count("fern"), meadow.count("stone")])
 	# In 3D by touch: a finger held still opens the order wheel; two taps on
 	# a man select every battalion of his arm.
 	Battle.touched = true
