@@ -185,6 +185,7 @@ func _ground() -> MeshInstance3D:
 	mesh.mesh = field.banks.ground_mesh(meta,tex)
 	# The picture has its light and shade already: less of the sun's; the fog over it.
 	mesh.material_override = field.fogged(tex, Color(0.8, 0.8, 0.78), 1)
+	RoadSurface3D.configure(mesh.material_override)
 	return mesh
 
 

@@ -162,3 +162,7 @@ schrijven (bijvoorbeeld Documenten of het Bureaublad).
 
 GitHub controleert het project bij elke wijziging (`tests/smoke_test.gd`,
 headless) en maakt een Windows-`.exe` (workflow *Godot*).
+# Gedetailleerde wegen
+
+De native wegen hebben bestrating, grindbermen, karrensporen en regenreactie
+in de bestaande terreinpass. Zie [de wegdocumentatie](../docs/godot-roads.md).
