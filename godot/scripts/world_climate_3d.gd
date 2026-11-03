@@ -33,7 +33,12 @@ static func sample(seconds: float, raining: bool, wetness: float) -> Dictionary:
 	var sunlight := Color(1.0, 0.95, 0.86).lerp(Color(1.0, 0.7, 0.46), warm)
 	sunlight = sunlight.lerp(Color(0.53, 0.65, 0.94), dark)
 	sunlight = sunlight.lerp(Color(0.79, 0.84, 0.91), cloud * 0.22)
+	# Visual air temperature only: gradual seasons, cooler nights/cloud.
+	# No new weather simulation, save field or gameplay modifier.
+	var temperature := weights.dot(Vector4(12.0,24.0,10.0,-2.0)) \
+		+ 4.0*sin((hour-8.0)*TAU/24.0)-cloud*2.0
 	return {"season": season, "weights": weights, "blend": blend, "snow": weights.w,
+		"temperature": temperature,
 		"autumn": weights.z, "summer": weights.y, "wetness": clampf(wetness, 0.0, 1.0),
 		"rain": (1.0 - weights.w) if raining else 0.0, "snowfall": weights.w if raining else 0.0,
 		"dark": dark, "cloud": cloud, "sun_color": sunlight,

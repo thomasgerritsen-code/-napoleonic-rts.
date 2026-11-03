@@ -62,6 +62,7 @@ var atmosphere: Atmosphere3D
 var construction: Construction3D
 var bridges: Bridges3D
 var building_ground: BuildingGround3D
+var chimneys: ChimneySmoke3D
 
 
 func _ready() -> void:
@@ -125,6 +126,9 @@ func _ready() -> void:
 	construction.battle = battle
 	construction.view = self
 	add_child(construction)
+	chimneys = ChimneySmoke3D.new()
+	chimneys.view = self
+	add_child(chimneys)
 
 
 ## A point of the map (game px) in 3D: metres, y up, on the ground.

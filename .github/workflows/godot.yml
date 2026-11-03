@@ -145,6 +145,15 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-houses.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_HOUSES" native-houses.log
 
+      - name: Cold chimney smoke, true flues, fog and bounded GPU puffs
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/chimney_smoke_test.gd 2>&1 | tee native-chimneys.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-chimneys.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_CHIMNEYS" native-chimneys.log
+
       - name: GPU actor geometry and animation equivalence
         run: |
           set -o pipefail

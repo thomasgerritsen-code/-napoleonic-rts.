@@ -170,3 +170,6 @@ in de bestaande terreinpass. Zie [de wegdocumentatie](../docs/godot-roads.md).
 De woonhuizen, boerderijen, schuren, herbergen en kerken hebben meer detail in
 gevels, ramen en daken, met behoud van de bestaande funderingen en één mesh
 per model. Zie [de huizendocumentatie](../docs/godot-house-details.md).
+
+Bij koude temperaturen komt lichte rook uit de echte schoorstenen, met de
+wind mee. Zie [de rookdocumentatie](../docs/godot-chimney-smoke.md).
