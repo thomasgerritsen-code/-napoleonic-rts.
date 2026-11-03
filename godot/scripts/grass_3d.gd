@@ -93,13 +93,18 @@ void vertex() {
 	colour=mix(colour,colour*vec3(1.15,1.02,0.76),summer*0.6+autumn*0.45);
 	VERTEX=world;
 	POSITION=PROJECTION_MATRIX*VIEW_MATRIX*vec4(world,1.0);
-	if(fade<0.015 || root.x<0.0 || root.y<0.0 || root.x>terrain_extent.x || root.y>terrain_extent.y) {
+	// No blades on unknown ground: there the field is a grey haze.
+	float unknown=textureLod(fog_tex,clamp(root/map_m,vec2(0),vec2(1)),0.0).a*fog_on;
+	if(fade<0.015 || unknown>0.7 || root.x<0.0 || root.y<0.0 || root.x>terrain_extent.x || root.y>terrain_extent.y) {
 		POSITION=vec4(0,0,2,1);
 	}
 }
 void fragment() {
 	float fog=texture(fog_tex,clamp(world.xz/map_m,vec2(0),vec2(1))).a*fog_on;
-	ALBEDO=colour*(1.0-wetness*0.17)*(1.0-fog*0.9);
+	// Ground seen before: the blades fade into the same haze as the ground.
+	vec3 lit=colour*(1.0-wetness*0.17);
+	float grey=dot(lit,vec3(0.3,0.59,0.11));
+	ALBEDO=mix(lit,mix(vec3(grey),vec3(0.4,0.42,0.46),0.45)*0.5,fog);
 	ROUGHNESS=mix(0.95,0.72,wetness);
 	BACKLIGHT=ALBEDO*0.18;
 }

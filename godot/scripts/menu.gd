@@ -79,7 +79,6 @@ func _ready() -> void:
 	var single: VBoxContainer = _pages["single"]
 	_heading(single, "Singleplayer")
 	Battle.fancy = false
-	Battle.view_3d = false
 	_choice(single, "Leerslag (begin hier)", "In een paar minuten stap voor stap: boeren, bouwen, een bataljon en formaties.", "tutorial")
 	var quick_button := Button.new()
 	quick_button.text = "Snelle slagen\nKorte gevechten met één doel"
@@ -89,20 +88,14 @@ func _ready() -> void:
 	single.add_child(quick_button)
 	_choice(single, "Veldslag tegen de computer", "Bouw een economie en een leger, en verover het Britse stadhuis.", "campaign")
 	_choice(single, "Testveld", "Grote legers tegenover elkaar, zonder economie: probeer formaties en snelheid.", "lab")
-	_proof_button(single, "Veldslag in 3D", "De veldslag tegen de computer in 3D (F3 wisselt tijdens het spel tussen 2D en 3D).", func() -> void:
-		Battle.view_3d = true
-		Battle.mode = "campaign"
-		get_tree().change_scene_to_file("res://scenes/main.tscn"))
-	_proof_button(single, "Proef: verbeterd 2D", "Zon die met het uur meedraait, bewegend water, wuivende bomen, wolkenschaduw.", func() -> void:
-		Battle.fancy = true
-		Battle.mode = "campaign"
-		get_tree().change_scene_to_file("res://scenes/main.tscn"))
 	_proof_button(single, "Proef: 3D-graphics", "Een stuk van de kaart in 3D met de Blender-modellen: draai en kantel de camera.", func() -> void:
 		get_tree().change_scene_to_file("res://proof3d/proof_3d.tscn"))
 	_load_button = Button.new()
 	_load_button.custom_minimum_size = Vector2(420, 64)
 	_load_button.add_theme_font_size_override("font_size", 15)
-	_load_button.pressed.connect(func() -> void: Battle.load_saved(get_tree()))
+	_load_button.pressed.connect(func() -> void:
+		_battle_in_3d()
+		Battle.load_saved(get_tree()))
 	single.add_child(_load_button)
 	_show_saved()
 	_back(single)
@@ -119,7 +112,7 @@ func _ready() -> void:
 		button.pressed.connect(func() -> void:
 			Battle.mode = "quick"
 			Battle.quick_id = id
-			get_tree().change_scene_to_file("res://scenes/main.tscn"))
+			_start_battle())
 		quick.add_child(button)
 	_back(quick)
 
@@ -210,7 +203,7 @@ func _choice(box: VBoxContainer, text: String, note: String, mode: String) -> vo
 	button.add_theme_font_size_override("font_size", 15)
 	button.pressed.connect(func() -> void:
 		Battle.mode = mode
-		get_tree().change_scene_to_file("res://scenes/main.tscn"))
+		_start_battle())
 	box.add_child(button)
 
 
@@ -286,7 +279,7 @@ func _go(role: String, side: String) -> void:
 	Battle.mode = "campaign"
 	Battle.online_role = role
 	Battle.online_side = side
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	_start_battle()
 
 
 ## The version, and updating from the menu (see Updater).
@@ -338,3 +331,15 @@ func _on_update_pressed() -> void:
 	else:
 		_update_note.text = "Zoeken naar updates…"
 		_updater.check()
+
+
+## Battles from the menu are fought in 3D (the 2D/3D button and F3 still
+## switch); set here, as a battle starts, so a test that opens the menu
+## first keeps its own choice.
+func _battle_in_3d() -> void:
+	Battle.view_3d = true
+
+
+func _start_battle() -> void:
+	_battle_in_3d()
+	get_tree().change_scene_to_file("res://scenes/main.tscn")

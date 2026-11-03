@@ -31,6 +31,8 @@ const RING := Color(1.0, 0.85, 0.35)
 var battle: Battle
 var camera: Camera3D
 var _sun: DirectionalLight3D
+## A phone draws the 3D at this share of its resolution (see _phone_quality).
+const PHONE_SCALE := 0.7
 var _env: Environment
 var _sky: ProceduralSkyMaterial
 var _sky_clock := 0.0
@@ -79,6 +81,8 @@ func _ready() -> void:
 	fx.battle = battle
 	add_child(fx)
 	add_child(_ground())
+	add_child(_apron())
+	_phone_quality(true)
 	camera = Camera3D.new()
 	camera.fov = 42.0
 	camera.near = 0.5
@@ -184,6 +188,42 @@ func _environment() -> void:
 	_sun.shadow_enabled = true
 	_sun.directional_shadow_max_distance = 180.0
 	add_child(_sun)
+
+
+## Beyond the map's edge the land goes on, plain grass of the edge's colour,
+## into the haze: no field floating in grey.
+func _apron() -> MeshInstance3D:
+	var size := Iso.WORLD / Iso.PPM
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(size.x * 5.0, size.y * 7.0)
+	# The edge's colour, under the same fog of war (its unknown haze) as the
+	# map's edge beside it.
+	var image := Image.create(1, 1, false, Image.FORMAT_RGB8)
+	image.fill(Color(83, 90, 60) / 255.0)
+	var apron := MeshInstance3D.new()
+	apron.name = "Apron"
+	apron.mesh = plane
+	apron.material_override = field.fogged(ImageTexture.create_from_image(image), Color(0.8, 0.8, 0.78))
+	apron.position = Vector3(size.x / 2.0, -0.08, size.y / 2.0)
+	apron.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return apron
+
+
+## On a phone the screen has three pixels for every point: the 3D is drawn
+## at a lower resolution and smoothed (FXAA), the shadows reach less far.
+## Back to full on leaving the 3D view.
+func _phone_quality(on: bool) -> void:
+	if not Phone.active():
+		return
+	var vp := get_viewport()
+	vp.scaling_3d_scale = PHONE_SCALE if on else 1.0
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if on else Viewport.SCREEN_SPACE_AA_DISABLED
+	if on and _sun != null:
+		_sun.directional_shadow_max_distance = 110.0
+
+
+func _exit_tree() -> void:
+	_phone_quality(false)
 
 
 ## The whole map's relief, the ground picture over it as the iso view shows it.

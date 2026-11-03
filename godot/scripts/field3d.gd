@@ -122,7 +122,11 @@ void fragment() {
 	c.rgb = mix(c.rgb, vec3(0.72,0.80,0.88) * (0.8 + detail * 0.22), settled);
 	c.rgb *= 1.0 - wetness * (surface_kind == 1 ? 0.17 : 0.08) * (1.0 - settled);
 	float dark = texture(fog_tex, clamp(wpos.xz / map_m, vec2(0.0), vec2(1.0))).a * fog_on;
-	ALBEDO = c.rgb * (1.0 - dark * 0.9);
+	// Unknown ground: a grey haze, its shapes still faintly there (not black:
+	// on a phone's small screen a dark field reads as nothing at all).
+	float grey = dot(c.rgb, vec3(0.3, 0.59, 0.11));
+	vec3 haze = mix(vec3(grey), vec3(0.4, 0.42, 0.46), 0.45) * 0.5;
+	ALBEDO = mix(c.rgb, haze, dark);
 	ROUGHNESS = mix(0.92, surface_kind == 1 ? 0.38 : 0.5, wetness * (1.0 - settled));
 	ROUGHNESS=mix(ROUGHNESS,0.7,bank_wet*(1.0-settled));
 """ + GrassSurface3D.FINISH + RoadSurface3D.FINISH + """
