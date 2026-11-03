@@ -13,7 +13,7 @@ extends Node3D
 ##   the rally point of a selected barracks.
 
 const FOG_SHADER := """shader_type spatial;
-""" + RoadSurface3D.UNIFORMS + """
+""" + RoadSurface3D.UNIFORMS + GrassSurface3D.UNIFORMS + """
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic;
 uniform vec4 tint : source_color = vec4(1.0);
 uniform sampler2D fog_tex : filter_linear;
@@ -55,6 +55,7 @@ float silt_grain(vec2 p) {
 	f=f*f*(3.0-2.0*f);
 	return mix(mix(grain(cell),grain(cell+vec2(1,0)),f.x),mix(grain(cell+vec2(0,1)),grain(cell+vec2(1,1)),f.x),f.y);
 }
+""" + GrassSurface3D.FUNCTIONS + """
 vec3 bank_grass(vec2 world) {
 	vec2 p=world*0.16;
 	vec2 weights=sin(fract(p)*3.14159265); weights*=weights;
@@ -63,7 +64,7 @@ vec3 bank_grass(vec2 world) {
 	vec3 b=texture(albedo_tex,bank_grass_rect.xy+fract(p+vec2(0.5,0))*bank_grass_rect.zw).rgb;
 	vec3 c=texture(albedo_tex,bank_grass_rect.xy+fract(p+vec2(0,0.5))*bank_grass_rect.zw).rgb;
 	vec3 d=texture(albedo_tex,bank_grass_rect.xy+fract(p+vec2(0.5))*bank_grass_rect.zw).rgb;
-	return mix(mix(d,c,weights.x),mix(b,a,weights.x),weights.y)*tint.rgb;
+	return grass_ground(world,mix(mix(d,c,weights.x),mix(b,a,weights.x),weights.y)*tint.rgb);
 }
 void fragment() {
 	if (build_progress < 0.9999 && wpos.y > build_base + max(0.18, build_height * build_progress)) { discard; }
@@ -94,7 +95,7 @@ void fragment() {
 			bank_wet=blend*(1.0-smoothstep(0.0,0.65,edge));
 		}
 	}
-""" + RoadSurface3D.FRAGMENT + """
+""" + GrassSurface3D.FRAGMENT + RoadSurface3D.FRAGMENT + """
 	float glass = step(c.r*1.6,c.g)*step(c.r*1.3,c.b)*step(c.b,c.g*1.6);
 	glass *= (1.0-step(0.18,max(c.r,max(c.g,c.b))))*(1.0-step(0.35,abs(world_normal.y)));
 	if (surface_kind != 0) { glass=0.0; }
@@ -124,7 +125,7 @@ void fragment() {
 	ALBEDO = c.rgb * (1.0 - dark * 0.9);
 	ROUGHNESS = mix(0.92, surface_kind == 1 ? 0.38 : 0.5, wetness * (1.0 - settled));
 	ROUGHNESS=mix(ROUGHNESS,0.7,bank_wet*(1.0-settled));
-""" + RoadSurface3D.FINISH + """
+""" + GrassSurface3D.FINISH + RoadSurface3D.FINISH + """
 	float coal = (1.0-smoothstep(forge_radius*0.45,max(0.0001,forge_radius),distance(wpos,forge_origin))) * step(0.7,world_normal.y);
 	EMISSION = vec3(0.8,0.19,0.025) * coal * forge_on * (1.0 - dark);
 	EMISSION += vec3(0.65,0.28,0.07) * glass * night * window_light_on * (1.0-dark);

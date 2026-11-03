@@ -154,6 +154,15 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-chimneys.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_CHIMNEYS" native-chimneys.log
 
+      - name: Fine grass and GPU blades keep roads, foundations and trenches clear
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 420 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/grass_render_test.gd 2>&1 | tee native-grass.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-grass.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_GRASS" native-grass.log
+
       - name: GPU actor geometry and animation equivalence
         run: |
           set -o pipefail

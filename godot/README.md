@@ -173,3 +173,6 @@ per model. Zie [de huizendocumentatie](../docs/godot-house-details.md).
 
 Bij koude temperaturen komt lichte rook uit de echte schoorstenen, met de
 wind mee. Zie [de rookdocumentatie](../docs/godot-chimney-smoke.md).
+
+Het gras heeft een scherpe bodemstructuur en echte grassprieten dichtbij de
+camera, met GPU-wind en afstandsafbouw. Zie [de grasdocumentatie](../docs/godot-grass.md).

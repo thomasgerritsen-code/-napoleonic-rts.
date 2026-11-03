@@ -63,6 +63,7 @@ var construction: Construction3D
 var bridges: Bridges3D
 var building_ground: BuildingGround3D
 var chimneys: ChimneySmoke3D
+var grass: Grass3D
 
 
 func _ready() -> void:
@@ -129,6 +130,9 @@ func _ready() -> void:
 	chimneys = ChimneySmoke3D.new()
 	chimneys.view = self
 	add_child(chimneys)
+	grass = Grass3D.new()
+	grass.view = self
+	add_child(grass)
 
 
 ## A point of the map (game px) in 3D: metres, y up, on the ground.
@@ -191,6 +195,7 @@ func _ground() -> MeshInstance3D:
 	# The picture has its light and shade already: less of the sun's; the fog over it.
 	mesh.material_override = field.fogged(tex, Color(0.8, 0.8, 0.78), 1)
 	RoadSurface3D.configure(mesh.material_override)
+	GrassSurface3D.configure(mesh.material_override)
 	return mesh
 
 
