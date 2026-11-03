@@ -809,7 +809,7 @@ func store_for(kind: String, side: String, at: Vector2) -> Building:
 	for b in buildings:
 		if b.side != side or not b.complete or not b.standing():
 			continue
-		var takes := b.type == "towncenter" or (kind == "wood" and b.type == "lumbercamp") or (kind == "iron" and b.type == "mine")
+		var takes := b.type == "towncenter" or (kind == "wood" and (b.type == "lumbercamp" or b.type == "sawmill")) or (kind == "iron" and b.type == "mine")
 		if not takes:
 			continue
 		var d := b.world.distance_squared_to(at)
@@ -821,7 +821,35 @@ func store_for(kind: String, side: String, at: Vector2) -> Building:
 
 func credit(side: String, kind: String, amount: float) -> void:
 	if economy[side].has(kind):
+		# A sawmill saws the wood to planks: a quarter more of it.
+		if kind == "wood" and has_complete(side, "sawmill"):
+			amount *= Rules.SAWMILL_WOOD
 		economy[side][kind] += amount
+
+
+## Whether a side has a building of this type standing and finished.
+func has_complete(side: String, type: String) -> bool:
+	for b in buildings:
+		if b.side == side and b.type == type and b.complete and b.standing():
+			return true
+	return false
+
+
+## What a building costs this side: a fifth less wood with a sawmill (not
+## the sawmill itself).
+func build_cost(side: String, type: String) -> Dictionary:
+	var cost: Dictionary = Rules.cost_of(type).duplicate()
+	if type != "sawmill" and cost.has("wood") and has_complete(side, "sawmill"):
+		cost["wood"] = roundf(float(cost["wood"]) * (1.0 - Rules.SAWMILL_SAVES))
+	return cost
+
+
+## Why a building cannot be laid out yet ("" when it can).
+func build_blocked(side: String, type: String) -> String:
+	var need: String = Rules.NEEDS.get(type, "")
+	if need != "" and not has_complete(side, need):
+		return "Eerst een %s nodig." % Rules.label(need).to_lower()
+	return ""
 
 
 func farmers_on(field: Building) -> int:
@@ -882,6 +910,8 @@ func notice_idle(u: Unit, used_up: Supply) -> void:
 
 func on_built(b: Building, by: Unit) -> void:
 	say("%s voltooid." % Rules.label(b.type), b.side)
+	if b.type == "sawmill":
+		say("Zagerij voltooid: hout levert een kwart meer op, en alle gebouwen kosten een vijfde minder hout.", b.side)
 	# The builders go to work at what they built.
 	for u in units:
 		if u.alive() and u.type == "worker" and u.task == "" and u.side == b.side and u.world.distance_to(b.world) < b.reach_radius() + 30.0:
@@ -896,7 +926,7 @@ func start_work_at(u: Unit, b: Building) -> void:
 		"farm":
 			if farmers_on(b) < 3:
 				u.set_task("farm", b)
-		"lumbercamp":
+		"lumbercamp", "sawmill":
 			var tree := nearest_supply(b.world, "wood", b.side)
 			if tree != null:
 				u.set_task("gather", tree)
@@ -1843,8 +1873,11 @@ func queue_unit(b: Building, type: String) -> bool:
 
 
 func start_placing(type: String) -> void:
-	if not can_afford(me, Rules.cost_of(type)):
-		say("Niet genoeg grondstoffen: %s nodig." % Rules.cost_text(Rules.cost_of(type)))
+	if build_blocked(me, type) != "":
+		say(build_blocked(me, type))
+		return
+	if not can_afford(me, build_cost(me, type)):
+		say("Niet genoeg grondstoffen: %s nodig." % Rules.cost_text(build_cost(me, type)))
 		return
 	placing = type
 	say("Kies een plek voor de %s (rechtsklik of Escape: annuleren)." % Rules.label(type).to_lower())
@@ -1892,8 +1925,8 @@ func site_for(type: String, at: Vector2) -> Variant:
 ## Lay out a building site for `side` and set `builders` to work on it.
 func lay_out(side: String, type: String, at: Vector2, builders: Array[Unit]) -> Building:
 	var spot_at: Variant = site_for(type, at)
-	var cost := Rules.cost_of(type)
-	if spot_at == null or not can_afford(side, cost):
+	var cost := build_cost(side, type)
+	if spot_at == null or not can_afford(side, cost) or build_blocked(side, type) != "":
 		return null
 	pay(side, cost)
 	var b := add_building(side, type, spot_at, false)

@@ -30,6 +30,12 @@ func _initialize() -> void:
 	var r := battle.form_regiment(men)
 	for i in 20:
 		battle._process(0.1)
+	if OS.get_environment("SAWMILL") != "":
+		var mill := battle.add_building(battle.me, "sawmill", home + Vector2(150, 330), true)
+		battle.view3d.view(mill.world, 20.0, 35.0, 22.0)
+		for i in 6:
+			await process_frame
+		await _save(out.path_join("phone3d_sawmill.png"))
 	battle.view3d.view(home + Vector2(220, 160), 0.0, 45.0, 70.0)
 	for i in 6:
 		await process_frame

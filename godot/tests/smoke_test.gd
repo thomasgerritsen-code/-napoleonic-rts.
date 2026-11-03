@@ -632,6 +632,31 @@ func _initialize() -> void:
 
 	print("GODOT_SMOKE ", JSON.stringify({"food": gathered, "economy": battle.economy, "fallen": fallen,
 		"pop": {"france": battle.pop_used("france"), "britain": battle.pop_used("britain")}, "plan": battle.ai.plan}))
+	# The sawmill: only after a lumber camp; then wood comes in a quarter
+	# more and other buildings cost a fifth less wood.
+	var saw_side := "britain"
+	var saw_home := battle.town_centre(saw_side).world
+	for b in battle.buildings.duplicate():
+		if b.side == saw_side and (b.type == "lumbercamp" or b.type == "sawmill"):
+			battle.buildings.erase(b)
+			b.queue_free()
+	var barracks_wood := float(battle.build_cost(saw_side, "barracks").get("wood", 0.0))
+	var saw_blocked := battle.build_blocked(saw_side, "sawmill") != ""
+	battle.add_building(saw_side, "lumbercamp", saw_home + Vector2(-500, 400), true)
+	var saw_open := battle.build_blocked(saw_side, "sawmill") == ""
+	var wood_before := float(battle.economy[saw_side]["wood"])
+	battle.credit(saw_side, "wood", 100.0)
+	var plain_wood := float(battle.economy[saw_side]["wood"]) - wood_before
+	var saw := battle.add_building(saw_side, "sawmill", saw_home + Vector2(-500, 560), true)
+	wood_before = float(battle.economy[saw_side]["wood"])
+	battle.credit(saw_side, "wood", 100.0)
+	var sawn_wood := float(battle.economy[saw_side]["wood"]) - wood_before
+	var cheaper := float(battle.build_cost(saw_side, "barracks").get("wood", 0.0))
+	_check(saw_blocked and saw_open and is_equal_approx(plain_wood, 100.0) and is_equal_approx(sawn_wood, 125.0)
+		and is_equal_approx(cheaper, roundf(barracks_wood * 0.8)) and saw.get("_sprite").texture != null,
+		"a sawmill needs a lumber camp, then saws wood to a quarter more (%d) and a barracks costs %d wood instead of %d" % [int(sawn_wood), int(cheaper), int(barracks_wood)])
+	battle.buildings.erase(saw)
+	saw.queue_free()
 	# Saved and taken up again: the same men, buildings, battalions, stores
 	# and hour, the men at their work.
 	_check(SaveGame.save(battle) == OK and SaveGame.exists() and SaveGame.describe() != "", "the battle is saved (%s)" % SaveGame.describe())

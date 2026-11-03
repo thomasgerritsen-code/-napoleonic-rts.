@@ -601,6 +601,57 @@ def build_lumbercamp(root, side):
     pennant(root, 2.6, 1.9, ("#24315c", "#efeee8", "#b02a2e") if side == "fr" else ("#c0282d", "#22336b"))
 
 
+def build_sawmill(root, side):
+    """A sawmill: a timber-framed shed under a tiled roof, open at the front
+    on a frame saw with a trunk in it, planks stacked to dry under a little
+    roof of their own, trunks waiting, sawdust on a trodden yard."""
+    rng = random.Random(53)
+    part("cyl", (1.0, 0.03), (0, 0.1, 0.015), M("#7a6347", "dirt", 0.95, alt="#6f6a45"), root, name="yard", segments=28)
+    bpy.context.object.scale = (3.4, 2.6, 1.0)
+    timber = M("#5d3f25", "planks", 0.85)
+    # The shed: a plank back wall, sides of timber posts, a pitched tiled roof.
+    part("box", (3.6, 0.14, 2.4), (0, 1.75, 1.2), M("#7b5636", "planks", 0.85, scale=1.3), root, name="backwall")
+    for x in (-1.8, -0.6, 0.6, 1.8):
+        part("box", (0.18, 0.18, 2.5), (x, 1.75, 1.25), timber, root, name="post")
+        part("box", (0.18, 0.18, 2.5), (x, 0.15, 1.25), timber, root, name="post")
+    for y in (0.15, 1.75):
+        part("box", (3.8, 0.2, 0.2), (0, y, 2.5), timber, root, name="beam")
+    for x in (-1.85, 1.85):
+        part("box", (0.12, 1.6, 2.4), (x, 0.95, 1.2), M("#7b5636", "planks", 0.85, scale=1.3), root, name="sidewall")
+    tiles = M("#8f4a33", "tiles", 0.8, alt="#7c3f2c")
+    part("box", (4.2, 1.15, 0.1), (0, 0.55, 2.82), tiles, root, rot=(-30, 0, 0), name="roof")
+    part("box", (4.2, 1.15, 0.1), (0, 1.35, 2.82), tiles, root, rot=(30, 0, 0), name="roof")
+    part("box", (4.25, 0.16, 0.14), (0, 0.95, 3.12), M("#6e4c2e", "plain", 0.8), root, name="ridge")
+    # The frame saw in the open front: two uprights, a cross bar, a blade,
+    # the trunk laid through it on trestles.
+    for x in (-0.35, 0.35):
+        part("box", (0.12, 0.12, 2.0), (x, -0.25, 1.0), timber, root, name="sawframe")
+    part("box", (0.95, 0.12, 0.12), (0, -0.25, 2.0), timber, root, name="sawbar")
+    part("box", (0.04, 0.02, 1.4), (0, -0.25, 1.15), M("#8a9196", "plain", 0.3, metal=0.85), root, name="blade")
+    for x in (-1.2, 1.2):
+        for a in (20, -20):
+            part("box", (0.09, 0.09, 0.85), (x, -0.25 + (0.1 if a > 0 else -0.1), 0.4), timber, root, rot=(a, 0, 0), name="trestle")
+    log(root, 3.2, 0.24, (0, -0.25, 0.86), name="sawlog")
+    # Planks stacked to dry, spaced with stickers, under a lean-to roof.
+    for row in range(6):
+        for k in range(5):
+            part("box", (2.0, 0.24, 0.05), (-2.6, -0.9 + k * 0.29, 0.1 + row * 0.11), M("#c7a06a" if (k + row) % 2 else "#b88f5c", "plain", 0.85),
+                 root, rot=(0, 0, 90 + rng.uniform(-1.5, 1.5)), name="plank")
+        part("box", (0.08, 1.5, 0.04), (-2.6, -0.32, 0.15 + row * 0.11), timber, root, name="sticker")
+    part("box", (1.2, 2.3, 0.06), (-2.6, -0.32, 1.25), M("#7b5636", "planks", 0.85), root, rot=(0, 12, 0), name="leanroof")
+    for y in (-1.3, 0.6):
+        part("box", (0.1, 0.1, 1.25), (-2.1, y, 0.62), timber, root, name="leanpost")
+    # Trunks waiting their turn.
+    for row, count in enumerate((3, 2)):
+        for k in range(count):
+            log(root, 2.6, 0.22, (2.7, -0.7 + (k - (count - 1) / 2) * 0.46, 0.23 + row * 0.4), rot=(90, 0, 0), name="trunk")
+    # Sawdust about the saw.
+    for i in range(22):
+        part("box", (0.16, 0.12, 0.015), (rng.uniform(-1.4, 1.4), -0.25 + rng.uniform(-0.8, 0.5), 0.04),
+             M("#e0c48e", "plain", 0.9), root, rot=(0, 0, rng.uniform(0, 180)), name="sawdust")
+    pennant(root, 1.9, -0.9, ("#24315c", "#efeee8", "#b02a2e") if side == "fr" else ("#c0282d", "#22336b"))
+
+
 FIELD_W, FIELD_D = 155.44 / 22.5, 117.92 / 22.5    # the game's farm footprint in metres
 
 
@@ -716,6 +767,8 @@ BUILDERS = {
     "bridge": build_bridge, "bridge_stone": build_bridge_stone, "bridge_wood": build_bridge_wood,
     "lumbercamp_fr": lambda r: build_lumbercamp(r, "fr"),
     "lumbercamp_br": lambda r: build_lumbercamp(r, "br"),
+    "sawmill_fr": lambda r: build_sawmill(r, "fr"),
+    "sawmill_br": lambda r: build_sawmill(r, "br"),
     "field_bare": lambda r: build_field(r, "bare"),
     "field_young": lambda r: build_field(r, "young"),
     "field_ripe": lambda r: build_field(r, "ripe"),
@@ -735,7 +788,7 @@ def world_points():
 
 
 # Buildings turn to the camera at an angle so two facades and a gable show.
-YAW = {"lumbercamp_fr": 28, "lumbercamp_br": -28, "tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
+YAW = {"lumbercamp_fr": 28, "lumbercamp_br": -28, "sawmill_fr": 28, "sawmill_br": -28, "tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
 
 
 def normal_override() -> bpy.types.Material:

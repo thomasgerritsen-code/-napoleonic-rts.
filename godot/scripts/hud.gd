@@ -479,8 +479,14 @@ func _fill_buttons() -> void:
 		_button("Bouw verder", "onafgemaakt", battle.assign_workers.bind("build"), "Bouwt onafgemaakte gebouwen verder af.")
 		_start_group("Bouwen", BUILD, 5)
 		for type in Rules.BUILDABLE:
-			_button(Rules.label(type), Rules.cost_text(Rules.cost_of(type)), battle.start_placing.bind(type),
-				"%s bouwen voor %s; klik waar het moet komen." % [Rules.label(type), Rules.cost_text(Rules.cost_of(type))])
+			var cost := battle.build_cost(battle.me, type)
+			var blocked := battle.build_blocked(battle.me, type)
+			var tip := "%s bouwen voor %s; klik waar het moet komen." % [Rules.label(type), Rules.cost_text(cost)]
+			if type == "sawmill":
+				tip += " Daarna levert hout een kwart meer op en kosten alle gebouwen een vijfde minder hout."
+			var built_button := _button(Rules.label(type), blocked if blocked != "" else Rules.cost_text(cost), battle.start_placing.bind(type),
+				blocked if blocked != "" else tip)
+			built_button.disabled = blocked != ""
 	if gun != null:
 		_start_group("Kanon", ORDERS, 1)
 		_button("Kartets laden" if gun.shot == "round" else "Ronde kogel", "K · kogel %d · kartets %d" % [gun.ammo["round"], gun.ammo["grape"]],

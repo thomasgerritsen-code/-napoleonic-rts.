@@ -413,6 +413,34 @@
     "y": 20
    },
    "w": 126
+  },
+  "sawmill_fr": {
+   "footprint": {
+    "d": 5.84,
+    "w": 7.01
+   },
+   "h": 267,
+   "heightM": 3.2,
+   "image": "sawmill_fr.webp",
+   "pivot": {
+    "x": 162,
+    "y": 168
+   },
+   "w": 389
+  },
+  "sawmill_br": {
+   "footprint": {
+    "d": 6.43,
+    "w": 6.79
+   },
+   "h": 279,
+   "heightM": 3.2,
+   "image": "sawmill_br.webp",
+   "pivot": {
+    "x": 172,
+    "y": 168
+   },
+   "w": 380
   }
  }
 }

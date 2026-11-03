@@ -61,9 +61,9 @@ func _add_art() -> void:
 	_sprite = Sprite2D.new()
 	_sprite.centered = false
 	var nation := "france" if side == "france" else "britain"
-	if type == "farm" or type == "lumbercamp":
+	if type == "farm" or type == "lumbercamp" or type == "sawmill":
 		# Modelled at true size: one metre is Iso.SPRITE_SCALE game px.
-		var prop_name := _field_look() if type == "farm" else "lumbercamp_" + ("fr" if side == "france" else "br")
+		var prop_name := _field_look() if type == "farm" else type + "_" + ("fr" if side == "france" else "br")
 		var prop: Dictionary = battle.props[prop_name]
 		_sprite.texture = load("res://assets/props/%s.webp" % prop_name)
 		_sprite.offset = -Vector2(prop["pivot"]["x"], prop["pivot"]["y"])

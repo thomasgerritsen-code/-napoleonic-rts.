@@ -15,11 +15,20 @@ const ARTILLERY_AFTER := 120.0
 const TRAINED_AT := {"worker": "towncenter", "infantry": "barracks", "officer": "barracks",
 	"drummer": "barracks", "cavalry": "stable", "artillery": "foundry"}
 ## What peasants may build, in menu order.
-const BUILDABLE := ["house", "farm", "lumbercamp", "mine", "barracks", "stable", "foundry", "tower", "hospital"]
+const BUILDABLE := ["house", "farm", "lumbercamp", "sawmill", "mine", "barracks", "stable", "foundry", "tower", "hospital"]
+## Buildings of the Godot game only (not in the web game's start.json).
+## The sawmill: after a lumber camp; while one stands, its side's wood comes
+## in a quarter more (sawn to planks) and every other building costs a fifth
+## less wood (Battle.build_cost, Battle.credit).
+const OWN_BUILDINGS := {"sawmill": {"cost": {"wood": 150, "iron": 50}, "w": 104.0, "h": 78.0, "hp": 600, "label": "Zagerij"}}
+const SAWMILL_WOOD := 1.25
+const SAWMILL_SAVES := 0.2
+## What must stand (complete) before a building may be laid out.
+const NEEDS := {"sawmill": "lumbercamp"}
 const LABELS := {"worker": "Boer", "infantry": "Musketier", "officer": "Officier", "drummer": "Tamboer",
 	"cavalry": "Cavalerie", "artillery": "Kanon", "towncenter": "Stadhuis", "barracks": "Kazerne",
 	"house": "Huis", "farm": "Graanakker", "stable": "Stal", "foundry": "Gieterij", "tower": "Schiettoren",
-	"mine": "IJzermijn", "lumbercamp": "Houthakkerskamp", "hospital": "Veldhospitaal",
+	"mine": "IJzermijn", "lumbercamp": "Houthakkerskamp", "hospital": "Veldhospitaal", "sawmill": "Zagerij",
 	"food": "voedsel", "wood": "hout", "iron": "ijzer"}
 
 static var _start := {}
@@ -36,6 +45,8 @@ static func unit_type(type: String) -> Dictionary:
 
 
 static func building_type(type: String) -> Dictionary:
+	if OWN_BUILDINGS.has(type):
+		return OWN_BUILDINGS[type]
 	return start()["buildingTypes"].get(type, {})
 
 
