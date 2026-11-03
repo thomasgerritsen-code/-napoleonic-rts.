@@ -97,7 +97,16 @@ func _process(delta: float) -> void:
 func refresh() -> void:
 	# (In 3D the fog is drawn by the 3D view from this grid; this sheet stays hidden.)
 	visible = enabled and (battle == null or battle.view3d == null)
-	if battle == null or not enabled:
+	if battle == null:
+		return
+	if not enabled:
+		# No fog: the grid the 3D view reads says so at once, everywhere
+		# clear (not the last fog it showed, left for each shader's own
+		# switch to catch up with).
+		for i in _cols * _rows:
+			_pixels[i * 2 + 1] = 0
+		_image.set_data(_cols, _rows, false, Image.FORMAT_LA8, _pixels)
+		_texture.update(_image)
 		return
 	_visible.fill(0)
 	var sources: Array[Node2D] = []
