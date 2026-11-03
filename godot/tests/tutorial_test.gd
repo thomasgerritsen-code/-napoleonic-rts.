@@ -72,7 +72,8 @@ func _initialize() -> void:
 		battle._process(STEP)
 		if battle.result != "":
 			break
-	check(battle.result == "Leerslag voltooid!", "beating it ends the learning battle (%s · %s)" % [battle.result, battle.status])
+	check(battle.result == "Leerslag voltooid!", "beating it ends the learning battle (%s · %s · ours %d at %s, theirs %d at %s%s)" % [
+		battle.result, battle.status, ours.strength(), ours.centroid().round(), theirs.strength(), theirs.centroid().round(), " routing" if theirs.routing else ""])
 	print("TUTORIAL ", "passed" if failures.is_empty() else "FAILED: " + ", ".join(failures))
 	quit(1 if not failures.is_empty() else 0)
 

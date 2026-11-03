@@ -104,9 +104,9 @@ func update(delta: float) -> void:
 	if step >= _steps.size() or battle.result != "":
 		return
 	_place_card()
-	if _ours != null and _ours.destroyed():
+	if _ours != null and (_ours.destroyed() or _ours.routing):
 		battle._finish("britain" if battle.me == "france" else "france", "tutorial")
-		battle.status = "Je bataljon is verslagen. Probeer de leerslag nog eens: houd de linie en vuur eerst."
+		battle.status = "Je bataljon is gevlucht. Probeer de leerslag nog eens: houd de linie en laat ze eerst binnen schot komen."
 		_card.visible = false
 		return
 	_close_in(delta)
@@ -200,7 +200,8 @@ func _marched() -> bool:
 	return _was_moving
 
 
-## A smaller British battalion comes on against ours, from the British side.
+## A small British battalion (the least that is one) comes on against
+## ours, from the British side.
 func _raise_theirs() -> void:
 	var foe := "britain" if battle.me == "france" else "france"
 	var target := _ours.centroid()
@@ -208,8 +209,8 @@ func _raise_theirs() -> void:
 	var from_dir := (their_home.world - target).normalized() if their_home != null else Vector2.RIGHT
 	var at := target + from_dir * 620.0
 	var men: Array[Unit] = []
-	for i in 16:
-		men.append(battle.add_unit(foe, "infantry", at + Vector2((i % 8) * 15, (i / 8) * 19)))
+	for i in 12:
+		men.append(battle.add_unit(foe, "infantry", at + Vector2((i % 6) * 15, (i / 6) * 19)))
 	men.append(battle.add_unit(foe, "officer", at + Vector2(60, -30)))
 	men.append(battle.add_unit(foe, "drummer", at + Vector2(60, 50)))
 	_theirs = battle.form_regiment(men)
