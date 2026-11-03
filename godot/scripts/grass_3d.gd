@@ -5,7 +5,7 @@ extends Node3D
 
 const GRID := 72
 const CELL := 0.6
-const BLADES := 6
+const BLADES := 8
 const MASK_CELL := GrassSurface3D.MASK_CELL
 
 const SHADER := """shader_type spatial;
@@ -58,18 +58,37 @@ void vertex() {
 	float dry=smoothstep(bank_rim+0.04,bank_rim+0.3,abs(root.x-bank.x));
 	float safe=cover*(1.0-blocked)*smoothstep(0.6,1.2,min(road.x,road.y))*dry;
 	float edge=1.0-smoothstep(14.0,21.0,length(root-centre.xz));
-	float fade=safe*edge*lod*(1.0-smoothstep(0.1,0.65,snow));
+	float margin=min(min(root.x,root.y),min(terrain_extent.x-root.x,terrain_extent.y-root.y));
+	float fade=safe*edge*lod*(1.0-smoothstep(0.1,0.65,snow))*smoothstep(0.05,0.4,margin);
 	float angle=hash(grid+vec2(7,91))*6.2831853;
 	mat2 turn=mat2(vec2(cos(angle),sin(angle)),vec2(-sin(angle),cos(angle)));
 	vec3 blade=VERTEX;
 	blade.xz=turn*blade.xz;
 	blade.y*=fade*(0.55+jitter.y*0.6);
-	blade.xz+=wind*(sin(now*1.7+root.x*1.1+root.y*0.7)+0.35*sin(now*2.8+root.y))*blade.y*blade.y*2.8;
+	float height=UV.y;
+	float strength=clamp(length(wind)/0.42,0.0,1.3);
+	vec2 direction=wind/max(length(wind),0.0001);
+	// Travelling gusts are shared across the meadow; small per-blade
+	// variations stop individual leaves moving like one rigid prop.
+	float wave=0.5+0.5*sin(dot(root,direction)*0.46-now*1.1);
+	float swell=0.5+0.5*sin(dot(root,vec2(0.13,0.19))-now*0.53);
+	float gust=smoothstep(0.2,0.85,wave*0.72+swell*0.28);
+	float flutter=sin(now*(2.1+jitter.x*0.8)+jitter.y*6.2831853+UV.x*4.7);
+	float clearance=1.0-texture(blocked_tex,(root+direction*0.45)/cover_extent).r;
+	float bend=clamp(strength*(0.14+gust*0.92+flutter*0.09),0.0,1.15)*clearance;
+	bend*=smoothstep(0.05,0.6,margin);
+	// Circular bending preserves blade length and fixes the root exactly.
+	// Three mesh segments follow the arc instead of sliding a flat card.
+	float radius=blade.y/max(height,0.001)/max(bend,0.001);
+	float arc=bend*height;
+	if(bend>0.001) {
+		blade.xz+=direction*radius*(1.0-cos(arc));
+		blade.y=radius*sin(arc);
+	}
 	world=vec3(root.x,ground(root)-0.012,root.y)+blade;
 	// Small leaves scatter skylight. An upward-biased aggregate normal also
 	// avoids ground-shadow acne on these sub-pixel blades at normal zoom.
-	NORMAL=normalize(vec3(turn*NORMAL.xz*0.25,0.0).xzy+vec3(0,1.0,0));
-	float height=UV.y;
+	NORMAL=normalize(vec3(turn*NORMAL.xz*0.25-direction*bend*height*0.45,0.0).xzy+vec3(0,1.0,0));
 	colour=mix(vec3(0.10,0.16,0.035),vec3(0.24,0.30,0.10),height)*(0.86+jitter.x*0.28);
 	colour=mix(colour,colour*vec3(1.15,1.02,0.76),summer*0.6+autumn*0.45);
 	VERTEX=world;
@@ -149,15 +168,17 @@ func _tuft() -> ArrayMesh:
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i in BLADES:
 		var yaw := i*TAU/BLADES+0.35
-		var h := 0.14+Battle.hash01(i,78)*0.12
-		var w := 0.012+Battle.hash01(i,79)*0.008
+		var h := 0.24+Battle.hash01(i,78)*0.22
+		var w := 0.007+Battle.hash01(i,79)*0.006
 		var origin := Vector3(cos(yaw)*0.065,0,sin(yaw)*0.065)
 		var right := Vector3(cos(yaw),0,sin(yaw))
-		var lean := Vector3(-sin(yaw),0,cos(yaw))*h*0.32
-		var p := [origin-right*w,origin+right*w,origin+Vector3.UP*h*0.58-right*w*0.6+lean*0.3,
-			origin+Vector3.UP*h*0.58+right*w*0.6+lean*0.3,origin+Vector3.UP*h+lean]
-		for index in [0,2,1,1,2,3,2,4,3]:
-			surface.set_uv(Vector2(0.5,Vector3(p[index]).y/h))
+		var lean := Vector3(-sin(yaw),0,cos(yaw))*h*0.18
+		var p := [origin-right*w,origin+right*w,
+			origin+Vector3.UP*h*0.33-right*w*0.78+lean*0.12,origin+Vector3.UP*h*0.33+right*w*0.78+lean*0.12,
+			origin+Vector3.UP*h*0.66-right*w*0.42+lean*0.45,origin+Vector3.UP*h*0.66+right*w*0.42+lean*0.45,
+			origin+Vector3.UP*h+lean]
+		for index in [0,2,1,1,2,3,2,4,3,3,4,5,4,6,5]:
+			surface.set_uv(Vector2(float(i)/BLADES,Vector3(p[index]).y/h))
 			surface.set_normal(Vector3(-sin(yaw),0.25,cos(yaw)).normalized())
 			surface.add_vertex(p[index])
 	surface.index()

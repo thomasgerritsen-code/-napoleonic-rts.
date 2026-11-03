@@ -176,3 +176,5 @@ wind mee. Zie [de rookdocumentatie](../docs/godot-chimney-smoke.md).
 
 Het gras heeft een scherpe bodemstructuur en echte grassprieten dichtbij de
 camera, met GPU-wind en afstandsafbouw. Zie [de grasdocumentatie](../docs/godot-grass.md).
+Individuele sprieten buigen nu zichtbaar in drie segmenten met reizende
+windvlagen, vanaf een vaste wortel; bij windstilte staan ze stil.

@@ -38,9 +38,9 @@ func _initialize() -> void:
 	var mm := grass.batch.multimesh
 	check(mm.instance_count==5184 and grass.get_child_count()==1,
 		"the complete close grass uses one fixed 5184-clump GPU batch")
-	check(mm.mesh.get_surface_count()==1 and mm.mesh.surface_get_array_index_len(0)==54
-		and mm.mesh.surface_get_array_len(0)<=36 and mm.mesh.get_aabb().size.y>0.14,
-		"the shared clump has six real tapered bent blades within an 18-triangle budget")
+	check(mm.mesh.get_surface_count()==1 and mm.mesh.surface_get_array_index_len(0)==120
+		and mm.mesh.surface_get_array_len(0)<=56 and mm.mesh.get_aabb().size.y>0.3,
+		"the shared clump has eight segmented tapered blades within a 40-triangle budget")
 	var fibre: Image = (load(GrassSurface3D.DETAIL) as Texture2D).get_image()
 	check(fibre.get_width()==512 and fibre.has_mipmaps() and grass.cover.get_width()==712,
 		"grass uses a bounded 512px mipmapped detail tile and a 0.5m cover mask")

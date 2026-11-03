@@ -8,9 +8,9 @@ de grote kleurvariatie. De bestaande oevers en bermen gebruiken die fijne
 structuur ook. Wegen, modder en water houden hun eigen oppervlak.
 
 `Grass3D` tekent daarnaast echte, taps toelopende en gebogen sprieten in één
-vaste MultiMesh: 5184 graspollen van zes sprieten. Elke gedeelde pol heeft
-30 geïndexeerde vertices en 18 driehoeken. Dat begrenst de hele laag op
-31.104 sprieten en 93.312 driehoeken, onafhankelijk van het aantal soldaten.
+vaste MultiMesh: 5184 graspollen van acht sprieten. Elke gedeelde pol heeft
+56 geïndexeerde vertices en 40 driehoeken. Dat begrenst de hele laag op
+41.472 sprieten en 207.360 driehoeken, onafhankelijk van het aantal soldaten.
 De kleine bladeren gebruiken zachte, naar boven gerichte verzamelingsnormalen
 om licht te verstrooien en schaduwacne tegen de bodem te beperken. Ze ontvangen
 wereldlicht en schaduwen, maar werpen zelf geen dure schaduwpassage.
@@ -19,6 +19,11 @@ De GPU verplaatst het raster rond de camera, met wereldvaste willekeurige
 posities, hoogtes, richtingen en kleuren. De CPU hoeft daarvoor geen pollen
 te verplaatsen of buffers opnieuw te uploaden. Wind buigt de sprieten; aan
 de rand van het detailgebied en bij uitzoomen worden ze geleidelijk korter.
+De langere sprieten hebben drie buigsegmenten. Reizende windvlagen sturen
+een cirkelboog vanaf de vaste wortel aan, met lichte verschillen per spriet.
+Die boog behoudt de lengte; de top buigt met de wind mee en veert terug.
+Bij windstilte stopt de animatie. Bovenkant en bladnormalen bewegen samen,
+zodat de vlagen ook door veranderend licht zichtbaar worden.
 Vanaf 95 m cameraafstand wordt de geometrie niet getekend. Sneeuw begraaft de
 sprieten. Regen en seizoenen beïnvloeden kleur en oppervlakteruwheid.
 Sprieten stoppen bij de werkelijke laatste terreintriangles, ook waar de
@@ -51,4 +56,15 @@ en verwijderde huizen, loopgraven, kraters, mist en sneeuw. Daarnaast worden
 camera-/bufferhergebruik, windbeweging, RNG-behoud, de volledige autoritaire
 spelstatus en ver uitzoomen gecontroleerd. De CI-stap is verplicht en
 publiceert `grass_before.png`, `grass_ground.png`, `grass_after.png` en
-`grass_comparison.png`. De bestaande 400-eenhedencontrole blijft verplicht.
+`grass_comparison.png`. De bestaande 400-eenhedencontrole blijft verplicht en
+controleert ook een normale cameraafstand met volledige grasgeometrie.
+
+`grass_wind_test.gd` meet daarnaast de pixelposities van echte wortel- en
+tipmarkeringen door de productie-GPU-shader. Wortels blijven stil, toppen
+bewegen zichtbaar, windstilte stopt ze en sterkere wind geeft meer buiging.
+De bewaarde versie-79-shader en het oorspronkelijke zes-sprietenmodel
+leveren de linkerhelft van een bewegende vergelijking, bij exact dezelfde
+camera, bodem, windinvoer en stilgezette simulatie. De rechterhelft toont de
+nieuwe sprieten. De 32 echte frameparen vormen een GIF en MP4 van vier
+seconden. `grass_wind_comparison.png`, `.gif` en `.mp4` worden gepubliceerd.
+Er worden geen beelden geïnterpoleerd of bewegingen achteraf verzonnen.

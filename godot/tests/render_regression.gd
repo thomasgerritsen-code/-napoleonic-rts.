@@ -64,6 +64,17 @@ func _initialize() -> void:
 	var out := OS.get_environment("SHOT_DIR")
 	if out != "":
 		root.get_texture().get_image().save_png(out.path_join("army400_3d.png"))
+	# Also exercise the full blade geometry with the army: the wide 90 m
+	# overview above deliberately reduces grass through its distance LOD.
+	battle.view3d.view(Vector2(4800, 2600), 15.0, 48.0, 55.0)
+	for i in 3:
+		await process_frame
+	await RenderingServer.frame_post_draw
+	var grass := battle.view3d.grass
+	var near_draws := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	check(men.size() == 400 and _active(men) > 100 and grass.batch.visible
+		and float(grass.material.get_shader_parameter("lod")) > 0.99 and near_draws < 5000,
+		"the 400-actor scene also stays within budget with full-detail wind grass (%d draws)" % near_draws)
 	battle.view3d.view(Vector2(450, 800), 15.0, 48.0, 45.0)
 	for i in 3:
 		await process_frame

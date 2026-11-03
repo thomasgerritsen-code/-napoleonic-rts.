@@ -27,7 +27,8 @@ jobs:
   godot:
     name: Godot check and Windows export
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Includes the real-renderer wind film as well as every existing gate.
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -163,6 +164,22 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-grass.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_GRASS" native-grass.log
 
+      - name: Anchored grass roots, bending tips and an animated wind comparison
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 600 xvfb-run -a -s "-screen 0 960x600x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 960x600 --script res://tests/grass_wind_test.gd 2>&1 | tee native-grass-wind.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-grass-wind.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_GRASS_WIND" native-grass-wind.log
+          command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+          ffmpeg -hide_banner -loglevel error -y -threads 2 -filter_complex_threads 1 -framerate 8 -i shots/grass_wind_frames/%03d.png \
+            -filter_complex "fps=8,scale=1120:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff:max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=3" \
+            -loop 0 shots/grass_wind_comparison.gif
+          ffmpeg -hide_banner -loglevel error -y -threads 2 -framerate 8 -i shots/grass_wind_frames/%03d.png \
+            -c:v libx264 -crf 20 -pix_fmt yuv420p -movflags +faststart shots/grass_wind_comparison.mp4
+          test -s shots/grass_wind_comparison.gif && test -s shots/grass_wind_comparison.mp4
+
       - name: GPU actor geometry and animation equivalence
         run: |
           set -o pipefail
@@ -234,7 +251,10 @@ jobs:
           body: Schermafbeeldingen van de Godot-versie uit de laatste geslaagde controle (om te zien wat de test zonder scherm niet ziet).
           prerelease: true
           make_latest: false
-          files: shots/*.png
+          files: |
+            shots/*.png
+            shots/*.gif
+            shots/*.mp4
 
       - name: Install export templates
         run: |
