@@ -25,7 +25,7 @@ func _initialize() -> void:
 	await _save(out.path_join("phone_battle.png"))
 	var mine: Array[Unit] = []
 	for u in battle.units:
-		if u.side == battle.me and u.kind == "worker":
+		if u.side == battle.me and u.type == "worker":
 			mine.append(u)
 			break
 	if not mine.is_empty():
