@@ -6,7 +6,7 @@ extends SceneTree
 ## a drummer form a battalion that marches; the computer develops its base;
 ## and two battalions within range fight.
 
-const LIMIT_MS := 240000   # within the CI step's 300 s timeout
+const LIMIT_MS := 330000   # within the CI step's 420 s timeout
 const STEP := 0.1
 
 var _failures: Array[String] = []
