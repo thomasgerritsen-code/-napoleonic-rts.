@@ -507,6 +507,8 @@ func _initialize() -> void:
 			lo = minf(lo, u.slot.dot(sideways))
 			hi = maxf(hi, u.slot.dot(sideways))
 		return hi - lo
+	# Square to the field (a rallied battalion faces where it fled from).
+	shaken.order_move(shaken.centroid(), 0.0)
 	var closed: float = width.call(shaken)
 	shaken.set_skirmish(true)
 	var spread_out: float = width.call(shaken)

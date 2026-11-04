@@ -721,9 +721,9 @@ func rally() -> void:
 	_safe_for = 0.0
 	formation = "line"
 	var here := centroid()
-	# Facing the nearest foe, or back the way it fled.
+	# Facing a foe close by, or back the way it fled.
 	facing = 0.0 if side == "france" else PI
-	var foe: Node2D = Battle.current.nearest_foe(here, side, 1600.0) if Battle.current != null else null
+	var foe: Node2D = Battle.current.nearest_foe(here, side, RANGE * 3.0) if Battle.current != null else null
 	if foe != null:
 		facing = (Battle.spot(foe) - here).angle()
 	elif _flee_to != Vector2.INF and last_centre != Vector2.INF and last_centre.distance_to(here) > 1.0:
