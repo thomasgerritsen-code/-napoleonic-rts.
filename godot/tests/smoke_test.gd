@@ -657,6 +657,48 @@ func _initialize() -> void:
 		"a sawmill needs a lumber camp, then saws wood to a quarter more (%d) and a barracks costs %d wood instead of %d" % [int(sawn_wood), int(cheaper), int(barracks_wood)])
 	battle.buildings.erase(saw)
 	saw.queue_free()
+	# The windmill (after a field: a fifth more food), the smithy (after a
+	# mine: a tenth harder shots) and the semaphore post (after a barracks:
+	# orders in half the time, far sight).
+	var extra_side := "britain"
+	# The British field, mine and barracks set aside for a moment (unfinished),
+	# not taken away: the battle goes on with them afterwards.
+	var set_aside: Array[Building] = []
+	for b in battle.buildings:
+		if b.side == extra_side and b.complete and b.type in ["farm", "mine", "barracks"]:
+			b.complete = false
+			set_aside.append(b)
+	var needs_first := battle.build_blocked(extra_side, "windmill") != "" and battle.build_blocked(extra_side, "smithy") != "" \
+		and battle.build_blocked(extra_side, "telegraph") != ""
+	var made: Array[Building] = []
+	for pair: Array in [["farm", Vector2(-700, 200)], ["mine", Vector2(-700, 420)], ["barracks", Vector2(-700, 640)]]:
+		made.append(battle.add_building(extra_side, pair[0], saw_home + pair[1], true))
+	var open_now := battle.build_blocked(extra_side, "windmill") == "" and battle.build_blocked(extra_side, "smithy") == "" \
+		and battle.build_blocked(extra_side, "telegraph") == ""
+	var far_spot := saw_home + Vector2(-1400, -300)
+	var slow_orders := battle.order_delay(far_spot, extra_side)
+	var food_before := float(battle.economy[extra_side]["food"])
+	battle.credit(extra_side, "food", 100.0)
+	var plain_food := float(battle.economy[extra_side]["food"]) - food_before
+	for pair: Array in [["windmill", Vector2(-900, 200)], ["smithy", Vector2(-900, 420)], ["telegraph", Vector2(-900, 640)]]:
+		made.append(battle.add_building(extra_side, pair[0], saw_home + pair[1], true))
+	food_before = float(battle.economy[extra_side]["food"])
+	battle.credit(extra_side, "food", 100.0)
+	var ground_food := float(battle.economy[extra_side]["food"]) - food_before
+	var fast_orders := battle.order_delay(far_spot, extra_side)
+	var post_sight := battle.fog.vision(made[-1])
+	var drawn := true
+	for b in made:
+		drawn = drawn and b.get("_sprite").texture != null
+	_check(needs_first and open_now and is_equal_approx(plain_food, 100.0) and is_equal_approx(ground_food, 120.0)
+		and is_equal_approx(fast_orders, slow_orders * 0.5) and post_sight >= 600.0 and battle.has_complete(extra_side, "smithy") and drawn,
+		"a windmill grinds a fifth more food (%d), a smithy stands, a semaphore post halves the orders' delay (%.2f s → %.2f s) and sees %d far" % [
+			int(ground_food), slow_orders, fast_orders, int(post_sight)])
+	for b in made:
+		battle.buildings.erase(b)
+		b.queue_free()
+	for b in set_aside:
+		b.complete = true
 	# Saved and taken up again: the same men, buildings, battalions, stores
 	# and hour, the men at their work.
 	_check(SaveGame.save(battle) == OK and SaveGame.exists() and SaveGame.describe() != "", "the battle is saved (%s)" % SaveGame.describe())

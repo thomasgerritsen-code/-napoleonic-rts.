@@ -31,8 +31,12 @@ func _initialize() -> void:
 	for i in 20:
 		battle._process(0.1)
 	if OS.get_environment("SAWMILL") != "":
-		var mill := battle.add_building(battle.me, "sawmill", home + Vector2(150, 330), true)
-		battle.view3d.view(mill.world, 20.0, 35.0, 22.0)
+		# The Godot game's own buildings in a row, on open ground south of
+		# the village.
+		var row := home + Vector2(-120, 620)
+		for i in Rules.OWN_BUILDINGS.size():
+			battle.add_building(battle.me, Rules.OWN_BUILDINGS.keys()[i], row + Vector2(i * 150, 0), true)
+		battle.view3d.view(row + Vector2(225, 0), 15.0, 38.0, 34.0)
 		for i in 6:
 			await process_frame
 		await _save(out.path_join("phone3d_sawmill.png"))

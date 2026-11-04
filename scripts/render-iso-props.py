@@ -652,6 +652,94 @@ def build_sawmill(root, side):
     pennant(root, 1.9, -0.9, ("#24315c", "#efeee8", "#b02a2e") if side == "fr" else ("#c0282d", "#22336b"))
 
 
+def build_windmill(root, side):
+    """A tower mill: a tapering whitewashed stone tower, a thatched cap
+    turned to the wind, four lattice sails, a door and a sack or two."""
+    rng = random.Random(61)
+    part("cyl", (1.0, 0.03), (0, 0, 0.015), M("#7a6347", "dirt", 0.95, alt="#6f6a45"), root, name="yard", segments=28)
+    bpy.context.object.scale = (2.6, 2.6, 1.0)
+    wall = M("#ddd5c2", "plaster", 0.9, alt="#c9bfa8")
+    part("cyl", (1.55, 5.6, 1.15), (0, 0, 2.8), wall, root, name="tower", segments=20)
+    part("cyl", (1.65, 0.35), (0, 0, 0.17), M("#9c9585", "wall", 0.9, alt="#7d766a"), root, name="footing", segments=20)
+    part("cyl", (1.35, 1.6, 0.25), (0, 0, 6.35), M("#a08a52", "thatch", 0.95, alt="#8b7444"), root, name="cap", segments=16)
+    door(root, 0, -1.48, 0.95, 1.8, color="#4a3220")
+    for z in (2.6, 4.3):
+        part("box", (0.4, 0.12, 0.55), (0.0, -1.38 + (z - 2.6) * 0.12, z), M("#2b2e31", "plain", 0.5), root, name="window")
+    # The sails on their shaft, out over the door side.
+    hub = (0, -1.45, 5.7)
+    part("cyl", (0.16, 0.7), (hub[0], hub[1] + 0.25, hub[2]), M("#5d3f25", "plain", 0.8), root, rot=(90, 0, 0), name="shaft")
+    frame = M("#6b4a2d", "planks", 0.85)
+    cloth = M("#e8e0cc", "cloth", 0.9)
+    for k in range(4):
+        a = k * 90 + 20
+        r = math.radians(a)
+        cx, cz = math.cos(r) * 2.05, math.sin(r) * 2.05
+        part("box", (4.2, 0.08, 0.12), (hub[0] + cx / 2, hub[1] - 0.1, hub[2] + cz / 2), frame, root, rot=(0, -a, 0), name="stock")
+        part("box", (3.2, 0.04, 0.62), (hub[0] + cx * 0.55 + math.cos(r + 1.57) * 0.33, hub[1] - 0.14,
+                                         hub[2] + cz * 0.55 + math.sin(r + 1.57) * 0.33), cloth, root, rot=(0, -a, 0), name="sail")
+    for i in range(3):
+        part("ball", (0.28, 1.0, 0.8, 1.1), (1.4 + i * 0.45, -1.2 + rng.uniform(-0.1, 0.1), 0.3), M("#c7b38a", "cloth", 0.95), root, name="sack")
+    pennant(root, -1.9, -1.0, ("#24315c", "#efeee8", "#b02a2e") if side == "fr" else ("#c0282d", "#22336b"), height=2.6)
+
+
+def build_smithy(root, side):
+    """A smithy: a low stone forge with a slate roof and a tall chimney, an
+    open front under a lean-to where the anvil stands, a quench tub, a pile
+    of iron bars and a grindstone."""
+    rng = random.Random(67)
+    part("cyl", (1.0, 0.03), (0, 0, 0.015), M("#6b5a46", "dirt", 0.95, alt="#5d5040"), root, name="yard", segments=28)
+    bpy.context.object.scale = (3.1, 2.5, 1.0)
+    stone = M("#9a9384", "wall", 0.92, scale=2.0, alt="#7d766a")
+    part("box", (3.8, 2.6, 2.4), (0, 0.6, 1.2), stone, root, name="forge")
+    slate = M("#4f5660", "slate", 0.8, alt="#434a52")
+    part("box", (4.1, 1.55, 0.1), (0, 0.05, 2.75), slate, root, rot=(-32, 0, 0), name="roof")
+    part("box", (4.1, 1.55, 0.1), (0, 1.15, 2.75), slate, root, rot=(32, 0, 0), name="roof")
+    part("box", (0.7, 0.7, 2.4), (1.4, 1.2, 3.1), stone, root, name="chimney")
+    part("box", (0.75, 0.75, 0.12), (1.4, 1.2, 4.32), M("#2a2622", "plain", 0.7), root, name="chimneytop")
+    door(root, -0.9, -0.72, 1.0, 1.9, color="#3d2a1a")
+    # The forge's glow through its arch.
+    part("box", (0.9, 0.06, 0.8), (0.7, -0.72, 0.85), M("#ff7a2a", "plain", 0.4), root, name="glow")
+    timber = M("#5d3f25", "planks", 0.85)
+    part("box", (3.6, 1.6, 0.07), (0, -1.45, 1.95), M("#7b5636", "planks", 0.85), root, rot=(14, 0, 0), name="leanto")
+    for x in (-1.7, 1.7):
+        part("box", (0.14, 0.14, 1.9), (x, -2.15, 0.95), timber, root, name="post")
+    # The anvil on its block, a quench tub, iron bars, a grindstone.
+    part("cyl", (0.3, 0.6), (0.2, -1.5, 0.3), M("#6a4a2f", "bark", 0.9), root, name="block", segments=12)
+    part("box", (0.62, 0.24, 0.24), (0.2, -1.5, 0.72), M("#3a3d40", "plain", 0.35, metal=0.9), root, name="anvil")
+    part("cyl", (0.35, 0.5), (-1.1, -1.7, 0.25), M("#6e4c2e", "planks", 0.85), root, name="tub", segments=14)
+    part("cyl", (0.31, 0.02), (-1.1, -1.7, 0.5), M("#2c3a40", "plain", 0.2), root, name="water", segments=14)
+    for i in range(6):
+        part("box", (1.3, 0.07, 0.07), (1.4, -1.9 + i * 0.09, 0.05 + (i % 2) * 0.07), M("#55595d", "plain", 0.4, metal=0.8), root,
+             rot=(0, 0, rng.uniform(-6, 6)), name="bar")
+    part("cyl", (0.45, 0.14), (-1.6, -0.9, 0.55), M("#b8ad97", "plain", 0.9), root, rot=(90, 0, 0), name="grindstone", segments=16)
+    pennant(root, 2.0, -1.0, ("#24315c", "#efeee8", "#b02a2e") if side == "fr" else ("#c0282d", "#22336b"), height=2.6)
+
+
+def build_telegraph(root, side):
+    """A Chappe semaphore post: a small stone hut and, above it, a tall mast
+    with the regulator beam and its two indicator arms, set at an angle as
+    if passing a signal; a ladder up the mast."""
+    part("cyl", (1.0, 0.03), (0, 0, 0.015), M("#7a6347", "dirt", 0.95, alt="#6f6a45"), root, name="yard", segments=28)
+    bpy.context.object.scale = (2.2, 2.2, 1.0)
+    stone = M("#b0a895", "wall", 0.92, scale=2.0, alt="#8e8778")
+    part("box", (2.4, 2.0, 2.2), (0, 0.2, 1.1), stone, root, name="hut")
+    part("cyl", (1.9, 1.0, 0.1), (0, 0.2, 2.7), M("#8f4a33", "tiles", 0.8, alt="#7c3f2c"), root, rot=(0, 0, 45), name="roof", segments=4, smooth=False)
+    door(root, -0.5, -0.82, 0.8, 1.6, color="#3d2a1a")
+    dark = M("#2f2a25", "planks", 0.8)
+    part("box", (0.22, 0.22, 7.2), (0.6, 0.2, 4.4), M("#5d3f25", "planks", 0.85), root, name="mast")
+    for z in range(1, 12):
+        part("box", (0.5, 0.05, 0.05), (0.6, -0.05, 2.6 + z * 0.4), M("#6b4a2d", "plain", 0.85), root, name="rung")
+    # The regulator, tilted, and the indicators at its ends.
+    part("box", (3.4, 0.14, 0.3), (0.6, -0.1, 7.6), dark, root, rot=(0, -18, 0), name="regulator")
+    # Each indicator hangs from (left) or stands on (right) its end of the
+    # regulator, turned a little: a letter of the code.
+    for sgn, tilt in ((-1, 25), (1, -25)):
+        x = 0.6 + sgn * 1.62
+        z = 7.6 - sgn * 0.52
+        part("box", (1.1, 0.1, 0.18), (x, -0.2, z + sgn * 0.5), dark, root, rot=(0, 90 + tilt, 0), name="indicator")
+    pennant(root, -1.4, -1.0, ("#24315c", "#efeee8", "#b02a2e") if side == "fr" else ("#c0282d", "#22336b"), height=2.6)
+
+
 FIELD_W, FIELD_D = 155.44 / 22.5, 117.92 / 22.5    # the game's farm footprint in metres
 
 
@@ -769,6 +857,12 @@ BUILDERS = {
     "lumbercamp_br": lambda r: build_lumbercamp(r, "br"),
     "sawmill_fr": lambda r: build_sawmill(r, "fr"),
     "sawmill_br": lambda r: build_sawmill(r, "br"),
+    "windmill_fr": lambda r: build_windmill(r, "fr"),
+    "windmill_br": lambda r: build_windmill(r, "br"),
+    "smithy_fr": lambda r: build_smithy(r, "fr"),
+    "smithy_br": lambda r: build_smithy(r, "br"),
+    "telegraph_fr": lambda r: build_telegraph(r, "fr"),
+    "telegraph_br": lambda r: build_telegraph(r, "br"),
     "field_bare": lambda r: build_field(r, "bare"),
     "field_young": lambda r: build_field(r, "young"),
     "field_ripe": lambda r: build_field(r, "ripe"),
@@ -788,7 +882,7 @@ def world_points():
 
 
 # Buildings turn to the camera at an angle so two facades and a gable show.
-YAW = {"lumbercamp_fr": 28, "lumbercamp_br": -28, "sawmill_fr": 28, "sawmill_br": -28, "tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
+YAW = {"lumbercamp_fr": 28, "lumbercamp_br": -28, "sawmill_fr": 28, "sawmill_br": -28, "windmill_fr": 20, "windmill_br": -20, "smithy_fr": 26, "smithy_br": -26, "telegraph_fr": 24, "telegraph_br": -24, "tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
 
 
 def normal_override() -> bpy.types.Material:

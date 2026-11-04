@@ -15,20 +15,42 @@ const ARTILLERY_AFTER := 120.0
 const TRAINED_AT := {"worker": "towncenter", "infantry": "barracks", "officer": "barracks",
 	"drummer": "barracks", "cavalry": "stable", "artillery": "foundry"}
 ## What peasants may build, in menu order.
-const BUILDABLE := ["house", "farm", "lumbercamp", "sawmill", "mine", "barracks", "stable", "foundry", "tower", "hospital"]
+const BUILDABLE := ["house", "farm", "windmill", "lumbercamp", "sawmill", "mine", "smithy", "barracks", "telegraph", "stable", "foundry", "tower", "hospital"]
 ## Buildings of the Godot game only (not in the web game's start.json).
 ## The sawmill: after a lumber camp; while one stands, its side's wood comes
 ## in a quarter more (sawn to planks) and every other building costs a fifth
 ## less wood (Battle.build_cost, Battle.credit).
-const OWN_BUILDINGS := {"sawmill": {"cost": {"wood": 150, "iron": 50}, "w": 104.0, "h": 78.0, "hp": 600, "label": "Zagerij"}}
+## The windmill: after a grain field; its side's food comes in a fifth more
+## (ground to flour). The smithy: after a mine; its side's muskets and guns
+## strike a tenth harder. The semaphore post (Chappe's telegraph): after a
+## barracks; its side's orders reach the battalions in half the time, and it
+## sees far over the land.
+const OWN_BUILDINGS := {
+	"sawmill": {"cost": {"wood": 150, "iron": 50}, "w": 104.0, "h": 78.0, "hp": 600, "label": "Zagerij"},
+	"windmill": {"cost": {"wood": 180, "food": 60}, "w": 82.0, "h": 72.0, "hp": 550, "label": "Windmolen"},
+	"smithy": {"cost": {"wood": 140, "iron": 90}, "w": 96.0, "h": 76.0, "hp": 650, "label": "Smederij"},
+	"telegraph": {"cost": {"wood": 160, "iron": 40}, "w": 70.0, "h": 66.0, "hp": 400, "label": "Seinpost"},
+}
 const SAWMILL_WOOD := 1.25
 const SAWMILL_SAVES := 0.2
+const WINDMILL_FOOD := 1.2
+const SMITHY_DAMAGE := 1.1
+const TELEGRAPH_ORDERS := 0.5
+const TELEGRAPH_SIGHT := 620.0
 ## What must stand (complete) before a building may be laid out.
-const NEEDS := {"sawmill": "lumbercamp"}
+const NEEDS := {"sawmill": "lumbercamp", "windmill": "farm", "smithy": "mine", "telegraph": "barracks"}
+## What each of the Godot game's own buildings does, for its button's tip.
+const DOES := {
+	"sawmill": "Daarna levert hout een kwart meer op en kosten alle gebouwen een vijfde minder hout.",
+	"windmill": "Daarna levert voedsel een vijfde meer op: het graan wordt tot meel gemalen.",
+	"smithy": "Daarna schieten je musketten en kanonnen een tiende harder.",
+	"telegraph": "Een seinpost van Chappe: je orders komen twee keer zo snel aan, en hij kijkt ver over het land.",
+}
 const LABELS := {"worker": "Boer", "infantry": "Musketier", "officer": "Officier", "drummer": "Tamboer",
 	"cavalry": "Cavalerie", "artillery": "Kanon", "towncenter": "Stadhuis", "barracks": "Kazerne",
 	"house": "Huis", "farm": "Graanakker", "stable": "Stal", "foundry": "Gieterij", "tower": "Schiettoren",
 	"mine": "IJzermijn", "lumbercamp": "Houthakkerskamp", "hospital": "Veldhospitaal", "sawmill": "Zagerij",
+	"windmill": "Windmolen", "smithy": "Smederij", "telegraph": "Seinpost",
 	"food": "voedsel", "wood": "hout", "iron": "ijzer"}
 
 static var _start := {}

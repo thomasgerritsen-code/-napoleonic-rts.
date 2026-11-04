@@ -824,6 +824,9 @@ func credit(side: String, kind: String, amount: float) -> void:
 		# A sawmill saws the wood to planks: a quarter more of it.
 		if kind == "wood" and has_complete(side, "sawmill"):
 			amount *= Rules.SAWMILL_WOOD
+		# A windmill grinds the grain: a fifth more food.
+		elif kind == "food" and has_complete(side, "windmill"):
+			amount *= Rules.WINDMILL_FOOD
 		economy[side][kind] += amount
 
 
@@ -910,8 +913,8 @@ func notice_idle(u: Unit, used_up: Supply) -> void:
 
 func on_built(b: Building, by: Unit) -> void:
 	say("%s voltooid." % Rules.label(b.type), b.side)
-	if b.type == "sawmill":
-		say("Zagerij voltooid: hout levert een kwart meer op, en alle gebouwen kosten een vijfde minder hout.", b.side)
+	if Rules.DOES.has(b.type):
+		say("%s voltooid. %s" % [Rules.label(b.type), String(Rules.DOES[b.type]).replace("Daarna ", "Nu ")], b.side)
 	# The builders go to work at what they built.
 	for u in units:
 		if u.alive() and u.type == "worker" and u.task == "" and u.side == b.side and u.world.distance_to(b.world) < b.reach_radius() + 30.0:
@@ -1109,6 +1112,9 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 	var damage := float(info.get("damage", 20)) * u.stat("ranged")
 	if u.regiment != null:
 		damage *= u.regiment.damage_factor()
+	# A smithy keeps the muskets and guns in order: a tenth harder.
+	if u.type != "cavalry" and has_complete(u.side, "smithy"):
+		damage *= Rules.SMITHY_DAMAGE
 	if target is Building:
 		(target as Building).hit(damage * (2.5 if u.type == "artillery" else 0.4))
 		return
@@ -1422,7 +1428,9 @@ func order_delay(at: Vector2, side: String) -> float:
 		if u.side == side and u.alive() and u.type == "officer" and (u.regiment == null or not u.regiment.routing):
 			nearest = minf(nearest, u.world.distance_to(at))
 	var bonus := 1.0 if nearest <= 260.0 else (0.5 if nearest <= 430.0 else 0.0)
-	return maxf(0.35, 0.75 + distance / 1100.0 - bonus * 0.35)
+	var delay := maxf(0.35, 0.75 + distance / 1100.0 - bonus * 0.35)
+	# A semaphore post sends the orders by its arms: half the time.
+	return delay * Rules.TELEGRAPH_ORDERS if has_complete(side, "telegraph") else delay
 
 
 func _deliver_orders() -> void:

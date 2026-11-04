@@ -11,7 +11,7 @@ const FLASH_COLOUR := Color(1.0, 0.78, 0.45)
 const LAMP_COLOUR := Color(1.0, 0.72, 0.38)
 ## The buildings with lit windows, and how big their glow is.
 const LAMPS := {"towncentre": 1.6, "house": 0.9, "barracks": 1.3, "hospital": 1.2, "stable": 1.0,
-	"tower": 0.8, "mill": 0.8, "lumbercamp": 0.7, "sawmill": 0.7, "mine": 0.7}
+	"tower": 0.8, "mill": 0.8, "lumbercamp": 0.7, "sawmill": 0.7, "windmill": 0.7, "smithy": 0.9, "telegraph": 0.6, "mine": 0.7}
 
 var battle: Battle
 ## Flashes since the start: tests.

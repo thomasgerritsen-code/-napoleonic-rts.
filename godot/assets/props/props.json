@@ -441,6 +441,90 @@
     "y": 168
    },
    "w": 380
+  },
+  "windmill_fr": {
+   "footprint": {
+    "d": 5.17,
+    "w": 5.91
+   },
+   "h": 405,
+   "heightM": 8.66,
+   "image": "windmill_fr.webp",
+   "pivot": {
+    "x": 134,
+    "y": 275
+   },
+   "w": 422
+  },
+  "windmill_br": {
+   "footprint": {
+    "d": 5.17,
+    "w": 5.91
+   },
+   "h": 420,
+   "heightM": 8.66,
+   "image": "windmill_br.webp",
+   "pivot": {
+    "x": 164,
+    "y": 289
+   },
+   "w": 422
+  },
+  "smithy_fr": {
+   "footprint": {
+    "d": 5.41,
+    "w": 6.08
+   },
+   "h": 308,
+   "heightM": 4.38,
+   "image": "smithy_fr.webp",
+   "pivot": {
+    "x": 150,
+    "y": 204
+   },
+   "w": 368
+  },
+  "smithy_br": {
+   "footprint": {
+    "d": 5.41,
+    "w": 5.97
+   },
+   "h": 283,
+   "heightM": 4.38,
+   "image": "smithy_br.webp",
+   "pivot": {
+    "x": 150,
+    "y": 179
+   },
+   "w": 363
+  },
+  "telegraph_fr": {
+   "footprint": {
+    "d": 4.4,
+    "w": 4.62
+   },
+   "h": 435,
+   "heightM": 8.27,
+   "image": "telegraph_fr.webp",
+   "pivot": {
+    "x": 118,
+    "y": 315
+   },
+   "w": 363
+  },
+  "telegraph_br": {
+   "footprint": {
+    "d": 4.4,
+    "w": 4.45
+   },
+   "h": 418,
+   "heightM": 8.27,
+   "image": "telegraph_br.webp",
+   "pivot": {
+    "x": 118,
+    "y": 298
+   },
+   "w": 356
   }
  }
 }

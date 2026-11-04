@@ -53,6 +53,8 @@ func _draw() -> void:
 func vision(node: Node2D) -> float:
 	if node is Building and (node as Building).type == "tower":
 		return float(Rules.tower_level((node as Building).tower_level)["vision"])
+	if node is Building and (node as Building).type == "telegraph" and (node as Building).complete:
+		return Rules.TELEGRAPH_SIGHT
 	if node is Building:
 		return 330.0 if (node as Building).type == "towncenter" else 250.0
 	match (node as Unit).type:

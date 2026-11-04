@@ -61,7 +61,7 @@ func _add_art() -> void:
 	_sprite = Sprite2D.new()
 	_sprite.centered = false
 	var nation := "france" if side == "france" else "britain"
-	if type == "farm" or type == "lumbercamp" or type == "sawmill":
+	if type == "farm" or type == "lumbercamp" or Rules.OWN_BUILDINGS.has(type):
 		# Modelled at true size: one metre is Iso.SPRITE_SCALE game px.
 		var prop_name := _field_look() if type == "farm" else type + "_" + ("fr" if side == "france" else "br")
 		var prop: Dictionary = battle.props[prop_name]

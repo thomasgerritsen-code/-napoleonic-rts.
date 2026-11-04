@@ -482,8 +482,8 @@ func _fill_buttons() -> void:
 			var cost := battle.build_cost(battle.me, type)
 			var blocked := battle.build_blocked(battle.me, type)
 			var tip := "%s bouwen voor %s; klik waar het moet komen." % [Rules.label(type), Rules.cost_text(cost)]
-			if type == "sawmill":
-				tip += " Daarna levert hout een kwart meer op en kosten alle gebouwen een vijfde minder hout."
+			if Rules.DOES.has(type):
+				tip += " " + String(Rules.DOES[type])
 			var built_button := _button(Rules.label(type), blocked if blocked != "" else Rules.cost_text(cost), battle.start_placing.bind(type),
 				blocked if blocked != "" else tip)
 			built_button.disabled = blocked != ""
