@@ -82,6 +82,13 @@ var _march: Array[Vector2] = []
 var _anchor := Vector2.ZERO
 var _end_face := 0.0
 var _forming := false
+## The colours: the man who carries them (infantry), and while they lie
+## fallen, the seconds until another takes them up. Their fall shakes the
+## whole battalion.
+const COLOURS_SHOCK := 10.0
+const COLOURS_TAKEN_UP := 3.0
+var colour_bearer: Unit = null
+var colours_down := 0.0
 var _places := {}            # Unit -> Vector2(right, forward) offset
 var _wheel := false          # the body turns with its way (else slides, keeping its front)
 var heading := 0.0           # the way the body goes, as the men face while they march
@@ -574,6 +581,40 @@ func morale() -> float:
 	return clampf(sum / list.size() + (5.0 if officer else -20.0) + drum, 0.0, 100.0)
 
 
+## The colours: when their bearer falls they lie a moment (every man of the
+## battalion shaken), then the man nearest the centre takes them up.
+func _keep_colours(delta: float) -> void:
+	if kind == "cavalry":
+		return
+	if colour_bearer != null and not colour_bearer.alive():
+		colour_bearer = null
+		colours_down = COLOURS_TAKEN_UP
+		var list := living()
+		for u in list:
+			u.morale = maxf(0.0, u.morale - COLOURS_SHOCK)
+		if not list.is_empty() and list[0].battle != null and list[0].battle.commanded(side):
+			list[0].battle.say("Het vaandel van %s is gevallen!" % name, side)
+	if colour_bearer != null:
+		return
+	colours_down = maxf(0.0, colours_down - delta)
+	if colours_down <= 0.0 and not routing:
+		colour_bearer = bearer_candidate()
+
+
+## Who would carry the colours: the musketeer nearest the battalion's centre.
+func bearer_candidate() -> Unit:
+	var here := centroid()
+	var best: Unit = null
+	var best_d := INF
+	for u in living():
+		if u.type == "infantry":
+			var d := u.world.distance_squared_to(here)
+			if d < best_d:
+				best_d = d
+				best = u
+	return best
+
+
 func morale_label() -> String:
 	if routing:
 		return "op de vlucht"
@@ -714,6 +755,7 @@ func charge(regiments: Array[Regiment]) -> bool:
 func update(delta: float, regiments: Array[Regiment]) -> void:
 	if destroyed():
 		return
+	_keep_colours(delta)
 	_nerve(delta)
 	if routing:
 		return

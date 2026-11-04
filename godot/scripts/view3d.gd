@@ -46,6 +46,13 @@ var _men := {}               # Unit -> {node, player, anim, ring}
 var _halls := {}             # Building -> Node3D
 var _scenery: Array = []     # [sprite, MultiMesh, index, transform]
 var _labels := {}            # Regiment -> Label3D
+var _colours := {}           # Regiment -> Node3D (pole, cloth)
+var _bars := {}              # Regiment -> Sprite3D (morale over strength)
+static var _bar_textures := {}
+static var _cloth_shader: Shader
+## On a phone the men (and their colours) are drawn this much larger: on a
+## small screen they read; nothing of the battle changes.
+const PHONE_MEN := 1.3
 var _lamps := {}             # Building -> OmniLight3D
 var _flash_pool: Array[OmniLight3D] = []
 var _flash_next := 0
@@ -467,6 +474,8 @@ func _sync_units(delta: float) -> void:
 			_sleep_man(m)
 			continue
 		node.position = surface_at(u.world) - Vector3.UP * field.sink(u)
+		if u.type != "worker":
+			node.scale = Vector3.ONE * men_scale()
 		node.rotation.y = lerp_angle(node.rotation.y, turn(u.facing), minf(1.0, delta * 10.0))
 		var ring: MeshInstance3D = m["ring"]
 		ring.visible = u.selected
@@ -723,7 +732,202 @@ func _sync_labels() -> void:
 		label.modulate = Color(0.55, 0.7, 1.0) if r.side == "france" else Color(1.0, 0.5, 0.45)
 		if r in battle.selected:
 			label.modulate = RING
-		label.text = "%s · %d" % [r.name, r.strength()]
+		# Veterans carry their honours by their name.
+		label.text = "%s · %d" % [r.name, r.strength()] if r.victories == 0 else "%s · %d · %s" % [r.name, r.strength(), r.rank_label()]
+		label.position.y += 1.3 * (men_scale() - 1.0)
+		_sync_bar(r, visible_)
+		_sync_colours(r, visible_)
+	for r: Variant in _colours.keys():
+		if not is_instance_valid(r) or (r as Regiment).destroyed():
+			(_colours[r] as Node3D).queue_free()
+			_colours.erase(r)
+	for r: Variant in _bars.keys():
+		if not is_instance_valid(r) or (r as Regiment).destroyed():
+			(_bars[r] as Node3D).queue_free()
+			_bars.erase(r)
+
+
+## How much larger the men are drawn (PHONE_MEN on a phone).
+func men_scale() -> float:
+	return PHONE_MEN if Phone.active() else 1.0
+
+
+## Over each battalion, under its name: its morale as a bar from green to
+## red, its strength as a thin line beneath.
+func _sync_bar(r: Regiment, shown: bool) -> void:
+	var bar: Sprite3D = _bars.get(r)
+	if bar == null:
+		bar = Sprite3D.new()
+		bar.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		bar.no_depth_test = true
+		bar.shaded = false
+		bar.pixel_size = 0.03
+		bar.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		bar.render_priority = 1
+		add_child(bar)
+		_bars[r] = bar
+	bar.visible = shown
+	if not shown:
+		return
+	bar.position = at(r.centroid()) + Vector3(0, 3.55 + 1.3 * (men_scale() - 1.0), 0)
+	var start := maxi(1, maxi(int(r.get("_start")), r.men.size()))
+	var strength := clampf(float(r.strength()) / maxf(1.0, float(start)), 0.0, 1.0)
+	bar.texture = bar_texture(0.0 if r.routing else r.morale() / 100.0, strength)
+
+
+## The bar's picture for a morale and strength (each 0..1), shared: twenty
+## steps of each.
+static func bar_texture(morale: float, strength: float) -> ImageTexture:
+	var m := clampi(roundi(morale * 20.0), 0, 20)
+	var st := clampi(roundi(strength * 20.0), 0, 20)
+	var key := m * 21 + st
+	if _bar_textures.has(key):
+		return _bar_textures[key]
+	var image := Image.create(42, 8, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.08, 0.08, 0.07, 0.85))
+	var fill := Color(0.85, 0.2, 0.15).lerp(Color(0.95, 0.8, 0.2), clampf(m / 10.0, 0.0, 1.0)).lerp(Color(0.35, 0.82, 0.3), clampf((m - 10) / 10.0, 0.0, 1.0))
+	for x in roundi(40.0 * m / 20.0):
+		for y in range(1, 5):
+			image.set_pixel(1 + x, y, fill)
+	for x in roundi(40.0 * st / 20.0):
+		image.set_pixel(1 + x, 6, Color(0.92, 0.9, 0.85))
+	var tex := ImageTexture.create_from_image(image)
+	_bar_textures[key] = tex
+	return tex
+
+
+## The battalion's colours over its bearer: the French tricolour under the
+## gilt eagle, the British King's Colour under a spearhead; veterans' with a
+## gold fringe. Gone while they lie fallen, and from a routed battalion.
+func _sync_colours(r: Regiment, shown: bool) -> void:
+	if r.kind == "cavalry":
+		return
+	var pole: Node3D = _colours.get(r)
+	var bearer: Unit = r.colour_bearer
+	if bearer == null and r.colours_down <= 0.0 and battle.net_role == "client":
+		bearer = r.bearer_candidate()
+	var veteran := r.victories >= 3
+	if pole == null or bool(pole.get_meta("veteran")) != veteran:
+		if pole != null:
+			pole.queue_free()
+		pole = _make_colours(r.side, veteran)
+		add_child(pole)
+		_colours[r] = pole
+	pole.visible = shown and bearer != null and bearer.alive() and bearer.visible and not r.routing
+	if not pole.visible:
+		return
+	var m: Dictionary = _men.get(bearer, {})
+	var base: Vector3 = (m["node"] as Node3D).position if not m.is_empty() else surface_at(bearer.world)
+	var side_way := Vector3(cos(r.facing + PI / 2.0), 0, sin(r.facing + PI / 2.0))
+	pole.position = base + side_way * 0.25 * men_scale()
+	pole.rotation.y = turn(r.facing) + PI / 2.0
+	pole.scale = Vector3.ONE * men_scale()
+
+
+func _make_colours(side: String, veteran: bool) -> Node3D:
+	var pole := Node3D.new()
+	pole.set_meta("veteran", veteran)
+	var staff := MeshInstance3D.new()
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = 0.025
+	cylinder.bottom_radius = 0.03
+	cylinder.height = 3.0
+	staff.mesh = cylinder
+	staff.position.y = 1.5
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.32, 0.22, 0.13)
+	staff.material_override = wood
+	pole.add_child(staff)
+	var gilt := StandardMaterial3D.new()
+	gilt.albedo_color = Color(0.85, 0.66, 0.2)
+	gilt.metallic = 0.8
+	gilt.roughness = 0.35
+	var finial := MeshInstance3D.new()
+	if side == "france":
+		# The eagle: a gilt body with spread wings.
+		var body := SphereMesh.new()
+		body.radius = 0.07
+		body.height = 0.16
+		finial.mesh = body
+		var wings := MeshInstance3D.new()
+		var wing_box := BoxMesh.new()
+		wing_box.size = Vector3(0.05, 0.1, 0.3)
+		wings.mesh = wing_box
+		wings.material_override = gilt
+		finial.add_child(wings)
+	else:
+		var spear := CylinderMesh.new()
+		spear.top_radius = 0.0
+		spear.bottom_radius = 0.045
+		spear.height = 0.2
+		finial.mesh = spear
+	finial.material_override = gilt
+	finial.position.y = 3.08
+	pole.add_child(finial)
+	var cloth := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(1.2, 0.85)
+	quad.subdivide_width = 10
+	cloth.mesh = quad
+	if _cloth_shader == null:
+		_cloth_shader = Shader.new()
+		_cloth_shader.code = """shader_type spatial;
+render_mode cull_disabled;
+uniform sampler2D cloth : source_color, filter_linear_mipmap;
+void vertex() {
+	// Flying from the staff: the free end ripples most.
+	float k = UV.x;
+	VERTEX.z += sin(UV.x * 7.0 - TIME * 4.2 + VERTEX.y * 2.0) * 0.09 * k;
+	VERTEX.y -= k * k * 0.08;
+}
+void fragment() {
+	ALBEDO = texture(cloth, UV).rgb;
+	ROUGHNESS = 0.9;
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = _cloth_shader
+	mat.set_shader_parameter("cloth", colours_texture(side, veteran))
+	cloth.material_override = mat
+	cloth.position = Vector3(0.62, 2.55, 0)
+	pole.add_child(cloth)
+	cloth.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	staff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return pole
+
+
+## The colours' cloth: France's tricolour (blue at the staff), Britain's
+## King's Colour (the Union); a veteran's with a gold fringe.
+static func colours_texture(side: String, veteran: bool) -> ImageTexture:
+	var w := 96
+	var h := 68
+	var image := Image.create(w, h, true, Image.FORMAT_RGB8)
+	var blue := Color(0.1, 0.16, 0.42)
+	var white := Color(0.94, 0.93, 0.88)
+	var red := Color(0.72, 0.1, 0.12)
+	for y in h:
+		for x in w:
+			var c := white
+			if side == "france":
+				c = blue if x < w / 3 else (white if x < 2 * w / 3 else red)
+			else:
+				var fx := (float(x) / w - 0.5) * 2.0
+				var fy := (float(y) / h - 0.5) * 2.0
+				c = blue
+				var diag := minf(absf(fx * h / w * 1.4 - fy), absf(fx * h / w * 1.4 + fy))
+				if diag < 0.22:
+					c = white
+				if diag < 0.08:
+					c = red
+				if absf(fx) < 0.2 or absf(fy) < 0.3:
+					c = white
+				if absf(fx) < 0.11 or absf(fy) < 0.17:
+					c = red
+			if veteran and (x < 3 or y < 3 or x >= w - 3 or y >= h - 3):
+				c = Color(0.86, 0.68, 0.22)
+			image.set_pixel(x, y, c)
+	image.generate_mipmaps()
+	return ImageTexture.create_from_image(image)
 
 
 # ---- light of a shot ----

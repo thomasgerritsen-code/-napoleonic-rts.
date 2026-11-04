@@ -28,6 +28,17 @@ func _initialize() -> void:
 	men.append(battle.add_unit(battle.me, "officer", spot + Vector2(90, -30)))
 	men.append(battle.add_unit(battle.me, "drummer", spot + Vector2(90, 50)))
 	var r := battle.form_regiment(men)
+	if OS.get_environment("FLAGS") != "":
+		# A veteran battalion of ours beside a British one: both colours.
+		r.victories = 3
+		var foes: Array[Unit] = []
+		var there := spot + Vector2(0, 170)
+		for i in 24:
+			foes.append(battle.add_unit("britain", "infantry", there + Vector2((i % 12) * 15, (i / 12) * 19)))
+		foes.append(battle.add_unit("britain", "officer", there + Vector2(90, -30)))
+		foes.append(battle.add_unit("britain", "drummer", there + Vector2(90, 50)))
+		var theirs := battle.form_regiment(foes)
+		theirs.order_move(there + Vector2(90, 10), 0.0)
 	for i in 20:
 		battle._process(0.1)
 	if OS.get_environment("SAWMILL") != "":

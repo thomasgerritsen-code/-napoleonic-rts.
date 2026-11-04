@@ -857,6 +857,24 @@ func _initialize() -> void:
 				misplaced += 1
 	_check(meadow.count("bush") > 60 and meadow.count("fern") > 30 and meadow.count("stone") > 40 and misplaced == 0,
 		"in 3D the meadows have bushes, ferns and stones (%d, %d, %d), none in water or on a building" % [meadow.count("bush"), meadow.count("fern"), meadow.count("stone")])
+	# In 3D each battalion carries its colours and shows its morale; when
+	# the bearer falls the battalion is shaken and another takes them up.
+	for i in 3:
+		deep._process(0.1)
+	await process_frame
+	deep.view3d.call("_sync_labels")
+	var colours: Dictionary = deep.view3d.get("_colours")
+	var bars: Dictionary = deep.view3d.get("_bars")
+	var flag_up := colours.has(line) and (colours[line] as Node3D).visible and bars.has(line) and line.colour_bearer != null
+	var morale_was := line.morale()
+	line.colour_bearer.hit(1000.0)
+	deep._process(0.1)
+	var colours_shook := line.morale() < morale_was - 5.0 and line.colours_down > 0.0
+	for i in 40:
+		deep._process(0.1)
+	_check(flag_up and colours_shook and line.colour_bearer != null and line.colour_bearer.alive(),
+		"in 3D a battalion carries its colours with its morale over it; their fall shakes it (%d → %d) and another takes them up" % [
+			int(morale_was), int(line.morale())])
 	# In 3D by touch: a finger held still opens the order wheel; two taps on
 	# a man select every battalion of his arm.
 	Battle.touched = true
