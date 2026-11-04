@@ -145,6 +145,16 @@ func _build() -> void:
 			_lay_out("mine", deposit.world)
 	elif battle.nearest_supply(_home, "food", SIDE) == null and _count("farm") < 3 and stock["wood"] >= 180.0:
 		_lay_out("farm", _near_home(330.0))
+	# The Godot game's own buildings, as the player may build them: a sawmill
+	# early (the rest is cheaper after), a windmill by the fields, a
+	# headquarters for quicker orders, a smithy, and a semaphore post out
+	# towards the French to watch for them.
+	elif _wants("sawmill", 210.0):
+		_lay_out("sawmill", _wood_site())
+	elif _wants("windmill", 270.0):
+		_lay_out("windmill", _near_home(340.0))
+	elif _wants("headquarters", 330.0):
+		_lay_out("headquarters", _home - (Iso.WORLD / 2.0 - _home).normalized() * 220.0)
 	elif battle.clock > 300.0 and _count("barracks") == 1 and stock["wood"] >= 700.0:
 		_lay_out("barracks", _near_home(380.0))
 	elif battle.clock > 360.0 and _count("stable") == 0 and stock["wood"] >= 360.0:
@@ -154,9 +164,24 @@ func _build() -> void:
 	elif battle.clock > float(Rules.medics()["aiAfter"]) and _count("hospital") == 0 and stock["wood"] >= 280.0 and stock["food"] >= 160.0:
 		# Behind the town centre, away from the French.
 		_lay_out("hospital", _home - (Iso.WORLD / 2.0 - _home).normalized() * 170.0)
+	elif _wants("smithy", 450.0):
+		_lay_out("smithy", _near_home(360.0))
+	elif _wants("telegraph", 510.0):
+		_lay_out("telegraph", _towards_france(420.0))
 	elif battle.clock > Rules.tower_ai()["after"] and _count("tower") < Rules.tower_ai()["max"] and _count("tower") == _count("tower", true) \
 			and stock["wood"] >= Rules.cost_of("tower").get("wood", 260) + 120.0:
 		_lay_out("tower", _towards_france(250.0 + 60.0 * _count("tower")))
+
+
+## Whether to lay out one of these now: none yet, past `after` seconds, what
+## it needs standing, and its cost in store with wood to spare.
+func _wants(type: String, after: float) -> bool:
+	if battle.clock <= after or _count(type) > 0 or battle.build_blocked(SIDE, type) != "":
+		return false
+	var cost := battle.build_cost(SIDE, type)
+	var spare := cost.duplicate()
+	spare["wood"] = float(spare.get("wood", 0.0)) + 80.0
+	return battle.can_afford(SIDE, spare)
 
 
 func _lay_out(type: String, near: Variant) -> void:

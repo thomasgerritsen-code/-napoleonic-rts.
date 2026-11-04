@@ -72,7 +72,7 @@ jobs:
           grep -q "GODOT_NAV" native-navigation.log
           grep -q "GODOT_BENCH" native-benchmark.log
 
-      - name: Learning battle and quick battles played through
+      - name: Learning battle, quick battles and the British building
         run: |
           set -o pipefail
           timeout 300 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/tutorial_test.gd 2>&1 | tee tutorial.log
@@ -81,6 +81,9 @@ jobs:
           timeout 600 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/quick_battle_test.gd 2>&1 | tee quick.log
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" quick.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "QUICK passed" quick.log
+          timeout 600 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/ai_buildings_test.gd 2>&1 | tee ai-buildings.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" ai-buildings.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "AI_BUILDINGS passed" ai-buildings.log
 
       - name: Original Blender art regression
         run: |

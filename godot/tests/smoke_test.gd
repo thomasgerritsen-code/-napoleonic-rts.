@@ -661,11 +661,12 @@ func _initialize() -> void:
 	# mine: a tenth harder shots) and the semaphore post (after a barracks:
 	# orders in half the time, far sight).
 	var extra_side := "britain"
-	# The British field, mine and barracks set aside for a moment (unfinished),
-	# not taken away: the battle goes on with them afterwards.
+	# The British field, mine and barracks, and any of these new buildings the
+	# computer has put up, set aside for a moment (unfinished), not taken
+	# away: the battle goes on with them afterwards.
 	var set_aside: Array[Building] = []
 	for b in battle.buildings:
-		if b.side == extra_side and b.complete and b.type in ["farm", "mine", "barracks"]:
+		if b.side == extra_side and b.complete and b.type in ["farm", "mine", "barracks", "windmill", "smithy", "headquarters", "telegraph"]:
 			b.complete = false
 			set_aside.append(b)
 	var needs_first := battle.build_blocked(extra_side, "windmill") != "" and battle.build_blocked(extra_side, "smithy") != "" \
