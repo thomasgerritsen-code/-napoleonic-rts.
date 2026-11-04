@@ -17,7 +17,7 @@ const VERSION := 1
 ## The British commander's own state that a save keeps.
 const AI_VARS := ["plan", "army_only", "_clock", "_home", "stance", "waves", "_next_wave", "_stance_since", "_losing_since"]
 const WEATHER_VARS := ["raining", "wetness", "_next", "_season"]
-const REGIMENT_VARS := ["destination", "hold", "still_seconds", "last_centre", "_start", "_break_base", "_lost_officer",
+const REGIMENT_VARS := ["destination", "hold", "fire_mode", "still_seconds", "last_centre", "_start", "_break_base", "_lost_officer",
 	"_lost_drummer", "_safe_for", "_line_after"]
 
 ## When Battle starts, the save to lay over the new battle (set by the menu).

@@ -57,6 +57,11 @@ func _initialize() -> void:
 	await _save(out.path_join("phone3d_village.png"))
 	battle.select_units(r.living())
 	battle.view3d.view(r.centroid(), 0.6, 35.0, 30.0)
+	if OS.get_environment("FLAGS") != "":
+		# The two fire at each other a while: the front ranks kneel.
+		for i in 40:
+			battle._process(0.1)
+		battle.view3d.view(r.centroid() + Vector2(0, 80), 90.0, 22.0, 16.0)
 	for i in 6:
 		await process_frame
 	await _save(out.path_join("phone3d_battalion.png"))

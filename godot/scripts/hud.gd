@@ -274,7 +274,7 @@ func show_wheel(at: Vector2) -> void:
 	close_wheel()
 	var screen := get_viewport().get_visible_rect().size
 	# An oval: the buttons are wider than high.
-	var radius := Vector2(125, 88)
+	var radius := Vector2(142, 96)
 	var centre := Vector2(clampf(at.x, radius.x + 52, screen.x - radius.x - 52), clampf(at.y, radius.y + 24, screen.y - radius.y - 24))
 	_wheel = Control.new()
 	_wheel.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -299,7 +299,8 @@ func show_wheel(at: Vector2) -> void:
 		["Tirailleurs", FORMATION, func() -> void: battle.skirmish()],
 		["Charge", ORDERS, func() -> void: battle.charge()],
 		["Stelling", ORDERS, func() -> void: battle.hold()],
-		["Halt", ORDERS, func() -> void: battle.halt()]]
+		["Halt", ORDERS, func() -> void: battle.halt()],
+		["Salvo / vrij", ORDERS, func() -> void: battle.toggle_fire_mode()]]
 	for i in items.size():
 		var item: Array = items[i]
 		var angle := -PI / 2.0 + TAU * i / items.size()
@@ -513,6 +514,10 @@ func _fill_buttons() -> void:
 		_button("Charge", "C · bajonet", battle.charge, "Stormt met de bajonet op de dichtstbijzijnde vijand af.")
 		_button("Stelling", "G · " + ("houdt stand" if holding else "schrap, ingraven"), battle.hold,
 			"Schrap zetten (30% minder verlies); na een tijd graaft het bataljon een loopgraaf." if not holding else "De stelling loslaten.", holding)
+		var volleys: bool = battle.selected[0].fire_mode == "volley"
+		_button("Vuur", "salvo's" if volleys else "naar believen", battle.toggle_fire_mode,
+			"Salvo's: het bataljon vuurt per peloton, rollend langs de linie; harder en het schokt de vijand. Tik voor vuur naar believen." if volleys
+			else "Vuur naar believen: ieder schiet zodra hij geladen heeft. Tik voor salvo's.", volleys)
 		if trench != null:
 			var next := Rules.trench_level(int(trench["level"]) + 1)
 			if not next.is_empty() and trench["upgrade_to"] == 0:

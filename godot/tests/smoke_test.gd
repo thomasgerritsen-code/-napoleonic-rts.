@@ -629,6 +629,43 @@ func _initialize() -> void:
 		if not u.alive():
 			fallen[u.side] += 1
 	_check(fallen["france"] > 0 and fallen["britain"] > 0, "both battalions lost men in the firefight (%s)" % fallen)
+	# Volleys: in line the front rank kneels; a battalion firing volleys
+	# lets one platoon fire at a time, rolling along the line; at will
+	# every loaded man fires.
+	var volley_pair: Array[Regiment] = []
+	for side_and_face: Array in [["france", 0.0, Vector2(4700, 3000)], ["britain", PI, Vector2(4880, 3000)]]:
+		var volley_men: Array[Unit] = []
+		var where: Vector2 = side_and_face[2]
+		for n in 24:
+			volley_men.append(battle.add_unit(side_and_face[0], "infantry", where + Vector2(0, (n - 12) * 15.0)))
+		volley_men.append(battle.add_unit(side_and_face[0], "officer", where + Vector2(-30, 0)))
+		volley_men.append(battle.add_unit(side_and_face[0], "drummer", where + Vector2(-30, 20)))
+		var made_r := battle.form_regiment(volley_men)
+		made_r.order_move(where, side_and_face[1])
+		volley_pair.append(made_r)
+	_run(battle, 6.0)
+	var volley_ours: Regiment = volley_pair[0]
+	if volley_ours.enemy != null:
+		var kneeling := 0
+		var platoons := {}
+		var fired_platoons := {}
+		for i in 30:
+			_run(battle, 0.1)
+			for u in volley_ours.living():
+				if u.anim_state in ["kaim", "kfire"]:
+					kneeling += 1
+				if u.type == "infantry":
+					platoons[u.platoon] = true
+				if u.anim_state in ["fire", "kfire"] and volley_ours.volleying():
+					fired_platoons[u.platoon] = true
+		volley_ours.fire_mode = "at_will"
+		_run(battle, 0.5)
+		var at_will := not volley_ours.volleying() and volley_ours.may_fire(volley_ours.living()[0])
+		volley_ours.fire_mode = "volley"
+		_check(kneeling > 0 and platoons.size() == Regiment.VOLLEY_PLATOONS and fired_platoons.size() >= 2 and at_will,
+			"the front rank kneels to fire and volleys roll by platoons along the line (%d platoons fired)" % fired_platoons.size())
+	else:
+		_check(false, "a French battalion in line fights for the volley check")
 
 	print("GODOT_SMOKE ", JSON.stringify({"food": gathered, "economy": battle.economy, "fallen": fallen,
 		"pop": {"france": battle.pop_used("france"), "britain": battle.pop_used("britain")}, "plan": battle.ai.plan}))

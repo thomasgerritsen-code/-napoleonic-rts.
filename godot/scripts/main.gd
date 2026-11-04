@@ -1149,10 +1149,16 @@ func _on_fired(u: Unit, target: Node2D) -> void:
 			var chance := clampf(0.45 - distance / 600.0, 0.06, 0.4)
 			if u.regiment != null:
 				chance *= u.regiment.fire_factor()
+			# A volley strikes harder and shakes even where it misses; a smithy's
+			# muskets a tenth harder.
+			var volley := u.regiment != null and u.regiment.volleying()
+			var musket := (Rules.SMITHY_DAMAGE if has_complete(u.side, "smithy") else 1.0) * (Regiment.VOLLEY_DAMAGE if volley else 1.0)
+			if volley:
+				foe.morale = maxf(0.0, foe.morale - Regiment.VOLLEY_SHOCK)
 			if randf() < chance:
 				# A cuirass turns part of the musket balls.
 				var armour := float(Rules.troop(foe.troop).get("armour", 0.0))
-				strike(foe, randf_range(45.0, 100.0) * u.stat("ranged") * (1.0 - armour)
+				strike(foe, randf_range(45.0, 100.0) * u.stat("ranged") * (1.0 - armour) * musket
 					* (u.regiment.damage_factor() if u.regiment != null else 1.0), u.world)
 
 
@@ -1657,6 +1663,21 @@ func double_tap(at: Vector2, man: Unit) -> bool:
 	say("Alle %d %s geselecteerd." % [count, "bataljons" if man.type == "infantry" else ("eskadrons" if man.type == "cavalry" else "batterijen")])
 	buzz(20)
 	return true
+
+
+## Volleys (the battalion fires by platoons, rolling along the line) or
+## fire at will (each man as he is loaded), for the selected battalions.
+func toggle_fire_mode() -> void:
+	if _relay("toggle_fire_mode"):
+		return
+	var list := selected
+	if list.is_empty():
+		return
+	var to := "at_will" if list[0].fire_mode == "volley" else "volley"
+	for r in list:
+		r.fire_mode = to
+	say("Vuren in salvo's: per peloton, rollend langs de linie." if to == "volley" else "Vuur naar believen: ieder schiet zodra hij geladen heeft.")
+	refresh_hud()
 
 
 ## Halt: the battalions stand where they are, the free men stop.

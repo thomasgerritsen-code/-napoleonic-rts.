@@ -29,6 +29,10 @@ var wound := ""
 ## Nerve, 0 to 100 (the web game's morale): shaken by hits and by comrades
 ## falling near him, steadied by his officer and drummer.
 var morale := 100.0
+## His place in his battalion's line (set as it forms): the rank (0 the
+## front, which kneels to fire) and the platoon he fires his volleys with.
+var rank_index := -1
+var platoon := 0
 ## Wind, 0 to 100 (the web game's stamina): marching and charging tire a man,
 ## standing he gets it back; a tired man goes slower.
 var stamina := 100.0
@@ -493,7 +497,8 @@ func _fire_cycle(foe: Node2D) -> void:
 		State.AIM:
 			if type != "artillery":
 				_play("aim")
-			if _clock <= 0.0:
+			# In volleys he holds his aim until his platoon's turn.
+			if _clock <= 0.0 and (regiment == null or regiment.may_fire(self)):
 				state = State.FIRE
 				_clock = 0.3
 				_play("fire", true)
@@ -824,6 +829,10 @@ func _play(state_name: String, restart := false) -> void:
 		state_name = "rest"
 	elif leaning and state_name == "fire":
 		state_name = "rfire"
+	# The front rank of a line kneels to aim and fire (the 3D men; 2D has
+	# no kneeling pictures and keeps standing: see _show).
+	elif type == "infantry" and regiment != null and state_name in ["aim", "fire"] and regiment.kneels(self):
+		state_name = "k" + state_name
 	if state_name != anim_state or restart:
 		anim_seq += 1
 	anim_state = state_name
@@ -857,6 +866,9 @@ func _show(restart := false) -> void:
 			shown = "gallop" if regiment != null and regiment.charging != null else _gait
 	var dir := shown_direction()
 	_crew_play(shown)
+	# No kneeling pictures in 2D: kneeling aim and fire are drawn standing.
+	if shown in ["kaim", "kfire"] and not _sprite.sprite_frames.has_animation("%s_%s" % [shown, dir]):
+		shown = shown.substr(1)
 	var anim := "%s_%s" % [shown, dir]
 	if not _sprite.sprite_frames.has_animation(anim):
 		anim = "walk_" + dir if shown in GAITS and _sprite.sprite_frames.has_animation("walk_" + dir) else "idle_" + dir

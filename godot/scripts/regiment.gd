@@ -89,6 +89,16 @@ const COLOURS_SHOCK := 10.0
 const COLOURS_TAKEN_UP := 3.0
 var colour_bearer: Unit = null
 var colours_down := 0.0
+## Fire: "volley" (by platoons, rolling along the line, each volley a
+## little harder and shaking the foe even where it misses) or "at_will"
+## (each man as soon as he is loaded). In line the front rank kneels.
+const VOLLEY_PLATOONS := 4
+const VOLLEY_STEP := 0.45
+const VOLLEY_DAMAGE := 1.15
+const VOLLEY_SHOCK := 1.2
+var fire_mode := "volley"
+var volley_platoon := -1
+var _volley_clock := 0.0
 var _places := {}            # Unit -> Vector2(right, forward) offset
 var _wheel := false          # the body turns with its way (else slides, keeping its front)
 var heading := 0.0           # the way the body goes, as the men face while they march
@@ -524,6 +534,8 @@ func _form(at: Vector2) -> void:
 				lateral = lateral * Battle.depth_rule_static("skirmishSpread", 2.3) + (Battle.hash01(u.id, 21) - 0.5) * 18.0
 				depth = depth * Battle.depth_rule_static("skirmishSpread", 2.3) + (Battle.hash01(u.id, 22) - 0.5) * 18.0
 			group[r].slot = at + right * lateral - forward * depth
+			group[r].rank_index = r
+			group[r].platoon = mini(VOLLEY_PLATOONS - 1, int(file * VOLLEY_PLATOONS / maxi(1, files)))
 	_clear_slots()
 
 
@@ -599,6 +611,32 @@ func _keep_colours(delta: float) -> void:
 	colours_down = maxf(0.0, colours_down - delta)
 	if colours_down <= 0.0 and not routing:
 		colour_bearer = bearer_candidate()
+
+
+## Whether this battalion is firing volleys now (in close order, at a foe).
+func volleying() -> bool:
+	return fire_mode == "volley" and enemy != null and not skirmish and kind != "cavalry" and not routing
+
+
+## The volley passes from platoon to platoon along the line.
+func _roll_volley(delta: float) -> void:
+	if not volleying():
+		volley_platoon = -1
+		return
+	_volley_clock -= delta
+	if _volley_clock <= 0.0:
+		_volley_clock = VOLLEY_STEP
+		volley_platoon = (volley_platoon + 1) % VOLLEY_PLATOONS
+
+
+## May this man fire now: at will always; in volleys only with his platoon.
+func may_fire(u: Unit) -> bool:
+	return not volleying() or u.platoon == volley_platoon
+
+
+## Kneels to fire: the front rank of a line in close order.
+func kneels(u: Unit) -> bool:
+	return formation == "line" and not skirmish and u.rank_index == 0
 
 
 ## Who would carry the colours: the musketeer nearest the battalion's centre.
@@ -756,6 +794,7 @@ func update(delta: float, regiments: Array[Regiment]) -> void:
 	if destroyed():
 		return
 	_keep_colours(delta)
+	_roll_volley(delta)
 	_nerve(delta)
 	if routing:
 		return

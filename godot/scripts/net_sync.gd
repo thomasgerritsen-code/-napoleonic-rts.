@@ -11,7 +11,7 @@ extends RefCounted
 ## The orders a client may give (Battle's own functions).
 const COMMANDS := ["order", "set_formation", "charge", "hold", "skirmish", "halt", "form_regiment", "reinforce",
 	"train", "build_at", "upgrade_tower", "quick_regiment", "train_missing", "toggle_auto_regiment", "toggle_shot",
-	"assign_workers", "upgrade_trench"]
+	"assign_workers", "upgrade_trench", "toggle_fire_mode"]
 
 var battle: Battle
 var link: NetLink
