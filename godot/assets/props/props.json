@@ -525,6 +525,34 @@
     "y": 298
    },
    "w": 356
+  },
+  "headquarters_fr": {
+   "footprint": {
+    "d": 6.62,
+    "w": 7.68
+   },
+   "h": 319,
+   "heightM": 5.1,
+   "image": "headquarters_fr.webp",
+   "pivot": {
+    "x": 160,
+    "y": 208
+   },
+   "w": 444
+  },
+  "headquarters_br": {
+   "footprint": {
+    "d": 6.77,
+    "w": 7.13
+   },
+   "h": 322,
+   "heightM": 5.1,
+   "image": "headquarters_br.webp",
+   "pivot": {
+    "x": 160,
+    "y": 202
+   },
+   "w": 421
   }
  }
 }

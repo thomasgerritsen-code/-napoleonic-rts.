@@ -6,7 +6,7 @@ extends SceneTree
 ## a drummer form a battalion that marches; the computer develops its base;
 ## and two battalions within range fight.
 
-const LIMIT_MS := 150000
+const LIMIT_MS := 240000   # within the CI step's 300 s timeout
 const STEP := 0.1
 
 var _failures: Array[String] = []
@@ -669,18 +669,18 @@ func _initialize() -> void:
 			b.complete = false
 			set_aside.append(b)
 	var needs_first := battle.build_blocked(extra_side, "windmill") != "" and battle.build_blocked(extra_side, "smithy") != "" \
-		and battle.build_blocked(extra_side, "telegraph") != ""
+		and battle.build_blocked(extra_side, "telegraph") != "" and battle.build_blocked(extra_side, "headquarters") != ""
 	var made: Array[Building] = []
 	for pair: Array in [["farm", Vector2(-700, 200)], ["mine", Vector2(-700, 420)], ["barracks", Vector2(-700, 640)]]:
 		made.append(battle.add_building(extra_side, pair[0], saw_home + pair[1], true))
 	var open_now := battle.build_blocked(extra_side, "windmill") == "" and battle.build_blocked(extra_side, "smithy") == "" \
-		and battle.build_blocked(extra_side, "telegraph") == ""
+		and battle.build_blocked(extra_side, "telegraph") == "" and battle.build_blocked(extra_side, "headquarters") == ""
 	var far_spot := saw_home + Vector2(-1400, -300)
 	var slow_orders := battle.order_delay(far_spot, extra_side)
 	var food_before := float(battle.economy[extra_side]["food"])
 	battle.credit(extra_side, "food", 100.0)
 	var plain_food := float(battle.economy[extra_side]["food"]) - food_before
-	for pair: Array in [["windmill", Vector2(-900, 200)], ["smithy", Vector2(-900, 420)], ["telegraph", Vector2(-900, 640)]]:
+	for pair: Array in [["windmill", Vector2(-900, 200)], ["smithy", Vector2(-900, 420)], ["headquarters", Vector2(-1100, 420)], ["telegraph", Vector2(-900, 640)]]:
 		made.append(battle.add_building(extra_side, pair[0], saw_home + pair[1], true))
 	food_before = float(battle.economy[extra_side]["food"])
 	battle.credit(extra_side, "food", 100.0)
@@ -692,13 +692,27 @@ func _initialize() -> void:
 		drawn = drawn and b.get("_sprite").texture != null
 	_check(needs_first and open_now and is_equal_approx(plain_food, 100.0) and is_equal_approx(ground_food, 120.0)
 		and is_equal_approx(fast_orders, slow_orders * 0.5) and post_sight >= 600.0 and battle.has_complete(extra_side, "smithy") and drawn,
-		"a windmill grinds a fifth more food (%d), a smithy stands, a semaphore post halves the orders' delay (%.2f s → %.2f s) and sees %d far" % [
+		"a windmill grinds a fifth more food (%d), a smithy stands, a headquarters halves the orders' delay (%.2f s → %.2f s), a semaphore post sees %d far" % [
 			int(ground_food), slow_orders, fast_orders, int(post_sight)])
 	for b in made:
 		battle.buildings.erase(b)
 		b.queue_free()
 	for b in set_aside:
 		b.complete = true
+	# A semaphore post of ours signals enemy troops coming into its view.
+	var foe_near: Unit = null
+	for u in battle.units:
+		if u.side != battle.me and u.alive() and u.military():
+			foe_near = u
+			break
+	var post := battle.add_building(battle.me, "telegraph", foe_near.world + Vector2(0, 300), true)
+	battle.status = ""
+	battle.set("_post_clock", 0.0)
+	battle._process(0.1)
+	var signalled := battle.status.begins_with("Seinpost")
+	battle.buildings.erase(post)
+	post.queue_free()
+	_check(signalled, "a semaphore post signals enemy troops coming into view (%s)" % battle.status)
 	# Saved and taken up again: the same men, buildings, battalions, stores
 	# and hour, the men at their work.
 	_check(SaveGame.save(battle) == OK and SaveGame.exists() and SaveGame.describe() != "", "the battle is saved (%s)" % SaveGame.describe())

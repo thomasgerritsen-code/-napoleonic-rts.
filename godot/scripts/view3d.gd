@@ -20,7 +20,7 @@ const DETAILED_HOUSES := ["cottage", "farmhouse", "barn", "inn", "chapel"]
 ## Building types to models (the side's own where there is one).
 const BUILDINGS := {"towncenter": ["farmhouse", 1.45], "house": ["cottage", 1.0], "barracks": ["barracks_%s", 1.0],
 	"stable": ["barn", 1.0], "foundry": ["foundry_%s", 1.0], "tower": ["tower_%s", 1.0], "hospital": ["hospital_%s", 1.0],
-	"lumbercamp": ["lumbercamp_%s", 1.0], "sawmill": ["sawmill_%s", 1.0], "windmill": ["windmill_%s", 1.0], "smithy": ["smithy_%s", 1.0], "telegraph": ["telegraph_%s", 1.0], "mine": ["mine", 1.0], "farm": ["field_ripe", 1.0]}
+	"lumbercamp": ["lumbercamp_%s", 1.0], "sawmill": ["sawmill_%s", 1.0], "windmill": ["windmill_%s", 1.0], "smithy": ["smithy_%s", 1.0], "telegraph": ["telegraph_%s", 1.0], "headquarters": ["headquarters_%s", 1.0], "mine": ["mine", 1.0], "farm": ["field_ripe", 1.0]}
 ## Village houses to models.
 const HOUSES := {"cottage": "cottage", "cottage2": "cottage", "farmhouse": "farmhouse", "farmhouse2": "farmhouse",
 	"chapel": "chapel", "inn": "inn", "barn": "barn"}

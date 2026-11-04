@@ -715,6 +715,52 @@ def build_smithy(root, side):
     pennant(root, 2.0, -1.0, ("#24315c", "#efeee8", "#b02a2e") if side == "fr" else ("#c0282d", "#22336b"), height=2.6)
 
 
+def _horse(root, x, y, yaw, coat):
+    """A plain saddled horse standing at a rail, facing along `yaw` degrees."""
+    r = math.radians(yaw)
+    fx, fy = math.cos(r), math.sin(r)
+    hide = M(coat, "plain", 0.8)
+    part("box", (1.5, 0.5, 0.6), (x, y, 1.1), hide, root, rot=(0, 0, yaw), name="horse")
+    for along in (-0.55, 0.55):
+        for side_ in (-0.17, 0.17):
+            part("box", (0.12, 0.12, 0.85), (x + fx * along - fy * side_, y + fy * along + fx * side_, 0.42), hide, root, name="leg")
+    part("box", (0.5, 0.26, 0.3), (x + fx * 0.95, y + fy * 0.95, 1.55), hide, root, rot=(0, -40, yaw), name="neck")
+    part("box", (0.5, 0.22, 0.24), (x + fx * 1.2, y + fy * 1.2, 1.7), hide, root, rot=(0, 25, yaw), name="head")
+    part("box", (0.55, 0.56, 0.08), (x - fx * 0.05, y - fy * 0.05, 1.43), M("#3a2516", "plain", 0.7), root, rot=(0, 0, yaw), name="saddle")
+
+
+def build_headquarters(root, side):
+    """A staff headquarters: a two-storey stone house under a hipped roof,
+    a map table under a striped awning before it, couriers' horses saddled
+    at a hitching rail, the side's colours on a tall staff."""
+    part("cyl", (1.0, 0.03), (0, 0, 0.015), M("#7a6347", "dirt", 0.95, alt="#6f6a45"), root, name="yard", segments=28)
+    bpy.context.object.scale = (3.4, 2.7, 1.0)
+    stone = M("#cdc3ac", "wall", 0.92, scale=2.0, alt="#b3a990")
+    part("box", (3.6, 2.6, 3.6), (0.3, 0.9, 1.8), stone, root, name="house")
+    part("cyl", (2.9, 1.5, 0.15), (0.3, 0.9, 4.35), M("#4f5660", "slate", 0.8, alt="#434a52"), root, rot=(0, 0, 45), name="roof",
+         segments=4, smooth=False)
+    door(root, 0.3, -0.42, 1.0, 2.0, color="#3d2a1a")
+    windows(root, 3.6, 2.6, (2.8,), 3, shutters="#2f4a3a" if side == "fr" else "#3a2f4a")
+    # The map table under a striped awning.
+    stripe = ("#24315c", "#efeee8") if side == "fr" else ("#c0282d", "#efeee8")
+    for i in range(6):
+        part("box", (0.3, 1.5, 0.04), (-1.6 + i * 0.3, -1.3, 2.15), M(stripe[i % 2], "cloth", 0.9), root, rot=(12, 0, 0), name="awning")
+    for x in (-1.75, 0.05):
+        part("box", (0.08, 0.08, 2.1), (x, -2.0, 1.05), M("#5d3f25", "plain", 0.85), root, name="pole")
+    part("box", (1.3, 0.8, 0.06), (-0.85, -1.35, 0.8), M("#6e4c2e", "planks", 0.85), root, name="table")
+    for x in (-1.4, -0.3):
+        for y in (-1.65, -1.05):
+            part("box", (0.06, 0.06, 0.78), (x, y, 0.39), M("#5d3f25", "plain", 0.85), root, name="tableleg")
+    part("box", (0.9, 0.6, 0.01), (-0.85, -1.35, 0.84), M("#e6dcc0", "plain", 0.9), root, rot=(0, 0, 8), name="map")
+    # Couriers' horses at the rail, saddled and ready.
+    part("box", (0.08, 2.6, 0.08), (2.7, -0.6, 1.0), M("#5d3f25", "plain", 0.85), root, name="rail")
+    for y in (-1.6, 0.4):
+        part("box", (0.08, 0.08, 1.0), (2.7, y, 0.5), M("#5d3f25", "plain", 0.85), root, name="railpost")
+    _horse(root, 3.6, -1.1, 180, "#6b4a30")
+    _horse(root, 3.6, 0.0, 180, "#3a2c22")
+    pennant(root, -2.3, 0.6, ("#24315c", "#efeee8", "#b02a2e") if side == "fr" else ("#c0282d", "#22336b"), height=4.2)
+
+
 def build_telegraph(root, side):
     """A Chappe semaphore post: a small stone hut and, above it, a tall mast
     with the regulator beam and its two indicator arms, set at an angle as
@@ -863,6 +909,8 @@ BUILDERS = {
     "smithy_br": lambda r: build_smithy(r, "br"),
     "telegraph_fr": lambda r: build_telegraph(r, "fr"),
     "telegraph_br": lambda r: build_telegraph(r, "br"),
+    "headquarters_fr": lambda r: build_headquarters(r, "fr"),
+    "headquarters_br": lambda r: build_headquarters(r, "br"),
     "field_bare": lambda r: build_field(r, "bare"),
     "field_young": lambda r: build_field(r, "young"),
     "field_ripe": lambda r: build_field(r, "ripe"),
@@ -882,7 +930,7 @@ def world_points():
 
 
 # Buildings turn to the camera at an angle so two facades and a gable show.
-YAW = {"lumbercamp_fr": 28, "lumbercamp_br": -28, "sawmill_fr": 28, "sawmill_br": -28, "windmill_fr": 20, "windmill_br": -20, "smithy_fr": 26, "smithy_br": -26, "telegraph_fr": 24, "telegraph_br": -24, "tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
+YAW = {"lumbercamp_fr": 28, "lumbercamp_br": -28, "sawmill_fr": 28, "sawmill_br": -28, "windmill_fr": 20, "windmill_br": -20, "smithy_fr": 26, "smithy_br": -26, "telegraph_fr": 24, "telegraph_br": -24, "headquarters_fr": 30, "headquarters_br": -30, "tower_fr": 20, "tower_br": -20, "hospital_fr": 24, "hospital_br": -24, "barracks_fr": 32, "barracks_br": -32, "farmhouse": -28, "barn": 30, "cottage": 38, "well": 20}
 
 
 def normal_override() -> bpy.types.Material:

@@ -296,6 +296,7 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	current = self
 	_watch_long_press(delta)
+	_watch_posts(delta)
 	if tutorial != null:
 		tutorial.update(delta)
 	if net_role == "client":
@@ -1429,8 +1430,8 @@ func order_delay(at: Vector2, side: String) -> float:
 			nearest = minf(nearest, u.world.distance_to(at))
 	var bonus := 1.0 if nearest <= 260.0 else (0.5 if nearest <= 430.0 else 0.0)
 	var delay := maxf(0.35, 0.75 + distance / 1100.0 - bonus * 0.35)
-	# A semaphore post sends the orders by its arms: half the time.
-	return delay * Rules.TELEGRAPH_ORDERS if has_complete(side, "telegraph") else delay
+	# A headquarters' aides and couriers ride with the orders: half the time.
+	return delay * Rules.HEADQUARTERS_ORDERS if has_complete(side, "headquarters") else delay
 
 
 func _deliver_orders() -> void:
@@ -1554,6 +1555,32 @@ func focus_selection() -> void:
 	for u in selected_units:
 		sum += u.world
 	camera.focus(Iso.to_screen(sum / selected_units.size()))
+
+
+## A semaphore post of ours signals enemy troops coming into its view
+## (at most once in TELEGRAPH_QUIET seconds a post).
+var _post_quiet := {}
+var _post_clock := 0.0
+
+
+func _watch_posts(delta: float) -> void:
+	_post_clock -= delta
+	if _post_clock > 0.0 or paused or result != "":
+		return
+	_post_clock = 1.0
+	for b in buildings:
+		if b.type != "telegraph" or b.side != me or not b.complete or not b.standing():
+			continue
+		if float(_post_quiet.get(b, -1.0e9)) + Rules.TELEGRAPH_QUIET > clock:
+			continue
+		for u in units:
+			if u.side != me and u.alive() and u.military() and u.world.distance_to(b.world) <= Rules.TELEGRAPH_SIGHT:
+				_post_quiet[b] = clock
+				say("Seinpost: vijandelijke troepen in zicht!")
+				buzz(60)
+				if _overlay != null:
+					_overlay.mark(Iso.to_screen(u.world))
+				break
 
 
 ## Stand the battle still, or let it go on (not online: the other player
