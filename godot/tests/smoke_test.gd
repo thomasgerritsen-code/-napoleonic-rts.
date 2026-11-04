@@ -649,7 +649,8 @@ func _initialize() -> void:
 		var kneeling := 0
 		var platoons := {}
 		var fired_platoons := {}
-		for i in 30:
+		# Long enough for a reload and the next roll of volleys.
+		for i in 80:
 			_run(battle, 0.1)
 			for u in volley_ours.living():
 				if u.anim_state in ["kaim", "kfire"]:

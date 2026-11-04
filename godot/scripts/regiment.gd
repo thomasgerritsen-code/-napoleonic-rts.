@@ -82,6 +82,8 @@ var _march: Array[Vector2] = []
 var _anchor := Vector2.ZERO
 var _end_face := 0.0
 var _forming := false
+var _face_clock := 0.0
+var _flee_to := Vector2.INF
 ## The colours: the man who carries them (infantry), and while they lie
 ## fallen, the seconds until another takes them up. Their fall shakes the
 ## whole battalion.
@@ -105,6 +107,14 @@ var heading := 0.0           # the way the body goes, as the men face while they
 var _line_after := false     # a line crossing the river in column, to form line again beyond it
 const RALLY_MORALE := 62.0
 const RALLY_SAFE := 235.0
+const RALLY_LEADERLESS := 15.0
+const FLEE_RUN := 650.0          # how far a broken battalion runs before it may stop   # seconds safe before sergeants rally a battalion without its officer
+## A standing battalion wheels to face a foe more than this far off its front
+## (not dug in, in square or in open order), at most once in FACE_EVERY s.
+const FACE_TURN := 1.05
+const FACE_EVERY := 8.0
+## A column halted this close to its foe goes in with the bayonet.
+const COLUMN_SHOCK := 170.0
 
 
 ## 1st, 2nd, 3rd, 4th ... 11th, 12th, 13th, 21st: the British numbering.
@@ -692,7 +702,14 @@ func _nerve(delta: float) -> void:
 		u.morale = minf(100.0, u.morale + gain * delta)
 	if routing:
 		_safe_for = 0.0 if danger else _safe_for + delta
-		if _safe_for >= 5.0 and officer and list.size() > maxi(3, _start / 3) and morale() >= RALLY_MORALE:
+		# Run on while the foe is still at its heels when it gets there.
+		if danger and _flee_to != Vector2.INF and here.distance_to(_flee_to) < 60.0:
+			_flee()
+		# With its officer it rallies soon; without him its sergeants rally
+		# it when it has been safe a while longer.
+		var enough := list.size() > maxi(3, _start / 3)
+		if enough and ((_safe_for >= 5.0 and officer and morale() >= RALLY_MORALE)
+				or (_safe_for >= RALLY_LEADERLESS and morale() >= RALLY_MORALE + 8.0)):
 			rally()
 	elif morale() < 22.0 and strength() > 0:
 		rout()
@@ -704,7 +721,13 @@ func rally() -> void:
 	_safe_for = 0.0
 	formation = "line"
 	var here := centroid()
+	# Facing the nearest foe, or back the way it fled.
 	facing = 0.0 if side == "france" else PI
+	var foe: Node2D = Battle.current.nearest_foe(here, side, 1600.0) if Battle.current != null else null
+	if foe != null:
+		facing = (Battle.spot(foe) - here).angle()
+	elif _flee_to != Vector2.INF and last_centre != Vector2.INF and last_centre.distance_to(here) > 1.0:
+		facing = (last_centre - here).angle()
 	destination = here
 	for u in living():
 		u.morale = maxf(u.morale, 55.0)
@@ -754,9 +777,29 @@ func rout() -> void:
 	enemy = null
 	charging = null
 	_march.clear()
-	var home_x := 120.0 if side == "france" else Iso.WORLD.x - 120.0
+	_flee()
+
+
+## A broken battalion runs back, away from its foe and towards its own town
+## centre, a long way but not to the end of the world; its men in a loose
+## crowd much as they stood, not in one another. Pressed again, it runs on.
+func _flee() -> void:
+	var here := centroid()
+	var home := Vector2(120.0 if side == "france" else Iso.WORLD.x - 120.0, here.y)
+	if Battle.current != null and Battle.current.town_centre(side) != null:
+		home = Battle.current.town_centre(side).world
+	var away := (home - here).normalized()
+	var foe: Node2D = Battle.current.nearest_foe(here, side, RALLY_SAFE * 1.5) if Battle.current != null else null
+	if foe != null:
+		away = (away + (here - Battle.spot(foe)).normalized()).normalized()
+	if away == Vector2.ZERO:
+		away = Vector2.LEFT if side == "france" else Vector2.RIGHT
+	var to := here + away * minf(FLEE_RUN, here.distance_to(home))
+	to = Vector2(clampf(to.x, 100.0, Iso.WORLD.x - 100.0), clampf(to.y, 100.0, Iso.WORLD.y - 100.0))
 	for u in living():
-		u.slot = Vector2(home_x, u.world.y + randf_range(-160.0, 160.0))
+		var offset := (u.world - here) * 1.3 + Vector2(randf_range(-12.0, 12.0), randf_range(-12.0, 12.0))
+		u.slot = to + offset
+	_flee_to = to
 
 
 func charge(regiments: Array[Regiment]) -> bool:
@@ -824,6 +867,43 @@ func update(delta: float, regiments: Array[Regiment]) -> void:
 			if d < best:
 				best = d
 				enemy = other
+	_face_threat(delta, here, regiments)
+
+
+## A standing battalion turns as one to face its foe (or the nearest enemy in
+## musket reach) when the foe is well off its front, rather than each man
+## turning about in his place; a column halted close to its foe charges.
+func _face_threat(delta: float, here: Vector2, regiments: Array[Regiment]) -> void:
+	_face_clock -= delta
+	if moving() or charging != null or routing or skirmish or formation == "square" or trench != null or _face_clock > 0.0:
+		return
+	if formation == "column" and enemy != null and enemy.centroid().distance_to(here) < COLUMN_SHOCK:
+		_face_clock = FACE_EVERY
+		charge(regiments)
+		return
+	var reach := RANGE + FILE_GAP * maxi(1, living().size() / RANKS) / 2.0
+	# A foe already before its front holds it where it stands.
+	for other in regiments:
+		if other.side != side and not other.routing and not other.destroyed():
+			var to := other.centroid() - here
+			if to.length() < reach and absf(angle_difference(facing, to.angle())) <= FACE_TURN:
+				return
+	var threat := Vector2.INF
+	if enemy != null:
+		threat = enemy.centroid()
+	elif Battle.current != null:
+		# As far as its outer men reach, not only from its centre.
+		var foe := Battle.current.nearest_foe(here, side, reach)
+		if foe != null:
+			threat = Battle.spot(foe)
+	if threat == Vector2.INF:
+		return
+	var way := (threat - here).angle()
+	if absf(angle_difference(facing, way)) > FACE_TURN:
+		_face_clock = FACE_EVERY
+		facing = way
+		destination = here
+		_form(here)
 
 
 func _melee(delta: float) -> void:
