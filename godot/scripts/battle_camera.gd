@@ -51,6 +51,15 @@ func fingers() -> int:
 	return _touches.size()
 
 
+## The 3D camera owns input in 3D. Focus still serves the minimap/selection.
+func presentation_3d(on: bool) -> void:
+	set_process(not on)
+	set_process_unhandled_input(not on)
+	_touches.clear()
+	_spread = 0.0
+	_dragging = false
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if _touch(event):
 		return

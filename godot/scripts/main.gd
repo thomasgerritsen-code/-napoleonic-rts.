@@ -243,6 +243,8 @@ func _ready() -> void:
 		SaveGame.restore(self, saved)
 		camera.focus(Iso.to_screen(town_centre(me).world + Vector2(260, 60)) if town_centre(me) != null else camera.position)
 		say("Opgeslagen slag geladen (%s)." % saved.get("saved_at", ""))
+	# Also includes optional presentation nodes created after set_view_3d.
+	Presentation2D.apply(self, not view_3d)
 
 
 ## The battle in 3D, or back in 2D: the field's own pictures are hidden while
@@ -262,6 +264,7 @@ func set_view_3d(on: bool) -> void:
 			(child as CanvasItem).visible = not on
 	for u in units:
 		u.presentation_3d(on)
+	Presentation2D.apply(self, not on)
 	refresh_hud()
 
 
@@ -1207,6 +1210,14 @@ func throw_grenade(thrower: Unit, at: Vector2) -> void:
 	var landing := at + Vector2(randf_range(-spread, spread), randf_range(-spread, spread))
 	var from := thrower.world
 	var flight := randf_range(float(g.get("flightMin", 0.7)), float(g.get("flightMax", 1.2)))
+	if view_3d:
+		# The explosion is simulation: its timer belongs to the battle, not
+		# to a hidden 2D projectile whose presentation may be sleeping.
+		var flight_timer := create_tween()
+		flight_timer.tween_interval(flight)
+		flight_timer.tween_callback(func() -> void:
+			_burst(thrower.side, landing, float(g.get("radius", 46)), float(g.get("damage", 34))))
+		return
 	var ball := Sprite2D.new()
 	ball.texture = _smoke
 	ball.modulate = Color(0.12, 0.11, 0.1)
@@ -1238,6 +1249,7 @@ func _puff(world_at: Vector2, size: float, _life: float, way := Vector2.ZERO) ->
 		sync.fx("p", world_at, size, way.angle() if way != Vector2.ZERO else 99.0)
 	if view3d != null:
 		view3d.fx.smoke(world_at, size, way)
+		return
 	if effects != null:
 		var out := Vector2(way.x, way.y * Iso.SQ) if way != Vector2.ZERO else Vector2.ZERO
 		effects.smoke(Iso.to_screen(world_at) + Vector2(0.0, -10.0), size, out)
@@ -1252,6 +1264,7 @@ func _earth(world_at: Vector2, size: float) -> void:
 		sync.fx("e", world_at, size)
 	if view3d != null:
 		view3d.fx.earth(world_at, size)
+		return
 	if effects != null:
 		effects.earth(Iso.to_screen(world_at), size)
 	if lights != null:

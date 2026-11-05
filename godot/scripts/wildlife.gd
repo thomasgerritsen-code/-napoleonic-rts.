@@ -75,15 +75,14 @@ func populate(woods: Array, layer: Node2D) -> void:
 
 
 func _add(kind: String, at: Vector2, home: Vector2, herd: int, layer: Node2D) -> void:
-	var look := AtlasLibrary.get_set([{"stag": "wds_iso_stag", "hind": "wdh_iso_hind", "rabbit": "wrb_iso_rabbit"}[kind]])
 	var sprite := AnimatedSprite2D.new()
+	sprite.process_mode = Node.PROCESS_MODE_DISABLED if battle.view_3d else Node.PROCESS_MODE_INHERIT
 	sprite.centered = false
 	sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE
-	sprite.sprite_frames = look["frames"]
-	sprite.offset = -Vector2(look["pivot"])
 	layer.add_child(sprite)
 	animals.append({"kind": kind, "sprite": sprite, "world": at, "home": home, "herd": herd, "state": "graze",
 		"to": at, "until": battle.clock + _rnd() * 6.0, "facing": _rnd() * TAU})
+	_show(animals[-1])
 
 
 ## Shots and bursts frighten them from far off.
@@ -183,6 +182,12 @@ func _step(a: Dictionary, delta: float) -> void:
 
 func _show(a: Dictionary) -> void:
 	var sprite: AnimatedSprite2D = a["sprite"]
+	if battle.view_3d:
+		return
+	if sprite.sprite_frames == null:
+		var look := AtlasLibrary.get_set([{"stag": "wds_iso_stag", "hind": "wdh_iso_hind", "rabbit": "wrb_iso_rabbit"}[a["kind"]]])
+		sprite.sprite_frames = look["frames"]
+		sprite.offset = -Vector2(look["pivot"])
 	sprite.position = Iso.to_screen(a["world"])
 	sprite.visible = battle.fog == null or battle.fog.sees(a["world"])
 	var state: String = a["state"]

@@ -69,6 +69,10 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if battle == null:
 		return
+	if battle.view_3d:
+		# Leaning drives the 3D poses too; 2D bank sprites and clipping do not.
+		_dress_men()
+		return
 	while _banks.size() < list.size():
 		var bank := Bank.new()
 		bank.owner_list = self
@@ -447,13 +451,15 @@ func _draw() -> void:
 ## rank steps onto the fire-step and leans on the bank, the ranks behind stand
 ## on the bed; the near wall hides them below its lip.
 func _dress_men() -> void:
+	var in_3d := battle.view_3d
 	var front := {}
 	var lips := {}
 	var crests := {}
-	for t in list:
-		var f := TrenchArt.Frame.new(t)
-		lips[TrenchArt.id_of(t)] = TrenchArt.lower_lip(TrenchArt.outline(f))
-		crests[TrenchArt.id_of(t)] = TrenchArt.crest(f)
+	if not in_3d:
+		for t in list:
+			var f := TrenchArt.Frame.new(t)
+			lips[TrenchArt.id_of(t)] = TrenchArt.lower_lip(TrenchArt.outline(f))
+			crests[TrenchArt.id_of(t)] = TrenchArt.crest(f)
 	for u in battle.units:
 		if not u.alive() or u.regiment == null or u.type == "artillery":
 			if u.leaning or u._cut != null:
@@ -480,6 +486,9 @@ func _dress_men() -> void:
 		var digging := u.type == "infantry" and (p < 1.0 or int(t.get("upgrade_to", 0)) != 0) and battle.clock - float(t.get("dug_at", -99.0)) < 2.0
 		var lean := not digging and p >= 1.0 and u.type == "infantry" and not u.regiment.routing \
 			and u.world.distance_to(u.slot) < Unit.TRENCH_SETTLE and v > float(front[tid]) - 8.0
+		if in_3d:
+			u.trench_look(Vector2.ZERO, INF, lean)
+			continue
 		var offset := Vector2.ZERO
 		var sink := TrenchArt.SINK * p
 		if lean:

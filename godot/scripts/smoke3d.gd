@@ -58,10 +58,13 @@ void fragment() {
 var battle: Battle
 var _now := 0.0
 var _kinds := {}
+## Cosmetic particles must not consume the battle's combat randomness.
+var _random := RandomNumberGenerator.new()
 static var _shader: Shader
 
 
 func _ready() -> void:
+	_random.randomize()
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = SHADER
@@ -120,33 +123,33 @@ func smoke(world: Vector2, size: float, way := Vector2.ZERO) -> void:
 	var out := way.normalized() if way != Vector2.ZERO else Vector2.ZERO
 	var push := 0.9 + size * 1.8
 	for i in n:
-		var spread := Vector3(randf_range(-0.15, 0.15), randf_range(-0.1, 0.1), randf_range(-0.15, 0.15)) * (1.0 + size * 3.0)
-		var v := out * push * randf_range(0.3, 1.0) + Vector2(randf_range(-0.35, 0.35), randf_range(-0.35, 0.35))
-		var shade := randf_range(0.84, 1.0)
-		_emit("smoke", at + spread, v, Color(shade, shade, shade * 0.97, randf_range(0.5, 0.75)), size * randf_range(0.8, 1.3), randf_range(4.5, 7.5))
+		var spread := Vector3(_random.randf_range(-0.15, 0.15), _random.randf_range(-0.1, 0.1), _random.randf_range(-0.15, 0.15)) * (1.0 + size * 3.0)
+		var v := out * push * _random.randf_range(0.3, 1.0) + Vector2(_random.randf_range(-0.35, 0.35), _random.randf_range(-0.35, 0.35))
+		var shade := _random.randf_range(0.84, 1.0)
+		_emit("smoke", at + spread, v, Color(shade, shade, shade * 0.97, _random.randf_range(0.5, 0.75)), size * _random.randf_range(0.8, 1.3), _random.randf_range(4.5, 7.5))
 
 
 ## Earth thrown up where a ball or shell strikes, with a little dust.
 func earth(world: Vector2, size := 1.0) -> void:
 	var at := View3D.at(world) + Vector3.UP * 0.1
 	for i in roundi(12.0 * size):
-		var v := Vector2(randf_range(-2.4, 2.4), randf_range(-2.4, 2.4)) * sqrt(size)
-		var shade := randf_range(0.7, 1.0)
+		var v := Vector2(_random.randf_range(-2.4, 2.4), _random.randf_range(-2.4, 2.4)) * sqrt(size)
+		var shade := _random.randf_range(0.7, 1.0)
 		var k: Dictionary = _kinds["earth"]
-		_emit("earth", at, v, Color(0.36 * shade, 0.27 * shade, 0.17 * shade, 1.0), randf_range(0.6, 1.3), randf_range(0.6, 0.9))
+		_emit("earth", at, v, Color(0.36 * shade, 0.27 * shade, 0.17 * shade, 1.0), _random.randf_range(0.6, 1.3), _random.randf_range(0.6, 0.9))
 		# Thrown up: the shader's rise is one for all, so each clod starts a little higher.
 		var mm: MultiMesh = k["mesh"]
 		var last := (int(k["next"]) - 1 + int(k["max"])) % int(k["max"])
-		mm.set_instance_transform(last, Transform3D(Basis().scaled(Vector3.ONE * randf_range(0.6, 1.3)), at + Vector3.UP * randf_range(0.0, 0.4)))
+		mm.set_instance_transform(last, Transform3D(Basis().scaled(Vector3.ONE * _random.randf_range(0.6, 1.3)), at + Vector3.UP * _random.randf_range(0.0, 0.4)))
 	for i in 3:
-		_emit("dust", at, Vector2(randf_range(-0.4, 0.4), randf_range(-0.4, 0.4)), Color(0.55, 0.46, 0.33, 0.6), size * randf_range(1.0, 1.6), randf_range(1.6, 2.6))
+		_emit("dust", at, Vector2(_random.randf_range(-0.4, 0.4), _random.randf_range(-0.4, 0.4)), Color(0.55, 0.46, 0.33, 0.6), size * _random.randf_range(1.0, 1.6), _random.randf_range(1.6, 2.6))
 	smoke(world, 0.35 * size)
 
 
 ## A little dust at a horse's hooves.
 func dust(world: Vector2, amount := 1.0) -> void:
-	_emit("dust", View3D.at(world) + Vector3.UP * 0.2, Vector2(randf_range(-0.3, 0.3), randf_range(-0.3, 0.3)),
-		Color(0.62, 0.53, 0.38, 0.45 * clampf(amount, 0.0, 1.0)), randf_range(0.7, 1.1), randf_range(1.5, 2.4))
+	_emit("dust", View3D.at(world) + Vector3.UP * 0.2, Vector2(_random.randf_range(-0.3, 0.3), _random.randf_range(-0.3, 0.3)),
+		Color(0.62, 0.53, 0.38, 0.45 * clampf(amount, 0.0, 1.0)), _random.randf_range(0.7, 1.1), _random.randf_range(1.5, 2.4))
 
 
 func _emit(kind: String, at: Vector3, velocity: Vector2, colour: Color, size: float, life: float) -> void:

@@ -28,10 +28,21 @@ class Team extends Node2D:
 	var _goal := Vector2.INF
 	var _path: Array[Vector2] = []
 	var _bearers: Array[AnimatedSprite2D] = []
+	var _side := "france"
+	var _in_3d := false
 
-	func _init(side: String, at: Vector2) -> void:
+	func _init(side: String, at: Vector2, in_3d := false) -> void:
 		world = at
-		var look := AtlasLibrary.get_set(["frw_iso_worker" if side == "france" else "brw_iso_worker"])
+		_side = side
+		_in_3d = in_3d
+		if not in_3d:
+			_pictures()
+		position = Iso.to_screen(world)
+
+	func _pictures() -> void:
+		if not _bearers.is_empty():
+			return
+		var look := AtlasLibrary.get_set(["frw_iso_worker" if _side == "france" else "brw_iso_worker"])
 		for i in 2:
 			var s := AnimatedSprite2D.new()
 			s.centered = false
@@ -40,7 +51,14 @@ class Team extends Node2D:
 			s.offset = -Vector2(look["pivot"])
 			add_child(s)
 			_bearers.append(s)
-		position = Iso.to_screen(world)
+
+	func presentation_3d(on: bool) -> void:
+		_in_3d = on
+		if on:
+			for bearer in _bearers:
+				bearer.pause()
+		else:
+			show_step(7.0)
 
 	## Walk towards `to` (by a bridge when the river lies between); true once there.
 	func walk(to: Vector2, speed: float, delta: float) -> bool:
@@ -62,6 +80,12 @@ class Team extends Node2D:
 
 	func show_step(lift: float) -> void:
 		position = Iso.to_screen(world)
+		if target != null and state == "carry":
+			target.world = world
+			target.position = position + Vector2(0, -lift)
+		if _in_3d:
+			return
+		_pictures()
 		var along := Vector2.from_angle(facing) * 9.5
 		var anim := ("march_" if moving else "idle_") + Iso.direction(facing)
 		for i in 2:
@@ -69,9 +93,6 @@ class Team extends Node2D:
 			s.position = Iso.to_screen(world + along * (i * 2 - 1)) - position
 			if s.animation != anim:
 				s.play(anim)
-		if target != null and state == "carry":
-			target.world = world
-			target.position = position + Vector2(0, -lift)
 		queue_redraw()
 
 	func _draw() -> void:
@@ -161,7 +182,7 @@ func apply_net_teams(list: Array) -> void:
 		var i: int = seen.get(h, 0)
 		seen[h] = i + 1
 		if i >= crew.size():
-			var fresh := Team.new(h.side, Vector2(a[1], a[2]))
+			var fresh := Team.new(h.side, Vector2(a[1], a[2]), battle.view_3d)
 			battle.add_to_field(fresh)
 			crew.append(fresh)
 		var t := crew[i]
@@ -183,7 +204,7 @@ func apply_net_teams(list: Array) -> void:
 func _raise_teams(h: Building, count: int) -> void:
 	var list: Array[Team] = []
 	for i in count:
-		var t := Team.new(h.side, _door(h) + Vector2(i * 24.0, 0))
+		var t := Team.new(h.side, _door(h) + Vector2(i * 24.0, 0), battle.view_3d)
 		battle.add_to_field(t)
 		list.append(t)
 	teams[h] = list

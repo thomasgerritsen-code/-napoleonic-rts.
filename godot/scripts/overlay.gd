@@ -53,7 +53,8 @@ func _process(delta: float) -> void:
 		_aim_life -= delta
 		if _aim_life <= 0.0:
 			_aim_at = Vector2.INF
-	queue_redraw()
+	if battle == null or not battle.view_3d:
+		queue_redraw()
 
 
 func _draw() -> void:

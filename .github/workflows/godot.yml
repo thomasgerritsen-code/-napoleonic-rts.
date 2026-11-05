@@ -63,6 +63,13 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" smoke.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_SMOKE" smoke.log
 
+      - name: 3D sleeps unused 2D work without pausing gameplay
+        run: |
+          set -o pipefail
+          timeout 240 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/presentation_3d_test.gd 2>&1 | tee native-presentation.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-presentation.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_PRESENTATION" native-presentation.log
+
       - name: Native movement and large-battle regression
         run: |
           set -o pipefail
@@ -113,6 +120,18 @@ jobs:
             "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/render_regression.gd 2>&1 | tee native-render.log
           if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-render.log | grep -v "still in use at exit"; then exit 1; fi
           grep -q "GODOT_RENDER" native-render.log
+
+      - name: Phone presentation in 3D and on returning to 2D
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 240 xvfb-run -a -s "-screen 0 844x390x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 844x390 --script res://tests/phone_3d_shots.gd 2>&1 | tee native-phone3d.log
+          SHOT_DIR="$PWD/shots" timeout 240 xvfb-run -a -s "-screen 0 844x390x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 844x390 --script res://tests/phone_shots.gd 2>&1 | tee native-phone.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-phone3d.log native-phone.log | grep -v "still in use at exit"; then exit 1; fi
+          test -s shots/phone3d_village.png && test -s shots/phone3d_battalion.png
+          test -s shots/phone_building.png && test -s shots/phone_wheel.png
 
       - name: Daylight highlight and night readability regression
         run: |

@@ -63,6 +63,7 @@ var battle: Battle
 var sun: DirectionalLight2D
 var _wind_material: ShaderMaterial
 var _cloud_material: ShaderMaterial
+var _cloud_layer: CanvasLayer
 var _normals := {}           # texture path -> CanvasTexture or null
 var _scan_clock := 0.0
 var _drift := Vector2.ZERO
@@ -120,6 +121,7 @@ func _add_water() -> void:
 ## cloud passes; its own layer, so the light of the hour does not dim it twice.
 func _add_clouds() -> void:
 	var layer := CanvasLayer.new()
+	_cloud_layer = layer
 	layer.layer = 1
 	layer.follow_viewport_enabled = true
 	battle.add_child(layer)
@@ -142,6 +144,13 @@ func _add_clouds() -> void:
 	sheet.size = Vector2(Iso.WORLD.x, Iso.WORLD.y * Iso.SQ + 600)
 	sheet.material = _cloud_material
 	layer.add_child(sheet)
+
+
+## Its separate cloud canvas must sleep too when the 3D sky takes over.
+func presentation_3d(on: bool) -> void:
+	visible = not on
+	sun.visible = not on
+	_cloud_layer.visible = not on
 
 
 ## The normal map beside a picture (name_n.webp), if there is one.

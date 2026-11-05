@@ -193,3 +193,7 @@ Het gras heeft een scherpe bodemstructuur en echte grassprieten dichtbij de
 camera, met GPU-wind en afstandsafbouw. Zie [de grasdocumentatie](../docs/godot-grass.md).
 Individuele sprieten buigen nu zichtbaar in drie segmenten met reizende
 windvlagen, vanaf een vaste wortel; bij windstilte staan ze stil.
+
+In 3D slaapt het overbodige 2D-beeldwerk en worden soldaat-atlassen pas geladen
+als je naar 2D terugschakelt. De gedeelde spelregels blijven actief.
+Zie [de prestatiecontrole](../docs/godot-presentation-performance.md).

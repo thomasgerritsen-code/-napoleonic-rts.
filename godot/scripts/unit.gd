@@ -152,12 +152,12 @@ func setup(battle_: Battle, side_: String, type_: String, at: Vector2, troop_ :=
 	hp = max_hp
 	speed = float(info.get("speed", 57)) * stat("speed")
 	_sprite = AnimatedSprite2D.new()
+	_sprite.process_mode = Node.PROCESS_MODE_DISABLED if battle.view_3d else Node.PROCESS_MODE_INHERIT
 	_sprite.centered = false
 	_sprite.scale = Vector2.ONE * Iso.SPRITE_SCALE
 	add_child(_sprite)
-	_wear(_coats())
-	if type == "artillery":
-		_man_the_gun()
+	if not battle.view_3d:
+		_picture_2d()
 	position = Iso.to_screen(world)
 	_play("idle")
 
@@ -662,7 +662,7 @@ func hit(damage: float) -> void:
 		var fade := create_tween()
 		fade.tween_property(self, "modulate:a", 0.25, 2.0)
 	else:
-		if not _sprite.sprite_frames.has_animation("die_e"):
+		if not battle.view_3d and not _sprite.sprite_frames.has_animation("die_e"):
 			_wear(["%s_iso_infantry", "%s_iso_fallen"])
 		_play(["die", "diefwd", "dieside"].pick_random() if type != "cavalry" and troop != "mounted" else "die", true)
 	battle.on_death(self)
@@ -701,7 +701,7 @@ func net_apply(a: Array) -> void:
 		state = State.DEAD
 		selected = false
 		z_index = -1
-		if not _sprite.sprite_frames.has_animation("die_e"):
+		if not battle.view_3d and not _sprite.sprite_frames.has_animation("die_e"):
 			_wear(["%s_iso_infantry", "%s_iso_fallen"])
 		hurt = true
 	if a[9] != "" and (a[9] != anim_state or a[10] != anim_seq):
@@ -726,6 +726,8 @@ func trench_look(offset: Vector2, lip_y: float, lean: bool) -> void:
 	if lean != leaning:
 		leaning = lean
 		_play(anim_state if anim_state != "rest" and anim_state != "rfire" else "idle", true)
+	if battle.view_3d:
+		return
 	_sprite.position = offset
 	if lip_y == INF:
 		if _cut != null:
@@ -785,6 +787,16 @@ func _wear(names: Array) -> void:
 	_sprite.sprite_frames = look["frames"]
 	_sprite.offset = -Vector2(look["pivot"])
 	_anim = ""
+
+
+## Sprite atlases are only needed if the player actually chooses 2D.
+func _picture_2d() -> void:
+	if _sprite.sprite_frames == null:
+		_wear(_coats())
+		if type == "artillery":
+			_man_the_gun()
+	if state == State.DEAD and type != "artillery" and not _sprite.sprite_frames.has_animation("die_e"):
+		_wear(["%s_iso_infantry", "%s_iso_fallen"])
 
 
 ## Three gunners stand behind a gun: they haul it on the march, ram and
@@ -854,8 +866,9 @@ func _horse() -> bool:
 ## going, standing while he is not; the feet of a moving one are set by
 ## present, from the ground covered.
 func _show(restart := false) -> void:
-	if battle != null and battle.view3d != null:
+	if battle != null and battle.view_3d:
 		return
+	_picture_2d()
 	var shown := anim_state
 	if state != State.DEAD:
 		if shown in GAITS and not _striding:
@@ -889,12 +902,21 @@ func _show(restart := false) -> void:
 ## Hidden sprite animations need no engine updates while Blender models
 ## render the battle. Switching back restores the actual current state.
 func presentation_3d(on: bool) -> void:
+	_sprite.process_mode = Node.PROCESS_MODE_DISABLED if on else Node.PROCESS_MODE_INHERIT
 	if on:
 		_sprite.pause()
+		_sprite.position = Vector2.ZERO
+		_sprite.material = null
+		_cut = null
 		for crew in _crew:
 			crew.pause()
 	else:
+		_shown_dir = posmod(roundi(facing / SECTOR), 8)
+		_turn_wait = 0.0
 		_show(true)
+		if state == State.DEAD:
+			_sprite.frame = _sprite.sprite_frames.get_frame_count(_sprite.animation) - 1
+			_sprite.pause()
 
 
 ## Every frame, after he has moved: his smoothed speed, the step cycle, the
@@ -941,16 +963,16 @@ func present(delta: float) -> void:
 		stride = 1.6
 	if not jumped:
 		_step_phase = fmod(_step_phase + covered / ppm / stride, 1.0)
+	if battle != null and battle.view_3d:
+		if _striding and battle.view3d != null and battle.view3d.atmosphere != null and type != "artillery":
+			battle.view3d.atmosphere.track(self)
+		return
 	# One sector at a time, and only once well past it.
 	_turn_wait = maxf(0.0, _turn_wait - delta)
 	var off := angle_difference(_shown_dir * SECTOR, facing)
 	if absf(off) > SECTOR / 2.0 + 0.12 and _turn_wait <= 0.0:
 		_shown_dir = posmod(_shown_dir + (1 if off > 0.0 else -1), 8)
 		_turn_wait = 0.085 if _horse() else 0.06
-	if battle != null and battle.view3d != null:
-		if _striding and battle.view3d.atmosphere != null and type != "artillery":
-			battle.view3d.atmosphere.track(self)
-		return
 	_show()
 	if _striding and String(_sprite.animation).get_slice("_", 0) in GAITS:
 		var count := _sprite.sprite_frames.get_frame_count(_sprite.animation)

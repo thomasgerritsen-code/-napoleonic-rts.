@@ -82,11 +82,14 @@ func _process(delta: float) -> void:
 		return
 	# Drops are born over the whole screen (and a strip above it), so the rain
 	# fills it top to bottom whatever its size; each falls for a moment.
-	var view := get_viewport().get_visible_rect().size
-	_rain.position = Vector2(view.x / 2.0 + 80.0, view.y / 2.0 - 60.0)
-	_rain.emission_rect_extents = Vector2(view.x / 2.0 + 160.0, view.y / 2.0 + 60.0)
-	_rain.emitting = raining and battle.view3d == null
-	_rain.visible = battle.view3d == null
+	var in_3d := battle.view_3d
+	_rain.emitting = raining and not in_3d
+	_rain.visible = not in_3d
+	_rain.process_mode = Node.PROCESS_MODE_DISABLED if in_3d else Node.PROCESS_MODE_INHERIT
+	if not in_3d:
+		var view := get_viewport().get_visible_rect().size
+		_rain.position = Vector2(view.x / 2.0 + 80.0, view.y / 2.0 - 60.0)
+		_rain.emission_rect_extents = Vector2(view.x / 2.0 + 160.0, view.y / 2.0 + 60.0)
 	update(delta)
 
 
