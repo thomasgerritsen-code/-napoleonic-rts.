@@ -244,7 +244,14 @@ func _ready() -> void:
 		camera.focus(Iso.to_screen(town_centre(me).world + Vector2(260, 60)) if town_centre(me) != null else camera.position)
 		say("Opgeslagen slag geladen (%s)." % saved.get("saved_at", ""))
 	# Also includes optional presentation nodes created after set_view_3d.
-	Presentation2D.apply(self, not view_3d)
+	_present_2d(not view_3d)
+
+
+## Xogot may still have the class index of the previously installed game.
+## Resolve the new helper by its file after Battle has finished compiling.
+func _present_2d(enabled: bool) -> void:
+	var presentation: GDScript = load("res://scripts/presentation_2d.gd")
+	presentation.call("apply", self, enabled)
 
 
 ## The battle in 3D, or back in 2D: the field's own pictures are hidden while
@@ -264,7 +271,7 @@ func set_view_3d(on: bool) -> void:
 			(child as CanvasItem).visible = not on
 	for u in units:
 		u.presentation_3d(on)
-	Presentation2D.apply(self, not on)
+	_present_2d(not on)
 	refresh_hud()
 
 

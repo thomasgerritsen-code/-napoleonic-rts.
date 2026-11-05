@@ -33,6 +33,13 @@ F3 herstelt de 2D-presentatie op aanvraag: huidige richting, lopende houding,
 kanonniers, dieren, dragers, licht en invoer. Een soldaat die in 3D al gevallen
 is, komt als liggend lichaam terug. Er veranderen geen save- of netwerkvelden.
 
+De veldslag laadt de presentatiehelper op zijn bestandspad nadat het eigen
+script is gecompileerd. Een bestaande Xogot-installatie hoeft de nieuwe globale
+klassenaam daardoor niet eerst in zijn klasse-index te hebben geregistreerd.
+`scripts/check-godot-presentation-cache.py` maakt een geïsoleerde oude index
+zonder die registratie en controleert zowel het parsen als de volledige
+presentatie-/gameplaytest. De werkende projectcache wordt daarbij niet gewijzigd.
+
 ## Metingen en controles
 
 Bij dezelfde lokale headless-opstelling, direct na het klaarzetten van 400

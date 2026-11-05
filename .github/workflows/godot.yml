@@ -56,6 +56,12 @@ jobs:
           done
           exit $failed
 
+      - name: Updated Xogot project with an older class index
+        run: |
+          set -o pipefail
+          python3 scripts/check-godot-presentation-cache.py --godot "$RUNNER_TEMP/godot" 2>&1 | tee native-class-cache.log
+          grep -q "STALE_CLASS_CACHE passed" native-class-cache.log
+
       - name: Headless battle check
         run: |
           set -o pipefail
