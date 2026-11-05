@@ -512,9 +512,13 @@ func _initialize() -> void:
 	var closed: float = width.call(shaken)
 	shaken.set_skirmish(true)
 	var spread_out: float = width.call(shaken)
+	# order_move above turned the battalion. The earlier front_way can now
+	# point at its rear, whose damage bonus must not enter this cover check.
+	front_way = Vector2.from_angle(shaken.facing) * 120.0
 	hp_before = target_man.hp
 	battle.strike(target_man, 10.0, target_man.world + front_way)
-	_check(spread_out > closed * 1.8 and hp_before - target_man.hp < 7.5, "tirailleurs spread out (%d to %d px) and are harder to hit" % [closed, spread_out])
+	_check(spread_out > closed * 1.8, "tirailleurs spread out (%.2f to %.2f px)" % [closed, spread_out])
+	_check(hp_before - target_man.hp < 7.5, "tirailleurs take less damage from their current front (%.2f)" % (hp_before - target_man.hp))
 	shaken.set_skirmish(false)
 
 	# A regiment of horse: hussars and an officer on horseback, no drummer.
