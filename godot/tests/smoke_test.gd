@@ -507,10 +507,14 @@ func _initialize() -> void:
 			lo = minf(lo, u.slot.dot(sideways))
 			hi = maxf(hi, u.slot.dot(sideways))
 		return hi - lo
-	# Back on the open ground it stood on, square to the field (a routed
-	# battalion runs home and rallies among the houses, facing where it
-	# fled from).
-	shaken.order_move(quiet, 0.0)
+	# Set down on open meadow mid-field, square to it: a routed battalion
+	# runs home and rallies among the houses, where buildings squeeze its
+	# open-order places, and faces where it fled from.
+	var open_field := Vector2(4750, 2400)
+	var rallied_at := shaken.centroid()
+	for u in shaken.living():
+		u.world = open_field + (u.world - rallied_at)
+	shaken.order_move(open_field, 0.0)
 	var closed: float = width.call(shaken)
 	shaken.set_skirmish(true)
 	var spread_out: float = width.call(shaken)
