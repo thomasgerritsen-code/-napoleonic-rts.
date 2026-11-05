@@ -4,7 +4,8 @@
   if (global.__MOBILE_NEARBY_SELECTION_V1__) return;
   if (typeof renderDynamicActions !== 'function') return;
 
-  const TARGET_INFANTRY = 12;
+  // 12 for a regiment; on the open map regiments take up to regimentOrders.maxInfantry.
+  const TARGET_INFANTRY = global.NRTS_CONFIG?.regimentOrders?.maxInfantry || 12;
   const NEARBY_RADIUS = 320;
   const NEARBY_RADIUS_SQ = NEARBY_RADIUS * NEARBY_RADIUS;
   const baseRenderDynamicActions = renderDynamicActions;
@@ -73,7 +74,7 @@
       available < 1
     );
     button.title = available
-      ? 'Voeg de dichtstbijzijnde vrije musketiers toe aan deze selectie, tot maximaal 12.'
+      ? `Voeg de dichtstbijzijnde vrije musketiers toe aan deze selectie, tot maximaal ${TARGET_INFANTRY}.`
       : `Er zijn geen extra vrije musketiers binnen ${NEARBY_RADIUS} meter beschikbaar.`;
     actionsEl.prepend(button);
   };

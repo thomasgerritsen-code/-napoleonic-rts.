@@ -60,6 +60,12 @@ const RIVER_SMOOTH_POINTS_V296=Object.freeze((()=>{
   const last=knots[knots.length-1];samples.push(Object.freeze({...last}));
   return samples;
 })());
+// Immutable river geometry: reuse segment arithmetic and allocate only the
+// final closest hit, rather than fifteen temporary hits for each water query.
+const riverSegmentsV067=Object.freeze(RIVER_SMOOTH_POINTS_V296.slice(0,-1).map((a,i)=>{
+  const b=RIVER_SMOOTH_POINTS_V296[i+1],vx=b.x-a.x,vy=b.y-a.y;
+  return Object.freeze({x:a.x,y:a.y,vx,vy,len2:vx*vx+vy*vy});
+}));
 function riverHitV067(x,y){
   const points=RIVER_SMOOTH_POINTS_V296;
   // The centerline is strictly increasing in y, so only neighboring
@@ -67,12 +73,35 @@ function riverHitV067(x,y){
   // iterating the entire 5-km river for every unit, formation and house.
   let lo=0,hi=points.length-1;
   while(hi-lo>1){const mid=(hi+lo)>>1;if(points[mid].y<y)lo=mid;else hi=mid;}
-  let best=null;
+  let bestIndex=-1,bestX,bestY,bestT,bestDistance;
   for(let i=Math.max(0,lo-7);i<=Math.min(points.length-2,lo+7);i++){
-    const hit=closestPointOnSegmentV066(x,y,points[i],points[i+1]);
-    if(!best||hit.distance<best.distance)best={...hit,segmentIndex:i};
+    const s=riverSegmentsV067[i];
+    const t=s.len2<=.0001?0:clampV066(((x-s.x)*s.vx+(y-s.y)*s.vy)/s.len2,0,1);
+    const px=s.len2<=.0001?s.x:s.x+s.vx*t,py=s.len2<=.0001?s.y:s.y+s.vy*t;
+    const distance=Math.hypot(x-px,y-py);
+    if(bestIndex<0||distance<bestDistance){bestIndex=i;bestX=px;bestY=py;bestT=t;bestDistance=distance;}
   }
-  return best;
+  return bestIndex<0?null:{x:bestX,y:bestY,t:bestT,distance:bestDistance,segmentIndex:bestIndex};
+}
+// Exact quick answer for points far from the river. riverHitV067 only measures
+// the segments around the binary-search index; every one of their points has an
+// x within that window's [min,max], so a point farther than `reach` outside it
+// horizontally is farther than `reach` from all of them. Most units, houses and
+// route samples are far from the water, and most river queries end here.
+const riverWindowV067=(()=>{
+  const points=RIVER_SMOOTH_POINTS_V296,n=points.length,min=new Float64Array(n),max=new Float64Array(n);
+  for(let lo=0;lo<n;lo++){
+    let a=Infinity,b=-Infinity;
+    for(let i=Math.max(0,lo-7);i<=Math.min(n-1,lo+8);i++){a=Math.min(a,points[i].x);b=Math.max(b,points[i].x);}
+    min[lo]=a;max[lo]=b;
+  }
+  return {min,max};
+})();
+function riverFarV067(x,y,reach){
+  const points=RIVER_SMOOTH_POINTS_V296;
+  let lo=0,hi=points.length-1;
+  while(hi-lo>1){const mid=(hi+lo)>>1;if(points[mid].y<y)lo=mid;else hi=mid;}
+  return x<riverWindowV067.min[lo]-reach||x>riverWindowV067.max[lo]+reach;
 }
 function crossingPassageContainsV067(c,x,y){
   const dx=x-c.x,dy=y-c.y,cos=Math.cos(c.angle),sin=Math.sin(c.angle);
@@ -80,11 +109,13 @@ function crossingPassageContainsV067(c,x,y){
   return Math.abs(along)<=c.length/2&&Math.abs(perp)<=c.width/2;
 }
 function crossingAtV067(x,y){
+  if(riverFarV067(x,y,RIVER_NAV_HALF_WIDTH_V067+28))return null;
   const raw=riverHitV067(x,y);
   if(!raw||raw.distance>RIVER_NAV_HALF_WIDTH_V067+28)return null;
   return WATER_CROSSINGS_V067.find(c=>crossingPassageContainsV067(c,x,y))||null;
 }
 function waterAtV067(x,y){
+  if(riverFarV067(x,y,RIVER_NAV_HALF_WIDTH_V067))return false;
   const hit=riverHitV067(x,y);
   if(!hit||hit.distance>RIVER_NAV_HALF_WIDTH_V067)return false;
   return !WATER_CROSSINGS_V067.some(c=>crossingPassageContainsV067(c,x,y));
@@ -120,7 +151,9 @@ function segmentWaterCrossingV067(ax,ay,bx,by){
   const distance=Math.hypot(bx-ax,by-ay),samples=Math.max(1,Math.ceil(distance/12));
   let touchesRiver=false,crossing=null,blocked=false;
   for(let i=0;i<=samples;i++){
-    const t=i/samples,x=ax+(bx-ax)*t,y=ay+(by-ay)*t,raw=riverHitV067(x,y);
+    const t=i/samples,x=ax+(bx-ax)*t,y=ay+(by-ay)*t;
+    if(riverFarV067(x,y,RIVER_NAV_HALF_WIDTH_V067))continue;
+    const raw=riverHitV067(x,y);
     if(!raw||raw.distance>RIVER_NAV_HALF_WIDTH_V067)continue;
     touchesRiver=true;
     const c=WATER_CROSSINGS_V067.find(item=>crossingPassageContainsV067(item,x,y));
@@ -128,7 +161,32 @@ function segmentWaterCrossingV067(ax,ay,bx,by){
   }
   return touchesRiver?{crossing,blocked}:null;
 }
-function segmentCrossesBlockedWaterV067(ax,ay,bx,by){return !!segmentWaterCrossingV067(ax,ay,bx,by)?.blocked;}
+// Boolean movement checks need neither a full route report nor repeated tests of
+// the exact same segment. Keep the original sampler for route/crossing metadata.
+const WATER_SEGMENT_CACHE_V1=new Map(),WATER_SEGMENT_STATS_V1={queries:0,hits:0,samples:0};
+function segmentCrossesBlockedWaterV067(ax,ay,bx,by){
+  WATER_SEGMENT_STATS_V1.queries++;
+  if(![ax,ay,bx,by].every(Number.isFinite))return false;
+  // Exact early answer for the common case, a step far from the river: every point
+  // of the segment lies within half its length of the middle, so when the middle
+  // is farther than that plus the river's half width, no point can be in the water.
+  const half=Math.hypot(bx-ax,by-ay)/2;
+  if(riverFarV067((ax+bx)/2,(ay+by)/2,RIVER_NAV_HALF_WIDTH_V067+half+1)){WATER_SEGMENT_STATS_V1.far=(WATER_SEGMENT_STATS_V1.far||0)+1;return false;}
+  const mid=riverHitV067((ax+bx)/2,(ay+by)/2);
+  if(!mid||mid.distance>RIVER_NAV_HALF_WIDTH_V067+half+1){WATER_SEGMENT_STATS_V1.far=(WATER_SEGMENT_STATS_V1.far||0)+1;return false;}
+  const key=`${ax}:${ay}:${bx}:${by}`,cached=WATER_SEGMENT_CACHE_V1.get(key);
+  if(cached!==undefined){WATER_SEGMENT_STATS_V1.hits++;return cached;}
+  const distance=Math.hypot(bx-ax,by-ay),samples=Math.max(1,Math.ceil(distance/12));
+  let blocked=false;
+  for(let i=0;i<=samples;i++){
+    const t=i/samples,x=ax+(bx-ax)*t,y=ay+(by-ay)*t,raw=riverHitV067(x,y);WATER_SEGMENT_STATS_V1.samples++;
+    if(raw&&raw.distance<=RIVER_NAV_HALF_WIDTH_V067&&!WATER_CROSSINGS_V067.some(c=>crossingPassageContainsV067(c,x,y))){blocked=true;break;}
+  }
+  if(WATER_SEGMENT_CACHE_V1.size>=512)WATER_SEGMENT_CACHE_V1.delete(WATER_SEGMENT_CACHE_V1.keys().next().value);
+  WATER_SEGMENT_CACHE_V1.set(key,blocked);return blocked;
+}
+window.NRTS?.events?.on?.('game:reset',()=>WATER_SEGMENT_CACHE_V1.clear());
+window.__WATER_SEGMENT_CACHE_V1__=Object.freeze({stats:()=>({...WATER_SEGMENT_STATS_V1,entries:WATER_SEGMENT_CACHE_V1.size,budget:512})});
 function crossingDelayV067(c,kind='infantry'){
   if(!c)return 0;
   if(c.type==='ford')return kind==='artillery'?7.5:kind==='cavalry'?3.2:3.8;

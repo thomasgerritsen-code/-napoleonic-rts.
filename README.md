@@ -1,6 +1,99 @@
-# Napoleonic RTS — v1.3.59
+# Napoleonic RTS — v1.4.7
 
 Een browser-RTS geïnspireerd door klassieke Napoleontische strategiespellen. De game draait in HTML5 Canvas + JavaScript en wordt vóór iedere GitHub Pages-release automatisch getest in Chromium.
+
+## v1.4.7 — startmenu
+
+De game opent eerst een licht startscherm met **Singleplayer** en **Multiplayer**.
+De kaart, soldaten en renderer laden pas na je keuze. Singleplayer begint de
+gewone slag tegen de computer; Multiplayer opent de lobby en wacht op een kamer.
+Tijdens die keuze loopt er geen singleplayer-simulatie op de achtergrond.
+**Hoofdmenu** brengt je terug; een actieve online kamer wordt daarbij verlaten.
+Op telefoons staat Hoofdmenu achter de bestaande knop Menu.
+
+`index.html` is het startscherm; `play.html` bevat de bestaande battlefield-bootstrap.
+Bestaande uitnodigingen en expliciete `?test=…`-links blijven werken.
+
+## v1.4.6 — eerste online multiplayer
+
+Twee spelers kunnen via een WebSocket-spelserver een kamer maken en deelnemen:
+Frankrijk tegen Groot-Brittannië. De server berekent de strijd; clients tonen
+zichtgefilterde updates met vloeiende beweging. Opdrachten, economie en productie
+worden op de server verwerkt. Bij uitval pauzeert de strijd, met 90 seconden om
+opnieuw te verbinden. Singleplayer blijft beschikbaar zonder serververbinding.
+
+Start lokaal met `npm ci`, `npx playwright install --with-deps chromium` en
+`npm run start:server`. Open daarna `http://localhost:8080/?view=iso` en kies
+**Multiplayer → Spel hosten**. De uitnodigingslink is voor een tweede speler.
+Voor internetspel moet deze server publiek op HTTPS/WSS draaien. Een lokaal
+localhost-adres werkt alleen op dezelfde computer. Hosting, grenzen en de
+stapsgewijze servermigratie staan in [de multiplayerhandleiding](docs/online-multiplayer.md).
+`Dockerfile` en `railway.json` staan klaar voor één blijvende serverinstantie;
+er wordt geen openbare server of hostingaccount aangemaakt door deze bestanden.
+
+## v1.4.5 — vier seizoenen
+
+Lente, zomer, herfst en winter volgen elkaar op: vier minuten per seizoen,
+zestien minuten voor een volledig jaar. De laatste 45 seconden gaan geleidelijk
+over naar het volgende seizoen. De klok toont nu ook het seizoen.
+
+De zomer krijgt warmere grond, de herfst koperkleurig loof en de winter sneeuw
+op grond en bomen. Winterse buien vallen als sneeuw; schoen- en hoefsporen zijn
+ook op droge sneeuw zichtbaar. Na de winter keert het groene landschap terug.
+
+Boomafbeeldingen worden gedeeld en hergebruikt, met maximaal 12 MiB extra cache
+en hoogstens één nieuwe kleurvariant per frame. De bestaande dag/nachtcyclus,
+regen, besturing en spelregels blijven behouden.
+
+## v1.4.4 — dag- en nachtcyclus
+
+Een volledige dag duurt tien minuten speeltijd. De slag begint om 08:00;
+rond 3:45 speeltijd wordt het avond, rond 5:00 is het nacht en rond 8:45 komt
+de zon weer op. Het licht verloopt geleidelijk van daglicht naar warme
+schemering en blauw maanlicht. Een compacte klok toont de fase en het tijdstip.
+
+De kleurlaag gebruikt maximaal één tekenactie per frame en geen extra
+beeldbuffers. Bediening, regen, mist en sporen blijven werken; een nieuwe slag
+zet de klok terug op 08:00.
+
+## v1.4.3 — regenbuien en zichtbare voet- en hoefsporen
+
+De eerste natuurlijke bui begint rond 1:45 speeltijd, voorafgegaan door bewolking.
+Buien duren ongeveer 65–100 seconden, met droge tussenpozen van 150–240 seconden.
+Op natte grond laten lopende soldaten afwisselende schoenafdrukken achter;
+cavalerie en officieren te paard laten hoefsporen achter. De afdrukken blijven
+na de bui even zichtbaar en vervagen wanneer de grond opdroogt.
+
+De sporen worden als kleine vectorvormen samen getekend, met maximaal 2600
+bewaarde afdrukgroepen. Stilstaande en ongeziene eenheden maken geen nieuwe
+sporen; brugdekken worden overgeslagen. Een nieuwe slag wist de oude sporen.
+
+## v1.4.2 — minder tekenwerk met hetzelfde beeld
+
+Onveranderde mistvormen worden hergebruikt en de schermprojectie leest de
+schermmaten eenmaal per frame. Dit vermindert herhaalde tekenberekeningen
+zonder extra terrein- of spritebuffers toe te voegen.
+Bewegende eenheden, weer, zachte mistranden en wolken blijven actief; resolutie,
+sprites, effecten en verversingsfrequenties blijven gelijk aan v1.4.1.
+
+## v1.4.1 — mobiel herstel
+
+Telefoons gebruiken weer de gecachte Canvas2D-route, een pixelverhouding van
+maximaal 1,5 en geen automatische HD-spritevergroting tijdens het spelen.
+Hierdoor vervallen de extra GPU-kopieën en het decoderen van zware HD-atlassen.
+De desktop-GPU-route en de multiplayerbasis blijven beschikbaar.
+
+## v1.4.0 — isometrische GPU-weergave en multiplayerfundament
+
+De speelbare isometrische kaart heeft nu WebGL2-batches voor terrein en sprites,
+met een begrensd texturegeheugen en Canvas2D als terugval. De gewone bediening
+gebruikt een gedeeld opdrachtprotocol; een transportonafhankelijke autoriteitsmodule
+voor een toekomstige spelserver controleert eigendom, volgorde en wachtrijen.
+Online wedstrijden, lobby's en de serveradapter moeten nog worden aangesloten.
+Daarnaast zijn riviercontroles na langere speelsessies goedkoper en krijgen
+infanterie en cavalerie ieder het passende type officier.
+
+Zie [GPU en multiplayer](docs/gpu-and-multiplayer.md) voor werking en grenzen.
 
 ## ▶ Speel nu
 

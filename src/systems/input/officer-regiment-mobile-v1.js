@@ -38,15 +38,20 @@
     return distanceSq(anchor, unit) <= AUTO_FILL_RADIUS_SQ;
   }
 
+  const countLabel = n => global.NRTS_CONFIG?.regimentOrders?.maxInfantry ? `${n} man` : `${n}/12`;
+
   function officerDraft(group, side = 'france') {
     const selected = (group || []).filter(unit => validLoose(unit, side));
-    const officers = selected.filter(unit => unit.type === 'officer');
+    const officers = selected.filter(unit => officerCanLead(unit, 'infantry'));
     if (officers.length !== 1) return null;
 
     const officer = officers[0];
     const selectedInfantry = selected.filter(unit => unit.type === 'infantry').slice(0, MAX_INFANTRY);
     const selectedIds = new Set(selectedInfantry.map(unit => unit.id));
-    const needed = Math.max(0, MIN_INFANTRY - selectedInfantry.length);
+    // On the open map the officer gathers every free musketier near him, up to a full
+    // regiment (regimentOrders.maxInfantry); otherwise the 12 it needs.
+    const fill = global.NRTS_CONFIG?.regimentOrders?.maxInfantry || MIN_INFANTRY;
+    const needed = Math.max(0, fill - selectedInfantry.length);
     const nearbyInfantry = nearestTo(
       officer,
       freeUnits(side, 'infantry').filter(unit =>
@@ -133,8 +138,8 @@
       if (!draft) return;
       const ready = draft.eligibility.canCreate;
       button.innerHTML = ready
-        ? `Maak regiment<br><small>auto · ${draft.eligibility.infantry}/12 · D${draft.eligibility.drummers}</small>`
-        : `Maak regiment<br><small>binnen ${AUTO_FILL_RADIUS} m · ${draft.eligibility.infantry}/12 · D${draft.eligibility.drummers}</small>`;
+        ? `Maak regiment<br><small>auto · ${countLabel(draft.eligibility.infantry)} · D${draft.eligibility.drummers}</small>`
+        : `Maak regiment<br><small>binnen ${AUTO_FILL_RADIUS} m · ${countLabel(draft.eligibility.infantry)} · D${draft.eligibility.drummers}</small>`;
       button.title = ready
         ? 'Vorm rond deze officier automatisch een regiment met minimaal 12 nabijgelegen musketiers en de dichtstbijzijnde vrije drummer.'
         : `Binnen ${AUTO_FILL_RADIUS} meter zijn nog niet genoeg vrije musketiers en/of geen vrije drummer beschikbaar.`;

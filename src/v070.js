@@ -293,6 +293,26 @@ function houseOverlapsV070(house, houses, gap=9) {
   return houses.some(other => Math.hypot(house.x-other.x,house.y-other.y) < r + Math.hypot(other.w,other.h)/2 + gap);
 }
 
+// A point `along` the road from the hamlet, following its bends (a straight
+// tangent leaves a curving road: Bois-Hameau's road bends north after v1.3.29).
+function roadPointAlongV070(road, x, y, direction, along) {
+  const start=roadTangentAtV070(road,x,y);
+  if (!start) return null;
+  const pts=road.points;
+  let i=start.segmentIndex, px=start.px, py=start.py, left=along;
+  for (let guard=0; guard<pts.length+1; guard++) {
+    const end=direction>0 ? pts[i+1] : pts[i];
+    const dx=end.x-px, dy=end.y-py, d=Math.hypot(dx,dy);
+    if (d>=left) {
+      const a=pts[i], b=pts[i+1], len=Math.hypot(b.x-a.x,b.y-a.y)||1;
+      return {x:px+dx/(d||1)*left, y:py+dy/(d||1)*left, tx:(b.x-a.x)/len, ty:(b.y-a.y)/len};
+    }
+    left-=d; px=end.x; py=end.y; i+=direction;
+    if (i<0 || i>=pts.length-1) return null;
+  }
+  return null;
+}
+
 function buildVillageSceneryV070() {
   const villages=[];
   for (const h of ROAD_HAMLETS_V066) {
@@ -305,17 +325,17 @@ function buildVillageSceneryV070() {
     for (let cycle=0; cycle<30 && houses.length<target; cycle++) {
       for (const road of usable) {
         if (houses.length>=target) break;
-        const tangent=roadTangentAtV070(road,h.x,h.y);
-        if (!tangent) continue;
         const direction=((slot+cycle)&1)?1:-1;
         const side=((Math.floor((slot+cycle)/2))&1)?1:-1;
         const along=82 + cycle*18 + (slot%3)*25 + randV069(state)*16;
         const verge=road.width/2 + 35 + randV069(state)*18;
         const w=31 + randV069(state)*14;
         const hh=21 + randV069(state)*10;
-        const x=h.x + tangent.tx*direction*along - tangent.ty*side*verge;
-        const y=h.y + tangent.ty*direction*along + tangent.tx*side*verge;
         slot++;
+        const tangent=roadPointAlongV070(road,h.x,h.y,direction,along);
+        if (!tangent) continue;
+        const x=tangent.x - tangent.ty*side*verge;
+        const y=tangent.y + tangent.tx*side*verge;
         if (x<45||y<45||x>WORLD.width-45||y>WORLD.height-45) continue;
         const clearance=houseRoadClearanceV070(x,y,w,hh);
         if (clearance < 14 || clearance > 95) continue;

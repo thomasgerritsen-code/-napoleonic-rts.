@@ -18,6 +18,9 @@ async function openGame(page) {
     window.__RTS_DEBUG__?.depleteResource &&
     window.__RTS_DEBUG__?.moveWorker
   ));
+  // Since the workers-only opening the British AI takes its own workers off
+  // gathering to build; this test is about French reassignment alone.
+  await page.evaluate(() => { aiDevelop = () => {}; aiMilitaryOrder = () => {}; });
   return pageErrors;
 }
 

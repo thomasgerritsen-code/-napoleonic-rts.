@@ -69,13 +69,13 @@
     subsystems: ['movement', 'formation', 'navigation', 'ai-production', 'ai-tactics', 'combat', 'simulation']
   });
 })(window);
-const fogScoutingScript=document.createElement('script');fogScoutingScript.src='src/systems/visibility/fog-scouting.js?build=fs1';fogScoutingScript.async=false;document.body.appendChild(fogScoutingScript);
+const fogScoutingScript=document.createElement('script');fogScoutingScript.src='src/systems/visibility/fog-scouting.js?build=fs2';fogScoutingScript.async=false;document.body.appendChild(fogScoutingScript);
 const moraleCommandScript=document.createElement('script');moraleCommandScript.src='src/systems/morale/command-morale.js?build=mc2';moraleCommandScript.async=false;document.body.appendChild(moraleCommandScript);
-const tacticalTerrainScript=document.createElement('script');tacticalTerrainScript.src='src/systems/terrain/tactical-terrain.js?build=tl1';tacticalTerrainScript.async=false;document.body.appendChild(tacticalTerrainScript);
+const tacticalTerrainScript=document.createElement('script');tacticalTerrainScript.src='src/systems/terrain/tactical-terrain.js?build=tl2';tacticalTerrainScript.async=false;document.body.appendChild(tacticalTerrainScript);
 const staminaDisciplineScript=document.createElement('script');staminaDisciplineScript.src='src/systems/movement/stamina-discipline.js?build=sd1';staminaDisciplineScript.async=false;document.body.appendChild(staminaDisciplineScript);
-const cavArtScript=document.createElement('script');cavArtScript.src='src/systems/combat/cavalry-artillery.js?build=ca1';cavArtScript.async=false;document.body.appendChild(cavArtScript);
+const cavArtScript=document.createElement('script');cavArtScript.src='src/systems/combat/cavalry-artillery.js?build=147ranks';cavArtScript.async=false;document.body.appendChild(cavArtScript);
 const weatherScript=document.createElement('script');weatherScript.src='src/systems/world/battlefield-weather.js?build=bw1';weatherScript.async=false;document.body.appendChild(weatherScript);
-const objectiveScript=document.createElement('script');objectiveScript.src='src/systems/scenario/objectives.js?build=os1';objectiveScript.async=false;document.body.appendChild(objectiveScript);
+const objectiveScript=document.createElement('script');objectiveScript.src='src/systems/scenario/objectives.js?build=147camps';objectiveScript.async=false;document.body.appendChild(objectiveScript);
 const frameStabilityScript=document.createElement('script');frameStabilityScript.src='src/systems/rendering/frame-stability-v1.js?build=smooth1';frameStabilityScript.async=false;document.body.appendChild(frameStabilityScript);
 const postCrossingTargetSafetyScript=document.createElement('script');postCrossingTargetSafetyScript.src='src/systems/navigation/post-crossing-target-safety-v1.js?build=pcts1';postCrossingTargetSafetyScript.async=false;document.body.appendChild(postCrossingTargetSafetyScript);
 const formationFacingV146BridgeScript=document.createElement('script');formationFacingV146BridgeScript.src='src/foundation/formation-facing-v146-bridge.js?build=259a';formationFacingV146BridgeScript.async=false;document.body.appendChild(formationFacingV146BridgeScript);

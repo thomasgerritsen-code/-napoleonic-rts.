@@ -70,12 +70,16 @@ function isWorldVisible(x, y, padding = 0) {
       aiDecisionClock += dt;
       if (aiDecisionClock >= 2.0) {
         aiDecisionClock = 0;
-        aiDevelop();
+        if (typeof TEST_MANUAL_SIMULATION !== 'undefined' && !TEST_MANUAL_SIMULATION && window.__FRAME_WORK_V1__)
+          window.__FRAME_WORK_V1__.enqueue('ai:develop', () => { if (!gameOver) aiDevelop(); }, { maxDelayMs: 120 });
+        else aiDevelop();
       }
       aiAttackClock += dt;
       if (aiAttackClock >= 8.0) {
         aiAttackClock = 0;
-        aiMilitaryOrder();
+        if (typeof TEST_MANUAL_SIMULATION !== 'undefined' && !TEST_MANUAL_SIMULATION && window.__FRAME_WORK_V1__)
+          window.__FRAME_WORK_V1__.enqueue('ai:orders', () => { if (!gameOver) aiMilitaryOrder(); }, { maxDelayMs: 80, priority: 1 });
+        else aiMilitaryOrder();
       }
       checkVictory();
     } else {

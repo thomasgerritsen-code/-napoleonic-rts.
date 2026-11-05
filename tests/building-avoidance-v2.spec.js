@@ -11,7 +11,7 @@ async function openAvoidance(page){
 test('loose unit locally detours around a gameplay building instead of sticking', async ({page})=>{
   const errors=await openAvoidance(page);
   const result=await page.evaluate(()=>{
-    const b=createBuilding('france','house',1600,1250,true);
+    const b=createBuilding('france','house',4000,1800,true);
     if(!b) return {missing:true};
     const start={x:Math.max(40,b.x-180),y:b.y};
     const target={x:Math.min(WORLD.width-40,b.x+180),y:b.y};
@@ -42,7 +42,7 @@ test('loose unit locally detours around a gameplay building instead of sticking'
 test('target inside a building is sanitized to reachable free ground', async ({page})=>{
   const errors=await openAvoidance(page);
   const result=await page.evaluate(()=>{
-    const b=createBuilding('france','barracks',1900,1350,true);
+    const b=createBuilding('france','barracks',4300,1800,true);
     if(!b) return {missing:true};
     const u=createUnit('france','infantry',Math.max(40,b.x-180),b.y);
     for(let i=0;i<480;i++) moveToward(u,b.x,b.y,1/60,TYPES.infantry.speed);

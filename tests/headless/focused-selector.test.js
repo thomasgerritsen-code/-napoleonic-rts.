@@ -14,10 +14,10 @@ test('bridge follower safety stays focused on the straggler regression', () => {
   assert.deepEqual(selected, ['tests/bridge-follower-safety-v1.spec.js','tests/smoke-v1.spec.js']);
 });
 
-test('musketeer sprite authority stays focused on sprite rendering', () => {
+test('the retired musketeer sprite module (no longer loaded) only selects smoke', () => {
   for (const file of ['src/assets/musketeer-sprite-v1.js','src/systems/rendering/musketeer-sprites-v1.js']) {
     const selected = selectFocusedTests([file]);
-    assert.deepEqual(selected, ['tests/musketeer-sprites-v1.spec.js','tests/smoke-v1.spec.js']);
+    assert.deepEqual(selected, ['tests/smoke-v1.spec.js']);
   }
 });
 

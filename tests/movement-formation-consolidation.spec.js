@@ -32,7 +32,8 @@ test('active v0.7.1 movement layer is owned by Architecture v2.1 modules', async
 });
 
 test('legacy v071 motion/hotfix files remain archived but are no longer loaded', async () => {
-  const html = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf8');
+  // The game page (index.html is the v1.4.7 start menu).
+  const html = fs.readFileSync(path.join(process.cwd(), 'play.html'), 'utf8');
   expect(html).not.toContain('src/v071-motion.js');
   expect(html).not.toContain('src/v071-speed-hotfix.js');
   const ordered = [

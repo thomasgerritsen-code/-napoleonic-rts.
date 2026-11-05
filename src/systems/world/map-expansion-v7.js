@@ -97,7 +97,8 @@
 
   const roads=Object.freeze([
     ...ROAD_NETWORK_V066.filter(road=>!omitted.has(road.id)),
-    ...strategicRoads
+    // The open map (iso view) also omits some of the strategic roads.
+    ...strategicRoads.filter(road=>!omitted.has(road.id))
   ]);
   const postalRelays=Object.freeze([
     {name:'Relais de la Chaussée',x:1150,y:900},

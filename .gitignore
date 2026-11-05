@@ -4,3 +4,7 @@ test-results/
 blob-report/
 art/generated/
 art/frames/
+__pycache__/
+.bvenv/
+bundle/
+public/

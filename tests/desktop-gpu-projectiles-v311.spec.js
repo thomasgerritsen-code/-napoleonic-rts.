@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const {test,expect}=require('@playwright/test');
 
 test('v311 musket and cannon projectiles use the existing smoke GPU batch and retain actual positions',async({page})=>{
@@ -27,7 +28,7 @@ test('v311 musket and cannon projectiles use the existing smoke GPU batch and re
       canvasCount:document.querySelectorAll('#game-smoke-gpu').length,
       noAdditionalProjectileCanvas:!document.getElementById('game-projectiles-gpu')};
   });
-  expect(result.version).toBe('1.3.59');
+  expect(result.version).toBe(currentReleaseVersion);
   expect(result.canvasCount).toBe(1);
   expect(result.noAdditionalProjectileCanvas).toBe(true);
   if(result.after.active){

@@ -8,7 +8,8 @@
   const staticCanvas = document.getElementById('game-static');
   const mainCanvas = document.getElementById('game');
   const mobile = !!root.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile;
-  const disabledByQuery = new URLSearchParams(location.search).get('gpu') === 'off';
+  const query = new URLSearchParams(location.search);
+  const disabledByQuery = query.get('gpu') === 'off' || query.get('view') === 'iso';
   const canvas = document.createElement('canvas');
   canvas.id = 'game-terrain-gpu';
   canvas.setAttribute('aria-hidden', 'true');

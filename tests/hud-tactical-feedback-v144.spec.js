@@ -64,8 +64,12 @@ test('multi-regiment feedback weights strength and morale by actual regiment siz
     first.morale = 100;
     second.morale = 40;
     firstMembers.forEach(u => { u.hp = u.maxHp; });
-    secondMembers.forEach((u, index) => {
-      if (index >= Math.ceil(secondMembers.length / 2)) u.dead = true;
+    // Half the regiment falls, but not its officer: since v147 a lost officer
+    // is a pressure reason of its own, and this test is about size weighting.
+    const command = new Set([second.officerId, second.drummerId]);
+    const killed = new Set(secondMembers.filter(u => !command.has(u.id)).slice(-Math.ceil(secondMembers.length / 2)).map(u => u.id));
+    secondMembers.forEach(u => {
+      if (killed.has(u.id)) u.dead = true;
       else u.hp = u.maxHp * .5;
     });
 

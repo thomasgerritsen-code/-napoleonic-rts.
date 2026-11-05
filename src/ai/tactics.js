@@ -2,11 +2,18 @@
 // ---------- Architecture v2: AI Commander v1 ----------
 // Production remains owned by ai/production.js. This file only decides military intent.
 
-const AI_COMMANDER_V1 = {
+const AI_COMMANDER_INITIAL_STATE_V1 = Object.freeze({
   state:'DEFEND', previousState:null, stateSince:0, cycle:0, wave:0,
   flankSide:1, retreatUntil:0, target:null, regroupPoint:null,
   threatDistance:null, reserveRegimentId:null
-};
+});
+const AI_COMMANDER_V1 = {...AI_COMMANDER_INITIAL_STATE_V1};
+// Keep the object shared with commander extensions, but discard every old
+// battle's targets, orders and clocks when the simulation starts over.
+NRTS.events.on('game:reset',()=>{
+  for(const key of Object.keys(AI_COMMANDER_V1))delete AI_COMMANDER_V1[key];
+  Object.assign(AI_COMMANDER_V1,AI_COMMANDER_INITIAL_STATE_V1);
+});
 const AI_TARGET_RETENTION_MARGIN=90;
 
 function aiClamp01(v){ return Math.max(0,Math.min(1,v)); }

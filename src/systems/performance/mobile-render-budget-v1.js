@@ -18,6 +18,10 @@
 
   let applications = 0;
   let last = null;
+  // Share of the budget actually drawn (1 = full). The adaptive resolution
+  // governor lowers it when frames run long and raises it again with headroom.
+  let scale = 1;
+  const MIN_RENDER_DPR = 0.6;
 
   function mobileTarget() {
     const shortEdge = Math.min(innerWidth || 0, innerHeight || 0);
@@ -25,19 +29,21 @@
     return coarse || shortEdge <= CONTRACT.mobileShortEdgeCssPx;
   }
 
+  // The iso view (NRTS_CONFIG.render, open map only) may draw sharper than the 2D map.
+  const caps = () => ({ ...CONTRACT, ...(root.NRTS_CONFIG?.render || {}) });
   function desiredDpr() {
-    const nativeDpr = Math.max(1, Number(root.devicePixelRatio) || 1);
-    if (mobileTarget()) return Math.min(nativeDpr, CONTRACT.mobileDprCap);
+    const nativeDpr = Math.max(1, Number(root.devicePixelRatio) || 1), cap = caps();
+    if (mobileTarget()) return Math.min(nativeDpr, cap.mobileDprCap);
     // A large monitor may otherwise require 4-8x as many pixels as a phone
     // on every frame, despite showing the same simulation.
     const viewportPixels = Math.max(1, Math.floor(innerWidth) * Math.floor(innerHeight));
-    const pixelCapDpr = Math.max(CONTRACT.minDesktopDpr,
-      Math.sqrt(CONTRACT.desktopMaxBackingPixels / viewportPixels));
-    return Math.min(nativeDpr, CONTRACT.desktopDprCap, pixelCapDpr);
+    const pixelCapDpr = Math.max(cap.minDesktopDpr,
+      Math.sqrt(cap.desktopMaxBackingPixels / viewportPixels));
+    return Math.min(nativeDpr, cap.desktopDprCap, pixelCapDpr);
   }
 
   function apply(reason = 'manual') {
-    const dpr = desiredDpr();
+    const full = desiredDpr(), dpr = scale < 1 ? Math.max(Math.min(full, MIN_RENDER_DPR), Math.round(full * scale * 100) / 100) : full;
     const cssWidth = Math.max(1, Math.floor(innerWidth));
     const cssHeight = Math.max(1, Math.floor(innerHeight));
     const width = Math.max(1, Math.floor(cssWidth * dpr));
@@ -58,6 +64,8 @@
       mobile: mobileTarget(),
       nativeDpr: Math.max(1, Number(root.devicePixelRatio) || 1),
       renderDpr: dpr,
+      fullDpr: full,
+      scale,
       cssWidth,
       cssHeight,
       backingWidth: canvas.width,
@@ -82,6 +90,14 @@
     contract: CONTRACT,
     desiredDpr,
     apply,
+    // Draw at this share of the budget (clamped to 0.4..1); returns the new state.
+    setScale(k, reason = 'scale') {
+      const next = Math.max(0.4, Math.min(1, Number(k) || 1));
+      if (next === scale) return last;
+      scale = next; return apply(reason);
+    },
+    scale: () => scale,
+    minRenderDpr: MIN_RENDER_DPR,
     state: () => last
   });
 })(window);

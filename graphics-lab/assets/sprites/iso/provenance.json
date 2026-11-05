@@ -1,0 +1,178 @@
+{
+  "assetId": "iso-scene-v338",
+  "sourceType": "original",
+  "author": "Claude Code via scripts/render-iso-infantry.py, commissioned by the repository owner",
+  "usageRights": "Original script-generated Blender models (soldiers, buildings, trees, terrain) and renders; no third-party models, textures or animations; full rights of the repository owner",
+  "sourceRef": "scripts/iso_blender_common.py, render-iso-infantry.py, render-iso-props.py, render-iso-ground.py (Blender 5.2 bpy, Cycles CPU) + pack-iso-atlas.py, render-iso-roles.py, render-iso-artillery.py, render-iso-cavalry.py",
+  "reviewedForUse": false,
+  "reviewNote": "Graphics Lab only; awaiting human visual review before any use in the game",
+  "camera": {
+    "projection": "orthographic",
+    "elevationDeg": 30,
+    "frame": {
+      "w": 176,
+      "h": 128
+    },
+    "pivot": {
+      "x": 88,
+      "y": 108
+    }
+  },
+  "directions": [
+    "e",
+    "se",
+    "s",
+    "sw",
+    "w",
+    "nw",
+    "n",
+    "ne"
+  ],
+  "states": {
+    "idle": 2,
+    "march": 6,
+    "aim": 2,
+    "fire": 3,
+    "reload": 4,
+    "die": 4,
+    "diefwd": 4,
+    "dieside": 4,
+    "kaim": 2,
+    "kfire": 3,
+    "misfire": 3,
+    "charge": 6,
+    "thrust": 3,
+    "rout": 6,
+    "crawl": 4,
+    "cheer": 2,
+    "look": 4,
+    "adjust": 4,
+    "lean": 2
+  },
+  "covers": [
+    "graphics-lab/assets/sprites/iso/*",
+    "graphics-lab/assets/iso/*"
+  ],
+  "sheets": {
+    "infantry": [
+      "idle",
+      "march",
+      "aim",
+      "fire",
+      "reload"
+    ],
+    "fallen": [
+      "die",
+      "diefwd",
+      "dieside"
+    ],
+    "combat": [
+      "kaim",
+      "kfire",
+      "misfire",
+      "charge",
+      "thrust"
+    ],
+    "morale": [
+      "rout",
+      "crawl",
+      "cheer"
+    ],
+    "idlex": [
+      "look",
+      "adjust",
+      "lean"
+    ]
+  },
+  "variants": {
+    "1": "base",
+    "2": "campaign overalls, oilcloth shako cover, moustache",
+    "3": "brown blanket roll, mess tin, sideburns",
+    "4": "grenadier company (French red epaulettes and plume, British wings and white plume)",
+    "5": "voltigeurs / British light company (yellow or green plume)"
+  },
+  "roles": {
+    "officer": [
+      "idle",
+      "march",
+      "command"
+    ],
+    "drummer": [
+      "idle",
+      "march",
+      "command"
+    ],
+    "ensign": [
+      "idle",
+      "march",
+      "command"
+    ]
+  },
+  "rendering": {
+    "supersample": 2,
+    "format": "lossy WebP q90 with lossless-quality alpha (Pillow)"
+  },
+  "artillery": {
+    "gun": {
+      "cell": {
+        "w": 256,
+        "h": 176
+      },
+      "pivot": {
+        "x": 128,
+        "y": 112
+      },
+      "states": {
+        "idle": 1,
+        "fire": 2,
+        "roll": 4
+      }
+    },
+    "gunner": {
+      "states": {
+        "idle": 2,
+        "ram": 4,
+        "load": 2,
+        "aim": 2,
+        "ready": 2,
+        "touch": 2,
+        "haul": 4,
+        "march": 6,
+        "die": 4,
+        "diefwd": 4,
+        "dieside": 4
+      }
+    }
+  },
+  "cavalry": {
+    "cell": {
+      "w": 224,
+      "h": 192
+    },
+    "pivot": {
+      "x": 112,
+      "y": 152
+    },
+    "states": {
+      "idle": 2,
+      "walk": 6,
+      "gallop": 6,
+      "slash": 3,
+      "rear": 2,
+      "die": 4,
+      "trot": 6
+    },
+    "variants": {
+      "1": "bay horse",
+      "2": "black horse (France) / grey horse (Britain)"
+    },
+    "riders": {
+      "france": "chasseur \u00e0 cheval",
+      "britain": "light dragoon"
+    },
+    "roles": {
+      "officer": "black horse, gold lace, epaulettes, sash",
+      "trumpeter": "grey horse, reversed coat, trumpet"
+    }
+  }
+}

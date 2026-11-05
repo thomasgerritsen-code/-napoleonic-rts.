@@ -1,0 +1,699 @@
+# Iso-weergave v1 — de game in de Graphics Lab-stijl (opt-in)
+
+GPU-rendering en de voorbereiding op online multiplayer staan beschreven in
+[gpu-and-multiplayer.md](gpu-and-multiplayer.md).
+
+## Rook, treffers en terrein
+
+Kruitrook vormt zachte, onregelmatige wolken die met de veranderende wind
+meedrijven, stijgen en uitdunnen. Een zichtbare treffer kan kort wat aarde bij
+de voeten opwerpen; op natte grond is dat effect kleiner en donkerder.
+Herstellen, verborgen eenheden, brugdekken en directe melee-reacties maken
+geen stofwolken. De effecten gebruiken de bestaande zichtbare schoten en
+gezondheidsveranderingen, ook in multiplayer, zonder extra netwerkberichten.
+
+Het terrein krijgt subtiele gras-, aarde- en bosranddetails, met krassen langs
+de richting van de wegen. Deze details volgen het bestaande hoogteveld en
+verschijnen niet op water. Ze worden in herbruikbare tegels getekend, met een
+limiet van 4 MiB op mobiel en 12 MiB op desktop. Per beeld worden maximaal twee
+nieuwe tegels op mobiel en drie op desktop gemaakt. Op grote afstand en in
+Overzicht verdwijnt deze fijne laag; sneeuw dempt de zomerse graskleuren.
+Een nieuwe slag wist de tijdelijke rook, stofreacties en detailtegels.
+
+## Beweging en gevechtshoudingen
+
+Soldaten en paarden draaien via tussenrichtingen en behouden hun pasritme bij
+een overgang tussen stap, draf en galop. Kleine lichaamsbewegingen maken het
+vertrekken, afremmen en stilstaan minder abrupt. Gewonden lopen met een lagere
+houding; steek- en sabelaanvallen hebben verschillende timings voor inzet,
+uitstrekken en herstel. Afweren en terugdeinzen volgen de echte gevechtsreacties.
+Vallen en opstaan versnellen en vertragen geleidelijk, met kleine verschillen
+per soldaat. Cavalerie behoudt daarbij het eigen paard en uniform.
+
+Deze laag gebruikt de bestaande sprites met één tekening per lichaam. Ze laadt
+geen extra afbeeldingen en verandert geen posities, bevelen, schade of
+netwerkberichten. Onzichtbare eenheden slaan de houdingsberekeningen over en
+een nieuwe slag wist het animatiegeheugen.
+
+## Officieren aanwijzen
+
+Infanterie krijgt een officier te voet uit de kazerne; cavalerie krijgt een
+officier te paard uit de stal. Regimentvorming gebruikt uitsluitend een passend
+type officier. Selecteer voor vervanging één regiment en één vrije officier en
+druk **Officier aanwijzen**. De vorige officier wordt vrijgemaakt; bestaande
+routes en bevelen blijven behouden. Een verkeerde combinatie schakelt de knop
+uit. Ook de Britse AI houdt de twee officiertypen apart.
+
+`/?view=iso` toont de echte game in de 30°-camera van de Graphics Lab, met de
+Blender-sprites uit `graphics-lab/assets/`. Zonder die parameter laadt het bestand
+wel, maar doet het niets: de game blijft precies zoals hij is.
+
+**PRESERVATION IMPACT: none for the default game.** Met `?view=iso` speelt de game
+op een open kaart (minder wegen en huizen, zie onder); verder wordt de simulatie
+(beweging, routes, bruggen, gevecht, moraal, AI, economie) alleen gelezen, nooit
+veranderd.
+
+## Wat er te zien is
+
+- **Terrein**: het eigen statische terrein van de game (wegen, rivier, bruggen,
+  dorpen, velden) wordt in tegels gebakken en plat op de grond gelegd, half zo hoog
+  als breed, zoals in het lab. De tegels worden per zoomniveau (¼, ½ of volle
+  resolutie) gemaakt, drie per frame, het midden van het scherm eerst; hoogstens 96
+  blijven bewaard.
+- **Eenheden** in 8 richtingen:
+  - musketiers in vijf uiterlijken, met mars, stilstaan, richten, vuren, herladen,
+    vluchten en de bajonetcharge;
+  - officieren en tamboers, die commando geven zolang hun regiment vuurt;
+  - cavalerie met stap, draf en galop (op snelheid) en de sabelhouw;
+  - kanonnen (rollen, vuren) en hun bediening (laden, aanzetten, klaarstaan);
+  - boeren nog als eenvoudige getekende figuurtjes (er zijn geen sprites voor).
+- **Sneuvelen**: wie valt, speelt een van de drie vallen en blijft liggen (hoogstens 320).
+- **Gebouwen en grondstoffen**: hoofdgebouw en kazerne als Blender-kazerne, woningen
+  als huisje, graanakkers als veld, bomen als eik of populier, bessen als struik met
+  bessen, ijzer als rots. Gebouwen in aanbouw zijn doorschijnend.
+- **Rook en kogels**: rook bij elk schot (een grote wolk bij kanonnen), kogels als
+  stipjes op schouderhoogte.
+- **Mist van oorlog** als wolken, in drie tinten zoals in de klassieke RTS-spellen:
+  - nooit gezien: onder wolken - witgrijs, van linksboven belicht met blauwgrijze
+    onderkanten, in twee lagen (een wolkendek en fijnere slierten) die elk op hun eigen
+    snelheid met de wind meedrijven, met hun schaduw op de grond;
+  - eerder gezien (de verkende vakken van de game): een dunne nevel; grond, wegen en
+    dorpen zie je, troepen niet;
+  - in zicht: helder, rond de Franse eenheden en gebouwen.
+  De **randen zijn wolkenranden**: de wolkstructuur duwt de rand naar buiten waar de wolk
+  dik is en trekt hem terug waar hij dun is, zodat hij in bollen en uitlopers verloopt
+  in plaats van als een vage airbrush-overgang; die vormen liggen vast op de grond en
+  drijven mee met het wolkendek. Alles ligt op het reliëf (een heuveltop krijgt zijn
+  zichtveld óp de heuvel). Vloeiend: elke nieuwe mist vloeit over in de vorige, de
+  mist is iets groter dan het scherm en schuift mee met de camera; de wolken worden op
+  een kwart van de schermresolutie getekend. Britten buiten zicht worden niet
+  getekend, net als in 2D.
+- **Hoogte geeft zicht** (alleen op deze kaart): wie hoger staat ziet verder, 3,5% per
+  meter, hoogstens anderhalf keer zo ver (op de hoogste top 322 in plaats van 215). Dat
+  geldt voor beide kanten, ook voor wat de Britse AI ziet.
+- Selectieringen, het sleepkader en de minimap van de game.
+
+## Open kaart (alleen in de iso-weergave)
+
+Met `?view=iso` speelt de game op een **open kaart**; zonder die parameter blijft de
+kaart precies zoals hij is (37 wegen, 224 huizen).
+
+- **Minder wegen**: 18 in plaats van 37. Zijwegen, boerenpaden en de meeste
+  strategische wegen vallen weg (`NRTS_CONFIG.world.roads.omittedIds`, ook voor de
+  `imperial-`-wegen in `map-expansion-v7.js`); de hoofdwegen en alle vijf de bruggen
+  blijven.
+- **Minder huizen**: `src/systems/world/open-map-v1.js` houdt hoogstens 9 dorpjes over,
+  minstens 900 px (40 m) uit elkaar, elk met de 6 huizen het dichtst bij het midden
+  (een kapel of herberg blijft staan). Samen 54 huizen. Omdat dit direct na
+  `village-collision-v4` gebeurt, gebruiken looproutes, botsingen, economie en de
+  weergave allemaal dezelfde dunne dorpen.
+- `NRTS_CONFIG.world.mapVariant` is `'open'` of `'standard'`.
+
+## Reliëf
+
+- Het landschap golft: zacht glooiend land (zo'n 1 à 3 m), de heuvels van de game als
+  brede ruggen (7 tot 14 m; op de open kaart 9 extra heuvels ten oosten en zuiden van de
+  rivier, die voor de game ook "heuvel" zijn: iets trager terrein), een dal dat naar de
+  rivier afloopt, en een vlak terras onder elk dorpshuis. Hoogste punt ~16 m.
+- `scripts/render-iso-gamemap.py` maakt die hoogtes (1 m-raster) en rendert het terrein
+  erop: wegen, rivier, erven en bosgrond liggen over de heuvels; een lagere zon laat
+  de hellingen zien, en het gras is in het dal groener en op de toppen droger.
+- Dezelfde hoogtes staan in `ground.json` (`relief`, 2 m-raster in cm). De
+  iso-weergave tilt alles wat op de grond staat erop: soldaten, ruiters, kanonnen,
+  lijken, huizen, bomen, bruggen, rook, vlaggetjes, ringen en de mist. Een klik zoekt
+  het punt op de helling dat je aanwijst.
+- Hellingen naar het noorden blijven onder 30° (steiler zou je vanuit de camera niet
+  meer zien).
+
+## Regimenten: verdedigen, grotere regimenten (open kaart)
+
+`src/systems/combat/regiment-orders-v1.js`, aan met `NRTS_CONFIG.regimentOrders`.
+
+- **Verdedigende houding** (knop **🛡 Verdedig** of toets **V**): een regiment dat stilstaat
+  in linie of carré graaft zich na 4 seconden in: het lijdt dan 30% minder verlies,
+  verliest bijna de helft minder moraal per treffer en herlaadt 15% sneller. Bij een
+  verplaatsing vervalt het voordeel; waar het weer stilstaat bouwt het zich opnieuw op.
+  In de iso-weergave staat er een schild boven het regiment: open terwijl het zich
+  ingraaft, gevuld zodra het ingegraven is. De Britse commandant graaft zijn regimenten
+  in zolang hij verdedigt of hergroepeert.
+- **Loopgraven**: een ingegraven regiment in linie begint 3 seconden later een loopgraaf
+  te graven langs zijn front (ongeveer 25 seconden, onder vijandelijk vuur binnen
+  ~12 m ruim twee keer zo lang). De hele lijn wordt meteen uitgezet en wordt
+  donkerder en dieper naarmate er gegraven wordt; de musketiers leggen hun geweer
+  weg en graven zichtbaar met de spade (Blender-animatie in 6 beelden: steken,
+  intrappen, wrikken, optillen, de aarde naar voren op de wal gooien, terug), elk
+  in zijn eigen tempo, en zakken mee de grond in. De aarden wal komt aan de
+  vijandkant en groeit mee; de officier en tamboer kijken toe. De loopgraaf is een
+  afgeronde kuil (ronde kopse kanten, met de hand gegraven ongelijke rand): je ziet
+  de achterwand met grondlagen naar beneden lopen naar een smallere bodem ~1,1 m
+  diep, de voorwand verbergt de benen van de mannen erin. De wal is een ronde
+  aarden rug die aan de uiteinden afloopt. In een voltooide loopgraaf stapt de
+  voorste rij op de vuurtrede langs de wal (een richel halverwege de diepte) en
+  leunt erop, het geweer over de rug gelegd (en vuurt er ook overheen); de rijen
+  erachter staan dieper, op de bodem. De wanden zijn bekleed met takkenbossen (fascines, Blender-
+  textuur), langs de binnenkant van de wal staan schanskorven (gevlochten manden
+  met aarde) met gaten ertussen voor de musketten, en op een wal die dwars over
+  het scherm loopt ligt een rij zandzakken. Vóór de wal ligt een ondiepe gracht.
+  Dekking geldt alleen tegen vuur van de walkant (binnen ~80° van de richting van
+  de loopgraaf); van opzij of van achteren staan de mannen in het open (alleen de
+  ingegraven-bonus blijft). Ruiterij kan er niet overheen stormen: in de gracht,
+  over de wal en door de loopgraaf gaat een ruiter stapvoets (30% snelheid), zijn
+  charge breekt en hij krijgt 40% meer schade.
+- **Loopgraaf versterken** (knop als je één regiment in een voltooide loopgraaf
+  selecteert): niveau 1 *Veldschans* (gegraven: kuil, wal, gracht; 50% minder
+  verlies van voren), niveau 2 *Bekleed* (120 hout, 10 s: takkenbossen tegen de
+  wanden; 62% minder), niveau 3 *Versterkt* (160 hout + 40 ijzer, 14 s:
+  schanskorven en zandzakken; 72% minder). Het regiment doet het werk zolang het
+  erin blijft staan (zichtbaar aan het graven; takkenbossen en korven verschijnen
+  gaandeweg); loopt het weg, dan wacht het werk. De Britse commandant versterkt
+  zijn eigen loopgraven als hij hout en ijzer over heeft. De tamboer en de officier gaan mee de loopgraaf
+  in, elk aan een uiteinde achter de rijen (al tijdens het graven). Wie in een voltooide
+  loopgraaf staat - van welke kant ook - lijdt 50% minder verlies en verliest nog
+  minder moraal dan alleen ingegraven. In de iso-weergave staan de mannen erin lager,
+  en de wal verbergt hun benen. Een loopgraaf blijft liggen als het regiment vertrekt;
+  elk regiment dat vlak bij een lege voltooide loopgraaf tot stilstand komt, stelt
+  zich erin op - ook bij de tweede of derde keer - front de kant op die de
+  loopgraaf heeft, en gaat in verdedigende houding. Wie wegloopt, laat de loopgraaf
+  los, zodat hij vrij is voor de volgende (of voor hetzelfde regiment). Ook de Britse
+  commandant graaft in waar hij verdedigt.
+- **Richting slepen met een pijl**: met troepen geselecteerd druk je op de plek waar
+  ze heen moeten en sleep je in de richting waar het front naar moet wijzen (één
+  vinger op de telefoon, de rechterknop op de computer). Een gouden pijl toont de
+  frontrichting, met een balk dwars erop waar de linie komt te staan (zo breed als het
+  regiment). Loslaten geeft de order: het regiment marcheert erheen en draait zijn
+  front die kant op; de pijl blijft even staan en vervaagt.
+- **Kanon bemannen** (een kanon heeft 2 musketiers nodig): selecteer een kanon en
+  druk op *Kanon bemannen* (💣) - het haalt zelf 2 man, eerst losse soldaten, anders
+  uit het dichtstbijzijnde regiment (dat houdt altijd minstens 6 musketiers). Of
+  selecteer soldaten (los of een heel regiment) en klik/tik op een eigen onbemand
+  kanon: 2 van hen lopen erheen. Een batterij die een man verloor, vul je op dezelfde
+  manier aan. Het kanon vuurt zodra de bemanning bij het stuk staat.
+- **Loopgraaf bezetten met een klik**: met een regiment geselecteerd klik (of tik)
+  je op een bestaande loopgraaf. Het regiment marcheert erheen, stelt zich in linie
+  langs de loopgraaf op met het front de kant van de loopgraaf op, bezet hem en gaat
+  in verdedigende houding. Selecteer je meer regimenten, dan bezet het eerste de
+  loopgraaf en vormen de andere een tweede linie er vlak achter. Zit er al een eigen
+  regiment in, dan gaan de nieuwe in tweede linie; een vijandelijke loopgraaf
+  aanklikken is gewoon een aanval. Een gewoon verplaatsbevel laat de loopgraaf weer los.
+- **Moraal**: boven elk regiment in zicht een balkje van groen naar rood; een
+  knipperend rood "!" als het wankelt (onder 45), een witte vlag als het merendeel
+  vlucht; een zwaardje en trommel tonen dat officier en tamboer er nog zijn (die
+  houden de moraal op peil).
+- **Flank en rug**: een regiment (niet in carré) dat van opzij geraakt wordt krijgt
+  25% meer schade en 50% meer moraalverlies; van achteren 50% en het dubbele.
+  Bij een cavaleriecharge rekent de charge de flank al mee; het moraalverlies groeit wel.
+- **Artillerie**: kanonskogels vliegen in een boog met een schaduw eronder en
+  stuiteren na de inslag verder, met opspattende aarde en een krater die anderhalve
+  minuut zichtbaar blijft. Een kogel op een loopgraaf beschadigt hem: genoeg
+  treffers en hij zakt een niveau, op niveau 1 ontstaat een bres (veel minder
+  dekking); een kogel naast een schiettoren raakt de toren. Mannen in de loopgraaf
+  herstellen hem zolang ze erin staan.
+- **Tirailleurs** (knop 🌿 bij Formatie): het regiment stelt zich verspreid op (ruim
+  twee keer zo ver uit elkaar), vuurt naar believen en 15% verder, is moeilijk te
+  raken (28% minder, tussen bomen 45% minder), maar ruiterij doet er 70% meer schade.
+  Nog eens drukken (of carré) sluit de gelederen.
+- **Weer** (rechts naast de wind in de bovenbalk): helder, bewolkt, regen en mist
+  wisselen elkaar af (elke 2,5 tot 5 minuten, met een overgang van ~25 s; regen
+  komt uit bewolking). Regen valt schuin met de wind, maakt het beeld donkerder en
+  doorweekt de bodem (in een minuut; drogen duurt vier minuten): natte grond is
+  donkerder met plassen, en wie erover loopt laat sporen achter - voetafdrukken,
+  hoefafdrukken, wielsporen van kanonnen - die vervagen naarmate het opdroogt.
+  In de regen ketsen musketten (tot 30% van de schoten), modder vertraagt (18%,
+  kanonnen 30%) en het zicht is 20% korter; mist legt een waas over het veld en
+  halveert ongeveer het zicht.
+- **Regiment maken** (⚑): selecteer een paar losse soldaten en tik *Regiment maken*:
+  het neemt hen en vult aan met de dichtstbijzijnde vrije musketiers (tot 12, of meer
+  als je er meer koos, tot 36), een officier en een tamboer, stelt ze in linie op
+  naar de vijand en selecteert het regiment. Bij de kazerne staat dezelfde knop
+  (voor de vrije mannen rond het verzamelpunt), *Train ontbrekende* (zet wat er
+  nog mist in de wachtrij) en *Auto-regiment* (aan: de kazerne vormt zelf een
+  regiment bij het verzamelpunt zodra er genoeg vrije mannen zijn). De knop laat
+  zien wat er is (bv. 12/12 · O✓ · T✗) en noemt wat er ontbreekt.
+- **Troepsoorten** (train in de kazerne en de stal, tegen een meerprijs; de Britten
+  hebben ze ook):
+  - *Grenadier* (🎩, uniform met berenmuts): 40% meer leven, 30% sterker met de
+    bajonet, 30% minder moraalverlies — maar 15% trager en duurder (+60 🍞 +30 🪵).
+  - *Voltigeur* (🪶, lichte compagnie): 25% verder schieten, vuurt naar believen, 15%
+    sneller — maar 25% minder leven en zwak van dichtbij (+30 🍞).
+  - *Oude Garde* (🦅, berenmuts met rode bovenlap, rode epauletten): de veteranen
+    van de keizer — 60% meer leven, 50% sterker met de bajonet, 15% treffender,
+    wijken bijna nooit — maar heel duur (+150 🍞 +80 🪵 +30 ⛏️), traag op te leiden
+    en hooguit 24 man.
+  - *Sapeur* (🪓, genie met berenmuts, baard, leren schort en bijl): een regiment
+    sapeurs graaft, versterkt en herstelt loopgraven 3x zo snel — maar 20% zwakker vuur.
+  - *Kurassier* (🛡, stalen kuras en helm met paardenstaart, zwarte paarden): 50% meer
+    leven, het kuras houdt 30% van het musketvuur tegen, 30% zwaardere charge — maar
+    15% trager en kost ijzer.
+  - *Poolse Lansier* (🚩, czapka en lans met rood-witte wimpel): 80% zwaarder tegen
+    infanterie die niet in carré staat en tegen vluchtende troepen — maar 25% zwakker
+    tegen andere ruiters.
+  - *Huzaar* (🐎, bruine paarden): 25% sneller, 40% verder zicht, sneller weer klaar —
+    maar 25% minder leven en een lichtere charge.
+  De Britten werven hun eigen soorten, met Britse namen: *Grenadiers*, *Light
+  Companies* (voltigeurs), *95th Rifles* (groene jassen, Baker-geweer: 60% verder,
+  25% treffender, schiet naar believen, scherpe ogen — maar laadt 60% trager),
+  *Light Dragoons* (huzaren) en de *Scots Greys* (zware dragonders met berenmuts op
+  grijze paarden: 35% meer leven, 40% zwaardere charge — maar 10% trager).
+  - *Kanonnen* (gieterij): naast de gewone *6-ponder* drie stukken, elk met een eigen
+    loop in de iso-weergave:
+    - *12-ponder* (💥, lange zware loop): 35% meer schade en 20% verder — maar 30% trager
+      te verplaatsen, laadt 20% trager en kost extra ijzer.
+    - *Houwitser* (🎇, korte wijde loop schuin omhoog): werpt granaten in een boog, dus
+      loopgraven geven geen dekking, en doet 2,5x schade aan loopgraven en torens —
+      maar 15% minder schade in het open veld en laadt trager.
+    - *Rijdende artillerie* (🏇, licht stuk; bij de Britten *Royal Horse Artillery*):
+      70% sneller, laadt 15% sneller — maar 20% minder schade en minder leven.
+  - *Officier te paard* (🎖, uit de stal): rijdt op het paard van de cavalerie-officier,
+    70% sneller, ziet 30% verder en zijn regiment verliest 15% minder moraal — maar
+    duurder. Een cavalerieregiment kiest een officier te paard als die er is. De Britten
+    hebben ook officieren te paard, 12-ponders, houwitsers en rijdende artillerie.
+  **Eén soort per regiment**: soldaten van verschillende soorten staan nooit samen in
+  een regiment. Kies je een gemengde groep, dan vormt de soort waar de meeste mannen van
+  zijn het regiment; de anderen blijven los, en wat er tot 12 ontbreekt wordt aangevuld
+  met vrije mannen van dezelfde soort in de buurt. *Regiment maken* en *Auto-regiment*
+  werken per soort, *Train ontbrekende* traint de soort van het regiment, en
+  *Versterk regiment* neemt alleen soldaten van de eigen soort op. Ook ruiters
+  (kurassiers, lansiers, huzaren) rijden alleen met hun eigen soort, en de Britten
+  heffen elk regiment als één soort. Een regiment heet naar zijn soort (bv. "Franse
+  Grenadiers 4", "Britse 95th Rifles 7").
+- **Menu onderin**: toont alleen wat bij je selectie past, in groepen met een kopje
+  en een vaste volgorde. Boeren: *Werk* (akker, bouw hervatten) en *Bouwen*
+  (woning, graanakker, kazerne, schiettoren, stal, gieterij). Soldaten: *Bevel*
+  (halt, bajonet/charge, verdedig, loopgraaf versterken), *Formatie* (linie,
+  colonne, carré, draaien) en *Regiment* (maken, versterken, selectie). Een gebouw:
+  *Productie* (trainen, verzamelpunt). Niets geselecteerd: een korte uitleg.
+  De knoppen hebben een eigen stijl: donker gelakt hout met een messingrand,
+  een serif-letter, een icoon boven elk label en een gekleurde bovenrand per groep
+  (Bevel rood, Formatie blauw, Regiment goud, Productie groenblauw, Werk groen,
+  Bouwen bruin); de gekozen formatie licht goud op, wat je niet kunt betalen is
+  grijs met een gestippelde rand.
+- **Schietbereik**: selecteer je soldaten (of artillerie) of een schiettoren, dan
+  ligt hun bereik als een licht geel veld met een duidelijke rand op de grond (het
+  bereik van alle schutters samen; rood bij een vijandelijke selectie). Vijanden
+  binnen dat veld krijgen een rode ring aan hun voeten. Musketiers vuren op de open
+  kaart tot 200 px (het standaardspel houdt 122): wat je in het veld ziet, wordt
+  beschoten, en een marcherende lijn houdt halt zodra er een vijand binnen komt.
+  Mannen in een loopgraaf of een ingegraven linie (verdedigend) vuren naar
+  believen: geladen en een vijand binnen bereik, dan schieten ze meteen, zonder op
+  de gezamenlijke salvo-maat (tot 3 s) te wachten.
+- **Schiettoren**: boeren bouwen hem met de knop **Schiettoren** (260 hout). Een
+  vierkante toren (Blender-model): stenen voet met schietgaten, een uitkragende
+  houten schutterskamer met schietsleuven en musketlopen, een piramidedak en de
+  vlag van de eigen kant. Klaar? Dan vuurt het garnizoen elke ~2,6 s een salvo van
+  2 schoten op de dichtstbijzijnde vijand binnen ~240 px (en zichtbaar), met
+  kruitdamp uit de sleuven. Vanaf de toren zie je ver (zicht 420, hoger op een
+  heuvel). De vijand kan hem beschieten en slopen (1100 HP). De Britse commandant
+  bouwt er na 5 minuten zelf één of twee, aan de kant van de Fransen.
+- **Grotere regimenten**: 12 tot 36 musketiers. "Selecteer nabij" vult aan tot 36, een
+  officier verzamelt alle vrije musketiers in zijn buurt (tot 36), en **Versterk
+  regiment** (één regiment + losse musketiers geselecteerd) voegt ze toe.
+
+## Selecteren en aanwijzen in de iso-weergave
+
+- Een klik op een soldaat gaat vóór het gebouw erachter (soldaten bij de deur van een
+  kazerne staan binnen diens voetafdruk, en gebouwen gingen eerst).
+- Bomen, struiken, rotsen en gebouwen worden aangewezen op hoe ze getekend zijn: een
+  klik op de kroon van een boom of het dak van een gebouw telt (daarvoor kwam de klik op
+  de grond áchter de boom uit). Bij overlap telt wat vooraan staat. Zo is een boer met
+  rechtsklik of tik makkelijk aan het hout, ijzer of een gebouw te zetten.
+- Een Brits regiment in gevecht blijft in linie: kleine verschuivingen van de
+  commandant worden genegeerd, grotere gaan in linie in plaats van via een marskolonne
+  (eerder sprongen regimenten om de paar seconden van linie naar colonne en terug).
+
+## Veldslagen en de Britse AI (open kaart)
+
+`src/systems/ai/campaign-pressure-v1.js`, aan met `NRTS_CONFIG.ai.pressure` (alleen met
+`?view=iso`). Een versneld potje met een passieve speler liet zien dat de Britse
+commandant één keer aanviel en daarna bleef wachten: hij wilde twee volle regimenten,
+zijn boeren bleven op voedsel staan (hout raakte op), de productie wachtte op een stal
+die hij niet kon betalen, losse musketiers vormden nooit een regiment, en soldaten
+konden geen gebouwen beschieten (het snelle doel-zoeken voor grote legers sloeg ze
+over), zodat een hoofdgebouw - en dus de slag - nooit te nemen was. De laag houdt de
+eigen commandant (verzamelen → opmars → aanval → flank) en voegt toe:
+
+- **Aanvalsgolven op de klok**: de eerste na 2,5 minuut, daarna elke 3 minuten (±30 s),
+  ook met één regiment, zodra het leger minstens 80% zo sterk is als het Franse (na
+  2 minuten wachten gaat hij toch). Nieuwe regimenten die thuis worden gevormd, volgen
+  als versterking en houden de aanval niet op.
+- **Gevechten die uitgevochten worden**: een golf vecht door zolang hij niet duidelijk
+  verliest (pas na 12 seconden achter elkaar onder de helft van de vijand ter plekke,
+  en nooit in de eerste 25 seconden), hoogstens 2,5 minuut; dan hergroeperen thuis en
+  de volgende golf. Terugtrekken alleen bij lage moraal én een verloren gevecht ter
+  plekke (eerder keerden kolonnes een vijand die ze aan het verslaan waren de rug toe).
+- **Een onverdedigd hoofdgebouw wordt belegerd** tot het valt; de linie stelt zich
+  binnen musketbereik van de muren op, en gebouwen zijn weer te beschieten (bereik
+  gemeten tot de muur). Een speler die niets doet, verliest na 8 à 13 minuten.
+- **Vluchters vluchten naar huis**, over de dichtstbijzijnde brug als dat over de
+  rivier is (ze bleven tegen de oever of midden tussen de vijand staan), en herstellen
+  zich thuis of waar ze vastlopen buiten schot. Voor beide kanten.
+- **Economie**: 18 boeren in plaats van 10, verdeeld over voedsel en hout naar wat
+  ontbreekt, boeren op de graanakkers als voedsel krap is, en musketiers, officieren
+  en tamboers in opleiding terwijl hij voor een gebouw spaart.
+- `window.__AI_PRESSURE_V1__.stats()`: golven, volgende golf, stand van de commandant
+  en een logboek (`aanvalsgolf 2: 4 regiment(en), 61 man`, `golf 1 afgebroken: …`).
+
+## Rivier en bruggen
+
+- De **rivier** loopt als één band door, boven de wegen en door de heuvels heen
+  (heuvels vlakken af waar rivier en wegen ze doorsnijden): modderige oevers, een
+  lichtere ondiepe rand, dieper water in het midden, een breedte die licht varieert
+  (4,2 m; het doorwaadbare deel van de game is 6,4 m), en riet langs de oevers.
+- **Bruggen** zijn Blender-modellen (`scripts/render-iso-props.py`):
+  - `bridge_stone`: een stenen boogbrug met oplopende opritten tussen vleugelmuren,
+    een zandweg over het dek en borstweringen met dekstenen;
+  - `bridge_wood`: een houten jukbrug op palen in het water, met een plankendek dat
+    aan beide kanten afloopt, randbalken en leuningen.
+  Elk wordt op de lengte van zijn oversteek in de game geschaald.
+- **Mannen op een brug** lopen op het dek: ze worden opgetild (vlak boven het water,
+  langs de opritten omhoog) en na de brug getekend. Klikken op hun lichaam werkt ook
+  daar.
+
+## Dorpen (Blender)
+
+- De dorpshuizen van de game (`VILLAGE_SCENERY_V4`; op de open kaart 54) staan er als Blender-gebouwen:
+  huisje, boerderij (met achtervleugel), schuur, herberg (met vleugel en uithangbord) en
+  kapel (met dwarsschip en vieringtoren), elk in **16 draaihoeken**
+  (`scripts/render-iso-village.py` → `graphics-lab/assets/iso/village/`). De modellen
+  volgen de verhoudingen en vleugels van de 2D-plattegrond van de game.
+- **Variatie:** de helft van de huisjes is witgekalkt onder rode pannen, een deel van de
+  boerderijen is van steen onder leien.
+- **Voordeur naar de weg:** de voorkant wijst naar het toegangspunt van het huis op de
+  weg (op de standaardkaart 194 van de 224 huizen recht voor; de rest aan de zijgevel).
+- **Aankleding** (vast per dorp, vrij van wegen, rivier en muren): een put bij het
+  dorpsplein, hooibergen achter boerderijen en schuren, fruitbomen in de achtertuinen,
+  een heg achter huisjes en een hek achter boerderijen.
+- **Rook** uit de meeste schoorstenen, dun en met de wind mee.
+- Bij het bakken van het terrein worden de platte daken weggeknipt; de tuinen blijven.
+- Dorpshuizen zijn in de game ongeveer een derde van ware grootte naast de soldaten;
+  ze worden 1,6× hun voetafdruk getekend (`VILLAGE_SCALE`). Waar mannen kunnen lopen
+  blijft door de voetafdruk van de game bepaald.
+
+## Overzicht in het gevecht
+
+- Onder elke soldaat, ruiter en elk kanon ligt een **ring in de kleur van zijn kant**
+  (blauw Frans, rood Brits).
+- **Decor wordt doorzichtig** (32%) zodra er een soldaat achter staat: huizen,
+  kazernes, bomen en dorpsaankleding.
+- **Kruitdamp** is kleiner en dunner, zodat je de mannen erdoor blijft zien.
+- **Minder drukte**: dorpshuizen 1,6× hun voetafdruk (was 2×); minder fruitbomen,
+  heggen en hekken.
+- **👁 Overzicht** (knop rechtsboven): decor half doorzichtig, geen dorpsaankleding en
+  geen schoorsteenrook, kruitdamp nog dunner. Ver uitgezoomd (zoom < 0,55) verdwijnen
+  aankleding en schoorsteenrook vanzelf.
+
+## Terrein uit Blender
+
+- `scripts/render-iso-gamemap.py` rendert het hele slagveld (356 × 222 m) in Blender uit
+  `graphics-lab/assets/iso/game/gamemap.json` (geëxporteerd uit de draaiende game met
+  `?view=iso`: 18 wegen, de rivier met 5 bruggen, bossen, heuvels en 54 dorpshuizen): gras met
+  plukjes en bloemen, wegen per klasse met bermen, de rivier (zie boven), donkere bosgrond, het reliëf (zie boven), en
+  een erf met moestuin bij elk huis. Resultaat `ground.jpg` (4978 × 1757, 14 px per
+  meter, met ruimte boven voor de verhoogde noordrand); de iso-weergave tekent alleen het deel dat in beeld is. Zonder die afbeelding
+  valt hij terug op de 2D-kaart.
+- **Wegen** als één wegdek (`RoadField` in het script): voor het hele slagveld wordt op
+  een raster van 25 cm uitgerekend hoe ver elk punt van de dichtstbijzijnde weg ligt
+  (per soort: chaussee of aarden weg), en het wegdek wordt daaruit getekend. Alle
+  wegen vormen zo samen één oppervlak: een **kruispunt is een kruispunt**, geen weg die
+  over een andere ligt; de binnenhoeken zijn afgerond (een zacht minimum van de
+  afstanden) en doodlopende einden rond. Eerst de bermen (uitgesleten, met gras dat
+  naar buiten toe terugkomt), daarover de rijbanen:
+  - chaussee: onregelmatige keien (Voronoi-cellen van ~20 cm, elk een eigen tint, met
+    donkere voegen) - zonder richting, dus geen naad in het patroon op een kruising;
+    grindbermen;
+  - zijweg: aangestampte aarde met twee karrensporen en hier en daar een plas erin; de
+    sporen vervagen waar twee wegen samenkomen;
+  - pad: twee sporen met gras ertussen.
+  Ook de erven en moestuinen bij de huizen lopen zacht uit in het gras.
+- **Bomenlanen**: langs de chaussees staan populieren aan weerszijden, om de 10 m met
+  hier en daar een gat, zoals langs de routes impériales (niet op wegen, bij bruggen,
+  in dorpen, bossen of bij een basis).
+- In de **bossen** van de game staan eiken en populieren als sprites (met open plekken,
+  niet op wegen of in de rivier), en ze worden doorzichtig over soldaten erachter.
+
+## Bediening zoals in het lab
+
+- **Vlaggetjes**: elk geselecteerd regiment toont een vlag op zijn bestemming met een
+  stippellijn vanaf waar het staat, tot het er is.
+- **Kijkrichting**: slepen met rechts (de bestaande order van de game) toont een pijl.
+- **Aanvalsdoel**: rechtsklik (of tik) op een zichtbare vijand: de selectie marcheert naar
+  schootsafstand van die vijand (infanterie 85% van haar bereik, kanonnen 80%, ruiters
+  tot contact) met het front naar hem toe — de eigen loop- en frontorders van de game;
+  het vechten doet de game zelf. Rode stippelringen en een vizier boven de vijand.
+- **Schuiven**: verticaal schuiven met toetsen of één vinger gaat op iso-snelheid.
+
+## Boeren en geluid
+
+- **Boeren** (`scripts/render-iso-roles.py --role worker`): linnen kiel, strohoed,
+  bijl; staan, lopen en hakken (bij een taak) in 8 richtingen (`frw`/`brw`).
+- **Geluid uit het lab** bovenop dat van de game (schoten, kanonnen, trommels): hoeven
+  onder galopperende ruiters, een trompet als ruiters chargeren, gesproken commando's
+  ("Joue! Feu!", "Present! Fire!", "En avant! À la baïonnette!"). Volgt de geluidsknop
+  van de game.
+
+## Schaal
+
+In linie staan de mannen in de game 18 px uit elkaar en in het lab 0,8 m: 1 m is
+22,5 game-pixels. Gebouwen in de game zijn kleiner dan op ware schaal; hun props
+worden op de voetafdruk van het gebouw geschaald.
+
+## Bediening
+
+Alles van de game blijft werken: selecteren, slepen, rechtsklik, formaties, de
+knoppen, touch en sneltoetsen. Tijdens de iso-weergave rekenen `screenToWorld` en
+`worldToScreen` in de iso-projectie. Omdat die alleen de hoogte halveert, blijft een
+kader op het scherm een rechthoek in de wereld. Een klik op het lichaam van een
+soldaat (boven zijn voeten) selecteert hem.
+
+Met de knop **🗺 2D-kaart / 🏰 Iso-weergave** rechtsboven schakel je tussen de twee
+weergaven; terug in 2D begint de terreincache opnieuw.
+
+## Techniek
+
+- `src/systems/rendering/iso-view-v1.js` neemt `renderStableFrameV1` over (het haakje
+  waarmee de game elk frame tekent). Eens per seconde draait ook de 2D-tekenaar mee,
+  met de 2D-projectie, zodat effecten die hij bijhoudt worden opgeruimd. Zijn beeld
+  wordt overgeschilderd.
+- Andere canvaslagen (statisch terrein, GPU-lagen) worden verborgen zolang de
+  iso-weergave aan staat; de minimap blijft.
+- `window.__ISO_VIEW_V1__`: `isOn()`, `setOn(bool)`, `stats()` (getekende eenheden,
+  sprites, props, tegels, lijken, rook, tekentijd), `screenOf(x,y)`, `bodyOf(unit)`.
+- Test: `tests/iso-view-v1.spec.js` (ook: de standaardkaart blijft 37 wegen en 224
+  huizen; open kaart; mannen op het brugdek).
+
+## Nieuwe slag en mobiele startcamera
+
+- **Nieuwe slag** begint ook met een verse Britse commandant en aanvalsgolfplanning.
+  De knop roept de huidige resetfunctie aan, zodat ook later geladen systemen
+  (zoals loopgraven en gewonden) hun vorige slag opruimen.
+  Ook oude gesneuvelden, kruitrook en animatietoestanden verdwijnen uit de iso-weergave.
+- Op een telefoon past de startcamera het hoofdgebouw en de eigen troepen samen
+  tussen de bedieningsbalken. Dit gebeurt bij het openen en bij een nieuwe slag;
+  tijdens het spelen blijft de camera waar de speler hem heen verplaatst.
+  In het mobiele menu schuift **Overzicht** opzij zodat **Nieuwe slag** bereikbaar blijft.
+- Regressies: `tests/iso-reset-v1.spec.js` en `tests/iso-start-camera-v1.spec.js`.
+  Bestaande besturing, desktopcamera en de 2D-route blijven behouden.
+
+## Nog niet (volgende stappen)
+
+1. De grond opnieuw renderen als de kaart van de game verandert (export + script).
+2. Tekenen via de GPU voor 520 eenheden op zwakke telefoons.
+3. Hoogte in het spel zelf: hoogte geeft verder zicht, maar heuvels blokkeren het zicht
+   (nog) niet en het schootsveld houdt er geen rekening mee.
+
+## Granaten, gesneuvelden, gewonden en het veldhospitaal
+
+- **Granaten** (`grenades-v1.js`): grenadiers en de Oude Garde steken binnen 45-135 px
+  van de vijand een handgranaat aan en werpen die in een boog (een sissend lontje in
+  de vlucht). Waar hij neerkomt barst hij: een steekvlam, rook, een knal en een
+  schroeiplek die in een minuut vervaagt. Alle vijanden binnen 46 px lopen schade
+  en schrik op (minder naarmate ze verder staan), ook in een loopgraaf - een granaat
+  valt erin. Elke man gooit hooguit eens per ~16 s.
+- **Gesneuvelden** liggen in een bloedplas die in een paar seconden uitvloeit.
+- **Gewonden** (`medics-v1.js`): van de gevallen musketiers, officieren en tamboers
+  is bijna de helft gewond in plaats van dood. Ze liggen waar ze vielen, bloedend,
+  met een klein wit teken. Haalt niemand hen, dan bloeden ze na 90 s dood.
+- **Veldhospitaal** (⛺, 180 🪵 60 🍞, een "ambulance" naar Larrey: linnen tenten, een
+  ambulancekar, brancards en de vlag): twee brancardteams - twee dragers en een
+  brancard - halen de gewonden van hun kant op, de dichtstbijzijnde eerst, en dragen
+  ze naar het hospitaal. Daar herstellen ze in 45 s en gaan ze terug naar hun eigen
+  regiment (als dat nog bestaat, van hun soort is en plaats heeft; anders wachten ze
+  vrij bij het hospitaal). Zonder bevolkingsruimte wachten ze tot er plaats is. De
+  dragers vechten niet en worden niet beschoten. De Britten zetten na een paar
+  minuten hun eigen hospitaal achter hun hoofdgebouw.
+
+## Prestaties bij grote veldslagen
+
+Gemeten met een veldslag van ruim 330 eenheden (12 regimenten, 4 ruiterregimenten,
+8 kanonnen) in de iso-weergave:
+
+| | voor | na |
+|---|---|---|
+| frame | 112 ms | 72 ms |
+| simulatie per frame | 33 ms | 19 ms |
+| zichtbaarheid per frame | 11,4 ms | 0,5 ms |
+
+- **Zichtbaarheid** (`visibility-cache-v1.js`): "kan Frankrijk dit zien?" werd per
+  Britse eenheid meerdere keren per frame gevraagd en liep elke keer alle Franse
+  eenheden af. Nu staan de Franse waarnemers één keer per spelmoment in een raster;
+  een vraag kijkt alleen naar de cellen eromheen, en het antwoord blijft dat moment
+  bewaard. Dezelfde antwoorden (getest), en de verkenning onthoudt nog steeds waar ze
+  de vijand het laatst zag. Het zichtbereik per eenheid wordt ook per moment bewaard.
+- **Zichtlijnen**: of een punt in het bos ligt, wordt per cel van 12 px onthouden
+  (bossen bewegen niet) in plaats van elke stap het hele terrein (rivieren, wegen)
+  opnieuw te vragen.
+- **Ringen onder de eenheden**: in één pad per kant getekend in plaats van één per man.
+- **Mist**: het masker met zijn golvende rand wordt 3-5 keer per seconde opnieuw
+  gemaakt (was 5-8, overvloeiend dus even vloeiend), en het teruglezen van de pixels
+  laat de grafische chip niet meer wachten (`willReadFrequently`).
+- **Alleen de iso-weergave**: het spel heeft geen 2D-kaart meer. De knop "2D-kaart" is
+  weg, en de 2D-renderer draait ook niet meer verborgen mee (hij tekende eens per
+  seconde een volledig 2D-beeld met 2D-mist, wat elke seconde een hapering gaf). Zijn
+  effectlijsten hebben elk een maximum en verkennen hoort bij de simulatie, dus er
+  hoeft niets voor te tekenen. Wie de gewone link opent (zonder `?view=iso`) komt
+  meteen in de iso-weergave; alleen geautomatiseerde browsers (de testset) krijgen
+  nog de oude 2D-pagina. De resolutie blijft altijd scherp.
+
+## Boerenwerk, bouwen in fasen, begroeiing en wild
+
+- **Boeren aan het werk** (`render-iso-roles.py`, atlas `frw`/`brw`): naast lopen en
+  hout hakken heeft de boer drie nieuwe animaties in 8 richtingen. Op de akker (of bij
+  een bessenstruik) werkt hij voorovergebogen met de schoffel tussen de gewassen; bij
+  ijzererts slaat hij met de houweel op de steen; bij een bouwplaats timmert hij met
+  een hamer. Hij kijkt daarbij naar waar hij aan werkt.
+- **Bouwen in fasen**: een gebouw dat nog gebouwd wordt, begint als uitgezet stuk kale
+  grond met paaltjes, hout en steen ernaast. Daarna rijst het van onder naar boven op
+  (de lijn volgt het gebouw zelf, niet de lege rand van het plaatje), met een steiger
+  van palen en een plankier op de hoogte waar gewerkt wordt; erboven een vage omtrek
+  van wat het wordt. De voorraad hout en steen raakt op naarmate het gebouw groeit.
+- **Begroeiing** (`render-iso-props.py`): beuk, berk, grove den, spar, wilg, meidoorn,
+  hazelaar en varens naast eik, populier en struik. Elk bos heeft een eigen menging
+  (loofbos, naaldbos of gemengd) met ondergroei van varens, hazelaar en meidoorn;
+  langs de rivier staan wilgen en een enkele berk; in het open veld her en der een
+  struik, een boom of een varenpol. Houtbronnen hebben verschillende boomsoorten en
+  de helft van de bessenstruiken is een meidoorn.
+- **Wild** (`wildlife-v1.js`, `render-iso-wildlife.py`, instelling `wildlife`): kleine
+  roedels edelherten (een bok met gewei en hindes) aan de bosranden en konijnen in de
+  weiden. Ze grazen, kijken rond en zwerven over hun eigen stuk grond. Komen er
+  mannen te dichtbij, of vallen er schoten of granaten in de buurt, dan slaat het
+  hele roedel op de vlucht (herten in sprongen, konijnen huppelend), weg van het
+  gevaar en nooit door de rivier, en komt verderop weer tot rust. Het wild is
+  alleen decor: er wordt niet op geschoten en het houdt niemand tegen. Je ziet het
+  alleen waar Frankrijk zicht heeft.
+
+## Regenbuien en sporen (v1.4.3)
+
+Een nieuwe slag begint helder. Rond 1:20 speeltijd trekt bewolking binnen; rond
+1:45 begint de eerste natuurlijke regenbui. Een bui duurt 65–100 spelseconden,
+met vervolgens 150–240 seconden zonder een nieuwe bui. Overgangen duren 15
+seconden. Wind stuurt de bestaande regendruppels aan; de bestaande effecten op
+zicht, modder en kruit blijven behouden. Buien en opdrogen volgen de
+simulatieklok; tijdens pauze verandert de weertoestand niet. De weergave gebruikt
+geen nieuwe afbeeldingen of GPU-contexten.
+
+Op vochtige grond verschijnen schoenafdrukken met afwisselend linker- en
+rechtervoet. Paarden en officieren te paard laten groepjes hoefijzerafdrukken
+achter; kanonnen behouden hun dubbele wielsporen. De grond blijft na de bui nat,
+en de afdrukken vervagen geleidelijk (levensduur 90–240 seconden, afhankelijk
+van het vocht). Stilstaande eenheden maken geen extra afdrukken. Beweging op
+brugdekken, in loopgraven en van ongeziene eenheden tekent geen modderspoor op
+het terrein. De sporen liggen op het reliëf, onder soldaten, gebouwen en mist.
+
+`wet-tracks-v1.js` bewaart maximaal 2600 afdrukgroepen in een ringbuffer en
+verwerkt hoogstens vier stappen per waargenomen eenheid per frame. Grote
+sprongen worden overgeslagen. Kleine vooraf opgebouwde vectorvormen volgen de
+acht looprichtingen; zichtbare afdrukken worden in maximaal vijftien vulacties
+per frame samengevoegd. Er zijn geen aparte canvassen of textures per afdruk.
+Dezelfde spoorpaden worden hergebruikt zolang camera, afdrukken en
+vervaging gelijk zijn. Verlopen afdrukken worden ook zonder nieuw verkeer
+opgeruimd. Nieuwe slag wist
+zowel sporen als weerklokken en start de weerreeks opnieuw. Schieten heeft een
+eigen toevalsstroom en verschuift de data van regenbuien niet.
+
+Diagnose: `__WEATHER_V1__.state()` bevat regen, vocht en `nextRainAt`;
+`__ISO_VIEW_V1__.stats()` bevat `rainDrops`, `tracks`, `trackDrawCalls` en
+`wetTracks`, `trackCacheBuilds` en `trackCacheReuses`;
+`__ISO_VIEW_V1__.tracks()` geeft een kopie van de afdrukgegevens.
+Tests: `tests/headless/weather-showers-v143.test.js`,
+`tests/headless/wet-tracks-v143.test.js` en `tests/iso-rain-tracks-v143.spec.js`.
+
+## Dag en nacht (v1.4.4)
+
+De isometrische slag heeft een visuele dagcyclus van 600 spelseconden, beginnend
+om 08:00. Avond begint na 225 seconden (17:00), nacht na 300 seconden (20:00),
+zonsopkomst na 525 seconden (05:00) en na 600 seconden is het opnieuw 08:00.
+Bewolking en regen hebben hun eigen tijdschema en blijven tegelijk werken.
+
+`day-night-v1.js` berekent de toestand uitsluitend uit de bestaande simulatieklok.
+Bij stilstaande speeltijd blijft ook de tijd van de dag gelijk; een nieuwe slag
+begint weer op dag 1 om 08:00. De klok staat op desktop bij de spelnaam en op
+telefoons onder de resourcebalk. Bij het openen van het mobiele menu schuift hij
+onder de overzichtsknop, zodat Nieuwe slag bereikbaar blijft. Tekst en tooltip
+verversen alleen wanneer de getoonde tijd of fase verandert.
+
+Zonsopkomst en zonsondergang gebruiken vloeiende interpolatie met geleidelijke
+hellingen. Warme schemering en blauw maanlicht worden gecombineerd tot maximaal
+één transparante kleurlaag over het bestaande beeld, inclusief mist en regen.
+Overdag wordt geen kleurlaag getekend. De nacht behoudt ruim voldoende helderheid
+om troepen en terrein te herkennen; de DOM-bediening en het sleepkader/de
+richtingspijl blijven op hun gewone helderheid. Resolutie, afbeeldingen,
+GPU-contexten en terrein-/spoorcaches veranderen niet. Er komen geen canvassen,
+textures, deeltjes of afzonderlijke lampen bij. Spelregels, zicht, AI en schade
+blijven gelijk.
+
+Config: `NRTS_CONFIG.dayNight` (`cycleSeconds`, `startHour`, `nightOpacity`,
+`twilightOpacity`). Diagnose: `__DAY_NIGHT_V1__.state()`, `.at(spelseconden)` en
+`__ISO_VIEW_V1__.stats().dayNight` / `.dayNightDraws`. Het systeem bewaart alleen
+de laatste berekende toestand, zonder een oplopende geschiedenis.
+
+`tests/headless/day-night-v144.test.js` controleert fases, periodiciteit,
+continuïteit, klok/reset en isolatie van de gewone 2D-game.
+`tests/iso-day-night-v144.spec.js` controleert de exacte kleurcompositie en het
+terugkeren van hetzelfde dagbeeld, ongewijzigde eenheden/weer/zicht, mobiele
+indeling, tijd/reset, nachtelijke selectie/marsorders en regen/sporen op zowel
+Canvas2D als de desktop-GPU.
+
+## Vier seizoenen (v1.4.5)
+
+De isometrische slag begint in de lente. Elk seizoen duurt 240 spelseconden;
+een jaar duurt 960 seconden. In de laatste 45 seconden lopen de grondkleuren
+geleidelijk over naar het volgende seizoen. Lente en zomer houden hun groene
+bomen; de zomer krijgt warmere grond. In de herfst kleuren loofbomen, hagen en
+struiken koperbruin, terwijl dennen en sparren groen blijven. Winter brengt
+lichte sneeuw op de grond en boomkruinen. Bomen veranderen op vaste, gespreide
+momenten binnen de overgang, zodat niet het hele bos tegelijk omslaat.
+
+De seizoensklok volgt uitsluitend de simulatieklok en staat los van de bestaande
+dag/nachtcyclus. De compacte klok toont het seizoen op een tweede regel op
+telefoons. Nieuwe slag begint weer in de lente, op dag 1 om 08:00, en ruimt
+oude kleurvarianten en afdrukken op.
+
+De bestaande buien blijven hun tijdschema volgen. Richting winter gaan hun
+regendruppels over in langzamer vallende sneeuwvlokken; richting lente wordt het
+weer regen. Het totale aantal neerslagdeeltjes blijft gelijk aan het bestaande
+regenbudget. Op sneeuw worden plassen en natte-grondverdonkering teruggenomen;
+schoen-, hoef- en wielsporen blijven ook bij droog weer zichtbaar. Spelregels,
+kaartbotsingen, gebouwen, grondstoffen, AI en eenheidsstatistieken veranderen niet.
+
+`seasons-v1.js` berekent de toestand en de vaste boomverdeling. Het landschap
+krijgt hoogstens één extra kleurvulling per frame, onder eenheden en gebouwen.
+`seasonal-props-v1.js` verandert alleen groene bladerpixels van gedeelde
+plantafbeeldingen. De originele alpha, stam, schaduwen, afmetingen en dieptevolgorde
+blijven behouden. De kleurcache is maximaal 12 MiB; er wordt hoogstens één
+plantafbeelding per frame voorbereid. De bestaande cache voor geschaalde sprites
+en de bestaande GPU-batches blijven in gebruik. Er worden geen extra bestanden
+of afzonderlijke varianten per boom geladen.
+
+Config: `NRTS_CONFIG.seasons` (`seasonSeconds`, `transitionSeconds`,
+`paletteBudgetMiB`). Diagnose: `__SEASONS_V1__.state()` / `.at(spelseconden)`,
+`__SEASONAL_PROPS_V1__.stats()` en `__ISO_VIEW_V1__.stats()` (`seasons`,
+`seasonGroundDraws`, `seasonalProps`, `snowFlakes`, `precipitationParticles`).
+De seizoensmodule bewaart alleen de laatste berekende toestand.
+
+Tests: `tests/headless/seasons-v145.test.js` controleert periodiciteit,
+overgangen, winterdekking en stabiele boomkleuren. `tests/iso-seasons-v145.spec.js`
+controleert vier verschillende beelden en hetzelfde lentebeeld na een jaar,
+ongewijzigde wereld en weer, sneeuw en afdrukken, mobiele indeling/reset,
+alpha-/stam-/schaduwbehoud, cachegrenzen en de desktop-GPU. De dag/nachttests
+zetten de afzonderlijke seizoensklok vast op lente om de exacte lichtcompositie
+onafhankelijk te blijven controleren; seizoensbeelden worden juist met vast
+daglicht vergeleken.

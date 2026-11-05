@@ -9,7 +9,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const read = relative => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 
 test('v1.2 loads the large-army performance authority after gameplay/render authorities', () => {
-  const html = read('index.html');
+  const html = read('play.html');
   const perf = html.indexOf('src/systems/performance/large-army-v1.js');
   const characters = html.indexOf('src/systems/rendering/characters.js');
   const movement = html.indexOf('src/systems/movement/stuck-recovery-v1.js');

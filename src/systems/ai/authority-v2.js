@@ -30,7 +30,7 @@
 
     if(complete('barracks').length){
       if(free('infantry').length<12&&aiQueue('infantry','barracks'))return'infantry';
-      if(!free('officer').length&&aiQueue('officer','barracks'))return'officer';
+      if(!free('officer').some(u=>officerCanLead(u,'infantry'))&&aiQueue('officer','barracks'))return'officer';
       if(!free('drummer').length&&aiQueue('drummer','barracks'))return'drummer';
       if(typeof aiTryFormRegiment==='function'&&aiTryFormRegiment())return'regiment';
     }
@@ -49,7 +49,7 @@
     const desiredRegs=cfg.desiredInfantryRegiments??4;
     if(activeRegiments('britain').filter(r=>groupKindV06(r)==='infantry').length<desiredRegs&&complete('barracks').length){
       if(free('infantry').length<12&&aiQueue('infantry','barracks'))return'reinforcement-infantry';
-      if(!free('officer').length&&aiQueue('officer','barracks'))return'reinforcement-officer';
+      if(!free('officer').some(u=>officerCanLead(u,'infantry'))&&aiQueue('officer','barracks'))return'reinforcement-officer';
       if(!free('drummer').length&&aiQueue('drummer','barracks'))return'reinforcement-drummer';
       if(typeof aiTryFormRegiment==='function'&&aiTryFormRegiment())return'reinforcement-regiment';
     }

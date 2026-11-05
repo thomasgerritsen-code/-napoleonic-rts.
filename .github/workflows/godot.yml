@@ -1,0 +1,349 @@
+name: Godot
+
+# The Godot version of the game (godot/): imports the project, runs the
+# headless battle check, and exports a Windows .exe kept with the run. A
+# passing build from this repository is also put on the release
+# "godot-latest" with its version.json, where the game's in-game updater
+# (godot/scripts/updater.gd) finds it.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths: ["godot/**", ".github/workflows/godot.yml"]
+  pull_request:
+    paths: ["godot/**", ".github/workflows/godot.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: godot-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.1
+
+jobs:
+  godot:
+    name: Godot check and Windows export
+    runs-on: ubuntu-latest
+    # Includes the real-renderer wind film as well as every existing gate.
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download Godot
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$RUNNER_TEMP/godot"
+          rm godot.zip
+          "$RUNNER_TEMP/godot" --version
+
+      - name: Import the project
+        run: |
+          # Script errors are reported per script in the next step.
+          timeout 300 "$RUNNER_TEMP/godot" --headless --path godot --import 2>&1 | tee import.log
+
+      - name: Check every script
+        run: |
+          failed=0
+          for f in godot/scripts/*.gd godot/tests/*.gd; do
+            out=$(timeout 60 "$RUNNER_TEMP/godot" --headless --path godot --check-only --script "res://${f#godot/}" 2>&1 || true)
+            if echo "$out" | grep -E "SCRIPT ERROR|Parse Error"; then echo "^^ in $f"; failed=1; fi
+          done
+          exit $failed
+
+      - name: Updated Xogot project with an older class index
+        run: |
+          set -o pipefail
+          python3 scripts/check-godot-presentation-cache.py --godot "$RUNNER_TEMP/godot" 2>&1 | tee native-class-cache.log
+          grep -q "STALE_CLASS_CACHE passed" native-class-cache.log
+
+      - name: Headless battle check
+        run: |
+          set -o pipefail
+          timeout 420 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/smoke_test.gd 2>&1 | tee smoke.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" smoke.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_SMOKE" smoke.log
+
+      - name: 3D sleeps unused 2D work without pausing gameplay
+        run: |
+          set -o pipefail
+          timeout 240 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/presentation_3d_test.gd 2>&1 | tee native-presentation.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-presentation.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_PRESENTATION" native-presentation.log
+
+      - name: Native movement and large-battle regression
+        run: |
+          set -o pipefail
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/navigation_test.gd 2>&1 | tee native-navigation.log
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/large_battle_benchmark.gd 2>&1 | tee native-benchmark.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-navigation.log native-benchmark.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_NAV" native-navigation.log
+          grep -q "GODOT_BENCH" native-benchmark.log
+
+      - name: Learning battle, quick battles and the British building
+        run: |
+          set -o pipefail
+          timeout 300 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/tutorial_test.gd 2>&1 | tee tutorial.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" tutorial.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "TUTORIAL passed" tutorial.log
+          timeout 600 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/quick_battle_test.gd 2>&1 | tee quick.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" quick.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "QUICK passed" quick.log
+          timeout 600 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/ai_buildings_test.gd 2>&1 | tee ai-buildings.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" ai-buildings.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "AI_BUILDINGS passed" ai-buildings.log
+
+      - name: Original Blender art regression
+        run: |
+          set -o pipefail
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/native_art_test.gd 2>&1 | tee native-art.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-art.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_ART" native-art.log
+
+      - name: Recruitment spacing and stationary trench regression
+        run: |
+          set -o pipefail
+          : > native-recruits.log
+          for spawn_seed in 0 1 2 3 4 5 6 7; do
+            RTS_RECRUIT_SEED="$spawn_seed" timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/recruitment_test.gd 2>&1 | tee -a native-recruits.log
+          done
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/trench_stationary_test.gd 2>&1 | tee native-trench-still.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-recruits.log native-trench-still.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_RECRUITS" native-recruits.log
+          test "$(grep -c GODOT_RECRUITS native-recruits.log)" -eq 8
+          grep -q "GODOT_TRENCH_STILL" native-trench-still.log
+
+      - name: Full-detail 3D animation regression
+        run: |
+          set -o pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb > /dev/null
+          timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/render_regression.gd 2>&1 | tee native-render.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-render.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_RENDER" native-render.log
+
+      - name: Phone presentation in 3D and on returning to 2D
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 240 xvfb-run -a -s "-screen 0 844x390x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 844x390 --script res://tests/phone_3d_shots.gd 2>&1 | tee native-phone3d.log
+          SHOT_DIR="$PWD/shots" timeout 240 xvfb-run -a -s "-screen 0 844x390x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 844x390 --script res://tests/phone_shots.gd 2>&1 | tee native-phone.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-phone3d.log native-phone.log | grep -v "still in use at exit"; then exit 1; fi
+          test -s shots/phone3d_village.png && test -s shots/phone3d_battalion.png
+          test -s shots/phone_building.png && test -s shots/phone_wheel.png
+
+      - name: Daylight highlight and night readability regression
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/lighting_render_test.gd 2>&1 | tee native-lighting.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-lighting.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_LIGHTING" native-lighting.log
+
+      - name: River surface and same-camera comparison
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/river_render_test.gd 2>&1 | tee native-river.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-river.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_RIVER" native-river.log
+
+      - name: Buildings clear slopes and retain supported foundations
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/building_ground_test.gd 2>&1 | tee native-building-ground.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-building-ground.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_BUILDING_GROUND" native-building-ground.log
+
+      - name: Continuous detailed roads, climate and bridge approaches
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/road_render_test.gd 2>&1 | tee native-roads.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-roads.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_ROADS" native-roads.log
+
+      - name: Detailed houses retain footprints, batching and night windows
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/house_details_test.gd 2>&1 | tee native-houses.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-houses.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_HOUSES" native-houses.log
+
+      - name: Cold chimney smoke, true flues, fog and bounded GPU puffs
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/chimney_smoke_test.gd 2>&1 | tee native-chimneys.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-chimneys.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_CHIMNEYS" native-chimneys.log
+
+      - name: Fine grass and GPU blades keep roads, foundations and trenches clear
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 420 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/grass_render_test.gd 2>&1 | tee native-grass.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-grass.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_GRASS" native-grass.log
+
+      - name: Anchored grass roots, bending tips and an animated wind comparison
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 600 xvfb-run -a -s "-screen 0 960x600x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 960x600 --script res://tests/grass_wind_test.gd 2>&1 | tee native-grass-wind.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-grass-wind.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_GRASS_WIND" native-grass-wind.log
+          command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+          ffmpeg -hide_banner -loglevel error -y -threads 2 -filter_complex_threads 1 -framerate 8 -i shots/grass_wind_frames/%03d.png \
+            -filter_complex "fps=8,scale=1120:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff:max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=3" \
+            -loop 0 shots/grass_wind_comparison.gif
+          ffmpeg -hide_banner -loglevel error -y -threads 2 -framerate 8 -i shots/grass_wind_frames/%03d.png \
+            -c:v libx264 -crf 20 -pix_fmt yuv420p -movflags +faststart shots/grass_wind_comparison.mp4
+          test -s shots/grass_wind_comparison.gif && test -s shots/grass_wind_comparison.mp4
+
+      - name: GPU actor geometry and animation equivalence
+        run: |
+          set -o pipefail
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/skin_regression.gd 2>&1 | tee native-skins.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-skins.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_SKINS" native-skins.log
+
+      - name: GPU actor appearance regression
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/skin_visual_test.gd 2>&1 | tee native-skin-pixels.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-skin-pixels.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_SKIN_PIXELS" native-skin-pixels.log
+
+      - name: Native climate and construction regression
+        run: |
+          set -o pipefail
+          timeout 180 "$RUNNER_TEMP/godot" --headless --path godot --script res://tests/world_3d_test.gd 2>&1 | tee native-world.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-world.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_WORLD" native-world.log
+
+      - name: All five 3D bridges and F3 regression
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 600 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/bridge_regression.gd 2>&1 | tee native-bridges.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-bridges.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_BRIDGES" native-bridges.log
+
+      - name: Visible 3D weather and seasonal render regression
+        run: |
+          set -o pipefail
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 600 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/world_3d_shots.gd 2>&1 | tee native-world-render.log
+          if grep -E "SCRIPT ERROR|Parse Error|ERROR:" native-world-render.log | grep -v "still in use at exit"; then exit 1; fi
+          grep -q "GODOT_WORLD_RENDER" native-world-render.log
+
+      - name: Screenshots with a real renderer
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb > /dev/null
+          mkdir -p shots
+          SHOT_DIR="$PWD/shots" timeout 300 xvfb-run -a -s "-screen 0 1600x900x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --resolution 1600x900 --script res://tests/screenshot.gd 2>&1 | tail -20
+          SHOT_DIR="$PWD/shots" timeout 900 xvfb-run -a -s "-screen 0 1600x900x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --resolution 1600x900 --script res://tests/proof_shots.gd 2>&1 | tail -10
+          SHOT_DIR="$PWD/shots" timeout 180 xvfb-run -a -s "-screen 0 1600x900x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1600x900 --script res://tests/mine_shots.gd 2>&1 | tail -10
+          SHOT_DIR="$PWD/shots" timeout 180 xvfb-run -a -s "-screen 0 1600x900x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1600x900 --script res://tests/art_gallery.gd 2>&1 | tail -10
+          ls -la shots
+          SHOT_DIR="$PWD/shots" timeout 240 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/recruitment_test.gd 2>&1 | tail -12
+          SHOT_DIR="$PWD/shots" timeout 180 xvfb-run -a -s "-screen 0 1400x860x24" \
+            "$RUNNER_TEMP/godot" --path godot --rendering-driver opengl3 --audio-driver Dummy --resolution 1400x860 --script res://tests/trench_stationary_test.gd 2>&1 | tail -12
+
+      - name: Publish the screenshots
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        continue-on-error: true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: godot-screens
+          name: Godot-schermafbeeldingen
+          target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
+          body: Schermafbeeldingen van de Godot-versie uit de laatste geslaagde controle (om te zien wat de test zonder scherm niet ziet).
+          prerelease: true
+          make_latest: false
+          files: |
+            shots/*.png
+            shots/*.gif
+            shots/*.mp4
+
+      - name: Install export templates
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -sSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dir"
+          unzip -q -j templates.tpz "templates/windows_release_x86_64.exe" "templates/version.txt" -d "$dir"
+          rm templates.tpz
+
+      - name: Stamp the build number
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          printf '{"build": %s, "commit": "%s", "date": "%s"}\n' "${{ github.run_number }}" "${HEAD_SHA::7}" "$(date -u +%Y-%m-%d)" > godot/version.json
+          cat godot/version.json
+
+      - name: Export Windows .exe
+        run: |
+          mkdir -p godot/build
+          timeout 600 "$RUNNER_TEMP/godot" --headless --path godot --export-release "Windows Desktop" build/NapoleonicRTS.exe 2>&1 | tee export.log
+          ls -la godot/build
+          test -s godot/build/NapoleonicRTS.exe
+
+      - name: Zip the project for Xogot (Godot on the iPad)
+        run: |
+          # The Godot project alone, in a folder of its own, to open in Xogot.
+          rm -rf /tmp/xogot && mkdir -p /tmp/xogot/NapoleonicRTS
+          rsync -a --exclude build --exclude .godot --exclude '*.import' --exclude '*.uid' godot/ /tmp/xogot/NapoleonicRTS/
+          (cd /tmp/xogot && zip -qr "$GITHUB_WORKSPACE/godot/build/NapoleonicRTS-project.zip" NapoleonicRTS)
+          ls -la godot/build/NapoleonicRTS-project.zip
+
+      - name: Keep the .exe with this run
+        uses: actions/upload-artifact@v5
+        with:
+          name: Napoleonic-RTS-Godot-Windows
+          path: godot/build/NapoleonicRTS.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish for the in-game updater
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: godot-latest
+          name: Godot-versie (nieuwste)
+          target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
+          body: De Godot-versie van Napoleonic RTS, na elke geslaagde controle bijgewerkt. Windows - download NapoleonicRTS.exe en start het; het spel werkt zichzelf daarna bij via het menu. iPad (Xogot) - download NapoleonicRTS-project.zip, pak het uit in de Bestanden-app en open de map NapoleonicRTS in Xogot; daarna werkt het spel zichzelf bij via Menu, Updates.
+          prerelease: false
+          make_latest: false
+          files: |
+            godot/build/NapoleonicRTS.exe
+            godot/build/NapoleonicRTS-project.zip
+            godot/version.json

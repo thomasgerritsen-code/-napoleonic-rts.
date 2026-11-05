@@ -49,7 +49,8 @@ function expectSafeLocalBerries(state) {
     expect(base.blockedApproaches).toBe(0);
   }
   expect(state.visibleFrenchCount).toBeGreaterThanOrEqual(3);
-  expect(state.renderVersion).toContain('local-berry-2d-overlay');
+  // The renderer's version string no longer names this pass (45135c5); the
+  // explicit pass and its draw counters below are the real check.
   expect(state.explicit2DPass).toBe(true);
   expect(state.render?.localVillageBerryDraws || 0).toBeGreaterThan(0);
   expect(state.render?.localOverlayFrames || 0).toBeGreaterThan(0);

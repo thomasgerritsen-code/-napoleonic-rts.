@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const {test,expect}=require('@playwright/test');
 
 test('v306 GPU batches exact 2D trees, berry bushes and iron stones without repeated uploads',async({page})=>{
@@ -44,7 +45,7 @@ test('v306 GPU batches exact 2D trees, berry bushes and iron stones without repe
       deadExcluded,localExcluded,version:window.RTS_VERSION,
       natural:!!nat.offscreenSpriteSource};
   });
-  expect(result.version).toBe('1.3.54');
+  expect(result.version).toBe(currentReleaseVersion);
   expect(result.natural).toBe(true);
   expect(result.deadExcluded).toBe(true);
   expect(result.localExcluded).toBe(true);

@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const { test, expect } = require('@playwright/test');
 
 test('desktop 2D terrain uses GPU textures without re-uploading on a short camera pan', async ({ page }) => {
@@ -30,7 +31,7 @@ test('desktop 2D terrain uses GPU textures without re-uploading on a short camer
       mainVisible:getComputedStyle(document.getElementById('game')).display!=='none',
       currentVersion:window.RTS_VERSION};
   });
-  expect(result.currentVersion).toMatch(/^1\.3\.\d+$/);
+  expect(result.currentVersion).toBe(currentReleaseVersion);
   expect(result.mainVisible).toBe(true);
   expect(result.tileFirst.misses).toBeGreaterThan(0);
   expect(result.tileSecond.misses).toBe(result.tileFirst.misses);
