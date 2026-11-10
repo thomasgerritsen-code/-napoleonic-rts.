@@ -551,6 +551,37 @@
       ctx.drawImage(image, -prop.pivot.x * k, -prop.pivot.y * k, prop.w * k, prop.h * k);
       ctx.restore(); view.stats.props++; view.stats.fallingTrees++; } };
   }
+  // The trees in a grid of world cells, so a frame looks only at the cells the
+  // screen can show (with woodTreeDrawable's margins and the highest relief),
+  // not at every tree of the map. Rebuilt when the trees are.
+  const TREE_CELL = 320;
+  let treeGrid = null;
+  function treesInView() {
+    const trees = view.woodTrees || [];
+    if (!trees.length) return trees;
+    if (!treeGrid || treeGrid.trees !== trees) {
+      const cells = new Map();
+      for (const tr of trees) {
+        const key = Math.floor(tr.x / TREE_CELL) + ',' + Math.floor(tr.y / TREE_CELL);
+        let c = cells.get(key); if (!c) cells.set(key, c = []); c.push(tr);
+      }
+      let top = 0; const R = view.relief;
+      if (R) for (const h of R.cm) if (h > top) top = h;
+      treeGrid = { trees, cells, top: top / 100 * PPM, out: [] };
+    }
+    const W = frameWidth || innerWidth, H = frameHeight || innerHeight, zz = z(), out = treeGrid.out;
+    out.length = 0;
+    // woodTreeDrawable keeps X in [-150, W + 150] and Y in [-30, H + 260]; a
+    // tree stands its ground height (at most `top`) higher than flat ground.
+    const x0 = camera.x + (-150 - W / 2) / zz, x1 = camera.x + (W + 150 - W / 2) / zz;
+    const y0 = camera.y + (-30 - H / 2) / (zz * SQ), y1 = camera.y + (H + 260 + treeGrid.top * LIFT * zz - H / 2) / (zz * SQ);
+    const cx0 = Math.floor(x0 / TREE_CELL), cx1 = Math.floor(x1 / TREE_CELL), cy0 = Math.floor(y0 / TREE_CELL), cy1 = Math.floor(y1 / TREE_CELL);
+    for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+      const c = treeGrid.cells.get(cx + ',' + cy); if (c) for (const tr of c) out.push(tr);
+    }
+    view.stats.treesConsidered = out.length;
+    return out;
+  }
   function woodTreeDrawable(tr) {
     const X = sx(tr.x), Y = gy(tr.x, tr.y);
     if (X < -150 || X > innerWidth + 150 || Y < -30 || Y > innerHeight + 260) return null;
@@ -2076,7 +2107,9 @@
     for (const u of units) {
       if (u.dead) continue;
       seen.add(u.id);
-      const onScreen = visible(u) && sx(u.x) >= -80 && sx(u.x) <= innerWidth + 80 && gy(u.x, u.y) >= -40 && gy(u.x, u.y) <= innerHeight + 140;
+      let onScreen = visible(u);
+      if (onScreen) { const ux = sx(u.x); onScreen = ux >= -80 && ux <= innerWidth + 80; }
+      if (onScreen) { const uy = gy(u.x, u.y); onScreen = uy >= -40 && uy <= innerHeight + 140; }
       const m = infoOf(u); track(u, m, t, dt, onScreen);
       if (!onScreen) {
         wetTracks.sample(u, m, trackWetness, elapsed, false); continue;
@@ -2163,7 +2196,7 @@
     for (const it of view.dressing || []) { const d = dressingDrawable(it); if (d) list.push(d); }
     if (view.props.oak && !view.woodTrees) view.woodTrees = buildWoodTrees();
     linkWoodTrees();
-    for (const tr of view.woodTrees || []) { const d = woodTreeDrawable(tr); if (d) list.push(d); }
+    for (const tr of treesInView()) { const d = woodTreeDrawable(tr); if (d) list.push(d); }
     for (const r of resources) {
       const X = sx(r.x), Y = gy(r.x, r.y);
       if (X < -120 || X > innerWidth + 120 || Y < -30 || Y > innerHeight + 260) continue;
@@ -2176,6 +2209,13 @@
     ctx.fillStyle = 'rgba(225,60,50,.38)'; ctx.fill(rings.britain);
     list.sort((p, q) => p.y - q.y);
     const men = list.filter(d => d.unit), covered = new Set();
+    // The men by screen cell, for the see-through test: a crown or roof looks
+    // only at the men in the cells its picture covers, not at every man.
+    const MEN_CELL = 96, menCells = new Map();
+    for (const man of men) {
+      const key = Math.floor(man.unit.x / MEN_CELL) * 65536 + Math.floor(man.unit.y / MEN_CELL);
+      let c = menCells.get(key); if (!c) menCells.set(key, c = []); c.push(man);
+    }
     st.seeThrough = 0;
     // The WebGL scene layer, when it runs: sprites to the graphics chip, hand
     // drawing through the scratch canvas, in the same painter's order.
@@ -2188,7 +2228,14 @@
       const [x0, y0, x1, y1] = d.box, ix = (x1 - x0) * 0.12, iy = (y1 - y0) * 0.08;
       let a = view.overview ? OVERVIEW_ALPHA : 1;
       let covering=false;
-      if (d.cover !== false) for (const man of men) { const p=man.unit; if (p.wy < d.y && p.x > x0 + ix && p.x < x1 - ix && p.y > y0 + iy && p.y < y1 - iy) { covering=true; covered.add(man); } }
+      if (d.cover !== false && men.length) {
+        const bx0 = x0 + ix, bx1 = x1 - ix, by0 = y0 + iy, by1 = y1 - iy;
+        const cx0 = Math.floor(bx0 / MEN_CELL), cx1 = Math.floor(bx1 / MEN_CELL), cy0 = Math.floor(by0 / MEN_CELL), cy1 = Math.floor(by1 / MEN_CELL);
+        for (let cx = cx0; cx <= cx1; cx++) for (let cy = cy0; cy <= cy1; cy++) {
+          const c = menCells.get(cx * 65536 + cy); if (!c) continue;
+          for (const man of c) { const p=man.unit; if (p.wy < d.y && p.x > bx0 && p.x < bx1 && p.y > by0 && p.y < by1) { covering=true; covered.add(man); } }
+        }
+      }
       if(covering){a=Math.min(a,COVER_ALPHA);st.seeThrough++;}
       ctx.globalAlpha = a; d.draw(); ctx.globalAlpha = 1;
     };
