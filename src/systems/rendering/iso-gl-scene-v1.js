@@ -9,14 +9,18 @@
 // iso-gpu-v1). Whatever the scene still draws by hand (a blood pool, a bridge,
 // a man clipped by his trench) the iso view draws into a 2D scratch canvas,
 // and that region is laid in as a texture at its place in the painter's order.
-// Opt in with ?gl=1 while it is brought to parity; ?gl=0 keeps it off.
+// On phones it is on by default: there the canvas drew every sprite with a
+// draw call of its own (the older GPU path stays off there, see iso-gpu-v1),
+// and this layer draws the whole scene in one or two. Without WebGL2, or when
+// the context is lost or fails, the canvas draws as before. ?gl=0 keeps it
+// off; on desktop it is opt-in with ?gl=1.
 (function installIsoGlScene(root) {
   const params = new URLSearchParams(location.search);
   const game = document.getElementById('game');
   if (!game || root.__ISO_GL_SCENE_V1__) return;
   const mobile = root.__MOBILE_RENDER_BUDGET_V1__?.state?.()?.mobile ??
     (matchMedia('(pointer:coarse)').matches || Math.min(innerWidth, innerHeight) <= 700);
-  let enabled = params.get('gl') === '1', paused = false;
+  let enabled = params.get('gl') === '1' || (mobile && params.get('gl') !== '0'), paused = false;
   const TILE = 512, STORAGE = TILE + 2, LAYER_BYTES = STORAGE * STORAGE * 4;
   const budget = (mobile ? 96 : 160) * 2 ** 20, layerCount = Math.floor(budget / LAYER_BYTES);
   const MAX_UPLOADS = mobile ? 8 : 16;          // new tiles a frame (the rest wait a frame, drawn by hand)
