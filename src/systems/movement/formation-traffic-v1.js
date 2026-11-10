@@ -121,8 +121,12 @@
         if(visited.has(pair))continue;
         visited.add(pair);
         let dx=other.x-u.x,dy=other.y-u.y;
-        let d=Math.hypot(dx,dy);
         const minD=(Number(TYPES[u.type]?.radius)||7)+(Number(TYPES[other.type]?.radius)||7)+1.5;
+        // Most neighbours stand well clear: a cheap test on squares (with a
+        // margin, so no pair at the edge is decided by rounding); the rest are
+        // measured and judged exactly as before.
+        if(dx*dx+dy*dy>minD*minD*1.000001+1e-9)continue;
+        let d=Math.hypot(dx,dy);
         if(d>=minD)continue;
         if(d<.001){const angle=((u.id*37+other.id*53)%360)*Math.PI/180;dx=Math.cos(angle);dy=Math.sin(angle);d=1;}
         const sameGroup=!!(u.regimentId&&u.regimentId===other.regimentId);

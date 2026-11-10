@@ -73,15 +73,18 @@ function riverHitV067(x,y){
   // iterating the entire 5-km river for every unit, formation and house.
   let lo=0,hi=points.length-1;
   while(hi-lo>1){const mid=(hi+lo)>>1;if(points[mid].y<y)lo=mid;else hi=mid;}
-  let bestIndex=-1,bestX,bestY,bestT,bestDistance;
-  for(let i=Math.max(0,lo-7);i<=Math.min(points.length-2,lo+7);i++){
+  // Squared distances while comparing; the closest one's distance is then
+  // measured exactly as before (Math.hypot), so every output bit stays.
+  let bestIndex=-1,bestX=0,bestY=0,bestT=0,best2=Infinity;
+  const first=Math.max(0,lo-7),last=Math.min(points.length-2,lo+7);
+  for(let i=first;i<=last;i++){
     const s=riverSegmentsV067[i];
-    const t=s.len2<=.0001?0:clampV066(((x-s.x)*s.vx+(y-s.y)*s.vy)/s.len2,0,1);
+    const t=s.len2<=.0001?0:Math.max(0,Math.min(1,((x-s.x)*s.vx+(y-s.y)*s.vy)/s.len2));
     const px=s.len2<=.0001?s.x:s.x+s.vx*t,py=s.len2<=.0001?s.y:s.y+s.vy*t;
-    const distance=Math.hypot(x-px,y-py);
-    if(bestIndex<0||distance<bestDistance){bestIndex=i;bestX=px;bestY=py;bestT=t;bestDistance=distance;}
+    const dx=x-px,dy=y-py,d2=dx*dx+dy*dy;
+    if(bestIndex<0||d2<best2){bestIndex=i;bestX=px;bestY=py;bestT=t;best2=d2;}
   }
-  return bestIndex<0?null:{x:bestX,y:bestY,t:bestT,distance:bestDistance,segmentIndex:bestIndex};
+  return bestIndex<0?null:{x:bestX,y:bestY,t:bestT,distance:Math.hypot(x-bestX,y-bestY),segmentIndex:bestIndex};
 }
 // Exact quick answer for points far from the river. riverHitV067 only measures
 // the segments around the binary-search index; every one of their points has an
