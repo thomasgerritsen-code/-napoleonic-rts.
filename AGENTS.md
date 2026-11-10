@@ -4,19 +4,17 @@ Twee assistenten werken tegelijk aan dit spel, op dezelfde branch
 (`claude/continue-updates-o6whr4`, PR #329). Deze afspraken houden het werk van
 de een heel als de ander pusht.
 
-## Waar het werk nu heen gaat (besluit van de eigenaar, 3 november 2026)
+## Waar het werk nu heen gaat (besluit van de eigenaar, 10 november 2026)
 
-- De webversie (JavaScript: `play.html`, `src/`) wordt niet verder gebouwd. Geen
-  nieuwe functies, graphics of tests meer voor de webversie; laat die code staan
-  zoals hij is.
-- Al het nieuwe werk gaat naar de Godot-versie (`godot/`), met de telefoon als
-  doel: spelen in Xogot op de iPhone (de compacte indeling van `Phone` en `Hud`).
-  Test nieuw werk ook op telefoonformaat (`godot/tests/phone_shots.gd`) en houd
-  het licht genoeg voor een telefoon.
-- Binnen Godot gaat alleen de 3D-weergave verder (`View3D`, `Field3D`,
-  `assets3d/`): geen nieuw grafisch werk meer voor de 2D-weergave. De 2D-kant
-  blijft bestaan als spelregels en als terugval (F3), maar wordt niet mooier
-  gemaakt.
+- De webversie (JavaScript: `play.html`, `src/`) wordt weer verder gebouwd, met
+  voorrang voor snelheid (vloeiend spelen, ook op de telefoon) en de 2.5D-weergave
+  (`?view=iso`: `src/systems/rendering/iso-view-v1.js`, `iso-gl-scene-v1.js`,
+  `iso-gpu-v1.js` en de Blender-sprites in `graphics-lab/assets/`).
+- Draai `npm run test:fast` bij elke wijziging aan web of `scripts/`, en de
+  Playwright-specs die bij het onderwerp horen (zoals `tests/iso-*.spec.js`).
+- De Godot-versie (`godot/`) blijft staan zoals hij is (laatste build 111); geen
+  nieuw werk daar tenzij de eigenaar erom vraagt. Het besluit van 3 november
+  (alleen Godot, alleen 3D) is hiermee vervallen.
 
 ## Voor je begint en voor je pusht
 
