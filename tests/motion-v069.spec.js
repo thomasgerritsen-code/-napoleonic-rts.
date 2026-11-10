@@ -25,7 +25,9 @@ test('roadside villages render without map labels and keep houses off every road
   await expect(page.locator('.version')).toHaveText(/^v\d/);
   const villages = await page.evaluate(() => window.__RTS_DEBUG__.villageSystemV069());
   expect(villages.labelsVisible).toBe(false);
-  expect(villages.villages).toHaveLength(6);
+  // v1.3.29 enlarged the map with more villages; the original six must remain.
+  expect(villages.villages.length).toBeGreaterThanOrEqual(6);
+  for(const name of ['Les Quatre Chemins','St.-Martin','La Croix','Bois-Hameau','Ferme du Sud','Ferme de l’Est'])expect(villages.villages.map(v=>v.name)).toContain(name);
   expect(villages.villages.every(v => v.houses.length >= 5)).toBe(true);
   expect(villages.villages.some(v => v.junctionRoadCount >= 4)).toBe(true);
   const houses = villages.villages.flatMap(v => v.houses);

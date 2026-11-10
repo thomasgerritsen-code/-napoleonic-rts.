@@ -51,22 +51,27 @@ test('publishing stamps unique, cache-busted identifiers on successive deploymen
   fs.mkdirSync(path.join(root, 'src/foundation'), { recursive: true });
   const original = '<script src="src/foundation/deployment-info.js?build=local"></script>';
   const indexPath = path.join(root, 'index.html');
+  const playPath = path.join(root, 'play.html');
   const scriptPath = path.join(root, 'src/foundation/deployment-info.js');
 
   fs.writeFileSync(indexPath, original);
+  fs.writeFileSync(playPath, original);
   const first = stampDeployment(root, {
     sha: 'a'.repeat(40), runNumber: 209, deployedAt: '2026-10-09T12:00:00.000Z'
   });
   assert.equal(first.runNumber, 209);
   assert.match(fs.readFileSync(indexPath, 'utf8'), /deployment-info.js\?build=aaaaaaaaaaaa/);
+  assert.match(fs.readFileSync(playPath, 'utf8'), /deployment-info.js\?build=aaaaaaaaaaaa/);
   assert.match(fs.readFileSync(scriptPath, 'utf8'), /"runNumber":209/);
 
   fs.writeFileSync(indexPath, original);
+  fs.writeFileSync(playPath, original);
   const second = stampDeployment(root, {
     sha: 'b'.repeat(40), runNumber: 210, deployedAt: '2026-10-09T13:00:00.000Z'
   });
   assert.equal(second.runNumber, 210);
   assert.match(fs.readFileSync(indexPath, 'utf8'), /deployment-info.js\?build=bbbbbbbbbbbb/);
+  assert.match(fs.readFileSync(playPath, 'utf8'), /deployment-info.js\?build=bbbbbbbbbbbb/);
   assert.match(fs.readFileSync(scriptPath, 'utf8'), /"runNumber":210/);
   assert.notEqual(first.commit, second.commit);
 });

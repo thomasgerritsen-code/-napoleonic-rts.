@@ -52,7 +52,7 @@
   }
 
   function reassignFrenchWorkerToSameResource(worker, exhaustedResource = null) {
-    if (!worker || worker.side !== 'france') return false;
+    if (!worker || (worker.side !== 'france' && !(worker.side === 'britain' && window.__NRTS_HUMAN_BRITAIN__))) return false;
     const resourceType = worker.preferredResourceType || exhaustedResource?.type || worker.returnResource?.type;
     const replacement = resourceType
       ? nearestResource(resourceType, worker.x, worker.y, exhaustedResource)
@@ -66,6 +66,7 @@
   }
 
   function autoAssignAIWorkers() {
+    if (window.__NRTS_HUMAN_BRITAIN__) return;
     // In the opening minutes the AI builds its food/wood economy. Iron mining
     // begins later, preventing a free early artillery technology jump.
     const allWorkers=livingUnits('britain').filter(u=>u.type==='worker');
@@ -97,7 +98,7 @@
         return;
       }
       moveToward(u, u.targetX, u.targetY, dt);
-      if (u.side === 'britain') {
+      if (u.side === 'britain' && !window.__NRTS_HUMAN_BRITAIN__) {
         const preferred = u.preferredResourceType==='iron' ? 'iron' : economies.britain.wood < economies.britain.food ? 'wood' : 'food';
         assignWorkerToResource(u, nearestResource(preferred, u.x, u.y));
       }
@@ -107,7 +108,7 @@
     if (u.task === 'gather') {
       const r = u.resourceTarget;
       if (!r || r.dead || r.amount <= 0) {
-        if (u.side === 'france' && reassignFrenchWorkerToSameResource(u, r)) return;
+        if ((u.side === 'france' || window.__NRTS_HUMAN_BRITAIN__) && reassignFrenchWorkerToSameResource(u, r)) return;
         u.task = null; u.resourceTarget = null;
         if (u.side === 'britain') autoAssignAIWorkers();
         return;
@@ -137,7 +138,7 @@
       if (u.returnResource && !u.returnResource.dead) {
         u.resourceTarget = u.returnResource; u.task = 'gather';
       } else {
-        if (u.side === 'france' && reassignFrenchWorkerToSameResource(u, u.returnResource)) return;
+        if ((u.side === 'france' || window.__NRTS_HUMAN_BRITAIN__) && reassignFrenchWorkerToSameResource(u, u.returnResource)) return;
         u.task = null; u.resourceTarget = null;
         if (u.side === 'britain') autoAssignAIWorkers();
       }

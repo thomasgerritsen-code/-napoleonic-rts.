@@ -40,7 +40,9 @@ test('legacy v0.7 motion and villages remain available in the production build',
   const villages=await page.evaluate(()=>window.__RTS_DEBUG__.villageSystemV070());
   expect(villages.labelsVisible).toBe(false);
   expect(villages.junctionStyle).toBe('flared-beaten-earth');
-  expect(villages.villages).toHaveLength(6);
+  // v1.3.29 enlarged the map with more villages; the original six must remain.
+  expect(villages.villages.length).toBeGreaterThanOrEqual(6);
+  for(const name of ['Les Quatre Chemins','St.-Martin','La Croix','Bois-Hameau','Ferme du Sud','Ferme de l’Est'])expect(villages.villages.map(v=>v.name)).toContain(name);
   const houses=villages.villages.flatMap(v=>v.houses);
   expect(houses.length).toBeGreaterThanOrEqual(45);
   expect(Math.min(...villages.villages.map(v=>v.houses.length))).toBeGreaterThanOrEqual(7);

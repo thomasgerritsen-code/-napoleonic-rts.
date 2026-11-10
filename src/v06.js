@@ -92,7 +92,7 @@ createRegiment = function createRegimentV06(side, candidateUnits, name = null) {
 function createCavalryRegimentV06(side, candidateUnits, name = null) {
   const free = candidateUnits.filter(u => !u.dead && u.side === side && !u.routing && !u.regimentId);
   const cavalry = free.filter(u => u.type === 'cavalry').slice(0, 12);
-  const officer = free.find(u => u.type === 'officer');
+  const officer = free.find(u => officerCanLead(u, 'cavalry'));
   if (cavalry.length < 4 || !officer) return null;
   const members = [...cavalry, officer], id = nextRegimentId++;
   const reg = { id, side, kind: 'cavalry', name: name || `${side === 'france' ? 'Frans' : 'Brits'} Cavalerie Regiment ${id}`, memberIds: members.map(u => u.id), officerId: officer.id, drummerId: null, formation: 'line', morale: 100, destroyed: false, brokenReason: null, targetX: centroid(members).x, targetY: centroid(members).y, facing: side === 'france' ? 0 : Math.PI, targetFacing: side === 'france' ? 0 : Math.PI, formedAt: elapsed, initialStrength: members.length, formedInfantryCount: 0 };
@@ -172,7 +172,7 @@ arrangeRegiment = function arrangeRegimentV06(reg, x, y, mode = reg.formation ||
   }
 };
 function cavalryEligibilityV06(group) {
-  const free = group.filter(u => !u.dead && !u.routing && !u.regimentId), cavalry = free.filter(u => u.type === 'cavalry').length, officers = free.filter(u => u.type === 'officer').length;
+  const free = group.filter(u => !u.dead && !u.routing && !u.regimentId), cavalry = free.filter(u => u.type === 'cavalry').length, officers = free.filter(u => officerCanLead(u, 'cavalry')).length;
   return { cavalry, officers, canCreate: cavalry >= 4 && officers >= 1 };
 }
 function artilleryBatteryEligibilityV06(group) {
@@ -181,7 +181,7 @@ function artilleryBatteryEligibilityV06(group) {
 }
 function makePlayerCavalryRegimentV06() {
   const group = [...selectedUnits], e = cavalryEligibilityV06(group);
-  if (!e.canCreate) { statusEl.textContent = `Cavalerie-regiment vereist 4 cavaleristen + 1 officier (nu ${e.cavalry}/${e.officers}).`; return; }
+  if (!e.canCreate) { statusEl.textContent = `Cavalerie-regiment vereist 4 cavaleristen + 1 officier te paard (nu ${e.cavalry}/${e.officers}).`; return; }
   const reg = createCavalryRegimentV06('france', group); if (!reg) return; selectWholeRegiment(reg); actionSignature = ''; updateHud(true); statusEl.textContent = `${reg.name} gevormd.`;
 }
 function makePlayerArtilleryBatteryV06() {
@@ -245,7 +245,10 @@ canvas.addEventListener('contextmenu', e => { if (performance.now() < suppressCo
 const moveTowardV05ForV06 = moveToward;
 moveToward = function moveTowardV06(u, tx, ty, dt, speed = TYPES[u.type].speed) {
   if (u.type === 'artillery' && !canArtilleryOperateV06(u)) return false;
-  const d = Math.hypot(tx-u.x,ty-u.y); if (d <= 5) { u.x=tx; u.y=ty; u.arrivedAtTarget=true; return true; }
+  // A deployed gun settles within 5 px: collision nudges must not keep it creeping
+  // back to its spot (that holds the battery in its travel stance, never firing).
+  const settle = u.type === 'artillery' ? 5 : Math.min(5, Math.max(.05, speed * dt));
+  const d = Math.hypot(tx-u.x,ty-u.y); if (d <= settle) { u.x=tx; u.y=ty; u.arrivedAtTarget=true; return true; }
   u.arrivedAtTarget=false; return moveTowardV05ForV06(u,tx,ty,dt,speed*terrainSpeedMultiplierV06(u));
 };
 resolveUnitOverlaps = function resolveUnitOverlapsV06() {
@@ -314,7 +317,7 @@ addEventListener('keydown',e=>{if(e.key==='Escape'&&rallyPlacementBuilding){rall
 const queuePanelV06=document.createElement('aside');queuePanelV06.id='productionQueuePanel';queuePanelV06.className='hud production-queue hidden';queuePanelV06.setAttribute('aria-label','Productiewachtrij');document.getElementById('app').appendChild(queuePanelV06);
 function renderQueuePanelV06(){const b=selectedBuilding;if(!b||!b.complete||!PRODUCTION_BUILDINGS_V06.has(b.type)){queuePanelV06.classList.add('hidden');return;}queuePanelV06.classList.remove('hidden');const rally=`${Math.round(b.rallyX)}, ${Math.round(b.rallyY)}`,items=b.queue.map((q,i)=>`<li class="${i===0?'active':''}"><span>${i+1}. ${q.label}</span>${i===0?`<strong>${Math.floor(b.production*100)}%</strong>`:'<strong>wacht</strong>'}</li>`).join('');queuePanelV06.innerHTML=`<strong>${BUILDINGS[b.type].label} · wachtrij</strong><span class="rally-line">🚩 ${rally}</span><ol>${items||'<li class="empty">Geen productie</li>'}</ol>`;}
 const renderDynamicActionsV05ForV06 = renderDynamicActions;
-renderDynamicActions = function renderDynamicActionsV06(force=false){renderDynamicActionsV05ForV06(force);const add=(action,html,disabled=false)=>{if(actionsEl.querySelector(`[data-action="${action}"]`))return;actionsEl.prepend(makeDynamicButton(action,html,disabled));};if(selectedBuilding?.complete&&selectedBuilding.side==='france'&&PRODUCTION_BUILDINGS_V06.has(selectedBuilding.type))add('set-rally','🚩 Verzamelpunt<br><small>volgende klik</small>');const loose=[...selectedUnits].filter(u=>!u.dead&&!u.routing&&!u.regimentId),bat=artilleryBatteryEligibilityV06(loose);if(bat.cannons)add('create-battery',`Kanonbemanning<br><small>${bat.cannons} kanon · ${bat.crew}/2 musketiers</small>`,!bat.canCreate);const cav=cavalryEligibilityV06(loose);if(cav.cavalry)add('create-cavalry-regiment',`Cav. regiment<br><small>${cav.cavalry}/4 · O${cav.officers}</small>`,!cav.canCreate);};
+renderDynamicActions = function renderDynamicActionsV06(force=false){renderDynamicActionsV05ForV06(force);const add=(action,html,disabled=false)=>{if(actionsEl.querySelector(`[data-action="${action}"]`))return;actionsEl.prepend(makeDynamicButton(action,html,disabled));};if(selectedBuilding?.complete&&selectedBuilding.side==='france'&&PRODUCTION_BUILDINGS_V06.has(selectedBuilding.type))add('set-rally','🚩 Verzamelpunt<br><small>volgende klik</small>');const loose=[...selectedUnits].filter(u=>!u.dead&&!u.routing&&!u.regimentId),bat=artilleryBatteryEligibilityV06(loose);if(bat.cannons)add('create-battery',`Kanonbemanning<br><small>${bat.cannons} kanon · ${bat.crew}/2 musketiers</small>`,!bat.canCreate);const cav=cavalryEligibilityV06(loose);if(cav.cavalry)add('create-cavalry-regiment',`Cav. regiment<br><small>${cav.cavalry}/4 · officier te paard ${cav.officers}</small>`,!cav.canCreate);};
 selectionRegimentSummary = function selectionRegimentSummaryV06(){const regs=selectedRegiments();if(regs.length!==1)return regs.length>1?`${regs.length} groepen geselecteerd`:null;const reg=regs[0],members=regimentMembers(reg),kind=groupKindV06(reg);if(kind==='artillery')return`${reg.name} · kanon ${artilleryForGroupV06(reg)?'✓':'✗'} · bemanning ${artilleryCrewV06(reg).length}/2 · ${canArtilleryOperateV06(artilleryForGroupV06(reg))?'operationeel':'NIET operationeel'}`;if(kind==='cavalry'){const officerAlive=members.some(u=>u.id===reg.officerId);return`${reg.name} · ${members.filter(u=>u.type==='cavalry').length} cavaleristen · O:${officerAlive?'✓':'✗'} · morale ${Math.round(reg.morale)}%`;}const officerAlive=members.some(u=>u.id===reg.officerId),drummerAlive=members.some(u=>u.id===reg.drummerId);return`${reg.name} · ${members.filter(u=>u.type==='infantry').length} musketiers · O:${officerAlive?'✓':'✗'} D:${drummerAlive?'✓':'✗'} · morale ${Math.round(reg.morale)}%`;};
 const updateHudV05ForV06=updateHud;
 updateHud=function updateHudV06(forceActions=false){updateHudV05ForV06(forceActions);renderQueuePanelV06();if(aiPlanEl)aiPlanEl.textContent=`Plan: ${aiStrategyV06} · ${aiPlan}`;};
@@ -322,7 +325,7 @@ actionsEl.addEventListener('click',e=>{const btn=e.target.closest('button');if(!
 
 function uncrewedArtilleryV06(side){return livingUnits(side).filter(u=>u.type==='artillery'&&!canArtilleryOperateV06(u));}
 function aiAutoCrewArtilleryV06(){for(const cannon of uncrewedArtilleryV06('britain')){if(cannon.regimentId)continue;const crew=freeUnits('britain','infantry').slice(0,2);if(crew.length<2)return false;createArtilleryBatteryV06('britain',cannon,crew);aiPlan='kanonbemanning toegewezen';}return true;}
-function aiTryCavalryRegimentV06(){const cav=freeUnits('britain','cavalry'),officer=freeUnits('britain','officer')[0];if(cav.length<4||!officer)return null;const reg=createCavalryRegimentV06('britain',[...cav.slice(0,8),officer]);if(reg)aiPlan=`${reg.name} gevormd`;return reg;}
+function aiTryCavalryRegimentV06(){const cav=freeUnits('britain','cavalry'),officer=freeUnits('britain','officer').find(u=>officerCanLead(u,'cavalry'));if(cav.length<4||!officer)return null;const reg=createCavalryRegimentV06('britain',[...cav.slice(0,8),officer]);if(reg)aiPlan=`${reg.name} gevormd`;return reg;}
 const aiDevelopV05ForV06=aiDevelop;
 aiDevelop=function aiDevelopV06(){if(gameOver)return;const waitingGuns=uncrewedArtilleryV06('britain').filter(u=>!u.regimentId);if(waitingGuns.length&&freeUnits('britain','infantry').length<2){const barracks=livingBuildings('britain').find(b=>b.type==='barracks'&&b.complete);if(barracks&&aiQueue('infantry','barracks')){aiPlan='kanonbemanning trainen';return;}}aiAutoCrewArtilleryV06();if(aiTryCavalryRegimentV06())return;if(aiStrategyV06==='defensive'&&populationUsed('britain')>=economies.britain.popCap-8&&economies.britain.wood>=120){if(aiBuild('house'))return;}aiDevelopV05ForV06();aiAutoCrewArtilleryV06();aiTryCavalryRegimentV06();};
 aiMilitaryOrder=function aiMilitaryOrderV06(){if(v05PeaceMode||gameOver)return;const infantryGroups=activeRegiments('britain').filter(r=>groupKindV06(r)==='infantry'),cavalryGroups=activeRegiments('britain').filter(r=>groupKindV06(r)==='cavalry'),batteries=activeGroupsV06('britain').filter(r=>groupKindV06(r)==='artillery');if(!infantryGroups.length&&!cavalryGroups.length)return;const frenchTargets=livingUnits('france').filter(u=>u.type!=='worker'&&!u.routing),frenchTC=livingBuildings('france').find(b=>b.type==='towncenter'),target=frenchTargets.length?centroid(frenchTargets):frenchTC?{x:frenchTC.x,y:frenchTC.y}:{x:650,y:900},threshold=aiStrategyV06==='aggressive'?35:aiStrategyV06==='defensive'?85:55,needed=aiStrategyV06==='aggressive'?1:aiStrategyV06==='defensive'?3:2,attackReady=elapsed>threshold||infantryGroups.length+cavalryGroups.length>=needed,tc=livingBuildings('britain').find(b=>b.type==='towncenter');if(!attackReady&&tc){infantryGroups.forEach((reg,i)=>orderGroupPathV06(reg,tc.x-260,tc.y+(i-(infantryGroups.length-1)/2)*125,'line',Math.PI));cavalryGroups.forEach((reg,i)=>orderGroupPathV06(reg,tc.x-170,tc.y-210-i*70,'column',Math.PI));batteries.forEach((reg,i)=>orderGroupPathV06(reg,tc.x+80,tc.y+180+i*75,'line',Math.PI));aiPlan=`${aiStrategyV06}: basis verdedigen`;return;}infantryGroups.forEach((reg,i)=>orderGroupPathV06(reg,target.x+150+i*45,target.y+(i-(infantryGroups.length-1)/2)*125,i%2?'column':'line',Math.PI));cavalryGroups.forEach((reg,i)=>{regimentMembers(reg).filter(u=>u.type==='cavalry').forEach(u=>u.chargeTimer=7);orderGroupPathV06(reg,target.x+40,target.y-190-i*90,'column',Math.PI);});batteries.forEach((reg,i)=>orderGroupPathV06(reg,target.x+410,target.y+150+i*85,'line',Math.PI));aiPlan=`${aiStrategyV06}: gecombineerde aanval`;};

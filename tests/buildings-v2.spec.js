@@ -7,7 +7,7 @@ test('buildings are top-down and no building footprint may occupy a road', async
   await page.waitForFunction(() => Boolean(
     window.NRTS?.subsystems.has('building-placement') &&
     window.NRTS?.subsystems.has('building-renderer') &&
-    window.RTS_SIM?.version === '0.7.1'
+    window.RTS_SIM?.version // the facade has moved on from 0.7.1; any version serves
   ));
 
   const result = await page.evaluate(() => {

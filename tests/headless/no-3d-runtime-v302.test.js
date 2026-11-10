@@ -10,7 +10,7 @@ function allFiles(dir) {
   });
 }
 test('the 2D-only game contains no 3D renderer source or Three.js runtime entrypoints', () => {
-  const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
+  const html = fs.readFileSync(path.join(root,'play.html'),'utf8');
   const css = fs.readFileSync(path.join(root,'style.css'),'utf8');
   const code = allFiles(path.join(root,'src')).filter(file => /\.(m?js)$/.test(file));
   assert.equal(code.filter(file => /battlefield-3d-/i.test(file)).length,0);

@@ -240,12 +240,22 @@
     return {x:obstacle.x+lx*cos-ly*sin,y:obstacle.y+lx*sin+ly*cos};
   }
 
+  // Each roof's reach (its corner circle), worked out once: every step of every
+  // man is tested against every roof, and almost all of them are far away.
+  const roofs=obstacles.map(o=>{
+    const hw=o.w*.5+UNIT_MARGIN,hh=o.h*.5+UNIT_MARGIN;
+    return {o,reach2:(hw*hw+hh*hh)*1.000001+1e-6};
+  });
   function resolveUnitPoint(point){
     let p={x:point.x,y:point.y},corrected=false;
     for(let pass=0;pass<8;pass++){
       let changed=false;
-      for(const obstacle of obstacles){
-        const next=localRoofCorrection(p,obstacle);
+      for(const roof of roofs){
+        const o=roof.o,dx=p.x-o.x,dy=p.y-o.y;
+        // Well outside the roof's corner circle (a margin, so rounding decides
+        // nothing; NaN still goes the old way): outside the roof.
+        if(dx*dx+dy*dy>roof.reach2) continue;
+        const next=localRoofCorrection(p,o);
         if(!next) continue;
         p=next;changed=true;corrected=true;
       }

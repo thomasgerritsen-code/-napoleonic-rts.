@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const index = fs.readFileSync('index.html', 'utf8');
+const index = fs.readFileSync('play.html', 'utf8');
 const feedback2d = fs.readFileSync('src/systems/rendering/order-target-feedback-v1.js', 'utf8');
 
 test('regiment order targets expose a footprint derived from production formation offsets', () => {

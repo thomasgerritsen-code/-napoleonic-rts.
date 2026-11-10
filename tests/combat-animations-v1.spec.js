@@ -19,7 +19,7 @@ test('Combat Animations v1 follows combat events and stays visual-only', async (
     applyDamage(target,2,0);
     return {version:api.version,features:[...api.features],meta,anim:anim?.kind||null,before,after,eventCount:api.eventCount(),targetDead:target.dead};
   });
-  expect(result.version).toBe('combat-animations-v1');
+  expect(result.version).toMatch(/^combat-animations-v1(\.|$)/);
   expect(result.meta?.phase).toBe('architecture-v2');
   expect(result.meta?.legacyBridge).toBe(false);
   expect(result.features).toContain('reload');

@@ -2,7 +2,7 @@ const {test,expect}=require('@playwright/test');
 
 test('v312 desktop animation clock interpolates between 60 Hz simulation steps',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('/',{waitUntil:'domcontentloaded'});
+  await page.goto('/play.html',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>!!window.RTS_SIM && !!window.__GPU_UNITS_V304__);
   const samples=await page.evaluate(async()=>{
     const original=draw,observed=[];

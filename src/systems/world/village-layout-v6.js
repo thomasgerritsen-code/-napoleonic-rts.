@@ -99,6 +99,8 @@
   }
 
   function nearestActiveRoadGeometry(x,y){
+    // The same loop, skipping roads that are too far to win (v069-map).
+    if(typeof nearestRoadGeometryAmongV069==='function') return nearestRoadGeometryAmongV069(activeRoadNetwork,x,y);
     let best=null;
     for(const road of activeRoadNetwork){
       const g=roadGeometryV069(road,x,y);

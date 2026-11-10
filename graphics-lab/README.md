@@ -1,3 +1,18 @@
+# Graphics Lab — v342 isometrische Blender-scène
+
+`/graphics-lab/iso.html`: soldaten vooraf gerenderd in Blender vanuit één eigen
+3D-model (infanterie, artillerie en cavalerie; vijf uiterlijken per leger incl. grenadiers en voltigeurs, 2× supersampled en als WebP, met officier, tamboer en vaandeldrager; ontplooien van colonne in linie) in 8 richtingen (marcheren, richten, vuren, herladen, drie manieren van vallen), plus gebouwen, bomen en terrein in dezelfde 30°-camera. Sinds v339 zijn regiment, batterij en eskadron te selecteren (klik/tik, sleepkader) en te bevelen (lopen, linie/colonne, vuren, charge); sinds v340 ook aanvalsdoelen, 45° draaien en sneltoetsen; sinds v341 gaan troepen om gebouwen heen en kies je op de telefoon de kijkrichting door vast te houden en te slepen; sinds v342 steekt iedereen de beek alleen over de brug over. Zie
+`docs/graphics-lab-v322-v323-iso-blender.md`.
+
+---
+# Graphics Lab — v321 animatiecontroller (opt-in)
+
+`/graphics-lab/?sprites=atlas` gebruikt de nieuwe deterministische
+infanterie-animatiecontroller en rasteratlas-lader (`render/`). Zolang er geen
+goedgekeurde atlassen zijn, valt de demo netjes terug op de SVG-soldaten.
+Zonder vlag blijft alles v320. Zie `docs/graphics-lab-v321-animation-controller.md`.
+
+---
 # Graphics Lab v320 — realistischere tweede proefscene
 
 Naast de oorspronkelijke v319-assets heeft de demonstratie nu:

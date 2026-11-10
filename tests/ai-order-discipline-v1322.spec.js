@@ -4,10 +4,13 @@ test('AI order discipline suppresses repeated strategic orders instead of restar
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?test=v071',{waitUntil:'networkidle'});
-  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment&&window.__AI_ORDER_DISCIPLINE_V1322__));
+  // order-discipline loads the commander-cohesion layer asynchronously; wait for
+  // both, since either may be the one that holds back a repeated order.
+  await page.waitForFunction(()=>Boolean(window.__RTS_DEBUG__?.createFreshInfantryRegiment&&window.__AI_ORDER_DISCIPLINE_V1322__&&window.__AI_COHESION_V140__));
   await page.evaluate(()=>window.__RTS_DEBUG__.setPeaceMode(true));
 
   const result=await page.evaluate(()=>{
+    const held=()=>window.__AI_ORDER_DISCIPLINE_V1322__.stats().suppressed+window.__AI_COHESION_V140__.stats().suppressed;
     gameOver=false;v05PeaceMode=false;
     for(const u of units){if(u.side==='france'&&u.type!=='worker'){u.x=120;u.y=120;u.targetX=120;u.targetY=120;u.morale=35;}}
     window.__RTS_DEBUG__.createFreshInfantryRegiment('britain',2380,760);
@@ -16,18 +19,20 @@ test('AI order discipline suppresses repeated strategic orders instead of restar
     eval('elapsed=80');
     window.__AI_COMMANDER_V1__.forceState('ADVANCE');
     aiMilitaryOrder();
-    const first=window.__AI_ORDER_DISCIPLINE_V1322__.stats();
+    const first=window.__AI_ORDER_DISCIPLINE_V1322__.stats(),heldBefore=held();
+    const regs=activeRegiments('britain'),marches=regs.map(r=>r.marchV063);
     eval('elapsed+=1');
     window.__AI_COMMANDER_V1__.forceState('ADVANCE');
     aiMilitaryOrder();
-    const second=window.__AI_ORDER_DISCIPLINE_V1322__.stats();
+    const heldAfter=held(),kept=regs.every((r,i)=>marches[i]&&r.marchV063===marches[i]);
     v05PeaceMode=true;
-    return{first,second,config:window.__AI_ORDER_DISCIPLINE_V1322__.config};
+    return{first,heldBefore,heldAfter,kept,config:window.__AI_ORDER_DISCIPLINE_V1322__.config};
   });
 
   expect(result.first.ordersSeen).toBeGreaterThan(0);
-  expect(result.second.ordersSeen).toBeGreaterThan(result.first.ordersSeen);
-  expect(result.second.suppressed).toBeGreaterThan(result.first.suppressed);
+  // The repeated strategic order is held back and no regiment restarts its march.
+  expect(result.heldAfter).toBeGreaterThan(result.heldBefore);
+  expect(result.kept).toBe(true);
   expect(result.config.orderTtl).toBeGreaterThan(4);
   expect(errors).toEqual([]);
 });

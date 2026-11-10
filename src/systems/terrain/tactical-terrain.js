@@ -2,7 +2,17 @@
 (function installTerrainLOSV1(global){
   const nrts=global.NRTS;if(!nrts)throw new Error('NRTS required');
   function terrainName(x,y){try{const t=terrainAtV06(x,y);return typeof t==='string'?t.toLowerCase():String(t?.type||t?.kind||'field').toLowerCase();}catch{return 'field';}}
-  function lineOfSight(a,b){const d=Math.hypot(b.x-a.x,b.y-a.y);const steps=Math.max(2,Math.ceil(d/36));let woods=0;for(let i=1;i<steps;i++){const q=i/steps,n=terrainName(a.x+(b.x-a.x)*q,a.y+(b.y-a.y)*q);if(n.includes('wood')||n.includes('forest'))woods++;if(woods>=2)return false;}return true;}
+  // Open map (NRTS_CONFIG.visibilityCache.losCell): woods do not move, so whether a
+  // sight-line sample lies in woods is remembered per small cell instead of asking
+  // the terrain (rivers, crossings, roads) again for every man every step.
+  const losCell=global.NRTS_CONFIG?.visibilityCache?.losCell||0,woodsMemo=losCell?new Map():null;
+  function woodsAt(x,y){
+    if(!woodsMemo){const n=terrainName(x,y);return n.includes('wood')||n.includes('forest');}
+    const cx=Math.floor(x/losCell),cy=Math.floor(y/losCell),k=cx*100003+cy;let w=woodsMemo.get(k);
+    if(w===undefined){const n=terrainName((cx+.5)*losCell,(cy+.5)*losCell);w=n.includes('wood')||n.includes('forest');woodsMemo.set(k,w);}
+    return w;
+  }
+  function lineOfSight(a,b){const d=Math.hypot(b.x-a.x,b.y-a.y);const steps=Math.max(2,Math.ceil(d/36));let woods=0;for(let i=1;i<steps;i++){const q=i/steps;if(woodsAt(a.x+(b.x-a.x)*q,a.y+(b.y-a.y)*q))woods++;if(woods>=2)return false;}return true;}
   function coverAt(e){const n=terrainName(e.x,e.y);if(n.includes('wood')||n.includes('forest'))return .82;if(n.includes('village')||n.includes('building'))return .88;return 1;}
 
   // Keep the final combat-query implementation (including its spatial index and metrics)

@@ -5,7 +5,8 @@ async function openBridgeSafety(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/?test=bridgefollowers',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>Boolean(
-    window.RTS_SIM && window.NRTS_NAVIGATION_V2?.active && window.__BRIDGE_FOLLOWER_SAFETY_V1__
+    window.RTS_SIM && window.NRTS_NAVIGATION_V2?.active && window.__BRIDGE_FOLLOWER_SAFETY_V1__ &&
+    window.__RTS_DEBUG__?.setPeaceMode && window.__RTS_DEBUG__?.createFreshInfantryRegiment
   ));
   return errors;
 }

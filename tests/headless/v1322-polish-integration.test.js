@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const index = fs.readFileSync('index.html', 'utf8');
+const index = fs.readFileSync('play.html', 'utf8');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const version = fs.readFileSync('src/foundation/version.js', 'utf8');
 const hud = fs.readFileSync('src/hud.js', 'utf8');
@@ -16,7 +16,7 @@ test('semantic version identity and browser cache keys stay aligned', () => {
   assert.ok(index.includes('class="version">v'+pkg.version+'</'));
   assert.match(index, /src\/foundation\/version\.js\?build=[0-9a-z]+/);
   assert.match(index, /src\/hud\.js\?build=[0-9a-z_-]+/);
-  assert.ok(index.includes('style.css?build=194victory'));
+  assert.ok(index.includes('style.css?build=147menu'));
 });
 
 test('selected regiments expose post-crossing regroup progress and cohesion', () => {

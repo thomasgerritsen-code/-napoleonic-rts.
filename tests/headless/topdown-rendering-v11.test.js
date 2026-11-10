@@ -9,7 +9,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const read = relative => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 
 test('v1.1 production runtime uses one unified human renderer', () => {
-  const html = read('index.html');
+  const html = read('play.html');
   assert.match(html, /src\/systems\/rendering\/characters\.js/);
   assert.doesNotMatch(html, /src\/assets\/musketeer-sprite-v1\.js/);
   assert.doesNotMatch(html, /src\/systems\/rendering\/musketeer-sprites-v1\.js/);

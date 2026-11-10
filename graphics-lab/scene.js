@@ -22,6 +22,12 @@ const state={mode:'new',count:32,quality:'balanced',zoom:1,camX:745,camY:452,
  realism:true,stage:'oprukken',renderLayers:0,
  pixi:null,world:null,soldiers:[],pixiTrees:[],last:performance.now(),time:0,paused:false};
 const soldiers=[];
+// v321 PR D1: opt-in raster atlas soldiers (?sprites=atlas). Without approved
+// atlases the lab keeps the legacy SVG soldiers; no placeholder art is drawn.
+const params=new URLSearchParams(location.search);
+const atlasRequested=params.get('sprites')==='atlas';
+const ATLAS_SIZE=36;
+state.spriteSet='legacy';state.atlas=null;state.atlasError=null;
 const random=(n)=>{let x=(Math.imul(n+1234,1664525)+1013904223)>>>0;return x/4294967296};
 function buildUnits(count){
   const per=Math.floor(count/2),newSoldiers=[];
@@ -114,6 +120,11 @@ function painter(ctx,now,stylized=false){
      ctx.fillStyle=u.team==='france'?'#273d65':'#a14642';
      ctx.beginPath();ctx.arc(pose.x,pose.y,7,0,7);ctx.fill();
      ctx.strokeStyle='#eee2c4';ctx.lineWidth=1;ctx.stroke();
+   }else if(state.atlas){
+     const anim=state.atlas.controller.update(u.team+':'+u.id,state.time*1000,
+       {moving:pose.walking,fireOrder:cycle.fire});
+     NRTSInfantryAtlas.drawInfantryFrame(ctx,state.atlas.getFrame(u.team,anim.state,anim.frame),
+       state.atlas.config,pose.x,pose.y,ATLAS_SIZE,pose.facing);
    }else{
      const key='infantry-'+u.team+(pose.stepping?'-march':'')+'.svg',size=29;
      ctx.save();ctx.translate(pose.x,pose.y);
@@ -343,9 +354,28 @@ window.__GRAPHICS_LAB_V319__={
  version:'320.0',state,assets:files.slice(),getStats:()=>({
    engine:state.engine,fps:state.fps,sprites:sceneObjects(),
    zoom:state.zoom,mode:state.mode,quality:state.quality,loaded:Object.keys(imgs).length,
-   realism:state.realism,stage:state.stage,staticTroopsDoNotMarch:true,animatedSmoke:true,layerCount:2
+   realism:state.realism,stage:state.stage,staticTroopsDoNotMarch:true,animatedSmoke:true,layerCount:2,
+   spriteSet:state.spriteSet,atlasRequested,atlasError:state.atlasError,
+   animation:state.atlas?state.atlas.controller.metrics():null
  })};
+// Loads both nation atlases; any validation/network failure keeps legacy SVGs.
+async function startAtlas(){
+ try{
+   const r=await fetch('./assets/sprites/unit-animation-config.json',{cache:'no-cache'});
+   if(!r.ok)throw new Error('animatieconfig ontbreekt');
+   const config=NRTSInfantryAnimation.validateConfig(await r.json());
+   const controller=NRTSInfantryAnimation.createInfantryAnimationController(config);
+   const atlas=await NRTSInfantryAtlas.loadInfantryAtlases('./assets/sprites/',config,controller.frameNames);
+   state.atlas={...atlas,config,controller};state.spriteSet='atlas';
+   return true;
+ }catch(e){
+   state.atlasError=String(e&&e.message||e);
+   console.warn('Graphics Lab atlas fallback:',e);
+   return false;
+ }
+}
 async function preload(){
+ const atlasReady=atlasRequested&&await startAtlas();
  await Promise.all(files.map(name=>new Promise((resolve,reject)=>{
    const im=new Image();im.onload=()=>{imgs[name]=im;resolve();};im.onerror=reject;
    im.src='./assets/'+name;
@@ -354,7 +384,12 @@ async function preload(){
  renderScale();updateStatus();
  requestAnimationFrame(drawFrame);
  // The GPU path is optional; ?pixi=off verifies offline Canvas sprite fallback.
- if(new URLSearchParams(location.search).get('pixi')!=='off')await startPixi();
+ if(atlasReady){
+   // PR D1 renders atlas frames on Canvas only; the Pixi texture path follows in D2.
+   state.engine='Canvas 2D · atlas-soldaten';ui.status.textContent='Rasteratlas geladen · deterministische animatiecontroller actief.';updateStatus();
+ }else if(atlasRequested){
+   state.engine='Canvas 2D · SVG-terugval';ui.status.textContent='Geen goedgekeurde atlas gevonden; SVG-soldaten blijven actief.';updateStatus();
+ }else if(params.get('pixi')!=='off')await startPixi();
  else{state.engine='Canvas 2D · offline sprites';ui.status.textContent='Offline demo: sprites direct op Canvas 2D.';updateStatus();}
 }
 preload().catch(err=>{

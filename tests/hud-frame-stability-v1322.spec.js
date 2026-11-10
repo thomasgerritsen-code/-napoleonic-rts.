@@ -26,5 +26,5 @@ test('HUD update reuses frame snapshots and selection summary input', async () =
   expect(hudSource).toContain("const frenchRegs = activeRegiments('france');");
   expect(hudSource).toContain("const britishRegs = activeRegiments('britain');");
   expect(hudSource).toContain('const selectedRegs = selectedRegiments();');
-  expect(hudSource).toContain('selectionRegimentSummary(selectedRegs)');
+  expect(hudSource).toMatch(/selectionRegimentSummary\w*\(selectedRegs\b/);
 });

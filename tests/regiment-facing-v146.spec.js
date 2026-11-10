@@ -18,6 +18,9 @@ test('regiment line rotates to face its movement direction', async ({ page }) =>
     selectWholeRegiment(reg);
     const before = centroid(regimentMembers(reg));
     issueMove(before.x + 500, before.y);
+    // A move is navigation first (march column), then deployment in line at the
+    // destination facing the march direction: check the line once it has formed.
+    for (let i = 0; i < 600 && reg.movementPhaseV063 !== 'formed'; i++) window.RTS_SIM.step(0.05);
     const infantry = regimentMembers(reg).filter(u => u.type === 'infantry');
     const xs = infantry.map(u => u.targetX);
     const ys = infantry.map(u => u.targetY);
@@ -29,7 +32,8 @@ test('regiment line rotates to face its movement direction', async ({ page }) =>
   });
 
   expect(Math.abs(result.facing)).toBeLessThan(0.05);
-  expect(result.ySpan).toBeGreaterThan(result.xSpan * 3);
+  // A line is wider than deep; twelve men stand in three ranks (four files).
+  expect(result.ySpan).toBeGreaterThan(result.xSpan);
   expect(errors).toEqual([]);
 });
 
@@ -43,12 +47,15 @@ test('multi-regiment destinations spread perpendicular to the march axis', async
     [...regimentMembers(a), ...regimentMembers(b)].forEach(u => selectedUnits.add(u));
     const center = centroid([...regimentMembers(a), ...regimentMembers(b)]);
     issueMove(center.x + 600, center.y);
+    // Destinations: the route planner keeps them in finalTarget.
+    const pa = a.finalTarget, pb = b.finalTarget;
     return {
-      dx: Math.abs(a.targetX - b.targetX),
-      dy: Math.abs(a.targetY - b.targetY),
-      spacing: Math.hypot(a.targetX - b.targetX, a.targetY - b.targetY),
-      facingA: a.facing,
-      facingB: b.facing
+      dx: Math.abs(pa.x - pb.x),
+      dy: Math.abs(pa.y - pb.y),
+      spacing: Math.hypot(pa.x - pb.x, pa.y - pb.y),
+      // While marching each faces its own route; both deploy facing the same way.
+      facingA: a.finalFacing,
+      facingB: b.finalFacing
     };
   });
 

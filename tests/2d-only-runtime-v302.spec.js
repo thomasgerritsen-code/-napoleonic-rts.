@@ -1,3 +1,4 @@
+const {version:currentReleaseVersion}=require('../package.json');
 const {test,expect}=require('@playwright/test');
 
 test('desktop boots strictly in 2D without 3D renderer, mode toggle or external Three.js',async({page})=>{
@@ -27,7 +28,7 @@ test('desktop boots strictly in 2D without 3D renderer, mode toggle or external 
   expect(result.threeBridge).toBe(false);
   expect(result.staticCanvas).toBe(true);
   expect(result.currentRiver).toBe(true);
-  expect(result.runtimeVersion).toMatch(/^1\.3\.\d+$/);
+  expect(result.runtimeVersion).toBe(currentReleaseVersion);
   expect(responses).toEqual([]);
   expect(errors).toEqual([]);
 });

@@ -24,8 +24,8 @@ test('Village landscape v7.2 adds richer archetype detail without changing navig
     };
   });
 
-  expect(result.landscape.version).toBe('village-landscape-v7.2');
-  expect(result.landscape.base).toBe('village-landscape-v6');
+  expect(result.landscape.version).toMatch(/^village-landscape-v7\.([2-9]|\d\d)/);
+  expect(result.landscape.base).toMatch(/^village-landscape-v6(\.|$)/);
   expect(result.landscape.archetypeLandmarks).toBe(true);
   expect(result.landscape.roadsideEdges).toBe(true);
   expect(result.landscape.sharedWell).toBe(true);
@@ -44,8 +44,8 @@ test('Village landscape v7.2 adds richer archetype detail without changing navig
   expect(result.landscape.woodlandUndergrowth).toBe(true);
   expect(result.landscape.crossroadsMilestone).toBe(true);
   expect(result.landscape.navigationUnchanged).toBe(true);
-  expect(result.authority.landscape).toBe('village-landscape-v6');
-  expect(result.authority.landscapeCharacter).toBe('village-landscape-v7.2');
+  expect(result.authority.landscape).toMatch(/^village-landscape-v6(\.|$)/);
+  expect(result.authority.landscapeCharacter).toMatch(/^village-landscape-v7\.([2-9]|\d\d)/);
   expect(result.authority.archetypeCharacter).toBe(true);
   expect(result.activeAuthority).toBe('village-authority-v6');
   expect(result.archetypes.length).toBeGreaterThanOrEqual(4);

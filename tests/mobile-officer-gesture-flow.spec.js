@@ -13,7 +13,14 @@ test('iPhone: officer tap -> 12 musketeers and drummer -> one march -> two-finge
     await page.waitForFunction(() => window.RTS_SIM && window.__OFFICER_REGIMENT_MOBILE_V1__ && window.__PLAYABILITY_CONTROLS_V1__?.mobile);
 
     const officer = await page.evaluate(() => {
-      const unit = window.RTS_SIM.snapshot().units.find(u => u.side === 'france' && u.type === 'officer' && !u.regimentId);
+      // Armies start with workers only: post a trained officer, twelve musketeers
+      // and a drummer in view, as the barracks would deliver them.
+      const at = screenToWorld(250, 140);
+      const officerUnit = createUnit('france', 'officer', at.x, at.y);
+      for (let i = 0; i < 12; i++) createUnit('france', 'infantry', at.x + 40 + (i % 6) * 18, at.y + 30 + Math.floor(i / 6) * 20);
+      createUnit('france', 'drummer', at.x - 30, at.y + 30);
+      window.RTS_SIM.step(0.05);
+      const unit = window.RTS_SIM.snapshot().units.find(u => u.id === officerUnit.id);
       return unit && { id: unit.id, ...window.__RTS_DEBUG__.worldToScreen(unit.x, unit.y) };
     });
     expect(officer).toBeTruthy();

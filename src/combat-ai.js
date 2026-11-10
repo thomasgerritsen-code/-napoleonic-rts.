@@ -1,5 +1,17 @@
 'use strict';
 // ---------- Combat ----------
+// Carry an immutable firing-time identity through every legacy damage wrapper.
+// The source is private simulation data; clients receive only visual projectiles.
+let combatDamageSource = null;
+function combatSourceFor(unit) {
+  return {side:unit.side, regimentId:unit.regimentId || null,
+    damageFactor:window.__REGIMENT_EXPERIENCE__?.attackMultiplier(unit.regimentId) || 1};
+}
+function dealCombatDamage(source, victim, damage, shock = 8) {
+  const previous = combatDamageSource; combatDamageSource = source || null;
+  try { return applyDamage(victim, damage * (source?.damageFactor || 1), shock); }
+  finally { combatDamageSource = previous; }
+}
 function nearestEnemyEntity(unit, maxRange) {
   const otherSide = opposite(unit.side);
   let best = null, bestD2 = maxRange * maxRange;
@@ -66,28 +78,30 @@ function fire(unit, enemy) {
   unit.reload = t.reload * (0.9 + Math.random() * 0.25);
   unit.facing = Math.atan2(enemy.y - unit.y, enemy.x - unit.x);
 
-  if (unit.type === 'cavalry' || unit.type === 'worker' || unit.type === 'drummer') {
+  const bayonet = (unit.type === 'infantry' || unit.type === 'officer') && unit.attackMode === 'bayonet';
+  if (unit.type === 'cavalry' || unit.type === 'worker' || unit.type === 'drummer' || bayonet) {
+    if (bayonet) unit.reload = Math.min(unit.reload, 1.15);
     const chargeBonus = unit.type === 'cavalry' && unit.chargeTimer > 0 ? 2 : 1;
-    applyDamage(enemy, t.damage * chargeBonus * (0.85 + Math.random() * 0.3), unit.chargeTimer > 0 ? 24 : 7);
+    dealCombatDamage(combatSourceFor(unit), enemy, t.damage * chargeBonus * (0.85 + Math.random() * 0.3), unit.chargeTimer > 0 ? 24 : 7);
     spawnImpact(enemy.x, enemy.y, 3);
     return;
   }
 
   if (unit.type === 'artillery' && unit.artilleryMode === 'grape') {
-    const angle = unit.facing;
+    const angle = unit.facing, source = combatSourceFor(unit);
     for (const other of units) {
       if (other.dead || other.side === unit.side) continue;
       const dx = other.x - unit.x, dy = other.y - unit.y, d = Math.hypot(dx, dy);
       if (d > 145) continue;
       const da = Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - angle), Math.cos(Math.atan2(dy, dx) - angle)));
-      if (da < 0.28) { applyDamage(other, 24 * (1 - d / 190), 18); spawnImpact(other.x, other.y, 3); }
+      if (da < 0.28) { dealCombatDamage(source, other, 24 * (1 - d / 190), 18); spawnImpact(other.x, other.y, 3); }
     }
     spawnSmoke(unit.x + Math.cos(angle) * 12, unit.y + Math.sin(angle) * 12, 14);
     return;
   }
 
   projectiles.push({
-    x: unit.x, y: unit.y, target: enemy, side: unit.side,
+    x: unit.x, y: unit.y, target: enemy, side: unit.side, source:combatSourceFor(unit),
     damage: t.damage, speed: t.projectileSpeed, artillery: unit.type === 'artillery', dead: false
   });
   spawnSmoke(unit.x + Math.cos(unit.facing) * 9, unit.y + Math.sin(unit.facing) * 9, unit.type === 'artillery' ? 10 : 4);
@@ -133,7 +147,7 @@ function updateUnit(u, dt) {
 
   let range = TYPES[u.type].range;
   if (u.type === 'artillery' && u.artilleryMode === 'grape') range = 145;
-  if (u.type === 'infantry' && u.attackMode === 'bayonet') range = 16;
+  if ((u.type === 'infantry' || u.type === 'officer') && u.attackMode === 'bayonet') range = 16;
 
   const enemy = nearestEnemyEntity(u, range);
   if (enemy && u.reload <= 0) {
@@ -160,11 +174,11 @@ function updateProjectiles(dt) {
         for (const u of units) {
           if (u.dead || u.side === p.side) continue;
           const dd = Math.hypot(u.x - p.target.x, u.y - p.target.y);
-          if (dd < 42) applyDamage(u, p.damage * Math.max(0.22, 1 - dd / 50), 24);
+          if (dd < 42) dealCombatDamage(p.source, u, p.damage * Math.max(0.22, 1 - dd / 50), 24);
         }
-        if (p.target.kind === 'building') applyDamage(p.target, p.damage * 0.8, 0);
+        if (p.target.kind === 'building') dealCombatDamage(p.source, p.target, p.damage * 0.8, 0);
       } else {
-        applyDamage(p.target, p.damage * (0.75 + Math.random() * 0.5), 10);
+        dealCombatDamage(p.source, p.target, p.damage * (0.75 + Math.random() * 0.5), 10);
         spawnImpact(p.target.x, p.target.y, 3);
       }
       p.dead = true;

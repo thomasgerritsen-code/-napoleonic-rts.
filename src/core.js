@@ -240,8 +240,13 @@
   function worldToScreen(wx, wy) {
     return { x: (wx - camera.x) * camera.zoom + innerWidth / 2, y: (wy - camera.y) * camera.zoom + innerHeight / 2 };
   }
+  // The camera is clamped every simulation step, often right after the HUD has
+  // changed the DOM; reading innerWidth there forces a layout each time (on a
+  // phone a large part of the step). The size is kept from the resize event.
+  let cameraViewW = innerWidth, cameraViewH = innerHeight;
+  addEventListener('resize', () => { cameraViewW = innerWidth; cameraViewH = innerHeight; });
   function clampCamera() {
-    const halfW = innerWidth / (2 * camera.zoom), halfH = innerHeight / (2 * camera.zoom);
+    const halfW = cameraViewW / (2 * camera.zoom), halfH = cameraViewH / (2 * camera.zoom);
     camera.x = Math.max(halfW, Math.min(WORLD.width - halfW, camera.x));
     camera.y = Math.max(halfH, Math.min(WORLD.height - halfH, camera.y));
   }

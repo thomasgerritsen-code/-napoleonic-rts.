@@ -9,7 +9,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const read = relative => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 
 test('game health observer loads after test lab and large-army performance authority', () => {
-  const html = read('index.html');
+  const html = read('play.html');
   const performance = html.indexOf('src/systems/performance/large-army-v1.js');
   const testLab = html.indexOf('src/test-lab.js');
   const health = html.indexOf('src/systems/diagnostics/game-health-observer-v1.js');

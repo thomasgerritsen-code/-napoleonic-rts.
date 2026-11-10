@@ -12,7 +12,7 @@ from pathlib import Path
 
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
 MAX_BYTES = 8 * 1024 * 1024
-MAX_PIXELS = 1024 * 1024
+MAX_PIXELS = 2048 * 2048
 
 
 class PngError(ValueError):
