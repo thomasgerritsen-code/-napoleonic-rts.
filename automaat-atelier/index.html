@@ -143,6 +143,7 @@ ul.hw li{margin:3px 0}
       <h2>Mechanisme</h2>
       <div class="tablewrap"><table id="mechTable"></table></div>
       <p class="note">Overbrengingshoek: hoek tussen stang en hefboom. Boven 40° loopt het licht, onder 25° gaat het klemmen.</p>
+      <div id="realPanel"></div>
       <h2>Pasvorm (3D)</h2>
       <div id="fitList"></div>
       <div class="row"><button class="btn" id="fitBtn" type="button">Controleer opnieuw</button></div>
@@ -198,7 +199,7 @@ const blobH=(b,x,z)=>{ const q=((x-b.x)/b.rx)**2+((z-b.z)/b.rz)**2; return q>=1?
 /* ------------------------------------------------------------------ */
 const PRESETS = {
   manta: { name:'Manta', w0Frac:0.11, split:{kind:'staart',side:-1,cut:(le,te)=>te-16}, colors:{wing:'#3f4954',body:'#363e48',belly:'#d9d6cf'},
-    def:{span:240,n:3,chord:105,sweep:30,thick:4,bulk:6,e:7,grow:35,lag:32,down:50,dihedral:4,attach:55,height:105,rpm:8,pitch:5,pphase:90,heave:4,hphase:270,forced:1,hole:2.0,tip:60,headk:0},
+    def:{span:240,n:1,chord:105,sweep:30,thick:4,bulk:6,e:14,grow:0,lag:0,down:50,glide:40,dihedral:4,attach:25,height:120,rpm:18,pitch:1.5,pphase:90,heave:0,hphase:270,forced:0,hole:2.0,tip:70,headk:0},
     plan(t,P){ const C=P.chord, le1=-P.sweep-C*0.05;
       const le=C*0.5*(1-Math.pow(t,1.7))+le1*Math.pow(t,2.2);
       const te=lerp(-C*0.5, le1-5, Math.pow(t,0.62));
@@ -291,7 +292,8 @@ const CONTROLS = [
   {g:'Beweging'},
   {id:'e',label:'Nokslag (excentriciteit)',min:4,max:16,step:0.5,unit:'mm'},
   {id:'down',label:'Duur van de neerslag',min:35,max:50,step:1,unit:'%',hint:'Echte vogels slaan snel neer en trekken de vleugel langzaam op. 50% is een gelijkmatige golf.'},
-  {id:'grow',label:'Extra slag per segment naar buiten',min:0,max:80,step:1,unit:'%'},
+  {id:'glide',label:'Glijfase bovenaan de slag',min:0,max:80,step:5,unit:'%',hint:'Manta\'s houden de vleugels even stil in de hoogste stand voordat ze neerslaan (Fish et al.).'},
+  {id:'grow',label:'Extra slag per segment naar buiten',min:0,max:250,step:1,unit:'%'},
   {id:'lag',label:'Faseverschil tussen segmenten',min:0,max:90,step:1,unit:'°',hint:'Geeft de golvende beweging: buitenste segmenten lopen achter.'},
   {id:'dihedral',label:'V-stelling in ruststand',min:-10,max:25,step:1,unit:'°'},
   {id:'attach',label:'Aangrijppunt stang op segment',min:25,max:85,step:1,unit:'%'},
@@ -310,7 +312,7 @@ const CONTROLS = [
   {id:'rpm',label:'Toerental nokas',min:2,max:40,step:1,unit:'rpm'}
 ];
 
-const STORE='automaat-atelier-v5';
+const STORE='automaat-atelier-v7';
 let P = loadParams() || Object.assign({preset:'manta'}, PRESETS.manta.def);
 function loadParams(){ try{ const s=localStorage.getItem(STORE); if(!s) return null; const o=JSON.parse(s); if(!PRESETS[o.preset]) return null; return Object.assign({},PRESETS[o.preset].def,o);}catch(e){return null;} }
 function saveParams(){ try{ localStorage.setItem(STORE,JSON.stringify(P)); }catch(e){} }
@@ -323,10 +325,11 @@ function warpFor(down){ const target=2*Math.PI*down/100; let lo=0, hi=0.95;
   const thetaStar=(a)=>{ let l=0,h=Math.PI; for(let k=0;k<40;k++){ const m=(l+h)/2; (m+a*(1-Math.cos(m))<Math.PI)?l=m:h=m; } return (l+h)/2; };
   if(target>=Math.PI-1e-6) return 0;
   for(let k=0;k<40;k++){ const m=(lo+hi)/2; thetaStar(m)>target?lo=m:hi=m; } return (lo+hi)/2; }
-function wave(a){ return {
-  f:(x)=>Math.cos(x+a*(1-Math.cos(x))),
-  f1:(x)=>-Math.sin(x+a*(1-Math.cos(x)))*(1+a*Math.sin(x)),
-  f2:(x)=>{ const w=x+a*(1-Math.cos(x)), w1=1+a*Math.sin(x), w2=a*Math.cos(x); return -Math.cos(w)*w1*w1-Math.sin(w)*w2; } }; }
+// w(x)=x+a(1-cos x)-b sin x: a = snellere neerslag, b = glijfase (vertraging) in de bovenste stand
+function wave(a,b){ b=b||0; const m=Math.hypot(a,b); if(m>0.92){ a*=0.92/m; b*=0.92/m; } return {
+  f:(x)=>Math.cos(x+a*(1-Math.cos(x))-b*Math.sin(x)),
+  f1:(x)=>-Math.sin(x+a*(1-Math.cos(x))-b*Math.sin(x))*(1+a*Math.sin(x)-b*Math.cos(x)),
+  f2:(x)=>{ const w=x+a*(1-Math.cos(x))-b*Math.sin(x), w1=1+a*Math.sin(x)-b*Math.cos(x), w2=a*Math.cos(x)+b*Math.sin(x); return -Math.cos(w)*w1*w1-Math.sin(w)*w2; } }; }
 
 /* ------------------------------------------------------------------ */
 /* Afgeleide maten van het mechanisme                                 */
@@ -343,7 +346,7 @@ function derive(alt){
   d.dihedral=P.dihedral*DEG;
   d.plan=(t)=>{ const r=pre.plan(clamp(t,0,1),P); let le=r.le, te=r.te; if(le-te<6){const m=(le+te)/2; le=m+3; te=m-3;} return {le,te,zc:(le+te)/2}; };
   d.ridges=pre.ridges(d,P);
-  d.warp=warpFor(P.down); d.W=wave(d.warp);
+  d.warp=warpFor(P.down); d.W=wave(d.warp,(P.glide||0)/100*0.85);
   d.e=[];d.Rb=[];d.Rmax=[];d.fw=[];d.xp=[];d.phi=[];
   for(let i=0;i<d.n;i++){
     const e=P.e*(1+P.grow/100*i); d.e[i]=e; d.xp[i]=9+6*i; d.phi[i]=-i*P.lag*DEG;
@@ -376,6 +379,7 @@ function derive(alt){
   const zmax=Math.max(...d.z), zmin=Math.min(...d.z)-(d.forced?7:0);
   // paal voor of achter de nokken; kantelstift aan de buitenkant daarvan
   const hb=hingeBandsRaw(d,0); d.le0=hb.le; d.te0=hb.te;
+  { const bo=pre.body(d.w0,hb.le,hb.te); d.BL=Math.max(...bo.front.map(p=>p[1]))-hb.te; } // lichaamslengte zonder staart
   d.belly=pre.belly(d.w0,d.le0,d.te0,P);
   if(pre.split){ d.zCut=pre.split.cut(d.le0,d.te0); d.side=pre.split.side; // buik blijft uit de buurt van het kop/staartscharnier
     const Bq=d.belly; let lo=Bq.zm-Bq.Lz, hi=Bq.zm+Bq.Lz; if(d.side>0) hi=Math.min(hi,d.zCut-6); else lo=Math.max(lo,d.zCut+6); Bq.zm=(lo+hi)/2; Bq.Lz=(hi-lo)/2; }
@@ -450,6 +454,7 @@ function derive(alt){
     if(bd<0&&d.n>=2){ // te smal: koppelstang op dezelfde pen als het stangoog van het voorgaande segment, aan de andere kant
       d.tipShared=true; d.dTA=d.l-d.att[d.n-2]; d.rTA=d.hTab; d.zTipRod=d.zTab[d.n-2]+3.3; d.zTipEye=d.zTipRod+3.3; }
     d.tipPlaneOK=bd>=0||d.tipShared;
+    if(d.n===1) d.belly.wb=Math.min(d.belly.wb,d.w0-d.dTA-6.5); // koppeloog hangt aan het lijf: buik smaller zodat het vrij hangt
     d.rTB=Math.max(d.t/2+6,d.rTA/d.kTip); d.bTB=Math.atan2(-d.rTB,d.dTB); d.rhoTB=Math.hypot(d.dTB,d.rTB);
     const Jp={x:d.w0+(d.n-1)*d.l*Math.cos(d.dihedral), y:d.yB+(d.n-1)*d.l*Math.sin(d.dihedral)}, aP=d.n>=2?d.dihedral:0;
     const A={x:Jp.x-d.dTA*Math.cos(aP)+d.rTA*Math.sin(aP), y:Jp.y-d.dTA*Math.sin(aP)-d.rTA*Math.cos(aP)};
@@ -1355,12 +1360,12 @@ function syncControls(){
 }
 let rbTimer=null, fitTimer=null;
 function scheduleRebuild(){ clearTimeout(rbTimer); rbTimer=setTimeout(()=>rebuild(false),90); }
-function analyzeOnly(){ analyze(); renderStatus(); renderForces(); }
+function analyzeOnly(){ analyze(); renderStatus(); renderForces(); renderReal(); }
 function rebuild(reframe){
   saveParams(); D=derive(null); lastA=null; buildParts(); analyze();
   buildScene();
   if(viewMode==='bed') buildBedScene();
-  renderStatus(); renderMech(); renderForces(); renderParts(); drawGraph();
+  renderStatus(); renderMech(); renderForces(); renderReal(); renderParts(); drawGraph();
   VCACHE.clear(); fitToken++; FIT={state:'idle'}; renderFit(); clearTimeout(fitTimer); fitTimer=setTimeout(runFitCheck,900);
   if(reframe) frameCamera();
 }
@@ -1449,6 +1454,23 @@ function drawTorque(){
   c.strokeStyle=acc; c.lineWidth=2; c.beginPath(); T.forEach((v,k)=>{ const x=X(k/T.length*360), y=Y(v); k?c.lineTo(x,y):c.moveTo(x,y); }); c.lineTo(X(360),Y(T[0])); c.stroke();
   c.strokeStyle=css('--muted'); c.beginPath(); c.moveTo(padL,Y(0)+.5); c.lineTo(W-padR,Y(0)+.5); c.stroke();
   const td=((curTheta/DEG)%360+360)%360; c.strokeStyle=css('--ink'); c.lineWidth=1; c.beginPath(); c.moveTo(X(td)+.5,padT); c.lineTo(X(td)+.5,padT+ih); c.stroke();
+}
+// meetwaarden van vrij zwemmende manta's (Fish et al.)
+const MANTA_REF={freq:0.31, freqSd:0.11, ampBL:0.74};
+function renderReal(){
+  const el=document.getElementById('realPanel'); if(P.preset!=='manta'){ el.innerHTML=''; return; }
+  const f=P.rpm/60, amp=(AN.tipMax-AN.tipMin)/D.BL, pr=Math.max(Math.abs(AN.pMin),Math.abs(AN.pMax));
+  const chip=(ok)=>`<span class="dot" style="background:var(${ok?'--ok':'--warn'})"></span>`;
+  const nl=(x,d)=>x.toFixed(d).replace('.',',');
+  const rows=[
+    ['Slagfrequentie',`${nl(f,2)} Hz`,`${nl(MANTA_REF.freq,2)} ± ${nl(MANTA_REF.freqSd,2)} Hz`,Math.abs(f-MANTA_REF.freq)<=MANTA_REF.freqSd],
+    ['Uitslag punt (× lijflengte)',`${nl(amp,2)}`,`${nl(MANTA_REF.ampBL,2)}`,Math.abs(amp-MANTA_REF.ampBL)<0.12],
+    ['Lijf kantelt / deint',`±${nl(pr,1)}° / ${nl(2*(D.eh||0),1)} mm`,'klein',pr<=3&&(D.eh||0)<=1.5],
+    ['Glijfase bovenaan',`${P.glide||0}%`,'ja',(P.glide||0)>=20],
+    ['Punt loopt achter',D.tipOn?`${nl(AN.tipRel[1]-AN.tipRel[0],0)}° buiging`:(P.lag>0?`fase ${P.lag}°`:'nee'),'ja',D.tipOn||P.lag>0]];
+  el.innerHTML=`<h2>Vergelijking met een echte manta</h2><div class="tablewrap"><table><thead><tr><th>Kenmerk</th><th style="text-align:right">Ontwerp</th><th style="text-align:right">Echte manta</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td style="white-space:normal">${chip(r[3])}${r[0]}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td></tr>`).join('')+`</tbody></table></div>
+    <p class="note">Bronnen: Fish et al. (2016) <a href="https://doi.org/10.3390/aerospace3030020" target="_blank" rel="noopener">Hydrodynamic performance of aquatic flapping</a>, Aerospace 3(3); Fish et al. (2018) <a href="https://journals.biologists.com/jeb/article/221/6/jeb166041/20833/Kinematics-of-swimming-of-the-manta-ray-three" target="_blank" rel="noopener">Kinematics of swimming of the manta ray</a>, J. Exp. Biol.; <a href="https://doi.org/10.3390/biomimetics7020045" target="_blank" rel="noopener">Biomimetics 7(2) 2022</a>. Een echte manta van ±4 m slaat ±0,3 keer per seconde; een kleine automaat mag iets sneller.</p>`;
 }
 function renderForces(){
   const rows=[['Bewegende massa',`${Math.round(PH.moving)} g`],['Piekkoppel (zwaartekracht)',`${AN.tauMax.toFixed(2)} N·cm`],
