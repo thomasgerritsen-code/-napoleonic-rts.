@@ -197,11 +197,11 @@ const blobH=(b,x,z)=>{ const q=((x-b.x)/b.rx)**2+((z-b.z)/b.rz)**2; return q>=1?
 /* spanfractie t (0 = lijf, 1 = punt). wing(): dikte in mm.             */
 /* ------------------------------------------------------------------ */
 const PRESETS = {
-  manta: { name:'Manta', w0Frac:0.11, split:{kind:'staart',side:-1,cut:(le,te)=>te-16}, colors:{wing:'#3f4954',body:'#363e48',belly:'#d9d6cf'},
-    def:{span:240,n:1,chord:105,sweep:30,thick:4,bulk:6,e:14,grow:0,lag:0,down:50,glide:40,dihedral:4,attach:25,height:120,rpm:18,pitch:1.5,pphase:90,heave:0,hphase:270,forced:0,hole:2.0,tip:70,headk:0},
+  manta: { name:'Manta', w0Frac:0.11, tailBase:14, split:{kind:'staart',side:-1,cut:(le,te)=>te-16}, colors:{wing:'#3f4954',body:'#363e48',belly:'#d9d6cf'},
+    def:{span:240,n:1,chord:105,sweep:10,thick:4,bulk:6,e:14,grow:0,lag:0,down:43,glide:40,dihedral:4,attach:25,height:120,rpm:16,pitch:1.5,pphase:260,heave:0,hphase:270,forced:0,hole:2.0,tip:70,headk:0,w0f:0.085,leExp:1.2,teExp:0.6},
     plan(t,P){ const C=P.chord, le1=-P.sweep-C*0.05;
-      const le=C*0.5*(1-Math.pow(t,1.7))+le1*Math.pow(t,2.2);
-      const te=lerp(-C*0.5, le1-5, Math.pow(t,0.62));
+      const le=C*0.5*(1-Math.pow(t,P.leExp||1.7))+le1*Math.pow(t,2.2);
+      const te=lerp(-C*0.5, le1-5, Math.pow(t,P.teExp||0.62));
       return {le,te}; },
     wing(tn,xc,s,z,P){ const tm=Math.max(1.6,P.bulk*(1-0.8*tn)); return 1.4+(tm-1.4)*Math.pow(af(xc),0.7); },
     ridges(){ return []; },
@@ -311,7 +311,7 @@ const CONTROLS = [
   {id:'rpm',label:'Toerental nokas',min:2,max:40,step:1,unit:'rpm'}
 ];
 
-const STORE='automaat-atelier-v7';
+const STORE='automaat-atelier-v8';
 let P = loadParams() || Object.assign({preset:'manta'}, PRESETS.manta.def);
 function loadParams(){ try{ const s=localStorage.getItem(STORE); if(!s) return null; const o=JSON.parse(s); if(!PRESETS[o.preset]) return null; return Object.assign({},PRESETS[o.preset].def,o);}catch(e){return null;} }
 function saveParams(){ try{ localStorage.setItem(STORE,JSON.stringify(P)); }catch(e){} }
@@ -338,7 +338,7 @@ function derive(alt){
   const pre=PRESETS[P.preset];
   const d={pre};
   d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced; d.gap=d.forced?11:9;
-  d.w0=Math.max(6,P.span*pre.w0Frac);
+  d.w0=Math.max(6,P.span*(P.w0f||pre.w0Frac));
   d.Sw=P.span/2-d.w0;
   d.tipOn=P.tip>0; d.kTip=clamp(P.tip/100,0.3,1); d.tf=d.tipOn?0.24:0;
   d.l=d.Sw*(1-d.tf)/d.n; d.lt=d.Sw*d.tf;
@@ -378,7 +378,13 @@ function derive(alt){
   const zmax=Math.max(...d.z), zmin=Math.min(...d.z)-(d.forced?7:0);
   // paal voor of achter de nokken; kantelstift aan de buitenkant daarvan
   const hb=hingeBandsRaw(d,0); d.le0=hb.le; d.te0=hb.te;
-  { const bo=pre.body(d.w0,hb.le,hb.te); d.BL=Math.max(...bo.front.map(p=>p[1]))-hb.te; } // lichaamslengte zonder staart
+  // vormmaten zoals Fish et al. 2016: lichaamslengte = rostrum (snuit, midden) tot staartbasis; aspectratio = spanwijdte² / oppervlak
+  { const bo=pre.body(d.w0,hb.le,hb.te), zR=bo.front[0][1], zT=hb.te-(pre.tailBase||0);
+    d.BL=zR-zT; d.zRostrum=zR; d.zTailBase=zT;
+    let Sw=0; const N=200; for(let k=0;k<N;k++){ const p=d.plan((k+0.5)/N); Sw+=(p.le-p.te)*d.Sw/N; }
+    const half=[[0,zR],...bo.front.slice(1),[d.w0,hb.le],[d.w0,hb.te],...bo.back.filter(p=>p[1]>=zT-0.01)]; if(half[half.length-1][0]>0) half.push([0,Math.max(zT,half[half.length-1][1])]);
+    const full=[...half,...half.slice(1,-1).reverse().map(p=>[-p[0],p[1]])]; d.Sbody=Math.abs(loopArea(full)); d.Splan=2*Sw+d.Sbody;
+    d.AR=P.span*P.span/d.Splan; d.spanBL=P.span/d.BL; d.tipPos=(zR-d.plan(1).zc)/d.BL; }
   d.belly=pre.belly(d.w0,d.le0,d.te0,P);
   if(pre.split){ d.zCut=pre.split.cut(d.le0,d.te0); d.side=pre.split.side; // buik blijft uit de buurt van het kop/staartscharnier
     const Bq=d.belly; let lo=Bq.zm-Bq.Lz, hi=Bq.zm+Bq.Lz; if(d.side>0) hi=Math.min(hi,d.zCut-6); else lo=Math.max(lo,d.zCut+6); Bq.zm=(lo+hi)/2; Bq.Lz=(hi-lo)/2; }
@@ -973,7 +979,9 @@ function segDist(p1,p2,q1,q2){
 function analyze(){
   const N=180, n=D.n;
   const A={angles:[...Array(n)].map(()=>[]), muMin:Array(n).fill(90), relMax:Array(n).fill(0), aMin:Array(n).fill(1e9), aMax:Array(n).fill(-1e9),
-    lockAt:Array(n).fill(null), hitAt:Array(n).fill(null), minY:1e9, tipMin:1e9, tipMax:-1e9, tipR:[], pitch:[], pMin:0, pMax:0, plock:false, tiltMax:0, tau:[], heave:[], Fw:Array(n).fill(1e9), FwAbs:Array(n).fill(0), Fp:1e9, Fh:1e9, tipAng:[], tipRel:[0,0], tipLock:false, head:[], headLock:false, headHit:false};
+    lockAt:Array(n).fill(null), hitAt:Array(n).fill(null), minY:1e9, tipMin:1e9, tipMax:-1e9, tipR:[], pitch:[], pMin:0, pMax:0, plock:false, tiltMax:0, tau:[], heave:[], Fw:Array(n).fill(1e9), FwAbs:Array(n).fill(0), Fp:1e9, Fh:1e9, tipAng:[], tipRel:[0,0], tipLock:false, head:[], headLock:false, headHit:false, p30:[], tipVel:[]};
+  // punt op 30% van de halve spanwijdte (vanaf het midden van het lijf), langs de vleugelketen
+  const s30=0.3*P.span/2-D.w0;
   const zt=D.plan(1).zc;
   let prev=null;
   for(let k=0;k<=N;k++){
@@ -990,6 +998,7 @@ function analyze(){
     if(D.headOn&&s.headH){ A.head.push(-s.a.head/DEG); if(s.headLock) A.headLock=true;
       for(let t=0;t<=1.001;t+=0.1){ const y=lerp(s.headA.y,s.headB.y,t), z=lerp(s.headA.z,s.headB.z,t), b=toBody(s.phi,y,z,s.h), Bq=D.belly;
         if(Math.abs(b.z-Bq.zm)<Bq.Lz){ const bot=D.yB-D.t/2-D.bellyIdeal(D.xHeadRod*0,b.z)*1; if(b.y+3.5>bot-0.5&&t>0.15&&t<0.85) A.headHit=true; } } }
+    { let rem=s30, y=D.yB; if(rem>0){ for(let i=0;i<n&&rem>0;i++){ const L=Math.min(rem,D.l); y=s.J[i].y+L*Math.sin(s.a[i]); rem-=L; } } A.p30.push(y); }
     const tip=s.tipEnd, tw=toWorld(s.phi,tip.y,zt,s.h); A.tipMin=Math.min(A.tipMin,tip.y); A.tipMax=Math.max(A.tipMax,tip.y); A.tipR.push({x:tip.x,y:tw.y,z:tw.z,yb:tip.y});
     if(k<N){ const F=camForces(s), r=driveRate(th); let tq=0; F.w.forEach((f,i)=>{ tq+=f*r.w[i]; A.Fw[i]=Math.min(A.Fw[i],f); A.FwAbs[i]=Math.max(A.FwAbs[i],Math.abs(f)); }); tq+=F.p*r.p+F.h*r.h; A.Fp=Math.min(A.Fp,F.p); A.FpAbs=Math.max(A.FpAbs||0,Math.abs(F.p)); A.Fh=Math.min(A.Fh,F.h); A.tau.push(tq/10); }
     A.heave.push(s.h);
@@ -997,6 +1006,11 @@ function analyze(){
   }
   // duur neerslag van de vleugelpunt
   let downN=0; for(let k=0;k<N;k++) if(A.tipR[k+1].yb<A.tipR[k].yb) downN++;
+  { const yb=A.tipR.map(p=>p.yb-D.yB), up=Math.max(0,...yb), dn=Math.max(0,...yb.map(v=>-v)); A.upFrac=up/Math.max(1e-6,up+dn);
+    A.ratio30=(Math.max(...A.p30)-Math.min(...A.p30))/Math.max(1e-6,A.tipMax-A.tipMin);
+    let kv=0, vmin=1e9; for(let k=0;k<N;k++){ const v=A.tipR[k+1].yb-A.tipR[k].yb; if(v<vmin){ vmin=v; kv=k; } } A.thDown=(kv+0.5)/N*360;
+    let kp=0, pmax=-1e9; A.pitch.forEach((v,k)=>{ if(v>pmax){ pmax=v; kp=k; } }); A.thNoseUp=kp/N*360;
+    A.pitchOK=D.pitchOn&&angDist(A.thDown*DEG,A.thNoseUp*DEG)<50*DEG; }
   A.downShare=downN/N;
   const msgs=[];
   for(let i=0;i<n;i++){
@@ -1454,22 +1468,31 @@ function drawTorque(){
   c.strokeStyle=css('--muted'); c.beginPath(); c.moveTo(padL,Y(0)+.5); c.lineTo(W-padR,Y(0)+.5); c.stroke();
   const td=((curTheta/DEG)%360+360)%360; c.strokeStyle=css('--ink'); c.lineWidth=1; c.beginPath(); c.moveTo(X(td)+.5,padT); c.lineTo(X(td)+.5,padT+ih); c.stroke();
 }
-// meetwaarden van vrij zwemmende manta's (Fish et al.)
-const MANTA_REF={freq:0.31, freqSd:0.11, ampBL:0.74};
+// meetwaarden uit Fish et al. 2016 (Aerospace 3, 20); 'afgelezen' = uit een figuur gemeten, geen getal in de tekst
+const MANTA_REF={spanBL:3.50/1.85, AR:3.5, tipPos:0.6, ampBL:0.824, ampSd:0.225, down:0.43, upFrac:0.62, r30:0.17};
 function renderReal(){
   const el=document.getElementById('realPanel'); if(P.preset!=='manta'){ el.innerHTML=''; return; }
-  const f=P.rpm/60, amp=(AN.tipMax-AN.tipMin)/D.BL, pr=Math.max(Math.abs(AN.pMin),Math.abs(AN.pMax));
+  const nl=(x,d)=>x.toFixed(d).replace('.',','), f=P.rpm/60, amp=(AN.tipMax-AN.tipMin)/D.BL, pr=Math.max(Math.abs(AN.pMin),Math.abs(AN.pMax));
   const chip=(ok)=>`<span class="dot" style="background:var(${ok?'--ok':'--warn'})"></span>`;
-  const nl=(x,d)=>x.toFixed(d).replace('.',',');
-  const rows=[
-    ['Slagfrequentie',`${nl(f,2)} Hz`,`${nl(MANTA_REF.freq,2)} ± ${nl(MANTA_REF.freqSd,2)} Hz`,Math.abs(f-MANTA_REF.freq)<=MANTA_REF.freqSd],
-    ['Uitslag punt (× lijflengte)',`${nl(amp,2)}`,`${nl(MANTA_REF.ampBL,2)}`,Math.abs(amp-MANTA_REF.ampBL)<0.12],
-    ['Lijf kantelt / deint',`±${nl(pr,1)}° / ${nl(2*(D.eh||0),1)} mm`,'klein',pr<=3&&(D.eh||0)<=1.5],
-    ['Glijfase bovenaan',`${P.glide||0}%`,'ja',(P.glide||0)>=20],
-    ['Punt loopt achter',D.tipOn?`${nl(AN.tipRel[1]-AN.tipRel[0],0)}° buiging`:(P.lag>0?`fase ${P.lag}°`:'nee'),'ja',D.tipOn||P.lag>0]];
-  el.innerHTML=`<h2>Vergelijking met een echte manta</h2><div class="tablewrap"><table><thead><tr><th>Kenmerk</th><th style="text-align:right">Ontwerp</th><th style="text-align:right">Echte manta</th></tr></thead><tbody>`+
-    rows.map(r=>`<tr><td style="white-space:normal">${chip(r[3])}${r[0]}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td></tr>`).join('')+`</tbody></table></div>
-    <p class="note">Bronnen: Fish et al. (2016) <a href="https://doi.org/10.3390/aerospace3030020" target="_blank" rel="noopener">Hydrodynamic performance of aquatic flapping</a>, Aerospace 3(3); Fish et al. (2018) <a href="https://journals.biologists.com/jeb/article/221/6/jeb166041/20833/Kinematics-of-swimming-of-the-manta-ray-three" target="_blank" rel="noopener">Kinematics of swimming of the manta ray</a>, J. Exp. Biol.; <a href="https://doi.org/10.3390/biomimetics7020045" target="_blank" rel="noopener">Biomimetics 7(2) 2022</a>. Een echte manta van ±4 m slaat ±0,3 keer per seconde; een kleine automaat mag iets sneller.</p>`;
+  const sec=(t)=>`<tr><th colspan="3" style="padding-top:10px">${t}</th></tr>`;
+  const row=(a,b,c,ok)=>`<tr><td style="white-space:normal">${chip(ok)}${a}</td><td class="num">${b}</td><td class="num" style="white-space:normal">${c}</td></tr>`;
+  el.innerHTML=`<h2>Vergelijking met een echte manta</h2><div class="tablewrap"><table><thead><tr><th>Kenmerk</th><th style="text-align:right">Ontwerp</th><th style="text-align:right">Fish et al.</th></tr></thead><tbody>`+
+    sec('Vorm')+
+    row('Spanwijdte : lijflengte',nl(D.spanBL,2),'1,89 (3,50 / 1,85 m)',Math.abs(D.spanBL-MANTA_REF.spanBL)<0.1)+
+    row('Aspectratio (span² / opp.)',nl(D.AR,2),'3,5',Math.abs(D.AR-MANTA_REF.AR)<0.2)+
+    row('Vinpunt vanaf snuit (× lijflengte)',nl(D.tipPos,2),'± 0,6 (afgelezen Fig. 18b)',Math.abs(D.tipPos-MANTA_REF.tipPos)<0.08)+
+    sec('Beweging')+
+    row('Slagfrequentie',`${nl(f,2)} Hz`,'0,15–0,5 Hz (f = 0,189 + 0,223·U)',f>=0.15&&f<=0.5)+
+    row('Uitslag punt (× lijflengte)',nl(amp,2),'0,82 ± 0,23',Math.abs(amp-MANTA_REF.ampBL)<=MANTA_REF.ampSd)+
+    row('Duur neerslag',`${Math.round(AN.downShare*100)}%`,'43% (opslag 57%)',Math.abs(AN.downShare-MANTA_REF.down)<0.06)+
+    row('Deel uitslag boven het lijf',`${Math.round(AN.upFrac*100)}%`,'± 62% (afgelezen Fig. 17b2)',Math.abs(AN.upFrac-MANTA_REF.upFrac)<0.08)+
+    row('Uitslag op 0,3 halve span ÷ punt',nl(AN.ratio30,2),'± 0,17 (afgelezen Fig. 17b2)',Math.abs(AN.ratio30-MANTA_REF.r30)<0.1)+
+    row('Lijf kantelt omhoog bij neerslag',AN.pitchOK?'ja':'nee','ja (blz. 15)',AN.pitchOK)+
+    row('Lijf verder stabiel',`±${nl(pr,1)}° / ${nl(2*(D.eh||0),1)} mm`,'klein',pr<=3&&(D.eh||0)<=1.5)+
+    row('Glijfase bovenaan',`${P.glide||0}%`,'ja (blz. 9)',(P.glide||0)>=20)+
+    row('Punt loopt achter, buigt omlaag bij opslag',D.tipOn?`${nl(AN.tipRel[1]-AN.tipRel[0],0)}° buiging`:'nee','ja (blz. 2, 9)',D.tipOn)+
+    `</tbody></table></div>
+    <p class="note">Bron: Fish, Schreiber, Moored, Liu, Dong &amp; Bart-Smith (2016), <a href="https://doi.org/10.3390/aerospace3030020" target="_blank" rel="noopener">Hydrodynamic Performance of Aquatic Flapping: Efficiency of Underwater Flight in the Manta</a>, Aerospace 3(3):20. Lijflengte gemeten van rostrum tot staartbasis, zoals in het artikel. Niet na te bootsen met vlakke scharnierende platen: de draaiing van de vinpunt (tot 70°) en de koordegolf.</p>`;
 }
 function renderForces(){
   const rows=[['Bewegende massa',`${Math.round(PH.moving)} g`],['Piekkoppel (zwaartekracht)',`${AN.tauMax.toFixed(2)} N·cm`],
