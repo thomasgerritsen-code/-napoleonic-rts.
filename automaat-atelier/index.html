@@ -199,7 +199,7 @@ const blobH=(b,x,z)=>{ const q=((x-b.x)/b.rx)**2+((z-b.z)/b.rz)**2; return q>=1?
 /* ------------------------------------------------------------------ */
 const PRESETS = {
   manta: { name:'Manta', w0Frac:0.11, tailBase:14, split:{kind:'staart',side:-1,cut:(le,te)=>te-16}, colors:{wing:'#3f4954',body:'#363e48',belly:'#d9d6cf'},
-    def:{span:240,n:1,chord:105,sweep:10,thick:4,bulk:6,e:14,grow:0,lag:0,down:43,glide:40,dihedral:4,attach:25,height:120,rpm:16,pitch:1.5,pphase:260,heave:0,hphase:270,forced:0,hole:2.0,tip:70,headk:0,w0f:0.085,leExp:1.2,teExp:0.6,skew:45,sym:1},
+    def:{span:240,n:3,chord:105,sweep:10,thick:4,bulk:6,e:4.6,grow:143,lag:18,down:42,glide:50,dihedral:7,attach:48,height:125,rpm:16,pitch:1.5,pphase:215,heave:0,hphase:270,forced:1,hole:2.0,tip:90,headk:0,w0f:0.085,leExp:1.2,teExp:0.6,skew:45,sym:1,lever:1.5},
     plan(t,P){ const C=P.chord, le1=-P.sweep-C*0.05;
       const le=C*0.5*(1-Math.pow(t,P.leExp||1.7))+le1*Math.pow(t,2.2);
       const te=lerp(-C*0.5, le1-5, Math.pow(t,P.teExp||0.62));
@@ -217,10 +217,11 @@ const PRESETS = {
       {x:w0*0.86,z:le+12,rx:3.4,rz:3.4,h:Math.max(4,B*0.75),p:0.6},{x:-w0*0.86,z:le+12,rx:3.4,rz:3.4,h:Math.max(4,B*0.75),p:0.6}]; },
     belly(w0,le,te,P){ return {wb:w0-6,zm:(le+te)/2,Lz:(le-te)/2+4,depth:P.bulk*0.9,p:2.6}; },
     // rugtekening (rifmanta): donkere rug, witte schoudervlekken die naar de vinvoorrand uitlopen; x = afstand tot het midden
-    pattern(x,z,w0,le,te){ const ax=Math.abs(x), zc=le-18;
-      const sh=Math.exp(-(((ax-(w0+16))/20)**2+((z-zc+(ax-w0)*0.35)/13)**2));
-      const mid=sstep(w0*0.35,w0*0.75,ax); const v=clamp(sh*mid*1.35,0,1);
-      const dark=[0.21,0.24,0.28], light=[0.86,0.87,0.86]; return [lerp(dark[0],light[0],v),lerp(dark[1],light[1],v),lerp(dark[2],light[2],v)]; } },
+    pattern(x,z,w0,le,te){ const ax=Math.abs(x);
+      // lichte band van achter de ogen schuin naar achteren/buiten, zacht uitlopend; donkere middenstreep
+      const d=segDist2(ax,z,w0*0.75,le-6,w0+46,le-44), along=clamp((ax-w0*0.75)/(46+w0*0.25),0,1);
+      const v=Math.exp(-((d/8.5)**2))*sstep(w0*0.3,w0*0.8,ax)*(1-0.6*along)*0.85;
+      const dark=[0.20,0.23,0.27], light=[0.80,0.82,0.82]; return [lerp(dark[0],light[0],v),lerp(dark[1],light[1],v),lerp(dark[2],light[2],v)]; } },
   vogel: { name:'Vogel', w0Frac:0.075, split:{kind:'kop',side:1,cut:(le,te)=>le+27}, colors:{wing:'#6f4d30',body:'#82603f',belly:'#cdb497'},
     def:{span:260,n:2,chord:72,sweep:20,thick:4,bulk:5,e:9,grow:30,lag:30,down:40,dihedral:8,attach:50,height:110,rpm:16,pitch:5,pphase:110,heave:5,hphase:0,forced:1,hole:2.0,tip:65,headk:100},
     plan(t,P){ const C=P.chord;
@@ -320,7 +321,7 @@ const CONTROLS = [
   {id:'rpm',label:'Toerental nokas',min:2,max:40,step:1,unit:'rpm'}
 ];
 
-const STORE='automaat-atelier-v10';
+const STORE='automaat-atelier-v11';
 let P = loadParams() || Object.assign({preset:'manta'}, PRESETS.manta.def);
 function loadParams(){ try{ const s=localStorage.getItem(STORE); if(!s) return null; const o=JSON.parse(s); if(!PRESETS[o.preset]) return null; return Object.assign({},PRESETS[o.preset].def,o);}catch(e){return null;} }
 function saveParams(){ try{ localStorage.setItem(STORE,JSON.stringify(P)); }catch(e){} }
@@ -655,8 +656,11 @@ function heightSolid(outer, holes, thick, grid, yBase, colorFn){
       side.push(...yt,...xt,...xb, ...yt,...xb,...yb); } } }
   const gT=new THREE.BufferGeometry(); gT.setAttribute('position',new THREE.BufferAttribute(top,3)); gT.setIndex(idxT); gT.computeVertexNormals();
   if(colorFn){ const col=new Float32Array(V.length*3); V.forEach((p,i)=>{ const c=colorFn(p[0],p[1]); col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2]; }); gT.setAttribute('color',new THREE.BufferAttribute(col,3)); }
+  const colB=colorFn?(colorFn.under||[0.86,0.87,0.86]):null;
   const gB=new THREE.BufferGeometry(); gB.setAttribute('position',new THREE.BufferAttribute(bot,3)); gB.setIndex(idxB);
+  if(colB){ const c=new Float32Array(V.length*3); for(let i=0;i<V.length;i++){ c[i*3]=colB[0]; c[i*3+1]=colB[1]; c[i*3+2]=colB[2]; } gB.setAttribute('color',new THREE.BufferAttribute(c,3)); }
   const gS=new THREE.BufferGeometry(); gS.setAttribute('position',new THREE.BufferAttribute(new Float32Array(side),3));
+  if(colorFn){ const c=new Float32Array(side.length); for(let k=0;k<side.length;k+=3){ const v=colorFn(side[k],side[k+2]); c[k]=v[0]*0.9; c[k+1]=v[1]*0.9; c[k+2]=v[2]*0.9; } gS.setAttribute('color',new THREE.BufferAttribute(c,3)); }
   return [{g:gT,oriented:true},{g:gB,oriented:true},{g:gS,oriented:true}];
 }
 // afgeronde rand: kwartcirkel tot de gewenste dikte; k=1 forceert de scharnierdikte
@@ -722,7 +726,7 @@ function buildSegment(i){
   const cR=Math.cos(Math.atan(skR)), cT=Math.cos(Math.atan(skT));
   const thick=(u,z,d)=>{ const da=Math.min(Math.abs(u-skR*(z-zr))*cR, last?1e9:Math.abs(l+skT*(z-zr)-u)*cT); return finishH(wingIdeal(s0+u,z),d,hingeK(da)); };
   const pads=eyePads(i), inPad=(u,z)=>pads.some(p=>u>=p.u0&&u<=p.u1&&z>=p.z0&&z<=p.z1);
-  const cf=D.pre.pattern?((u,z)=>D.pre.pattern(D.w0+s0+u,z,D.w0,D.le0,D.te0)):null, LIGHT=cf?[0.86,0.87,0.86]:null;
+  const cf=D.pre.pattern?((u,z)=>D.pre.pattern(D.w0+s0+u,z,D.w0,D.le0,D.te0)):null, LIGHT=cf?[0.20,0.23,0.27]:null;
   if(!D.sym){
     const items=heightSolid(pts,[],thick,2.0,-D.t/2,cf);
     items.push(...knucklesSk(hbR,0,1,skR,zr,0)); if(!last) items.push(...knucklesSk(hbT,l,0,skT,zr,0));
@@ -731,7 +735,8 @@ function buildSegment(i){
   // symmetrisch profiel: bovenhelft vanaf het middenvlak omhoog, onderhelft omlaag (vlak onder de ogen op -t/2)
   const half=(u,z,d,low)=>{ if(low&&inPad(u,z)) return D.t/2; return Math.max(0.6,thick(u,z,d)/2); };
   const top=heightSolid(pts,[],(u,z,d)=>half(u,z,d,false),2.0,0,cf); top.push(...knucklesSk(hbR,0,1,skR,zr,1)); if(!last) top.push(...knucklesSk(hbT,l,0,skT,zr,1));
-  const bot=heightSolid(pts,[],(u,z,d)=>half(u,z,d,true),2.0,0);
+  const cfU=cf?Object.assign(()=>[0.86,0.87,0.86],{under:[0.86,0.87,0.86]}):null;
+  const bot=heightSolid(pts,[],(u,z,d)=>half(u,z,d,true),2.0,0,cfU);
   for(const it of bot){ const a=it.g.attributes.position.array; for(let k=1;k<a.length;k+=3) a[k]=-a[k];
     if(it.g.index){ const ix=it.g.index.array; for(let k=0;k<ix.length;k+=3){ const t=ix[k+1]; ix[k+1]=ix[k+2]; ix[k+2]=t; } } else flipTris(a);
     it.g.attributes.position.needsUpdate=true; if(it.g.attributes.normal) it.g.deleteAttribute('normal'); if(it.g.index) it.g.computeVertexNormals(); }
@@ -780,7 +785,7 @@ function buildBody(){
   let headPts=null, hc=null;
   if(D.headOn){ const sd=D.side;
     const bodyCut=hingeOnCut(clipZ(pts,D.zCut,-sd),D.zCut,-sd,0); hc=bodyCut.hb; headPts=hingeOnCut(clipZ(pts,D.zCut,sd),D.zCut,sd,1).pts; pts=bodyCut.pts; }
-  const cf=D.pre.pattern?((x,z)=>D.pre.pattern(x,z,w0,hb.le,hb.te)):null, LIGHT=[0.86,0.87,0.86];
+  const cf=D.pre.pattern?((x,z)=>D.pre.pattern(x,z,w0,hb.le,hb.te)):null, LIGHT=[0.20,0.23,0.27];
   const items=heightSolid(pts,[],thick,1.8,-D.t/2,cf);
   items.push(...knuckles(hb,w0,0), ...knuckles(hb,-w0,0));
   if(hc) for(let k=0;k<hc.nb;k++) if(k%2===0) items.push(tubeX(D.rh,D.R,hc.z[k]+0.3,hc.z[k+1]-0.3,0,D.zCut));
@@ -1121,6 +1126,7 @@ function analyze(){
     if(A.tiltMax>5) msgs.push(['warn',`Door het kantelen staan de vleugelstangen tot ${A.tiltMax.toFixed(1)}° scheef. Boven 5° gaan de pennen wringen; verklein de kanteling.`]);
   }
   if(P.rpm>30) msgs.push(['warn','Boven 30 rpm ziet de beweging er gejaagd uit en slijten de pennen snel.']);
+  if(ADAPT_NOTE===D.n) msgs.push(['warn',`Met ${D.n} segmenten worden de vleugeldelen bij ${P.span} mm spanwijdte te smal: er is geen opstelling met een grote, vrije vleugelslag. Kies minder segmenten of een grotere spanwijdte.`]);
   // krachten en motor
   A.tauMax=Math.max(...A.tau); A.tauMin=Math.min(...A.tau); A.tauReq=Math.max(0.5,A.tauMax)/0.5; // rendement ~50% (wrijving pennen en nokken)
   A.kgcm=Math.max(0.5,A.tauReq/9.81);
@@ -1470,11 +1476,42 @@ function buildControls(){
     host.appendChild(w);
     const inp=w.querySelector('input');
     inp.addEventListener('input',()=>{ const old=P[c.id]; P[c.id]=Number(inp.value);
-      if(c.id==='n'&&old!==P.n){ // segmenten worden korter/langer: slag evenredig meeschalen zodat de hoeken gelijk blijven
-        const k=old/P.n; P.e=Math.round(clamp(P.e*k,4,16)*2)/2; document.getElementById('c_e').value=P.e; showVal(CONTROLS.find(x=>x.id==='e')); }
+      if(c.id==='n'&&old!==P.n) adaptSegments(old,P.n);
       showVal(c); if(c.id==='rpm'){ saveParams(); analyzeOnly(); } else scheduleRebuild(); });
   }
   syncControls();
+}
+// snelle kinematische controle (zonder 3D-opbouw): blokkeert/botst er iets, en hoe groot is de slag?
+let ADAPT_NOTE=null;
+function kinCheck(){
+  const Psave=P, Dsave=D; let res;
+  try{ D=derive(null); const N=48; let prev=null, lock=false, hit=false, muMin=90, relMax=0, tmin=1e9, tmax=-1e9;
+    for(let k=0;k<=N;k++){ const s=solve(k/N*2*Math.PI,prev); prev=s.a;
+      for(let i=0;i<D.n;i++){ if(s.lock[i]) lock=true; muMin=Math.min(muMin,s.mu[i]); relMax=Math.max(relMax,Math.abs(i===0?s.a[0]:s.a[i]-s.a[i-1])/DEG);
+        for(let j=0;j<i;j++) if(segDist(s.B[i],s.P[i],s.J[j],s.J[j+1])<D.t/2+3.6) hit=true; }
+      if(D.tipOn&&s.tipLock) lock=true; if(D.tipOn&&s.tipTilt>8*DEG) hit=true;
+      const y=s.tipEnd.y; tmin=Math.min(tmin,y); tmax=Math.max(tmax,y); }
+    const fits=!D.pitchOn||(D.inBelly(D.zPost,6)&&D.inBelly(D.ze,5));
+    const viol=(lock?10:0)+(hit?5:0)+Math.max(0,25-muMin)/5+Math.max(0,relMax-55)/10+(D.leverOn?Math.max(0,D.bMax/DEG-38)/5:0)+(fits?0:8);
+    res={ok:viol===0, viol, amp:(tmax-tmin)/D.BL};
+  }catch(e){ res={ok:false,amp:0}; }
+  P=Psave; D=Dsave; return res; }
+// meer/minder segmenten: zoek slag, groei en faseverschil waarbij alles vrij loopt, met de grootste natuurlijke vleugelslag
+function adaptSegments(oldN,newN){
+  const base=Object.assign({},P), tipF=P.tip>0?0.76:1, e0=P.e*(oldN/newN)/((newN>1&&(P.lever||1)<=1.01)?1.5:1);
+  const lev=newN>1?Math.max(1.5,P.lever||1):1, cand=[];
+  for(const eF of [0.4,0.55,0.7,0.85,1,1.25]) for(const g of (newN>1?[20,50,80,120,160,200]:[0])) for(const lg of (newN>1?[8,16,24]:[P.lag||0])) for(const fo of (newN>1?[1]:[P.forced||0]))
+    cand.push({e:Math.round(clamp(e0*eF,2,16)*2)/2,grow:g,lag:lg,lever:lev,forced:fo});
+  let best=null, least=null;
+  for(const c of cand){ P=Object.assign({},base,c,{n:newN}); const r=kinCheck();
+    if(!least||r.viol<least.viol) least={viol:r.viol,c};
+    if(!r.ok) continue;
+    const sc=-Math.abs(Math.min(r.amp,0.85)-0.85)-0.02*c.grow/100; if(!best||sc>best.sc) best={sc,c,amp:r.amp}; }
+  ADAPT_NOTE=null;
+  if(!best||best.amp<0.3){ ADAPT_NOTE=newN; if(!best) best=least; }
+  P=base; Object.assign(P,{n:newN}, best?best.c:{e:Math.round(clamp(e0,2,16)*2)/2});
+  for(const id of ['e','grow','lag','lever']){ const el=document.getElementById('c_'+id); if(el){ el.value=P[id]; showVal(CONTROLS.find(x=>x.id===id)); } }
+  const fe=document.getElementById('c_forced'); if(fe) fe.checked=!!P.forced;
 }
 function showVal(c){ if(c.type==='check') return; if(P[c.id]==null) P[c.id]=c.min; const v=P[c.id]; document.getElementById('o_'+c.id).textContent=(c.step<1?v.toFixed(1):v)+(c.unit?(c.unit==='°'||c.unit==='%'?c.unit:' '+c.unit):''); }
 function syncControls(){
