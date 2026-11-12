@@ -1,0 +1,840 @@
+<title>Automaat Atelier</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: werkbank — instellingen links, 3D-werkstuk in het midden, analyse en printlijst rechts; op telefoon onder elkaar. */
+:root{
+  --bg:#e9ece8; --panel:#f7f8f5; --line:#cfd5cd; --ink:#1c2420; --muted:#5b665f;
+  --accent:#9a6418; --accent-ink:#ffffff; --view:#dfe4de; --grid:#b9c1b8;
+  --ok:#2f7a4b; --warn:#a86a00; --bad:#b3362c;
+  --f-display:"Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121614; --panel:#1a1f1c; --line:#2d3530; --ink:#e3e8e2; --muted:#9aa59d;
+  --accent:#d9a24a; --accent-ink:#1a1408; --view:#171c19; --grid:#2f3833;
+  --ok:#5fbf83; --warn:#e0a640; --bad:#ef7a6e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121614; --panel:#1a1f1c; --line:#2d3530; --ink:#e3e8e2; --muted:#9aa59d;
+  --accent:#d9a24a; --accent-ink:#1a1408; --view:#171c19; --grid:#2f3833;
+  --ok:#5fbf83; --warn:#e0a640; --bad:#ef7a6e; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+*{box-sizing:border-box}
+header.top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding-block:12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  border-bottom:1px solid var(--line);background:var(--panel)}
+header.top h1{font-family:var(--f-display);font-weight:700;font-size:20px;margin:0;letter-spacing:-.01em}
+header.top p{margin:0;color:var(--muted);font-size:13px}
+.app{display:grid;grid-template-columns:1fr;gap:0}
+.panel{background:var(--panel);padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0}
+.viewwrap{position:relative;height:min(62vh,560px);min-height:320px;background:var(--view);min-width:0;order:-1}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+@media (min-width:1060px){
+  body{display:flex;flex-direction:column;overflow:hidden}
+  .app{flex:1;min-height:0;grid-template-columns:300px minmax(0,1fr) 370px}
+  .panel{overflow:auto;padding-left:16px;padding-right:16px}
+  .panel.left{border-right:1px solid var(--line)}
+  .panel.right{border-left:1px solid var(--line)}
+  .viewwrap{height:auto;min-height:0;order:0}
+}
+h2{font-family:var(--f-display);font-weight:500;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+h2:first-child{margin-top:2px}
+#ctlGroups h2:first-child{margin-top:18px}
+.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.presets button{font:inherit;font-size:12.5px;padding:7px 4px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;cursor:pointer}
+.presets button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:9px 0}
+.ctl label{font-size:13px}
+.ctl output{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ctl input{grid-column:1/-1;width:100%;accent-color:var(--accent);margin:0}
+.ctl .hint{grid-column:1/-1;font-size:11.5px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:inherit;font-size:13px;padding:7px 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn:focus-visible,.presets button:focus-visible,.tabs button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.check{display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0}
+.check input{accent-color:var(--accent)}
+.hud{position:absolute;left:max(10px,env(safe-area-inset-left,0px));top:10px;display:flex;gap:6px;flex-wrap:wrap}
+.hud .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.hud .seg button{font:inherit;font-size:12.5px;padding:6px 10px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.hud .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.hud .pill{font-family:var(--f-mono);font-size:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-variant-numeric:tabular-nums}
+.scrub{position:absolute;left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));bottom:10px;display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.scrub input{flex:1;accent-color:var(--accent);min-width:0}
+.scrub .btn{padding:4px 10px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:8px 12px;border:0;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.status{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-radius:6px;border:1px solid var(--line);margin:6px 0;font-size:13px}
+.status b{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.status.ok b{background:var(--ok);color:var(--panel)}
+.status.warn b{background:var(--warn);color:var(--panel)}
+.status.bad b{background:var(--bad);color:var(--panel)}
+#graph{width:100%;height:190px;display:block}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:5px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:500;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+td.bad{color:var(--bad)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+select{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);max-width:100%}
+.totals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.totals div{border:1px solid var(--line);border-radius:6px;padding:8px}
+.totals span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.totals strong{font-family:var(--f-mono);font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+.note{font-size:12.5px;color:var(--muted)}
+ul.hw{margin:6px 0 0;padding-left:18px;font-size:13px}
+ul.hw li{margin:3px 0}
+#exportMsg{font-size:12.5px;margin-top:8px;min-height:1em}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<header class="top">
+  <h1>Automaat Atelier</h1>
+  <p>Ontwerp een bewegend dier, test het mechanisme virtueel en exporteer de onderdelen voor je 3D-printer.</p>
+</header>
+
+<div class="app">
+  <aside class="panel left" id="controls">
+    <h2>Dier</h2>
+    <div class="presets" id="presets"></div>
+    <div id="ctlGroups"></div>
+    <h2>Weergave</h2>
+    <label class="check"><input type="checkbox" id="optTrail" checked> Baan van de vleugelpunten</label>
+    <label class="check"><input type="checkbox" id="optGhost" checked> Sokkel doorzichtig</label>
+    <div class="row" style="margin-top:10px"><button class="btn" id="resetBtn" type="button">Standaardwaarden dier</button></div>
+  </aside>
+
+  <section class="viewwrap" aria-label="3D-weergave">
+    <canvas id="view"></canvas>
+    <div class="hud">
+      <div class="seg" role="group" aria-label="Weergave">
+        <button type="button" id="vAsm" aria-pressed="true">Simulatie</button>
+        <button type="button" id="vBed" aria-pressed="false">Printbed</button>
+      </div>
+      <span class="pill" id="hudInfo">—</span>
+    </div>
+    <div class="scrub" id="scrubBar">
+      <button class="btn" id="playBtn" type="button" aria-label="Pauzeer">❚❚</button>
+      <input type="range" id="theta" min="0" max="360" step="1" value="0" aria-label="Krukhoek">
+      <span class="pill" id="thetaOut" style="border:0;padding:0">0°</span>
+    </div>
+  </section>
+
+  <aside class="panel right">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabA" aria-selected="true">Analyse</button>
+      <button type="button" role="tab" id="tabP" aria-selected="false">Printen</button>
+    </div>
+    <div id="paneA" role="tabpanel">
+      <div id="statusList"></div>
+      <h2>Vleugelhoek per segment over één omwenteling</h2>
+      <canvas id="graph"></canvas>
+      <div class="legend" id="legend"></div>
+      <h2>Mechanisme</h2>
+      <div class="tablewrap"><table id="mechTable"></table></div>
+      <p class="note">Overbrengingshoek: hoek tussen stang en hefboom. Boven 40° loopt het licht, onder 25° gaat het klemmen.</p>
+    </div>
+    <div id="paneP" role="tabpanel" hidden>
+      <h2>Printer</h2>
+      <select id="bed" aria-label="Printbed">
+        <option value="256x256x256">Bambu Lab A1 / P1S — 256 × 256 mm</option>
+        <option value="250x210x220">Prusa MK4 — 250 × 210 mm</option>
+        <option value="220x220x250">Creality Ender 3 — 220 × 220 mm</option>
+        <option value="180x180x180">Bambu Lab A1 mini — 180 × 180 mm</option>
+      </select>
+      <div class="totals">
+        <div><span>Onderdelen</span><strong id="tParts">–</strong></div>
+        <div><span>PLA (massief)</span><strong id="tGram">–</strong></div>
+        <div><span>Printbedden</span><strong id="tBeds">–</strong></div>
+      </div>
+      <div class="tablewrap"><table id="partsTable"></table></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="exportBtn" type="button">Download STL-bestanden (.zip)</button></div>
+      <div id="exportMsg" class="note"></div>
+      <h2>Ook nodig</h2>
+      <ul class="hw" id="hwList"></ul>
+    </div>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+"use strict";
+const DEG = Math.PI/180;
+const SEGC = ['#d4892a','#3b82b8','#3f9a68','#b0569f'];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+/* ------------------------------------------------------------------ */
+/* Dieren: vleugelvorm (koorde langs de spanwijdte), lijf en versiering */
+/* t = 0 bij het lijf, 1 bij de vleugelpunt. Waarden in mm.             */
+/* ------------------------------------------------------------------ */
+const PRESETS = {
+  manta: { name:'Manta', w0Frac:0.11,
+    def:{span:240,n:3,chord:105,sweep:30,thick:4,e:7,grow:35,lag:35,dihedral:4,attach:55,height:105,rpm:12},
+    plan(t,P){ const C=P.chord; const c=C*(0.07+0.93*Math.pow(1-t,1.15)); const zc=-P.sweep*Math.pow(t,1.7)+C*0.08*(1-t); return {c,zc,scal:0}; },
+    body(w0,le,te){ return {
+      front:[[0,le+6],[w0*0.45,le+8],[w0*0.62,le+30],[w0*0.92,le+27],[w0*0.88,le+5]],
+      back:[[w0*0.55,te-8],[2.6,te-16],[2.2,te-105],[0,te-108]] }; },
+    domes(w0,le,te){ return [{x:0,z:(le+te)/2+4,r:w0*0.7,h:5},{x:w0*0.72,z:le+20,r:3.2,h:2.6},{x:-w0*0.72,z:le+20,r:3.2,h:2.6}]; } },
+  vogel: { name:'Vogel', w0Frac:0.07,
+    def:{span:260,n:2,chord:72,sweep:22,thick:4,e:9,grow:30,lag:30,dihedral:8,attach:50,height:110,rpm:14},
+    plan(t,P){ const C=P.chord; let c = t<0.62 ? C*(1-0.18*t) : C*0.888*Math.sqrt(Math.max(0,1-Math.pow((t-0.62)/0.38,2))); c=Math.max(c,C*0.1); return {c,zc:-P.sweep*Math.pow(t,1.3),scal:0}; },
+    body(w0,le,te){ return {
+      front:[[0,le+48],[w0*0.55,le+44],[w0*0.9,le+32],[w0*0.95,le+14],[w0*0.92,le+4]],
+      back:[[w0*0.6,te-14],[w0*0.55,te-24],[w0*1.45,te-64],[w0*0.75,te-72],[0,te-66]] }; },
+    domes(w0,le,te){ return [{x:0,z:le+28,r:w0*0.78,h:11},{x:0,z:(le+te)/2,r:w0*0.85,h:7},{x:w0*0.55,z:le+34,r:2.4,h:2},{x:-w0*0.55,z:le+34,r:2.4,h:2}]; } },
+  vlinder: { name:'Vlinder', w0Frac:0.035,
+    def:{span:200,n:1,chord:95,sweep:10,thick:4,e:10,grow:0,lag:0,dihedral:10,attach:40,height:100,rpm:10},
+    plan(t,P){ const C=P.chord; const c=C*(0.45+0.75*Math.pow(Math.sin(Math.PI*(0.1+0.75*t)),0.7)); return {c,zc:C*0.12*t-P.sweep*0.4*t,scal:0}; },
+    body(w0,le,te){ return {
+      front:[[0,le+15],[w0*0.2,le+15],[w0*2.6,le+52],[w0*3.1,le+52],[w0*2.9,le+48],[w0*0.75,le+11],[w0*0.92,le+4]],
+      back:[[w0*0.9,te-8],[w0*0.7,te-42],[0,te-52]] }; },
+    domes(w0,le,te){ return [{x:0,z:le+6,r:w0*0.95,h:5},{x:0,z:(le+te)/2+8,r:w0*0.95,h:4}]; } },
+  vleermuis: { name:'Vleermuis', w0Frac:0.06,
+    def:{span:260,n:3,chord:80,sweep:25,thick:4,e:7,grow:35,lag:40,dihedral:2,attach:55,height:115,rpm:16},
+    plan(t,P){ const C=P.chord; const c=C*(0.12+0.88*(1-Math.pow(t,1.6))); return {c,zc:-P.sweep*t*0.6,scal:C*0.11*Math.abs(Math.sin(3*Math.PI*t))}; },
+    body(w0,le,te){ return {
+      front:[[0,le+20],[w0*0.3,le+21],[w0*0.55,le+42],[w0*0.88,le+20],[w0*0.92,le+5]],
+      back:[[w0*0.6,te-14],[0,te-22]] }; },
+    domes(w0,le,te){ return [{x:0,z:le+12,r:w0*0.8,h:8},{x:w0*0.4,z:le+16,r:2.2,h:1.8},{x:-w0*0.4,z:le+16,r:2.2,h:1.8}]; } }
+};
+
+const CONTROLS = [
+  {g:'Vorm'},
+  {id:'span',label:'Spanwijdte',min:120,max:400,step:5,unit:'mm'},
+  {id:'n',label:'Segmenten per vleugel',min:1,max:4,step:1,unit:''},
+  {id:'chord',label:'Vleugelbreedte bij het lijf',min:40,max:160,step:1,unit:'mm'},
+  {id:'sweep',label:'Pijlstelling (punten naar achter)',min:-20,max:80,step:1,unit:'mm'},
+  {id:'thick',label:'Plaatdikte',min:3.5,max:6,step:0.5,unit:'mm',hint:'Scharnieren gebruiken stukjes 1,75 mm filament als pen.'},
+  {g:'Beweging'},
+  {id:'e',label:'Nokslag (excentriciteit)',min:4,max:16,step:0.5,unit:'mm'},
+  {id:'grow',label:'Extra slag per segment naar buiten',min:0,max:80,step:1,unit:'%'},
+  {id:'lag',label:'Faseverschil tussen segmenten',min:0,max:90,step:1,unit:'°',hint:'Geeft de golvende beweging: buitenste segmenten lopen achter.'},
+  {id:'dihedral',label:'V-stelling in ruststand',min:-10,max:25,step:1,unit:'°'},
+  {id:'attach',label:'Aangrijppunt stang op segment',min:25,max:85,step:1,unit:'%'},
+  {id:'height',label:'Hoogte lijf boven sokkel',min:60,max:180,step:1,unit:'mm'},
+  {g:'Motor'},
+  {id:'rpm',label:'Toerental nokas',min:2,max:40,step:1,unit:'rpm'}
+];
+
+let P = loadParams() || Object.assign({preset:'manta'}, PRESETS.manta.def);
+function loadParams(){ try{ const s=localStorage.getItem('automaat-atelier-v1'); if(!s) return null; const o=JSON.parse(s); if(!PRESETS[o.preset]) return null; return Object.assign({},PRESETS[o.preset].def,o);}catch(e){return null;} }
+function saveParams(){ try{ localStorage.setItem('automaat-atelier-v1',JSON.stringify(P)); }catch(e){} }
+
+/* ------------------------------------------------------------------ */
+/* Afgeleide maten van het mechanisme                                 */
+/* ------------------------------------------------------------------ */
+let D;
+function derive(){
+  const pre=PRESETS[P.preset];
+  const d={pre};
+  d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=1.0; d.cl=0.5;
+  d.w0=Math.max(6,P.span*pre.w0Frac);
+  d.Sw=P.span/2-d.w0; d.l=d.Sw/d.n;
+  d.dihedral=P.dihedral*DEG;
+  d.plan=(t)=>{ const r=pre.plan(clamp(t,0,1),P); let le=r.zc+r.c/2, te=r.zc-r.c/2+r.scal; if(le-te<6){const m=(le+te)/2; le=m+3; te=m-3;} return {le,te,zc:(le+te)/2}; };
+  d.e=[];d.Rc=[];d.fw=[];d.xp=[];d.phi=[];
+  for(let i=0;i<d.n;i++){ d.e[i]=P.e*(1+P.grow/100*i); d.Rc[i]=d.e[i]+4.5; d.fw[i]=d.e[i]+3; d.xp[i]=9+6*i; d.phi[i]=-i*P.lag*DEG; }
+  const emax=Math.max(...d.e);
+  d.yc=2*emax+4.5+4;
+  d.Hb=Math.max(55, d.yc+2*emax+4.5+4+2+3);
+  d.S=d.e.map((e,i)=>d.Hb+3-d.yc-d.Rc[i]+e);
+  d.yB=d.Hb+P.height;
+  d.att=[];d.rho=[];d.beta=[];d.tAtt=[];
+  const hTab=d.t/2+4;
+  for(let i=0;i<d.n;i++){ d.att[i]=P.attach/100*d.l; d.rho[i]=Math.hypot(d.att[i],hTab); d.beta[i]=Math.atan2(-hTab,d.att[i]); d.tAtt[i]=(i*d.l+d.att[i])/d.Sw; }
+  // z-vlakken: volger i op z_i, stang op z_i+3.8, oog onder vleugel op z_i+7.1
+  // kies z0 zo dat elk oog binnen de koorde van zijn segment valt (interval-doorsnede), anders kleinste kwadraten
+  let acc=0, lo=-1e9, hi=1e9;
+  for(let i=0;i<d.n;i++){ const pf=d.plan(d.tAtt[i]); acc+=pf.zc+9*i; lo=Math.max(lo,pf.te+4.5+9*i-7.1); hi=Math.min(hi,pf.le-4.5+9*i-7.1); }
+  d.z0= lo<=hi ? (lo+hi)/2 : acc/d.n-7.1;
+  d.z=[];d.zRod=[];d.zTab=[];
+  for(let i=0;i<d.n;i++){ d.z[i]=d.z0-9*i; d.zRod[i]=d.z[i]+3.8; d.zTab[i]=d.z[i]+7.1; }
+  d.zPost=d.z0+12;
+  d.Wh=Math.max(38, 2*emax+4.5+8);
+  d.zFront=d.zPost+4.2+7;
+  d.zBack=Math.min(d.z[d.n-1]-2-2-28-3, d.zFront-70);
+  d.pivotY=(i,th)=>d.Hb+7+d.e[i]+d.e[i]*Math.sin(th+d.phi[i]);
+  // stanglengtes uit ruststand (volger halverwege de slag)
+  d.L=[]; let J={x:d.w0,y:d.yB};
+  for(let i=0;i<d.n;i++){
+    const g=d.dihedral+d.beta[i];
+    const Pp={x:J.x+d.rho[i]*Math.cos(g), y:J.y+d.rho[i]*Math.sin(g)};
+    d.L[i]=Math.hypot(Pp.x-d.xp[i], Pp.y-(d.Hb+7+d.e[i]));
+    J={x:J.x+d.l*Math.cos(d.dihedral), y:J.y+d.l*Math.sin(d.dihedral)};
+  }
+  return d;
+}
+
+function angDist(a,b){ let x=(a-b)%(2*Math.PI); if(x>Math.PI)x-=2*Math.PI; if(x<-Math.PI)x+=2*Math.PI; return Math.abs(x); }
+function solve(theta, prevA){
+  const out={a:[],J:[],P:[],B:[],lock:[],mu:[]};
+  let J={x:D.w0,y:D.yB};
+  for(let i=0;i<D.n;i++){
+    const B={x:D.xp[i], y:D.pivotY(i,theta)};
+    const rho=D.rho[i], beta=D.beta[i], L=D.L[i];
+    const dx=B.x-J.x, dy=B.y-J.y, d=Math.hypot(dx,dy);
+    let gamma, lock=false;
+    if(d>rho+L || d<Math.abs(rho-L) || d<1e-9){ lock=true; gamma=Math.atan2(dy,dx)+(d>rho+L?0:Math.PI); }
+    else{
+      const aa=(rho*rho-L*L+d*d)/(2*d), h=Math.sqrt(Math.max(0,rho*rho-aa*aa));
+      const mx=J.x+aa*dx/d, my=J.y+aa*dy/d;
+      const g1=Math.atan2(my+h*dx/d-J.y, mx-h*dy/d-J.x), g2=Math.atan2(my-h*dx/d-J.y, mx+h*dy/d-J.x);
+      const ref=(prevA?prevA[i]:D.dihedral)+beta;
+      gamma = angDist(g1,ref)<=angDist(g2,ref)?g1:g2;
+    }
+    let a=gamma-beta; if(prevA){ while(a-prevA[i]>Math.PI)a-=2*Math.PI; while(a-prevA[i]<-Math.PI)a+=2*Math.PI; }
+    const Pp={x:J.x+rho*Math.cos(gamma), y:J.y+rho*Math.sin(gamma)};
+    const rx=Pp.x-B.x, ry=Pp.y-B.y, lx=Pp.x-J.x, ly=Pp.y-J.y;
+    const c=Math.abs(rx*lx+ry*ly)/(Math.hypot(rx,ry)*Math.hypot(lx,ly)+1e-9);
+    out.a.push(a); out.J.push(J); out.P.push(Pp); out.B.push(B); out.lock.push(lock); out.mu.push(Math.acos(Math.min(1,c))/DEG);
+    J={x:J.x+D.l*Math.cos(a), y:J.y+D.l*Math.sin(a)};
+  }
+  out.J.push(J);
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* Geometrie                                                          */
+/* ------------------------------------------------------------------ */
+function shapeFrom(pts){ const s=new THREE.Shape(); s.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) s.lineTo(pts[i][0],pts[i][1]); s.closePath(); return s; }
+function circlePath(x,y,r){ const p=new THREE.Path(); p.absarc(x,y,r,0,Math.PI*2,false); return p; }
+function dedupe(pts){ const o=[]; for(const p of pts){ const q=o[o.length-1]; if(!q||Math.abs(q[0]-p[0])>1e-6||Math.abs(q[1]-p[1])>1e-6) o.push(p);} const f=o[0],l=o[o.length-1]; if(o.length>1&&Math.abs(f[0]-l[0])<1e-6&&Math.abs(f[1]-l[1])<1e-6) o.pop(); return o; }
+// Plaat in het xz-vlak, dikte in y gecentreerd rond 0
+function plateXZ(shape, thick){ const g=new THREE.ExtrudeGeometry(shape,{depth:thick,bevelEnabled:false,curveSegments:18}); g.rotateX(Math.PI/2); g.translate(0,thick/2,0); return g; }
+// Plaat in het xy-vlak, dikte in z gecentreerd rond 0
+function plateXY(shape, thick){ const g=new THREE.ExtrudeGeometry(shape,{depth:thick,bevelEnabled:false,curveSegments:18}); g.translate(0,0,-thick/2); return g; }
+function tubeZ(ri,ro,z0,z1,ax,ay){ const pts=[[ri,z0],[ro,z0],[ro,z1],[ri,z1],[ri,z0]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,22); g.rotateX(Math.PI/2); g.translate(ax,ay,0); return g; }
+function dome(x,y,z,r,h){ const pts=[new THREE.Vector2(0,0)]; for(let k=0;k<=10;k++){ const a=k/10*Math.PI/2; pts.push(new THREE.Vector2(Math.max(1e-3,r*Math.cos(a)), h*Math.sin(a))); } pts[pts.length-1].x=0; const g=new THREE.LatheGeometry(pts,24); g.translate(x,y,z); return g; }
+function signedVol(a){ let v=0; for(let i=0;i<a.length;i+=9){ v+= a[i]*(a[i+4]*a[i+8]-a[i+5]*a[i+7]) - a[i+1]*(a[i+3]*a[i+8]-a[i+5]*a[i+6]) + a[i+2]*(a[i+3]*a[i+7]-a[i+4]*a[i+6]); } return v/6; }
+function flipTris(a){ for(let i=0;i<a.length;i+=9){ for(let k=0;k<3;k++){ const t=a[i+3+k]; a[i+3+k]=a[i+6+k]; a[i+6+k]=t; } } }
+function merge(geos){
+  const parts=[]; let total=0;
+  for(const g of geos){ const ng=g.index?g.toNonIndexed():g; const a=Float32Array.from(ng.attributes.position.array); if(signedVol(a)<0) flipTris(a); parts.push(a); total+=a.length; if(ng!==g) ng.dispose(); g.dispose(); }
+  const out=new Float32Array(total); let o=0; for(const a of parts){ out.set(a,o); o+=a.length; }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(out,3)); g.computeVertexNormals(); return g;
+}
+function mirrorX(g){ const a=Float32Array.from(g.attributes.position.array); for(let i=0;i<a.length;i+=3) a[i]=-a[i]; flipTris(a); const n=new THREE.BufferGeometry(); n.setAttribute('position',new THREE.BufferAttribute(a,3)); n.computeVertexNormals(); return n; }
+
+function hingeBands(j){
+  const pf=D.plan(j*D.l/D.Sw), m=1.2, chord=pf.le-pf.te;
+  let nb=Math.floor((chord-2*m)/9); if(nb%2===0) nb--; nb=clamp(nb,3,9);
+  const bw=(chord-2*m)/nb, z=[]; for(let k=0;k<=nb;k++) z.push(pf.te+m+k*bw);
+  return {te:pf.te,le:pf.le,nb,bw,z};
+}
+// Scharnierrand; punten met z oplopend. dir=+1: plaat ligt aan de +u kant van de as.
+function hingeEdge(hb,axis,dir,parity){
+  const own=axis+dir*(D.rh+0.6), rec=axis+dir*(D.R+D.cl), pts=[[rec,hb.te]];
+  for(let k=0;k<hb.nb;k++){ const x=(k%2===parity)?own:rec; pts.push([x,hb.z[k]],[x,hb.z[k+1]]); }
+  pts.push([rec,hb.le]); return pts;
+}
+function knuckles(hb,axis,parity){ const g=[]; for(let k=0;k<hb.nb;k++) if(k%2===parity) g.push(tubeZ(D.rh,D.R,hb.z[k]+0.3,hb.z[k+1]-0.3,axis,0)); return g; }
+
+function buildSegment(i){
+  const l=D.l, s0=i*l, last=i===D.n-1;
+  const hbR=hingeBands(i), hbT=last?null:hingeBands(i+1);
+  const root=hingeEdge(hbR,0,1,1);
+  const tip= last ? [[l,D.plan(1).te],[l,D.plan(1).le]] : hingeEdge(hbT,l,-1,0);
+  const u0=root[root.length-1][0], u1=tip[tip.length-1][0];
+  const lead=[],trail=[]; const N=18;
+  for(let k=1;k<N;k++){ const u=u0+(u1-u0)*k/N; lead.push([u,D.plan((s0+u)/D.Sw).le]); }
+  const u0b=root[0][0], u1b=tip[0][0];
+  for(let k=N-1;k>=1;k--){ const u=u0b+(u1b-u0b)*k/N; trail.push([u,D.plan((s0+u)/D.Sw).te]); }
+  const pts=dedupe([...root,...lead,...tip.slice().reverse(),...trail]);
+  const geos=[plateXZ(shapeFrom(pts),D.t)];
+  geos.push(...knuckles(hbR,0,1)); if(!last) geos.push(...knuckles(hbT,l,0));
+  // oog voor de stang onder de plaat
+  const d=D.att[i], yc=-D.t/2-4, tab=new THREE.Shape();
+  tab.moveTo(d-4,-D.t/2+0.8); tab.lineTo(d+4,-D.t/2+0.8); tab.lineTo(d+4,yc); tab.absarc(d,yc,4,0,-Math.PI,true); tab.lineTo(d-4,-D.t/2+0.8);
+  tab.holes.push(circlePath(d,yc,D.rh));
+  const tg=plateXY(tab,3); tg.translate(0,0,D.zTab[i]); geos.push(tg);
+  return merge(geos);
+}
+function buildBody(){
+  const hb=hingeBands(0), w0=D.w0, b=D.pre.body(w0,hb.le,hb.te);
+  const edgeR=hingeEdge(hb,w0,-1,0);                      // z oplopend
+  const right=[...b.front, ...edgeR.slice().reverse(), ...b.back];
+  const left=right.slice(1,-1).reverse().map(p=>[-p[0],p[1]]);
+  const pts=dedupe([...right,...left]);
+  const geos=[plateXZ(shapeFrom(pts),D.t)];
+  geos.push(...knuckles(hb,w0,0), ...knuckles(hb,-w0,0));
+  for(const dm of D.pre.domes(w0,hb.le,hb.te)) geos.push(dome(dm.x,D.t/2-0.3,dm.z,dm.r,dm.h));
+  return merge(geos);
+}
+function buildRod(L){
+  const pts=[]; for(let k=0;k<=12;k++){ const a=-Math.PI/2+Math.PI*k/12; pts.push([L+3.5*Math.cos(a),3.5*Math.sin(a)]); }
+  for(let k=0;k<=12;k++){ const a=Math.PI/2+Math.PI*k/12; pts.push([3.5*Math.cos(a),3.5*Math.sin(a)]); }
+  const s=shapeFrom(dedupe(pts));
+  s.holes.push(circlePath(0,0,D.rh)); s.holes.push(circlePath(L,0,D.rh));
+  return merge([plateXY(s,3)]);
+}
+function buildFollower(i){
+  const fw=D.fw[i], S=D.S[i], xp=D.xp[i], cw=xp+4.5;
+  const pts=[[-fw,0],[fw,0],[fw,4],[3,4],[3,S],[cw,S],[cw,S+8],[-cw,S+8],[-cw,S],[-3,S],[-3,4],[-fw,4]];
+  const s=shapeFrom(pts); s.holes.push(circlePath(xp,S+4,D.rh)); s.holes.push(circlePath(-xp,S+4,D.rh));
+  return merge([plateXY(s,4)]);
+}
+function buildCam(i){
+  const e=D.e[i], ph=D.phi[i];
+  const s=new THREE.Shape(); s.absarc(e*Math.cos(ph),e*Math.sin(ph),D.Rc[i],0,Math.PI*2,false);
+  const a0=Math.acos(1.2/1.6), hole=new THREE.Path(); hole.moveTo(1.6*Math.cos(a0),1.6*Math.sin(a0));
+  for(let k=1;k<=20;k++){ const a=a0+(2*Math.PI-2*a0)*k/20; hole.lineTo(1.6*Math.cos(a),1.6*Math.sin(a)); }
+  hole.closePath(); s.holes.push(hole);
+  return merge([plateXY(s,4)]);
+}
+function buildPost(){ const len=D.yB-D.t/2-(D.Hb-3); const g=new THREE.CylinderGeometry(4,4,len,28); g.translate(0,len/2,0); return merge([g]); }
+function buildBox(){
+  const W=D.Wh, zb=D.zBack, zf=D.zFront, H=D.Hb;
+  const rect=(x0,y0,x1,y1)=>shapeFrom([[x0,y0],[x1,y0],[x1,y1],[x0,y1]]);
+  const top=rect(-W,zb,W,zf); top.holes.push(circlePath(0,D.zPost,4.2));
+  for(let i=0;i<D.n;i++){ const z=D.z[i]; const h=new THREE.Path(); h.moveTo(-3.4,z-2.3); h.lineTo(3.4,z-2.3); h.lineTo(3.4,z+2.3); h.lineTo(-3.4,z+2.3); h.closePath(); top.holes.push(h); }
+  const front=rect(-W,3,W,H-3); front.holes.push(circlePath(0,D.yc,1.8));
+  const back=rect(-W,3,W,H-3);
+  const side=()=>{ const g=new THREE.BoxGeometry(3,H-6,zf-zb-6); return g; };
+  return {
+    top: merge([plateXZ(top,3)]), bottom: merge([plateXZ(rect(-W,zb,W,zf),3)]),
+    front: merge([plateXY(front,3)]), back: merge([plateXY(back,3)]), side: merge([side()]),
+    pos:{top:[0,H-1.5,0],bottom:[0,1.5,0],front:[0,0,zf-1.5],back:[0,0,zb+1.5],sideR:[W-1.5,H/2,(zf+zb)/2],sideL:[-W+1.5,H/2,(zf+zb)/2]}
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Onderdelen: geometrie in montagestand + draaiing voor het printbed  */
+/* ------------------------------------------------------------------ */
+const rotX=(a)=>new THREE.Matrix4().makeRotationX(a), rotZ=(a)=>new THREE.Matrix4().makeRotationZ(a), I4=()=>new THREE.Matrix4();
+let PARTS=[], G={};
+function buildParts(){
+  for(const p of PARTS){ p.geo.dispose(); if(p.printGeo) p.printGeo.dispose(); }
+  PARTS=[]; G={seg:[],segL:[],rod:[],fol:[],cam:[]};
+  const add=(id,name,qty,geo,rot,kind,idx)=>{ const p={id,name,qty,geo,rot,kind,idx}; PARTS.push(p); return p; };
+  G.body=add('lichaam','Lichaam',1,buildBody(),I4(),'wing').geo;
+  for(let i=0;i<D.n;i++){
+    const g=buildSegment(i); G.seg[i]=g; add('vleugel_R'+(i+1),'Vleugel rechts '+(i+1),1,g,rotX(Math.PI),'wing',i);
+    const gl=mirrorX(g); G.segL[i]=gl; add('vleugel_L'+(i+1),'Vleugel links '+(i+1),1,gl,rotX(Math.PI),'wing',i);
+  }
+  for(let i=0;i<D.n;i++){ G.rod[i]=add('stang_'+(i+1),'Stang '+(i+1),2,buildRod(D.L[i]),rotX(-Math.PI/2),'rod',i).geo; }
+  for(let i=0;i<D.n;i++){ G.fol[i]=add('volger_'+(i+1),'Volger '+(i+1),1,buildFollower(i),rotX(-Math.PI/2),'mech',i).geo; }
+  for(let i=0;i<D.n;i++){ G.cam[i]=add('nok_'+(i+1),'Nok '+(i+1)+' ('+Math.round(-D.phi[i]/DEG)+'°)',1,buildCam(i),rotX(-Math.PI/2),'mech',i).geo; }
+  G.post=add('paal','Paal',1,buildPost(),I4(),'post').geo;
+  const box=buildBox(); G.box=box;
+  add('sokkel_deksel','Sokkel deksel',1,box.top,I4(),'box'); add('sokkel_bodem','Sokkel bodem',1,box.bottom,I4(),'box');
+  add('sokkel_voor','Sokkel voorwand',1,box.front,rotX(-Math.PI/2),'box'); add('sokkel_achter','Sokkel achterwand',1,box.back,rotX(-Math.PI/2),'box');
+  add('sokkel_zijwand','Sokkel zijwand',2,box.side,rotZ(Math.PI/2),'box');
+  for(const p of PARTS){
+    const g=p.geo.clone(); g.applyMatrix4(p.rot); g.computeBoundingBox();
+    const bb=g.boundingBox; g.translate(-(bb.min.x+bb.max.x)/2,-bb.min.y,-(bb.min.z+bb.max.z)/2); g.computeBoundingBox();
+    p.printGeo=g; const s=g.boundingBox.getSize(new THREE.Vector3()); p.size=[s.x,s.z,s.y];
+    p.vol=Math.abs(signedVol(g.attributes.position.array))/1000; // cm³
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Analyse over één omwenteling                                       */
+/* ------------------------------------------------------------------ */
+let AN;
+function segDist(p1,p2,q1,q2){
+  const d=(a,b,c)=>{ const vx=c.x-b.x, vy=c.y-b.y, L2=vx*vx+vy*vy||1e-9; let t=((a.x-b.x)*vx+(a.y-b.y)*vy)/L2; t=clamp(t,0,1); return Math.hypot(a.x-b.x-t*vx,a.y-b.y-t*vy); };
+  const cr=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
+  if(cr(p1,p2,q1)*cr(p1,p2,q2)<0 && cr(q1,q2,p1)*cr(q1,q2,p2)<0) return 0;
+  return Math.min(d(p1,q1,q2),d(p2,q1,q2),d(q1,p1,p2),d(q2,p1,p2));
+}
+function analyze(){
+  const N=180, n=D.n;
+  const A={angles:[...Array(n)].map(()=>[]), muMin:Array(n).fill(90), relMax:Array(n).fill(0), aMin:Array(n).fill(1e9), aMax:Array(n).fill(-1e9),
+    lockAt:Array(n).fill(null), hitAt:Array(n).fill(null), minY:1e9, tipMin:1e9, tipMax:-1e9, tipR:[], states:[]};
+  let prev=null;
+  for(let k=0;k<=N;k++){
+    const th=k/N*2*Math.PI, s=solve(th,prev); prev=s.a; A.states.push(s);
+    for(let i=0;i<n;i++){
+      const a=s.a[i]/DEG; A.angles[i].push(a); A.aMin[i]=Math.min(A.aMin[i],a); A.aMax[i]=Math.max(A.aMax[i],a);
+      A.muMin[i]=Math.min(A.muMin[i],s.mu[i]);
+      const rel=Math.abs(i===0?s.a[0]:s.a[i]-s.a[i-1])/DEG; A.relMax[i]=Math.max(A.relMax[i],rel);
+      if(s.lock[i]&&A.lockAt[i]===null) A.lockAt[i]=Math.round(th/DEG);
+      for(let j=0;j<i;j++){ if(segDist(s.B[i],s.P[i],s.J[j],s.J[j+1])<D.t/2+3.6 && A.hitAt[i]===null) A.hitAt[i]=Math.round(th/DEG); }
+      A.minY=Math.min(A.minY,s.J[i].y-D.t/2,s.J[i+1].y-D.t/2,s.P[i].y-4);
+    }
+    const tip=s.J[n]; A.tipMin=Math.min(A.tipMin,tip.y); A.tipMax=Math.max(A.tipMax,tip.y); A.tipR.push(tip);
+  }
+  const msgs=[];
+  for(let i=0;i<n;i++){
+    if(A.lockAt[i]!==null) msgs.push(['bad',`Segment ${i+1} blokkeert rond ${A.lockAt[i]}°: de stang kan de vleugel niet volgen. Verklein de nokslag of zet het aangrijppunt verder naar buiten.`]);
+    if(A.hitAt[i]!==null) msgs.push(['bad',`Stang ${i+1} raakt een binnenste vleugelsegment rond ${A.hitAt[i]}°. Verhoog het lijf of vergroot de V-stelling.`]);
+    if(A.muMin[i]<12) msgs.push(['bad',`Overbrengingshoek segment ${i+1} zakt naar ${A.muMin[i].toFixed(0)}°: het mechanisme slaat hier vast.`]);
+    else if(A.muMin[i]<25) msgs.push(['warn',`Overbrengingshoek segment ${i+1} is minimaal ${A.muMin[i].toFixed(0)}°: loopt zwaar, de motor moet meer kracht leveren.`]);
+    if(A.relMax[i]>75) msgs.push(['warn',`Scharnier ${i+1} buigt tot ${A.relMax[i].toFixed(0)}°. Boven 75° kunnen de ogen elkaar raken.`]);
+    const pf=D.plan(D.tAtt[i]);
+    if(D.zTab[i]>pf.le-3||D.zTab[i]<pf.te+3) msgs.push(['bad',`Het oog van stang ${i+1} valt buiten vleugelsegment ${i+1}. Verminder de pijlstelling of verplaats het aangrijppunt.`]);
+    const hb=hingeBands(i); if(hb.bw<3.5) msgs.push(['warn',`Scharnier ${i+1} is erg smal (${(hb.le-hb.te).toFixed(0)} mm). Maak de vleugel breder.`]);
+  }
+  if(A.minY<D.Hb+4) msgs.push(['bad','Een vleugel komt in de onderste stand op de sokkel. Verhoog het lijf of verklein de slag.']);
+  const hb0=hingeBands(0); if(D.zPost<hb0.te-10||D.zPost>hb0.le+20) msgs.push(['warn','De paal zit niet onder het midden van het lijf. Het lijf wordt mogelijk scheef gelijmd.']);
+  if(P.rpm>30) msgs.push(['warn','Boven 30 rpm ziet de beweging er gejaagd uit en slijten de pennen snel. 8–18 rpm oogt het meest natuurlijk.']);
+  if(!msgs.some(m=>m[0]==='bad')) msgs.unshift(['ok',`Het mechanisme loopt vrij over een volle omwenteling. De vleugelpunt beweegt ${(A.tipMax-A.tipMin).toFixed(0)} mm op en neer.`]);
+  A.msgs=msgs; AN=A;
+}
+
+/* ------------------------------------------------------------------ */
+/* Scène                                                              */
+/* ------------------------------------------------------------------ */
+const canvas=document.getElementById('view');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(32,1,1,5000);
+const controls=new THREE.OrbitControls(camera,canvas); controls.enableDamping=true; controls.dampingFactor=0.12;
+scene.add(new THREE.HemisphereLight(0xffffff,0x5a5040,0.75));
+const sun=new THREE.DirectionalLight(0xffffff,0.85); sun.position.set(180,320,260); scene.add(sun);
+const fill=new THREE.DirectionalLight(0xffffff,0.3); fill.position.set(-220,120,-180); scene.add(fill);
+
+const MAT={
+  brass:new THREE.MeshStandardMaterial({color:0xb8873e,metalness:0.55,roughness:0.42,flatShading:true}),
+  bronze:new THREE.MeshStandardMaterial({color:0x8d5c2c,metalness:0.5,roughness:0.5,flatShading:true}),
+  wood:new THREE.MeshStandardMaterial({color:0x6e4b2e,metalness:0.05,roughness:0.8,transparent:true,opacity:0.28,depthWrite:false}),
+  steel:new THREE.MeshStandardMaterial({color:0x8a9096,metalness:0.7,roughness:0.35}),
+  motor:new THREE.MeshStandardMaterial({color:0x3c4248,metalness:0.4,roughness:0.5}),
+  seg:SEGC.map(c=>new THREE.MeshStandardMaterial({color:new THREE.Color(c),metalness:0.15,roughness:0.55,flatShading:true})),
+  bad:new THREE.MeshStandardMaterial({color:0xd8402f,metalness:0.1,roughness:0.5,emissive:0x400000}),
+  print:new THREE.MeshStandardMaterial({color:0xc9a15f,metalness:0.1,roughness:0.6,flatShading:true}),
+  printBad:new THREE.MeshStandardMaterial({color:0xd8402f,metalness:0.1,roughness:0.6,flatShading:true})
+};
+let asm=new THREE.Group(), bedGroup=new THREE.Group(); scene.add(asm); scene.add(bedGroup);
+let M={};
+function clearGroup(g){ while(g.children.length){ const c=g.children.pop(); if(c.geometry&&c.userData.own) c.geometry.dispose(); } }
+function buildScene(){
+  clearGroup(asm); M={segR:[],segL:[],rodR:[],rodL:[],fol:[],cam:[]};
+  const mk=(geo,mat)=>{ const m=new THREE.Mesh(geo,mat); asm.add(m); return m; };
+  M.body=mk(G.body,MAT.bronze); M.body.position.set(0,D.yB,0);
+  for(let i=0;i<D.n;i++){
+    M.segR[i]=mk(G.seg[i],MAT.brass);
+    M.segL[i]=mk(G.seg[i],MAT.brass); M.segL[i].scale.x=-1;
+    M.rodR[i]=mk(G.rod[i],MAT.seg[i]); M.rodR[i].position.z=D.zRod[i];
+    M.rodL[i]=mk(G.rod[i],MAT.seg[i]); M.rodL[i].position.z=D.zRod[i];
+    M.fol[i]=mk(G.fol[i],MAT.seg[i]); M.fol[i].position.z=D.z[i];
+    M.cam[i]=mk(G.cam[i],MAT.seg[i]); M.cam[i].position.set(0,D.yc,D.z[i]);
+  }
+  const post=mk(G.post,MAT.bronze); post.position.y=D.Hb-3;
+  const b=G.box, bp=b.pos;
+  M.box=[mk(b.top,MAT.wood),mk(b.bottom,MAT.wood),mk(b.front,MAT.wood),mk(b.back,MAT.wood),mk(b.side,MAT.wood),mk(b.side,MAT.wood)];
+  M.box[0].position.set(...bp.top); M.box[1].position.set(...bp.bottom); M.box[2].position.set(...bp.front); M.box[3].position.set(...bp.back); M.box[4].position.set(...bp.sideR); M.box[5].position.set(...bp.sideL);
+  M.box.forEach(m=>m.renderOrder=2);
+  // as en motor (aankoopdelen, niet geprint)
+  const zm=D.zBack+3, shaftLen=D.zFront-(zm+26);
+  const sh=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,shaftLen,12),MAT.steel); sh.userData.own=true; sh.rotation.x=Math.PI/2; sh.position.set(0,D.yc,zm+26+shaftLen/2); asm.add(sh);
+  const mo=new THREE.Mesh(new THREE.BoxGeometry(12,10,24),MAT.motor); mo.userData.own=true; mo.position.set(0,D.yc,zm+13); asm.add(mo);
+  // baan van de vleugelpunten
+  const zt=D.plan(1).zc, ptsR=AN.tipR.map(p=>new THREE.Vector3(p.x,p.y,zt)), ptsL=AN.tipR.map(p=>new THREE.Vector3(-p.x,p.y,zt));
+  const lm=new THREE.LineBasicMaterial({color:new THREE.Color(SEGC[(D.n-1)%4])});
+  M.trail=new THREE.Group();
+  [ptsR,ptsL].forEach(pts=>{ const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm); l.userData.own=true; M.trail.add(l); });
+  asm.add(M.trail);
+  applyViewOpts();
+}
+function applyViewOpts(){
+  if(M.trail) M.trail.visible=document.getElementById('optTrail').checked;
+  const ghost=document.getElementById('optGhost').checked;
+  MAT.wood.opacity=ghost?0.28:1; MAT.wood.transparent=ghost; MAT.wood.depthWrite=!ghost; MAT.wood.needsUpdate=true;
+}
+let lastA=null;
+function pose(theta){
+  const s=solve(theta,lastA); lastA=s.a;
+  for(let i=0;i<D.n;i++){
+    const J=s.J[i], a=s.a[i];
+    M.segR[i].position.set(J.x,J.y,0); M.segR[i].rotation.z=a;
+    M.segL[i].position.set(-J.x,J.y,0); M.segL[i].rotation.z=-a;
+    const B=s.B[i], Pp=s.P[i], ang=Math.atan2(Pp.y-B.y,Pp.x-B.x);
+    M.rodR[i].position.x=B.x; M.rodR[i].position.y=B.y; M.rodR[i].rotation.z=ang;
+    M.rodL[i].position.x=-B.x; M.rodL[i].position.y=B.y; M.rodL[i].rotation.z=Math.PI-ang;
+    const bad=s.lock[i]; M.rodR[i].material=M.rodL[i].material=bad?MAT.bad:MAT.seg[i];
+    M.fol[i].position.y=D.yc+D.Rc[i]+D.e[i]*Math.sin(theta+D.phi[i]);
+    M.cam[i].rotation.z=theta;
+  }
+  return s;
+}
+
+/* Printbed-weergave: onderdelen plat neergelegd, verdeeld over bedden */
+let BEDS=[];
+function bedSize(){ const v=document.getElementById('bed').value.split('x').map(Number); return {x:v[0],y:v[1],z:v[2]}; }
+function layoutBeds(){
+  const bs=bedSize(), gap=6, W=bs.x-2*gap, H=bs.y-2*gap; const items=[];
+  for(const p of PARTS) for(let q=0;q<p.qty;q++) items.push({p,w:p.size[0],h:p.size[1]});
+  for(const it of items){
+    const fits=(w,h)=>w<=W&&h<=H;
+    it.rot=false;
+    if((it.h>it.w&&fits(it.h,it.w))||(!fits(it.w,it.h)&&fits(it.h,it.w))){ it.rot=true; [it.w,it.h]=[it.h,it.w]; }
+    it.tooBig=!fits(it.w,it.h)||it.p.size[2]>bs.z;
+  }
+  items.sort((a,b)=>b.h-a.h||b.w-a.w);
+  const beds=[];
+  for(const it of items){
+    if(it.tooBig){ beds.push({items:[Object.assign(it,{x:gap,y:gap})],shelves:[],full:true}); continue; }
+    let placed=false;
+    for(const b of beds){ if(b.full) continue;
+      for(const sh of b.shelves){ if(it.h<=sh.h&&sh.x+it.w<=gap+W){ b.items.push(Object.assign(it,{x:sh.x,y:sh.y})); sh.x+=it.w+gap; placed=true; break; } }
+      if(placed) break;
+      const ny=b.shelves.length?b.shelves[b.shelves.length-1].y+b.shelves[b.shelves.length-1].h+gap:gap;
+      if(ny+it.h<=gap+H){ b.shelves.push({y:ny,h:it.h,x:gap+it.w+gap}); b.items.push(Object.assign(it,{x:gap,y:ny})); placed=true; break; }
+    }
+    if(!placed){ const b={items:[],shelves:[{y:gap,h:it.h,x:gap+it.w+gap}]}; b.items.push(Object.assign(it,{x:gap,y:gap})); beds.push(b); }
+  }
+  BEDS=beds; return beds;
+}
+let gridColor=new THREE.Color('#999'), viewColor=new THREE.Color('#ddd');
+function buildBedScene(){
+  clearGroup(bedGroup); const bs=bedSize(); const beds=layoutBeds();
+  const cols=Math.ceil(Math.sqrt(beds.length));
+  beds.forEach((b,bi)=>{
+    const ox=(bi%cols)*(bs.x+40), oz=Math.floor(bi/cols)*(bs.y+40);
+    const plate=new THREE.Mesh(new THREE.BoxGeometry(bs.x,1,bs.y),new THREE.MeshStandardMaterial({color:gridColor,roughness:0.9,metalness:0}));
+    plate.userData.own=true; plate.position.set(ox+bs.x/2,-0.5,oz+bs.y/2); bedGroup.add(plate);
+    const grid=new THREE.GridHelper(Math.max(bs.x,bs.y),Math.round(Math.max(bs.x,bs.y)/20),viewColor,viewColor); grid.userData.own=true; grid.position.set(ox+bs.x/2,0.05,oz+bs.y/2); grid.scale.set(bs.x/Math.max(bs.x,bs.y),1,bs.y/Math.max(bs.x,bs.y)); bedGroup.add(grid);
+    for(const it of b.items){
+      const m=new THREE.Mesh(it.p.printGeo,it.tooBig?MAT.printBad:MAT.print);
+      if(it.rot) m.rotation.y=Math.PI/2;
+      m.position.set(ox+it.x+it.w/2,0,oz+it.y+it.h/2); bedGroup.add(m);
+    }
+  });
+  bedGroup.userData.extent={x:cols*(bs.x+40)-40, z:Math.ceil(beds.length/cols)*(bs.y+40)-40};
+}
+
+let viewMode='asm';
+function frameCamera(){
+  if(viewMode==='asm'){
+    const r=Math.max(P.span*1.1,D.yB+80)*2.6, ty=D.yB*0.55;
+    controls.target.set(0,ty,0);
+    const v=new THREE.Vector3(0.55,0.42,0.9).normalize().multiplyScalar(r);
+    camera.position.set(v.x,ty+v.y,v.z);
+  } else {
+    const e=bedGroup.userData.extent||{x:256,z:256}; const r=Math.max(e.x,e.z*1.3)*1.45;
+    controls.target.set(e.x/2,0,e.z/2); camera.position.set(e.x/2,r*0.85,e.z/2+r*0.6);
+  }
+  controls.update();
+}
+function setView(mode){
+  viewMode=mode; document.getElementById('vAsm').setAttribute('aria-pressed',mode==='asm'); document.getElementById('vBed').setAttribute('aria-pressed',mode==='bed');
+  asm.visible=mode==='asm'; bedGroup.visible=mode==='bed'; document.getElementById('scrubBar').hidden=mode!=='asm';
+  if(mode==='bed') buildBedScene();
+  frameCamera(); updateHud();
+}
+
+/* ------------------------------------------------------------------ */
+/* Panelen                                                            */
+/* ------------------------------------------------------------------ */
+function buildControls(){
+  const pr=document.getElementById('presets');
+  for(const k of Object.keys(PRESETS)){ const b=document.createElement('button'); b.type='button'; b.textContent=PRESETS[k].name; b.dataset.k=k; b.onclick=()=>{ P=Object.assign({preset:k},PRESETS[k].def); syncControls(); rebuild(true); }; pr.appendChild(b); }
+  const host=document.getElementById('ctlGroups');
+  for(const c of CONTROLS){
+    if(c.g){ const h=document.createElement('h2'); h.textContent=c.g; host.appendChild(h); continue; }
+    const w=document.createElement('div'); w.className='ctl';
+    w.innerHTML=`<label for="c_${c.id}">${c.label}</label><output id="o_${c.id}"></output><input type="range" id="c_${c.id}" min="${c.min}" max="${c.max}" step="${c.step}">`+(c.hint?`<span class="hint">${c.hint}</span>`:'');
+    host.appendChild(w);
+    const inp=w.querySelector('input');
+    inp.addEventListener('input',()=>{ P[c.id]=Number(inp.value); showVal(c); if(c.id==='rpm'){ saveParams(); analyzeOnly(); } else scheduleRebuild(); });
+  }
+  syncControls();
+}
+function showVal(c){ const v=P[c.id]; document.getElementById('o_'+c.id).textContent=(c.step<1?v.toFixed(1):v)+(c.unit?(c.unit==='°'||c.unit==='%'?c.unit:' '+c.unit):''); }
+function syncControls(){
+  document.querySelectorAll('#presets button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===P.preset));
+  for(const c of CONTROLS){ if(c.g) continue; document.getElementById('c_'+c.id).value=P[c.id]; showVal(c); }
+}
+let rbTimer=null;
+function scheduleRebuild(){ clearTimeout(rbTimer); rbTimer=setTimeout(()=>rebuild(false),60); }
+function analyzeOnly(){ analyze(); renderStatus(); }
+function rebuild(reframe){
+  saveParams(); D=derive(); lastA=null; analyze(); buildParts(); buildScene();
+  if(viewMode==='bed') buildBedScene();
+  renderStatus(); renderMech(); renderParts(); drawGraph();
+  if(reframe) frameCamera();
+}
+function renderStatus(){
+  const host=document.getElementById('statusList'); host.innerHTML='';
+  const lab={ok:'In orde',warn:'Let op',bad:'Probleem'};
+  for(const [lv,txt] of AN.msgs){ const d=document.createElement('div'); d.className='status '+lv; const b=document.createElement('b'); b.textContent=lab[lv]; const s=document.createElement('span'); s.textContent=txt; d.append(b,s); host.appendChild(d); }
+}
+function renderMech(){
+  const t=document.getElementById('mechTable');
+  let h='<thead><tr><th>Seg.</th><th style="text-align:right">Hoek min–max</th><th style="text-align:right">Overbr.</th><th style="text-align:right">Slag</th><th style="text-align:right">Stang</th></tr></thead><tbody>';
+  for(let i=0;i<D.n;i++){
+    const mu=AN.muMin[i], cls=mu<12?' bad':'';
+    h+=`<tr><td><span class="dot" style="background:${SEGC[i]}"></span>${i+1}</td><td class="num">${AN.aMin[i].toFixed(0)}° … ${AN.aMax[i].toFixed(0)}°</td><td class="num${cls}">${mu.toFixed(0)}°</td><td class="num">${(2*D.e[i]).toFixed(1)} mm</td><td class="num">${D.L[i].toFixed(1)} mm</td></tr>`;
+  }
+  t.innerHTML=h+'</tbody>';
+  document.getElementById('legend').innerHTML=Array.from({length:D.n},(_,i)=>`<span><i style="background:${SEGC[i]}"></i>Segment ${i+1}${i?` (${Math.round(-D.phi[i]/DEG)}° later)`:''}</span>`).join('');
+}
+function renderParts(){
+  const bs=bedSize(); layoutBeds();
+  let h='<thead><tr><th>Onderdeel</th><th style="text-align:right">Aantal</th><th style="text-align:right">Maat (mm)</th><th style="text-align:right">Gram</th></tr></thead><tbody>';
+  let count=0, grams=0;
+  for(const p of PARTS){
+    const big=(Math.min(p.size[0],p.size[1])>Math.min(bs.x,bs.y)-12)||(Math.max(p.size[0],p.size[1])>Math.max(bs.x,bs.y)-12)||p.size[2]>bs.z;
+    const g=p.vol*1.24; count+=p.qty; grams+=g*p.qty;
+    h+=`<tr><td>${p.name}</td><td class="num">${p.qty}×</td><td class="num${big?' bad':''}">${p.size.map(v=>v.toFixed(0)).join(' × ')}</td><td class="num">${g.toFixed(1)}</td></tr>`;
+  }
+  document.getElementById('partsTable').innerHTML=h+'</tbody>';
+  document.getElementById('tParts').textContent=count;
+  document.getElementById('tGram').textContent=Math.round(grams)+' g';
+  document.getElementById('tBeds').textContent=BEDS.length;
+  const pins=[]; for(let j=0;j<D.n;j++){ const hb=hingeBands(j); pins.push((hb.le-hb.te).toFixed(0)); }
+  const hw=[
+    `Gelijkstroom-tandwielmotor N20, 3–6 V, ongeveer ${Math.max(5,Math.round(P.rpm/5)*5)} rpm, met 3 mm D-as`,
+    `As 3 mm met vlakke kant (D-profiel), lengte ${Math.round(D.zFront-(D.zBack+3+24))} mm, of een koppeling op de motoras`,
+    `Batterijhouder 2× AA met schakelaar, en twee stukjes draad`,
+    `Scharnierpennen van 1,75 mm filament: per vleugel ${pins.map(p=>p+' mm').join(', ')} (2 vleugels)`,
+    `${4*D.n} korte pennen van 1,75 mm filament (± 12 mm) voor de stangen; uiteinden licht aansmelten`,
+    `Secondelijm of PLA-lijm voor paal, sokkelwanden en nokken op de as`
+  ];
+  document.getElementById('hwList').innerHTML=hw.map(x=>`<li>${x}</li>`).join('');
+}
+const gctx=document.getElementById('graph').getContext('2d');
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+let curTheta=0;
+function drawGraph(){
+  const cv=document.getElementById('graph'), dpr=Math.min(2,window.devicePixelRatio||1);
+  const W=cv.clientWidth||300, H=cv.clientHeight||190; if(cv.width!==Math.round(W*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  const c=gctx; c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,W,H);
+  const padL=36,padR=8,padT=8,padB=22, iw=W-padL-padR, ih=H-padT-padB;
+  let lo=Math.min(...AN.aMin), hi=Math.max(...AN.aMax); lo=Math.floor(lo/10)*10; hi=Math.ceil(hi/10)*10; if(hi-lo<20){hi+=10;lo-=10;}
+  const X=(d)=>padL+d/360*iw, Y=(v)=>padT+(hi-v)/(hi-lo)*ih;
+  c.font='11px "IBM Plex Mono", monospace'; c.fillStyle=css('--muted'); c.strokeStyle=css('--line'); c.lineWidth=1;
+  const step=(hi-lo)>80?20:10;
+  for(let v=lo;v<=hi;v+=step){ c.beginPath(); c.moveTo(padL,Y(v)+.5); c.lineTo(W-padR,Y(v)+.5); c.stroke(); c.textAlign='right'; c.textBaseline='middle'; c.fillText(v+'°',padL-5,Y(v)); }
+  c.textAlign='center'; c.textBaseline='top';
+  for(let d=0;d<=360;d+=90) c.fillText(d+'°',clamp(X(d),padL+8,W-padR-12),H-padB+5);
+  if(lo<0&&hi>0){ c.strokeStyle=css('--muted'); c.globalAlpha=.5; c.beginPath(); c.moveTo(padL,Y(0)+.5); c.lineTo(W-padR,Y(0)+.5); c.stroke(); c.globalAlpha=1; }
+  for(let i=0;i<D.n;i++){
+    const arr=AN.angles[i]; c.strokeStyle=SEGC[i]; c.lineWidth=2; c.beginPath();
+    arr.forEach((v,k)=>{ const x=X(k/(arr.length-1)*360), y=Y(v); k?c.lineTo(x,y):c.moveTo(x,y); }); c.stroke();
+  }
+  const td=((curTheta/DEG)%360+360)%360; c.strokeStyle=css('--accent'); c.lineWidth=1.5; c.beginPath(); c.moveTo(X(td)+.5,padT); c.lineTo(X(td)+.5,padT+ih); c.stroke();
+  for(let i=0;i<D.n;i++){ const k=Math.round(td/360*(AN.angles[i].length-1)), v=AN.angles[i][k]; c.fillStyle=SEGC[i]; c.beginPath(); c.arc(X(td),Y(v),3.5,0,Math.PI*2); c.fill(); }
+}
+function updateHud(){
+  const el=document.getElementById('hudInfo');
+  if(viewMode==='bed'){ const bs=bedSize(); el.textContent=`${BEDS.length} printbed${BEDS.length>1?'den':''} · ${bs.x}×${bs.y} mm`; }
+  else el.textContent=`${P.rpm} rpm · spanwijdte ${P.span} mm · hoogte ${Math.round(D.yB+15)} mm`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Export: binaire STL's in een zip                                   */
+/* ------------------------------------------------------------------ */
+function stlBinary(g, name){
+  const a=g.attributes.position.array, nt=a.length/9, buf=new ArrayBuffer(84+nt*50), dv=new DataView(buf);
+  const hdr=('Automaat Atelier '+name).slice(0,79); for(let i=0;i<hdr.length;i++) dv.setUint8(i,hdr.charCodeAt(i)&127);
+  dv.setUint32(80,nt,true); let o=84;
+  for(let t=0;t<nt;t++){
+    const v=[]; for(let k=0;k<3;k++){ const x=a[t*9+k*3], y=a[t*9+k*3+1], z=a[t*9+k*3+2]; v.push([x,-z,y]); } // y-boven -> z-boven
+    const ux=v[1][0]-v[0][0],uy=v[1][1]-v[0][1],uz=v[1][2]-v[0][2],wx=v[2][0]-v[0][0],wy=v[2][1]-v[0][1],wz=v[2][2]-v[0][2];
+    let nx=uy*wz-uz*wy, ny=uz*wx-ux*wz, nz=ux*wy-uy*wx; const ln=Math.hypot(nx,ny,nz)||1;
+    dv.setFloat32(o,nx/ln,true); dv.setFloat32(o+4,ny/ln,true); dv.setFloat32(o+8,nz/ln,true); o+=12;
+    for(const p of v){ dv.setFloat32(o,p[0],true); dv.setFloat32(o+4,p[1],true); dv.setFloat32(o+8,p[2],true); o+=12; }
+    dv.setUint16(o,0,true); o+=2;
+  }
+  return new Uint8Array(buf);
+}
+const CRC=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=CRC[(c^u8[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zip(files){
+  const enc=new TextEncoder(), chunks=[], central=[]; let off=0;
+  for(const f of files){
+    const name=enc.encode(f.name), data=f.data, crc=crc32(data);
+    const lh=new DataView(new ArrayBuffer(30)); lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0x0800,true); lh.setUint16(8,0,true); lh.setUint16(10,0,true); lh.setUint16(12,0x21,true);
+    lh.setUint32(14,crc,true); lh.setUint32(18,data.length,true); lh.setUint32(22,data.length,true); lh.setUint16(26,name.length,true); lh.setUint16(28,0,true);
+    chunks.push(new Uint8Array(lh.buffer),name,data);
+    const ch=new DataView(new ArrayBuffer(46)); ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(8,0x0800,true); ch.setUint16(10,0,true); ch.setUint16(12,0,true); ch.setUint16(14,0x21,true);
+    ch.setUint32(16,crc,true); ch.setUint32(20,data.length,true); ch.setUint32(24,data.length,true); ch.setUint16(28,name.length,true); ch.setUint32(42,off,true);
+    central.push(new Uint8Array(ch.buffer),name); off+=30+name.length+data.length;
+  }
+  const csize=central.reduce((s,c)=>s+c.length,0);
+  const end=new DataView(new ArrayBuffer(22)); end.setUint32(0,0x06054b50,true); end.setUint16(8,files.length,true); end.setUint16(10,files.length,true); end.setUint32(12,csize,true); end.setUint32(16,off,true);
+  return new Blob([...chunks,...central,new Uint8Array(end.buffer)],{type:'application/zip'});
+}
+function stlName(p,i){ return `${String(i+1).padStart(2,'0')}_${p.id}${p.qty>1?'_x'+p.qty:''}.stl`; }
+function readme(){
+  const L=[];
+  L.push(`AUTOMAAT ATELIER — ${PRESETS[P.preset].name}`,'',`Spanwijdte ${P.span} mm, ${D.n} segment(en) per vleugel, totale hoogte ca. ${Math.round(D.yB+15)} mm.`,'');
+  L.push('ONDERDELEN (bestand — aantal)');
+  PARTS.forEach((p,i)=>L.push(`  ${stlName(p,i)} — ${p.qty}x  (${p.size.map(v=>v.toFixed(0)).join(' x ')} mm)`));
+  L.push('','PRINTEN','  - Alle bestanden liggen al plat en in de juiste stand. PLA, 0,2 mm laaghoogte, 3 wanden, 20% vulling.','  - Geen support nodig. Vleugels printen met de bovenkant op het bed; het oog voor de stang wijst omhoog.','  - Scharniergaten en stanggaten zijn 2,0 mm: precies ruimte voor een pen van 1,75 mm filament.','');
+  L.push('MONTAGE');
+  L.push('  1. Lijm bodem, voor-, achter- en zijwanden. Het deksel nog los laten.');
+  L.push('  2. Zet de motor tegen de achterwand en schuif de as door de nokken naar het gat in de voorwand.');
+  L.push('     De D-gaten in de nokken bepalen de fase: nok 1 vooraan (bij de paal), de nummers lopen naar achter.');
+  D.phi.forEach((ph,i)=>L.push(`     Nok ${i+1}: ${Math.round(-ph/DEG)} graden fase, slag ${(2*D.e[i]).toFixed(1)} mm.`));
+  L.push('  3. Steek de volgers door de sleuven van het deksel (voet naar beneden) en plaats het deksel; de voeten rusten op de nokken.');
+  L.push('  4. Lijm de paal in het ronde gat van het deksel en het lijf er bovenop.');
+  L.push('  5. Scharnier de vleugelsegmenten met filament-pennen aan het lijf en aan elkaar. Smelt de pen-uiteinden licht aan.');
+  L.push('  6. Verbind elke stang met een pen aan de dwarsbalk van de volger en aan het oog onder het vleugelsegment.');
+  D.L.forEach((l,i)=>L.push(`     Stang ${i+1}: ${l.toFixed(1)} mm hart-op-hart, verbindt volger ${i+1} met vleugelsegment ${i+1}.`));
+  L.push('  7. Sluit de motor via de schakelaar aan op de batterijhouder. De vleugels zakken door hun eigen gewicht terug op de nokken.','');
+  L.push('Gecontroleerd in de simulatie:'); AN.msgs.forEach(m=>L.push('  - '+m[1]));
+  return L.join('\r\n');
+}
+async function doExport(){
+  const msg=document.getElementById('exportMsg'); msg.textContent='Bestanden worden gemaakt…';
+  const files=PARTS.map((p,i)=>({name:stlName(p,i), data:stlBinary(p.printGeo,p.name)}));
+  files.push({name:'LEESMIJ.txt',data:new TextEncoder().encode(readme())});
+  const blob=zip(files), fname=`automaat-${P.preset}-${P.span}mm.zip`;
+  let dl=null; try{ if(window.claude&&window.claude.use) dl=await window.claude.use('downloads'); }catch(e){ dl=null; }
+  if(dl){
+    try{ await dl.save({filename:fname,data:blob}); msg.textContent=`Opgeslagen: ${fname}`; }
+    catch(err){ const c=err&&err.code; msg.textContent= c==='declined'?'Downloaden geannuleerd.': c==='rate_limited'?'Er staat al een downloadvenster open. Probeer het zo opnieuw.':'Downloaden lukt hier niet. Open de pagina in de browser om de bestanden op te slaan.'; }
+  } else {
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    msg.textContent=`Download gestart: ${fname} (${files.length-1} STL-bestanden + LEESMIJ).`;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Thema, lus, events                                                 */
+/* ------------------------------------------------------------------ */
+function applyTheme(){
+  viewColor=new THREE.Color(css('--view')||'#dfe4de'); gridColor=new THREE.Color(css('--grid')||'#b9c1b8');
+  scene.background=viewColor; if(viewMode==='bed') buildBedScene(); if(AN) drawGraph();
+}
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme); }catch(e){}
+
+function resize(){ const w=canvas.clientWidth, h=canvas.clientHeight; if(!w||!h) return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+new ResizeObserver(()=>{ resize(); if(AN) drawGraph(); }).observe(canvas.parentElement);
+
+let playing=!matchMedia('(prefers-reduced-motion: reduce)').matches, lastT=performance.now(), graphTick=0;
+const playBtn=document.getElementById('playBtn'), thetaIn=document.getElementById('theta'), thetaOut=document.getElementById('thetaOut');
+function setPlaying(v){ playing=v; playBtn.textContent=v?'❚❚':'▶'; playBtn.setAttribute('aria-label',v?'Pauzeer':'Afspelen'); }
+playBtn.onclick=()=>setPlaying(!playing);
+thetaIn.addEventListener('input',()=>{ setPlaying(false); curTheta=Number(thetaIn.value)*DEG; });
+function loop(now){
+  const dt=Math.min(0.1,(now-lastT)/1000); lastT=now;
+  if(playing&&viewMode==='asm'){ curTheta=(curTheta+P.rpm/60*2*Math.PI*dt)%(2*Math.PI); }
+  if(viewMode==='asm'&&D){ pose(curTheta); const d=Math.round(curTheta/DEG)%360; thetaIn.value=d; thetaOut.textContent=String(d).padStart(3,' ')+'°'; if(++graphTick%3===0) drawGraph(); }
+  controls.update(); renderer.render(scene,camera); requestAnimationFrame(loop);
+}
+setPlaying(playing);
+
+document.getElementById('vAsm').onclick=()=>setView('asm');
+document.getElementById('vBed').onclick=()=>setView('bed');
+document.getElementById('optTrail').onchange=applyViewOpts;
+document.getElementById('optGhost').onchange=applyViewOpts;
+document.getElementById('resetBtn').onclick=()=>{ P=Object.assign({preset:P.preset},PRESETS[P.preset].def); syncControls(); rebuild(true); };
+document.getElementById('bed').onchange=()=>{ renderParts(); if(viewMode==='bed'){ buildBedScene(); frameCamera(); } updateHud(); };
+document.getElementById('exportBtn').onclick=doExport;
+const tabA=document.getElementById('tabA'), tabP=document.getElementById('tabP');
+function setTab(a){ tabA.setAttribute('aria-selected',a); tabP.setAttribute('aria-selected',!a); document.getElementById('paneA').hidden=!a; document.getElementById('paneP').hidden=a; if(a) drawGraph(); }
+tabA.onclick=()=>setTab(true); tabP.onclick=()=>setTab(false);
+
+buildControls();
+resize(); applyTheme();
+rebuild(true); updateHud();
+setInterval(updateHud,1000);
+requestAnimationFrame(loop);
+window.__AA={get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme, stlBinary, zip};
+})();
+</script>
