@@ -214,7 +214,12 @@ const PRESETS = {
       {x:0,z:le+2,rx:w0*0.75,rz:12,h:B*1.05},
       {x:0,z:te-6,rx:w0*0.45,rz:16,h:B*0.8},
       {x:w0*0.86,z:le+12,rx:3.4,rz:3.4,h:Math.max(4,B*0.75),p:0.6},{x:-w0*0.86,z:le+12,rx:3.4,rz:3.4,h:Math.max(4,B*0.75),p:0.6}]; },
-    belly(w0,le,te,P){ return {wb:w0-6,zm:(le+te)/2,Lz:(le-te)/2+4,depth:P.bulk*0.9,p:2.6}; } },
+    belly(w0,le,te,P){ return {wb:w0-6,zm:(le+te)/2,Lz:(le-te)/2+4,depth:P.bulk*0.9,p:2.6}; },
+    // rugtekening (rifmanta): donkere rug, witte schoudervlekken die naar de vinvoorrand uitlopen; x = afstand tot het midden
+    pattern(x,z,w0,le,te){ const ax=Math.abs(x), zc=le-18;
+      const sh=Math.exp(-(((ax-(w0+16))/20)**2+((z-zc+(ax-w0)*0.35)/13)**2));
+      const mid=sstep(w0*0.35,w0*0.75,ax); const v=clamp(sh*mid*1.35,0,1);
+      const dark=[0.21,0.24,0.28], light=[0.86,0.87,0.86]; return [lerp(dark[0],light[0],v),lerp(dark[1],light[1],v),lerp(dark[2],light[2],v)]; } },
   vogel: { name:'Vogel', w0Frac:0.075, split:{kind:'kop',side:1,cut:(le,te)=>le+27}, colors:{wing:'#6f4d30',body:'#82603f',belly:'#cdb497'},
     def:{span:260,n:2,chord:72,sweep:20,thick:4,bulk:5,e:9,grow:30,lag:30,down:40,dihedral:8,attach:50,height:110,rpm:16,pitch:5,pphase:110,heave:5,hphase:0,forced:1,hole:2.0,tip:65,headk:100},
     plan(t,P){ const C=P.chord;
@@ -307,13 +312,14 @@ const CONTROLS = [
   {id:'tip',label:'Meebuigende vleugelpunt',min:0,max:100,step:5,unit:'%',hint:'Een vrij scharnierende punt met een koppelstangetje: hij blijft achter bij de slag, als een soepele vleugel. 0% = geen punt.'},
   {id:'headk',label:'Kop of staart tegen de kanteling in',min:0,max:250,step:5,unit:'%',hint:'100% houdt de kop recht terwijl het lijf kantelt (zoals een vogel). Meer geeft een zwiepende staart. Werkt alleen als het lijf kantelt.'},
   {g:'Constructie'},
+  {id:'lever',label:'Hefboom op de sokkel (slagversterking)',min:1,max:5,step:0.5,unit:'×',hint:'Een tuimelaar per vleugelstang maakt van een kleine nokslag een grote stangslag; zo kunnen meerdere segmenten groot bewegen met een compacte sokkel. 1× = geen hefboom.'},
   {id:'forced',type:'check',label:'Gedwongen terugloop (groefnokken)',hint:'Een pen in de volger loopt in een groef: de vleugels worden ook omlaag getrokken en kunnen niet blijven hangen. Nokken worden groter.'},
   {id:'hole',label:'Pengat (voor 1,75 mm filament)',min:1.85,max:2.4,step:0.05,unit:'mm',hint:'Print eerst de testset. Klemt de pen, maak het gat groter; rammelt hij, kleiner.'},
   {g:'Motor'},
   {id:'rpm',label:'Toerental nokas',min:2,max:40,step:1,unit:'rpm'}
 ];
 
-const STORE='automaat-atelier-v9';
+const STORE='automaat-atelier-v10';
 let P = loadParams() || Object.assign({preset:'manta'}, PRESETS.manta.def);
 function loadParams(){ try{ const s=localStorage.getItem(STORE); if(!s) return null; const o=JSON.parse(s); if(!PRESETS[o.preset]) return null; return Object.assign({},PRESETS[o.preset].def,o);}catch(e){return null;} }
 function saveParams(){ try{ localStorage.setItem(STORE,JSON.stringify(P)); }catch(e){} }
@@ -339,7 +345,10 @@ let D;
 function derive(alt){
   const pre=PRESETS[P.preset];
   const d={pre};
-  d.sym=!!P.sym; d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced; d.gap=d.forced?11:9;
+  d.sym=!!P.sym; d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced;
+  // hefboom (tuimelaar): volgerpen in sleuf op afstand d0 van het draaipunt, stang aan het eind op aL = k·d0
+  d.leverOn=(P.lever||1)>1.01; d.kLev=P.lever||1; d.d0=10; d.aLi=[]; for(let i=0;i<(P.n|0);i++) d.aLi[i]=d.kLev*(1+(P.grow||0)/100*i)*d.d0; d.aL=Math.max(...d.aLi);
+  d.gap=d.leverOn?(d.forced?14:12):(d.forced?11:9); d.oRk=3.8; d.oRod=d.leverOn?6.5:3.8; d.oTab=d.leverOn?9.6:7.1;
   d.w0=Math.max(6,P.span*(P.w0f||pre.w0Frac));
   d.Sw=P.span/2-d.w0;
   d.tipOn=P.tip>0; d.kTip=clamp(P.tip/100,0.3,1); d.tf=d.tipOn?0.24:0;
@@ -350,7 +359,7 @@ function derive(alt){
   d.warp=warpFor(P.down); d.W=wave(d.warp,(P.glide||0)/100*0.85);
   d.e=[];d.Rb=[];d.Rmax=[];d.fw=[];d.xp=[];d.phi=[];
   for(let i=0;i<d.n;i++){
-    const e=P.e*(1+P.grow/100*i); d.e[i]=e; d.xp[i]=9+6*i; d.phi[i]=-i*P.lag*DEG;
+    const e=d.leverOn?P.e:P.e*(1+P.grow/100*i); d.e[i]=e; d.xp[i]=d.leverOn?16+7*i:9+6*i; d.phi[i]=-i*P.lag*DEG; // met hefbomen: gelijke nokken, langere hefboom naar buiten
     let mn=1e9, mx1=0; for(let k=0;k<360;k++){ const x=k*DEG; mn=Math.min(mn,e*(d.W.f(x)+d.W.f2(x))); mx1=Math.max(mx1,Math.abs(e*d.W.f1(x))); }
     if(!d.forced) d.Rb[i]=Math.max(e+6, 4-mn);
     else { // pen in groef: drukhoek max 30° -> s >= |s'|/tan30
@@ -370,13 +379,13 @@ function derive(alt){
   // nokken achter elkaar op de as; richting zo kiezen dat elk oog binnen zijn vleugelsegment valt
   let best=null;
   for(const dir of [-1,1]){ let acc=0, lo=-1e9, hi=1e9, miss=0;
-    for(let i=0;i<d.n;i++){ const pf=d.plan(d.tAtt[i]); acc+=pf.zc-dir*d.gap*i; lo=Math.max(lo,pf.te+5.5-dir*d.gap*i-7.1); hi=Math.min(hi,pf.le-5.5-dir*d.gap*i-7.1); }
-    const z0= lo<=hi ? (lo+hi)/2 : acc/d.n-7.1;
-    for(let i=0;i<d.n;i++){ const pf=d.plan(d.tAtt[i]), zt=z0+dir*d.gap*i+7.1; miss+=Math.max(0,pf.te+5.5-zt)+Math.max(0,zt-(pf.le-5.5)); }
+    for(let i=0;i<d.n;i++){ const pf=d.plan(d.tAtt[i]); acc+=pf.zc-dir*d.gap*i; lo=Math.max(lo,pf.te+5.5-dir*d.gap*i-d.oTab); hi=Math.min(hi,pf.le-5.5-dir*d.gap*i-d.oTab); }
+    const z0= lo<=hi ? (lo+hi)/2 : acc/d.n-d.oTab;
+    for(let i=0;i<d.n;i++){ const pf=d.plan(d.tAtt[i]), zt=z0+dir*d.gap*i+d.oTab; miss+=Math.max(0,pf.te+5.5-zt)+Math.max(0,zt-(pf.le-5.5)); }
     if(!best||miss<best.miss-1e-6) best={dir,z0,miss}; }
   d.z0=best.z0; d.zdir=best.dir;
   d.z=[];d.zRod=[];d.zTab=[];
-  for(let i=0;i<d.n;i++){ d.z[i]=d.z0+d.zdir*d.gap*i; d.zRod[i]=d.z[i]+3.8; d.zTab[i]=d.z[i]+7.1; }
+  for(let i=0;i<d.n;i++){ d.z[i]=d.z0+d.zdir*d.gap*i; d.zRod[i]=d.z[i]+d.oRod; d.zTab[i]=d.z[i]+d.oTab; d.zRk=d.zRk||[]; d.zRk[i]=d.z[i]+d.oRk; }
   const zmax=Math.max(...d.z), zmin=Math.min(...d.z)-(d.forced?7:0);
   // paal voor of achter de nokken; kantelstift aan de buitenkant daarvan
   const hb=hingeBandsRaw(d,0); d.le0=hb.le; d.te0=hb.te;
@@ -427,18 +436,22 @@ function derive(alt){
   const rmax=Math.max(...d.Rmax, d.RmaxP, d.heaveOn?d.Rbh+d.eh:0), top=Math.max(...d.e.map((e,i)=>d.Rb[i]+e+(d.forced?4:0)), d.pitchOn?d.spMax:0, d.heaveOn?d.Rbh+d.eh:0);
   d.yc=rmax+4;
   d.Hb=Math.max(55, d.yc+top+9, d.yc+rmax+3+GUIDE_H+2);
-  d.S=d.e.map((e,i)=>d.Hb+3-d.yc-d.Rb[i]+e);
+  d.bMax=d.leverOn?Math.atan(Math.max(...d.e)/d.d0):0;
+  d.lift=d.leverOn?Math.max(0,d.aL*Math.sin(d.bMax)+5-7-Math.min(...d.e)):0;
+  d.S=d.e.map((e,i)=>d.Hb+3-d.yc-d.Rb[i]+e+d.lift);
   d.yB=d.Hb+P.height;
   d.Wh=Math.max(38, rmax+8, Math.max(...d.fw)+8, d.fwp+8);
   d.zFront=Math.max(zmax+8, d.zPost+4.2+7, d.pitchOn? d.ze+10 : -1e9);
   d.zBack=Math.min(zmin-2-2-28-3, d.zPost-4.2-6-28, d.pitchOn? d.ze-10-28-3 : 1e9, d.zFront-70);
   d.pivotY=(i,th)=>d.Hb+7+d.e[i]+d.e[i]*d.W.f(th+d.phi[i]);
-  d.barY=(i,q)=>d.Hb+7+d.e[i]+(q-d.Rb[i]);   // hoogte dwarsbalk bij volgerstand q
+  d.barY=(i,q)=>d.Hb+7+d.e[i]+d.lift+(q-d.Rb[i]);   // hoogte dwarsbalk(pen) bij volgerstand q
+  d.yr=d.e.map(e=>d.Hb+7+e+d.lift); d.xr=d.xp.map(x=>x-d.d0);
+  d.Bpos=(i,yF)=>{ if(!d.leverOn) return {x:d.xp[i],y:yF,b:0}; const b=Math.atan2(yF-d.yr[i],d.d0); return {x:d.xr[i]+d.aLi[i]*Math.cos(b), y:d.yr[i]+d.aLi[i]*Math.sin(b), b}; };
   d.L=[]; let J={x:d.w0,y:d.yB};
   for(let i=0;i<d.n;i++){
     const g=d.dihedral+d.beta[i];
     const Pp={x:J.x+d.rho[i]*Math.cos(g), y:J.y+d.rho[i]*Math.sin(g)};
-    d.L[i]=Math.hypot(Pp.x-d.xp[i], Pp.y-(d.Hb+7+d.e[i]));
+    const Br=d.Bpos(i,d.yr?d.yr[i]:d.Hb+7+d.e[i]+d.lift); d.L[i]=Math.hypot(Pp.x-Br.x, Pp.y-Br.y);
     J={x:J.x+d.l*Math.cos(d.dihedral), y:J.y+d.l*Math.sin(d.dihedral)};
   }
   d.frame={y:d.yB, z:d.zPost};                     // draai-/verschuifpunt van het lijf
@@ -509,8 +522,8 @@ function solveDrive(q, prevA){
   const pt=pitchFrom(q,prevA&&prevA.phi); out.phi=pt.phi; out.a.phi=pt.phi; out.plock=pt.lock; out.h=heaveOf(q); out.q=q;
   let J={x:D.w0,y:D.yB};
   for(let i=0;i<D.n;i++){
-    const yw=D.barY(i,q.w[i]), bb=toBody(out.phi,yw,D.zRod[i],out.h);
-    const B={x:D.xp[i], y:bb.y}; out.Bw.push({x:D.xp[i],y:yw,z:D.zRod[i]});
+    const Bp=D.Bpos(i,D.barY(i,q.w[i])), yw=Bp.y, bb=toBody(out.phi,yw,D.zRod[i],out.h);
+    const B={x:Bp.x, y:bb.y}; out.Bw.push({x:Bp.x,y:yw,z:D.zRod[i]}); (out.beta=out.beta||[]).push(Bp.b);
     const dzr=bb.z-D.zRod[i]; out.tilt.push(Math.asin(clamp(Math.abs(dzr)/D.L[i],0,1))/DEG);
     const rho=D.rho[i], beta=D.beta[i], L=Math.sqrt(Math.max(1,D.L[i]*D.L[i]-dzr*dzr));
     const dx=B.x-J.x, dy=B.y-J.y, d=Math.hypot(dx,dy);
@@ -575,8 +588,8 @@ function signedVol(a){ let v=0; for(let i=0;i<a.length;i+=9){ v+= a[i]*(a[i+4]*a
 function flipTris(a){ for(let i=0;i<a.length;i+=9){ for(let k=0;k<3;k++){ const t=a[i+3+k]; a[i+3+k]=a[i+6+k]; a[i+6+k]=t; } } }
 function flatNormals(a){ const n=new Float32Array(a.length); for(let i=0;i<a.length;i+=9){ const ux=a[i+3]-a[i],uy=a[i+4]-a[i+1],uz=a[i+5]-a[i+2],vx=a[i+6]-a[i],vy=a[i+7]-a[i+1],vz=a[i+8]-a[i+2]; let x=uy*vz-uz*vy,y=uz*vx-ux*vz,z=ux*vy-uy*vx; const l=Math.hypot(x,y,z)||1; for(let k=0;k<3;k++){ n[i+k*3]=x/l; n[i+k*3+1]=y/l; n[i+k*3+2]=z/l; } } return n; }
 // items: gesloten BufferGeometry (oriëntatie automatisch) of {g, oriented:true} (al goed georiënteerd)
-function merge(items){
-  const P=[],N=[]; let total=0;
+function merge(items,base){
+  const P=[],N=[],C=[]; let total=0, anyC=false;
   for(const it of items){
     const g=it.isBufferGeometry?it:it.g, oriented=!it.isBufferGeometry&&it.oriented;
     const ng=g.index?g.toNonIndexed():g;
@@ -584,13 +597,17 @@ function merge(items){
     let n=ng.attributes.normal?Float32Array.from(ng.attributes.normal.array):null;
     if(!oriented&&signedVol(a)<0){ flipTris(a); if(n){ flipTris(n); for(let k=0;k<n.length;k++) n[k]=-n[k]; } }
     if(!n) n=flatNormals(a);
-    P.push(a); N.push(n); total+=a.length; if(ng!==g) ng.dispose(); g.dispose();
+    let c=ng.attributes.color?Float32Array.from(ng.attributes.color.array):null; if(c) anyC=true;
+    if(c&&!oriented&&signedVol(a)<0) flipTris(c);
+    P.push(a); N.push(n); C.push(c); total+=a.length; if(ng!==g) ng.dispose(); g.dispose();
   }
-  const pos=new Float32Array(total), nor=new Float32Array(total); let o=0;
-  for(let k=0;k<P.length;k++){ pos.set(P[k],o); nor.set(N[k],o); o+=P[k].length; }
-  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.BufferAttribute(nor,3)); return g;
+  const pos=new Float32Array(total), nor=new Float32Array(total), col=anyC?new Float32Array(total):null; let o=0;
+  const b=base||[1,1,1];
+  for(let k=0;k<P.length;k++){ pos.set(P[k],o); nor.set(N[k],o); if(col){ if(C[k]) col.set(C[k],o); else for(let q=0;q<P[k].length;q+=3){ col[o+q]=b[0]; col[o+q+1]=b[1]; col[o+q+2]=b[2]; } } o+=P[k].length; }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('normal',new THREE.BufferAttribute(nor,3)); if(col) g.setAttribute('color',new THREE.BufferAttribute(col,3)); return g;
 }
-function mirrorX(g){ const a=Float32Array.from(g.attributes.position.array), n=Float32Array.from(g.attributes.normal.array); for(let i=0;i<a.length;i+=3){ a[i]=-a[i]; n[i]=-n[i]; } flipTris(a); flipTris(n); const o=new THREE.BufferGeometry(); o.setAttribute('position',new THREE.BufferAttribute(a,3)); o.setAttribute('normal',new THREE.BufferAttribute(n,3)); return o; }
+function mirrorX(g){ const a=Float32Array.from(g.attributes.position.array), n=Float32Array.from(g.attributes.normal.array); for(let i=0;i<a.length;i+=3){ a[i]=-a[i]; n[i]=-n[i]; } flipTris(a); flipTris(n); const o=new THREE.BufferGeometry(); o.setAttribute('position',new THREE.BufferAttribute(a,3)); o.setAttribute('normal',new THREE.BufferAttribute(n,3));
+  if(g.attributes.color){ const c=Float32Array.from(g.attributes.color.array); flipTris(c); o.setAttribute('color',new THREE.BufferAttribute(c,3)); } return o; }
 
 /* Hoogteveld-lichaam: vlakke onderkant op yBase, bolle bovenkant.
    Rand en gaten in het xz-vlak; thick(x,z,d) geeft de dikte (d = afstand tot de rand). */
@@ -601,7 +618,7 @@ function unCollinear(L){ const n=L.length; for(let i=0;i<n;i++){ const a=L[(i-1+
 function loopArea(L){ let A=0; for(let i=0;i<L.length;i++){ const a=L[i], b=L[(i+1)%L.length]; A+=a[0]*b[1]-b[0]*a[1]; } return A/2; }
 function insideLoops(loops,x,z){ let c=false; for(const L of loops) for(let i=0,j=L.length-1;i<L.length;j=i++){ const xi=L[i][0],zi=L[i][1],xj=L[j][0],zj=L[j][1]; if((zi>z)!==(zj>z) && x<(xj-xi)*(z-zi)/(zj-zi)+xi) c=!c; } return c; }
 function distLoops(loops,x,z){ let m=1e9; for(const L of loops) for(let i=0;i<L.length;i++){ const a=L[i], b=L[(i+1)%L.length]; const d=segDist2(x,z,a[0],a[1],b[0],b[1]); if(d<m) m=d; } return m; }
-function heightSolid(outer, holes, thick, grid, yBase){
+function heightSolid(outer, holes, thick, grid, yBase, colorFn){
   outer=dedupe(outer); holes=holes.map(h=>dedupe(h));
   const loops=[outer,...holes];
   const V=[...outer,...holes.flat()].map(p=>[p[0],p[1]]);
@@ -636,6 +653,7 @@ function heightSolid(outer, holes, thick, grid, yBase){
       const xt=[V[x][0],yBase+H[x],V[x][1]], yt=[V[y][0],yBase+H[y],V[y][1]], xb=[V[x][0],yBase,V[x][1]], yb=[V[y][0],yBase,V[y][1]];
       side.push(...yt,...xt,...xb, ...yt,...xb,...yb); } } }
   const gT=new THREE.BufferGeometry(); gT.setAttribute('position',new THREE.BufferAttribute(top,3)); gT.setIndex(idxT); gT.computeVertexNormals();
+  if(colorFn){ const col=new Float32Array(V.length*3); V.forEach((p,i)=>{ const c=colorFn(p[0],p[1]); col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2]; }); gT.setAttribute('color',new THREE.BufferAttribute(col,3)); }
   const gB=new THREE.BufferGeometry(); gB.setAttribute('position',new THREE.BufferAttribute(bot,3)); gB.setIndex(idxB);
   const gS=new THREE.BufferGeometry(); gS.setAttribute('position',new THREE.BufferAttribute(new Float32Array(side),3));
   return [{g:gT,oriented:true},{g:gB,oriented:true},{g:gS,oriented:true}];
@@ -703,20 +721,21 @@ function buildSegment(i){
   const cR=Math.cos(Math.atan(skR)), cT=Math.cos(Math.atan(skT));
   const thick=(u,z,d)=>{ const da=Math.min(Math.abs(u-skR*(z-zr))*cR, last?1e9:Math.abs(l+skT*(z-zr)-u)*cT); return finishH(wingIdeal(s0+u,z),d,hingeK(da)); };
   const pads=eyePads(i), inPad=(u,z)=>pads.some(p=>u>=p.u0&&u<=p.u1&&z>=p.z0&&z<=p.z1);
+  const cf=D.pre.pattern?((u,z)=>D.pre.pattern(D.w0+s0+u,z,D.w0,D.le0,D.te0)):null, LIGHT=cf?[0.86,0.87,0.86]:null;
   if(!D.sym){
-    const items=heightSolid(pts,[],thick,2.0,-D.t/2);
+    const items=heightSolid(pts,[],thick,2.0,-D.t/2,cf);
     items.push(...knucklesSk(hbR,0,1,skR,zr,0)); if(!last) items.push(...knucklesSk(hbT,l,0,skT,zr,0));
-    const g=merge(items); return {full:g};
+    const g=merge(items,LIGHT); return {full:g};
   }
   // symmetrisch profiel: bovenhelft vanaf het middenvlak omhoog, onderhelft omlaag (vlak onder de ogen op -t/2)
   const half=(u,z,d,low)=>{ if(low&&inPad(u,z)) return D.t/2; return Math.max(0.6,thick(u,z,d)/2); };
-  const top=heightSolid(pts,[],(u,z,d)=>half(u,z,d,false),2.0,0); top.push(...knucklesSk(hbR,0,1,skR,zr,1)); if(!last) top.push(...knucklesSk(hbT,l,0,skT,zr,1));
+  const top=heightSolid(pts,[],(u,z,d)=>half(u,z,d,false),2.0,0,cf); top.push(...knucklesSk(hbR,0,1,skR,zr,1)); if(!last) top.push(...knucklesSk(hbT,l,0,skT,zr,1));
   const bot=heightSolid(pts,[],(u,z,d)=>half(u,z,d,true),2.0,0);
   for(const it of bot){ const a=it.g.attributes.position.array; for(let k=1;k<a.length;k+=3) a[k]=-a[k];
     if(it.g.index){ const ix=it.g.index.array; for(let k=0;k<ix.length;k+=3){ const t=ix[k+1]; ix[k+1]=ix[k+2]; ix[k+2]=t; } } else flipTris(a);
     it.g.attributes.position.needsUpdate=true; if(it.g.attributes.normal) it.g.deleteAttribute('normal'); if(it.g.index) it.g.computeVertexNormals(); }
   bot.push(...knucklesSk(hbR,0,1,skR,zr,-1)); if(!last) bot.push(...knucklesSk(hbT,l,0,skT,zr,-1));
-  const gTop=merge(top), gBot=merge(bot);
+  const gTop=merge(top,LIGHT), gBot=merge(bot,LIGHT);
   return {full:merge([gTop.clone(),gBot.clone()]), top:gTop, bot:gBot};
 }
 function buildEye(depth){ // los oog, wordt onder de vleugel gelijmd; oorsprong = midden van de lijmvlakte
@@ -760,12 +779,13 @@ function buildBody(){
   let headPts=null, hc=null;
   if(D.headOn){ const sd=D.side;
     const bodyCut=hingeOnCut(clipZ(pts,D.zCut,-sd),D.zCut,-sd,0); hc=bodyCut.hb; headPts=hingeOnCut(clipZ(pts,D.zCut,sd),D.zCut,sd,1).pts; pts=bodyCut.pts; }
-  const items=heightSolid(pts,[],thick,1.8,-D.t/2);
+  const cf=D.pre.pattern?((x,z)=>D.pre.pattern(x,z,w0,hb.le,hb.te)):null, LIGHT=[0.86,0.87,0.86];
+  const items=heightSolid(pts,[],thick,1.8,-D.t/2,cf);
   items.push(...knuckles(hb,w0,0), ...knuckles(hb,-w0,0));
   if(hc) for(let k=0;k<hc.nb;k++) if(k%2===0) items.push(tubeX(D.rh,D.R,hc.z[k]+0.3,hc.z[k+1]-0.3,0,D.zCut));
   D.headCutHB=hc;
-  if(headPts){ const hi=heightSolid(headPts,[],thick,1.5,-D.t/2); if(hc) for(let k=0;k<hc.nb;k++) if(k%2===1) hi.push(tubeX(D.rh,D.R,hc.z[k]+0.3,hc.z[k+1]-0.3,0,D.zCut)); G.headGeo=merge(hi); }
-  return merge(items);
+  if(headPts){ const hi=heightSolid(headPts,[],thick,1.5,-D.t/2,cf); if(hc) for(let k=0;k<hc.nb;k++) if(k%2===1) hi.push(tubeX(D.rh,D.R,hc.z[k]+0.3,hc.z[k+1]-0.3,0,D.zCut)); G.headGeo=merge(hi,cf?LIGHT:null); }
+  return merge(items,cf?LIGHT:null);
 }
 function bellyOutline(){ const B=D.belly, o=[], n=72; for(let k=0;k<n;k++){ const a=k/n*2*Math.PI, c=Math.cos(a), s=Math.sin(a); o.push([B.wb*Math.sign(c)*Math.pow(Math.abs(c),2/B.p), B.zm+B.Lz*Math.sign(s)*Math.pow(Math.abs(s),2/B.p)]); } return o; }
 function buildBelly(){ // onderste helft van het lijf, vlak tegen de bovenhelft; paal steekt erdoor
@@ -787,6 +807,16 @@ function buildRod(L){
   const s=shapeFrom(dedupe(pts)); s.holes.push(circlePath(0,0,D.rh)); s.holes.push(circlePath(L,0,D.rh));
   return merge([plateXY(s,ROD.t)]);
 }
+// tuimelaar: draaipunt in de oorsprong, sleuf voor de volgerpen rond d0, oog voor de stang op aL
+function buildRocker(i){ const r=4, L=D.aLi[i], pts=[]; for(let k=0;k<=12;k++){ const a=-Math.PI/2+Math.PI*k/12; pts.push([L+r*Math.cos(a),r*Math.sin(a)]); }
+  for(let k=0;k<=12;k++){ const a=Math.PI/2+Math.PI*k/12; pts.push([-r+r*Math.cos(a)+r,r*Math.sin(a)]); }
+  const s=shapeFrom(dedupe(pts)); s.holes.push(circlePath(0,0,D.rh)); s.holes.push(circlePath(L,0,D.rh));
+  const r0=D.d0-0.6, r1=D.d0/Math.cos(Math.max(D.bMax,0.2))+0.8, w=D.rh+0.15, sl=new THREE.Path();
+  sl.moveTo(r0,-w); sl.lineTo(r1,-w); sl.absarc(r1,0,w,-Math.PI/2,Math.PI/2,false); sl.lineTo(r0,w); sl.absarc(r0,0,w,Math.PI/2,Math.PI*1.5,false); s.holes.push(sl);
+  return merge([plateXY(s,ROD.t)]); }
+// steun voor het draaipunt, op het deksel gelijmd; oorsprong = bovenkant deksel
+function buildRockerPost(i){ const h=D.yr[i]-D.Hb, sh=new THREE.Shape(); sh.moveTo(-4,0); sh.lineTo(4,0); sh.lineTo(4,h); sh.absarc(0,h,4,0,Math.PI,false); sh.lineTo(-4,0); sh.holes.push(circlePath(0,h,D.rh));
+  const foot=new THREE.BoxGeometry(12,2,8); foot.translate(0,1,0); return merge([plateXY(sh,ROD.t),foot]); }
 function buildFollower(i){
   if(D.forced) return buildPinFollower(i);
   const fw=D.fw[i], S=D.S[i], xp=D.xp[i], cw=xp+4.5;
@@ -929,6 +959,9 @@ function buildParts(){
   G.eye=add('stangoog','Stangoog',2*D.n,buildEye(),rotX(Math.PI),'mech').geo;
   for(let i=0;i<D.n;i++) G.rod[i]=add('stang_'+(i+1),'Stang '+(i+1),2,buildRod(D.L[i]),rotX(-Math.PI/2),'rod').geo;
   for(let i=0;i<D.n;i++) G.fol[i]=add('volger_'+(i+1),'Volger '+(i+1),1,buildFollower(i),rotX(-Math.PI/2),'mech').geo;
+  G.rk=null; G.rkPost=[];
+  if(D.leverOn){ G.rk=[]; for(let i=0;i<D.n;i++){ G.rk[i]=add('tuimelaar_'+(i+1),'Tuimelaar '+(i+1)+' ('+(D.aLi[i]/D.d0).toFixed(1).replace('.',',')+'×)',2,buildRocker(i),rotX(-Math.PI/2),'mech').geo;
+    G.rkPost[i]=add('draaipunt_'+(i+1),'Draaipuntsteun '+(i+1),2,buildRockerPost(i),rotX(-Math.PI/2),'mech').geo; } }
   for(let i=0;i<D.n;i++) G.cam[i]=add('nok_'+(i+1),'Nok '+(i+1)+' ('+Math.round(-D.phi[i]/DEG)+'°)',1,buildCam(i),rotX(-Math.PI/2),'mech').geo;
   G.post=add('paal','Paal'+(D.heaveOn?' (met voet)':''),1,buildPost(),I4(),'post').geo;
   if(D.heaveOn){
@@ -984,7 +1017,7 @@ function setupPhysics(){
   PH={ body,
     seg:D.e.map((_,i)=>comb([[G.segMI[i],[0,0,0]],[eye,[D.att[i],-D.t/2,D.zTab[i]]]])),
     rod:D.e.map((_,i)=>get('stang_'+(i+1)).mi.m),
-    fol:D.e.map((_,i)=>get('volger_'+(i+1)).mi),
+    fol:D.e.map((_,i)=>get('volger_'+(i+1)).mi), rk:D.leverOn?D.e.map((_,i)=>get('tuimelaar_'+(i+1)).mi):null,
     pfol:D.pitchOn?get('volger_kantel').mi:null, plink:D.pitchOn?get('kantelstang').mi.m:0,
     post:D.heaveOn?get('paal').mi:null,
     tip:D.tipOn?comb([[G.tipMI,[0,0,0]],[get('puntoog').mi,[D.bLocX,-D.t/2,D.zTipEye]]]):null, tipRod:D.tipOn?get('puntstang').mi.m:0,
@@ -1002,6 +1035,7 @@ function energy(s){
     const yb=J.y+c[0]*Math.sin(a)+c[1]*Math.cos(a); U+=2*PH.seg[i].m*toWorld(s.phi,yb,c[2],s.h).y;
     const tw=toWorld(s.phi,s.P[i].y,D.zRod[i],s.h); U+=2*PH.rod[i]*(s.Bw[i].y+tw.y)/2;
     U+=PH.fol[i].m*(D.yc+q.w[i]+PH.fol[i].c[1]);
+    if(PH.rk) U+=2*PH.rk[i].m*(D.yr[i]+PH.rk[i].c[0]*Math.sin(s.beta[i]));
   }
   if(PH.tip&&s.tipM){ const c=new THREE.Vector3(...PH.tip.c).applyMatrix4(s.tipM); U+=2*PH.tip.m*toWorld(s.phi,c.y,c.z,s.h).y;
     U+=2*PH.tipRod*(toWorld(s.phi,s.tipA.y,s.tipA.z,s.h).y+toWorld(s.phi,s.tipB.y,s.tipB.z,s.h).y)/2; }
@@ -1092,6 +1126,7 @@ function analyze(){
   // sterkte: Euler-knik van de dunne stangen (PLA E≈3500 N/mm²), belasting ~1,5 × nokkracht
   const I=ROD.w*Math.pow(ROD.t,3)/12, Fmax=Math.max(0.05,...A.FwAbs)*1.5; A.rodSF=Math.min(...D.L.map(L=>Math.PI*Math.PI*3500*I/(L*L)))/Fmax;
   A.wobble=Math.atan(0.6/(3+GUIDE_H))/DEG;
+  if(D.leverOn&&D.bMax>38*DEG) msgs.push(['warn',`De tuimelaars draaien tot ${Math.round(D.bMax/DEG)}°; boven 38° gaat de pen in de sleuf haken. Verklein de nokslag en vergroot de hefboom.`]);
   if(A.rodSF<4) msgs.push(['warn',`De stangen hebben weinig marge tegen knikken (${A.rodSF.toFixed(1)}×). Gebruik 25% vulling of een kortere stang.`]);
   A.watt=A.tauReq/100*P.rpm/60*2*Math.PI;
   if(!D.forced) A.Fw.forEach((f,i)=>{ if(f<0) msgs.push(['bad',`Volger ${i+1} komt los van zijn nok: de vleugel trekt hem omhoog (${f.toFixed(2)} N). Zet gedwongen terugloop aan of vergroot de V-stelling.`]); else if(f<0.05) msgs.push(['warn',`Volger ${i+1} drukt maar ${(f*102).toFixed(0)} g op zijn nok. Bij wrijving kan hij blijven hangen; overweeg gedwongen terugloop.`]); });
@@ -1150,7 +1185,9 @@ const MAT={
 };
 function applyFinish(){
   const f=FINISH[document.getElementById('finish').value](PRESETS[P.preset]);
-  for(const [m,c] of [[MAT.wing,f.wing],[MAT.body,f.body],[MAT.belly,f.belly]]){ m.color.set(c); m.metalness=f.metal; m.roughness=f.rough; m.needsUpdate=true; }
+  const pat=document.getElementById('finish').value==='natuur'&&!!PRESETS[P.preset].pattern;
+  for(const [m,c] of [[MAT.wing,f.wing],[MAT.body,f.body],[MAT.belly,f.belly]]){ m.color.set(c); m.metalness=f.metal; m.roughness=f.rough; m.vertexColors=false; m.needsUpdate=true; }
+  if(pat) for(const m of [MAT.wing,MAT.body]){ m.color.set('#ffffff'); m.vertexColors=true; }
 }
 let asm=new THREE.Group(), bedGroup=new THREE.Group(); scene.add(asm); scene.add(bedGroup);
 let M={};
@@ -1179,6 +1216,9 @@ function buildScene(){
     M.rodR[i]=mk(G.rod[i],MAT.seg[i]); M.rodR[i].position.z=D.zRod[i]; M.rodR[i].userData.tag='rod'+i+'R';
     M.rodL[i]=mk(G.rod[i],MAT.seg[i]); M.rodL[i].position.z=D.zRod[i]; M.rodL[i].userData.tag='rod'+i+'L';
     M.fol[i]=mk(G.fol[i],MAT.seg[i]); M.fol[i].position.z=D.z[i]; M.fol[i].userData.tag='fol'+i;
+    if(D.leverOn){ M.rk=M.rk||[]; M.rk[i]=[];
+      for(const sg of [1,-1]){ const r=mk(G.rk[i],MAT.seg[i]); r.position.set(sg*D.xr[i],D.yr[i],D.zRk[i]); r.userData.tag='rk'+i+(sg>0?'R':'L'); M.rk[i].push(r);
+        const p=mk(G.rkPost[i],MAT.motor); p.position.set(sg*D.xr[i],D.Hb,D.zRod[i]); p.userData.tag='pp'+i+(sg>0?'R':'L'); } }
     M.cam[i]=mk(G.cam[i],MAT.seg[i]); M.cam[i].position.set(0,D.yc,D.z[i]); M.cam[i].userData.tag='cam'+i;
   }
   M.post=mk(G.post,MAT.body); M.post.position.set(0,postFoot0(),D.zPost); M.post.userData.tag='post';
@@ -1239,6 +1279,7 @@ function pose(theta){
     }
     M.rodR[i].material=M.rodL[i].material=s.lock[i]?MAT.bad:MAT.seg[i];
     M.fol[i].position.y=D.yc+D.s(i,theta);
+    if(D.leverOn&&M.rk&&M.rk[i]){ const b=s.beta[i]; M.rk[i][0].rotation.z=b; M.rk[i][1].rotation.z=Math.PI-b; }
     M.cam[i].rotation.z=theta;
   }
   M.tilt.rotation.x=s.phi; M.tilt.position.y=D.frame.y+s.h;
@@ -1281,7 +1322,7 @@ function voxelize(geo){
       for(let i=i0;i<=i1;i++){ const id=(i*ny+j)*nz+k; if(!occ[id]){ occ[id]=1; pts.push(mn.x+(i+0.5)*h, mn.y+(j+0.5)*h, mn.z+(k+0.5)*h); } } } }
   const v={mn,nx,ny,nz,occ,pts:new Float32Array(pts),bb}; VCACHE.set(geo.uuid,v); return v;
 }
-const STATIC_TAGS=new Set(['box','guide','motorh','bush','spacer']);
+const STATIC_TAGS=new Set(['box','guide','motorh','bush','spacer']); const isPost=(t)=>/^pp\d/.test(t);
 function allowedPair(a,b){
   const A=a.userData.tag, B=b.userData.tag, has=(x,y)=>(A===x&&B===y)||(A===y&&B===x), pre=(x,y)=>(A.startsWith(x)&&B.startsWith(y))||(A.startsWith(y)&&B.startsWith(x));
   if(a.parent===b||b.parent===a) return true;
@@ -1289,6 +1330,9 @@ function allowedPair(a,b){
     ['pfol','pcam'],['pfol','box'],['pfol','guide'],['pfol','plink'],['plink','lug'],['headrod','headeye'],['spacer','box'],['spacer','spacer'],['box','box'],['box','guide'],['box','motorh'],['guide','guide'],['motorh','spacer']];
   for(const [x,y] of fixed) if(has(x,y)) return true;
   if(pre('fol','box')||pre('fol','guide')||pre('cam','spacer')||has('pcam','spacer')||has('hcam','spacer')) return true;
+  if(pre('pp','box')||pre('pp','guide')) return true;
+  if((A.startsWith('rk')||B.startsWith('rk'))){ const r=A.startsWith('rk')?A:B, o=r===A?B:A, ri=+r.replace(/\D/g,''), sd=r.slice(-1);
+    if(o==='fol'+ri||o==='rod'+ri+sd||o==='pp'+ri+sd) return true; }
   const num=(t)=>+t.replace(/\D/g,''), side=(t)=>t.slice(-1);
   if(A.startsWith('seg')&&B.startsWith('seg')&&side(A)===side(B)&&Math.abs(num(A)-num(B))===1) return true;
   if(pre('body','seg0')) return true;
@@ -1304,13 +1348,14 @@ function allowedPair(a,b){
 function tagLabel(t){ const n=(x)=>+x.replace(/\D/g,'')+1, sd=(x)=>x.endsWith('R')?' rechts':x.endsWith('L')?' links':'';
   if(t.startsWith('seg')) return 'Vleugel'+sd(t)+' '+n(t); if(t.startsWith('eye')) return 'Stangoog '+n(t)+sd(t); if(t.startsWith('rod')) return 'Stang '+n(t)+sd(t);
   if(t.startsWith('fol')) return 'Volger '+n(t); if(t.startsWith('cam')) return 'Nok '+n(t);
+  if(t.startsWith('rk')) return 'Tuimelaar '+n(t)+sd(t); if(/^pp\d/.test(t)) return 'Draaipuntsteun '+n(t)+sd(t);
   const m={body:'Lijf',belly:'Buik',head:D.split?({kop:'Kop',staart:'Staart',achterlijf:'Achterlijf'}[D.split.kind]):'Kop',bracket:'Draaibeugel',lug:'Kanteloog',plink:'Kantelstang',pfol:'Kantelvolger',pcam:'Kantelnok',post:'Paal',hcam:'Deinnok',bush:'Geleidebus',box:'Sokkel',guide:'Geleideblok',spacer:'Afstandsbus',motorh:'Motorhouder',headrod:'Kopstang',headeye:'Kopoog',tipR:'Vleugelpunt rechts',tipL:'Vleugelpunt links',tiprodR:'Koppelstang punt rechts',tiprodL:'Koppelstang punt links',tipeyeR:'Puntoog rechts',tipeyeL:'Puntoog links',tipAR:'Koppeloog rechts',tipAL:'Koppeloog links'};
   return m[t]||t; }
 let FIT={state:'idle',res:null}, fitToken=0;
 function runFitCheck(){
   const token=++fitToken; FIT={state:'busy',res:null}; renderFit();
   const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&o.userData.tag) meshes.push(o); });
-  const isStatic=(m)=>STATIC_TAGS.has(m.userData.tag)||(m.userData.tag==='post'&&!D.heaveOn);
+  const isStatic=(m)=>STATIC_TAGS.has(m.userData.tag)||isPost(m.userData.tag)||(m.userData.tag==='post'&&!D.heaveOn);
   const pairs=[]; for(let i=0;i<meshes.length;i++) for(let j=i+1;j<meshes.length;j++){ const a=meshes[i], b=meshes[j]; if(isStatic(a)&&isStatic(b)) continue; if(allowedPair(a,b)) continue; pairs.push([a,b]); }
   const steps=24, hits=new Map(); let k=0;
   const inv=new THREE.Matrix4(), mAB=new THREE.Matrix4(), v=new THREE.Vector3(), ba=new THREE.Box3(), bb=new THREE.Box3();
@@ -1423,11 +1468,14 @@ function buildControls(){
     w.innerHTML=`<label for="c_${c.id}">${c.label}</label><output id="o_${c.id}"></output><input type="range" id="c_${c.id}" min="${c.min}" max="${c.max}" step="${c.step}">`+(c.hint?`<span class="hint">${c.hint}</span>`:'');
     host.appendChild(w);
     const inp=w.querySelector('input');
-    inp.addEventListener('input',()=>{ P[c.id]=Number(inp.value); showVal(c); if(c.id==='rpm'){ saveParams(); analyzeOnly(); } else scheduleRebuild(); });
+    inp.addEventListener('input',()=>{ const old=P[c.id]; P[c.id]=Number(inp.value);
+      if(c.id==='n'&&old!==P.n){ // segmenten worden korter/langer: slag evenredig meeschalen zodat de hoeken gelijk blijven
+        const k=old/P.n; P.e=Math.round(clamp(P.e*k,4,16)*2)/2; document.getElementById('c_e').value=P.e; showVal(CONTROLS.find(x=>x.id==='e')); }
+      showVal(c); if(c.id==='rpm'){ saveParams(); analyzeOnly(); } else scheduleRebuild(); });
   }
   syncControls();
 }
-function showVal(c){ if(c.type==='check') return; const v=P[c.id]; document.getElementById('o_'+c.id).textContent=(c.step<1?v.toFixed(1):v)+(c.unit?(c.unit==='°'||c.unit==='%'?c.unit:' '+c.unit):''); }
+function showVal(c){ if(c.type==='check') return; if(P[c.id]==null) P[c.id]=c.min; const v=P[c.id]; document.getElementById('o_'+c.id).textContent=(c.step<1?v.toFixed(1):v)+(c.unit?(c.unit==='°'||c.unit==='%'?c.unit:' '+c.unit):''); }
 function syncControls(){
   document.querySelectorAll('#presets button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===P.preset));
   for(const c of CONTROLS){ if(c.g) continue; const el=document.getElementById('c_'+c.id); if(c.type==='check'){ el.checked=!!P[c.id]; continue; } el.value=P[c.id]; showVal(c); }
@@ -1639,7 +1687,9 @@ function readme(){
     L.push(`     en het lange puntoog ${D.dTB} mm voorbij het scharnier onder de vleugelpunt; beide ${(D.plan(D.n*D.l/D.Sw).le-D.zTipEye).toFixed(1)} mm achter de voorrand. Verbind ze met de koppelstang (${D.Lc.toFixed(1)} mm).`); }
   if(D.headOn&&D.headCutHB){ L.push(`     ${D.split.kind[0].toUpperCase()+D.split.kind.slice(1)}: scharnier hem met een filament-pen dwars aan het lijf. Lijm het oog ${Math.abs(D.hdz).toFixed(1)} mm voorbij het scharnier,`);
     L.push(`     ${D.xHead} mm naast het midden, onder de ${D.split.kind}. Verbind het met de stang (${D.Lh.toFixed(1)} mm) met het oog aan de paal.`); }
-  L.push('  7. Verbind elke stang met een pen aan de dwarsbalk van de volger en aan het stangoog.');
+  if(D.leverOn){ L.push(`  7. Hefbomen: lijm per vleugelstang een draaipuntsteun op het deksel, ${D.xr[0].toFixed(0)} mm (en verder per segment) links en rechts van het midden.`);
+    L.push(`     Zet de tuimelaar met een pen op de steun. De pen in de dwarsbalk van de volger steekt door de sleuf van de tuimelaar; de vleugelstang hangt aan het eind (versterking ${String(D.kLev).replace('.',',')}×).`); }
+  else L.push('  7. Verbind elke stang met een pen aan de dwarsbalk van de volger en aan het stangoog.');
   D.L.forEach((l,i)=>L.push(`     Stang ${i+1}: ${l.toFixed(1)} mm hart-op-hart, verbindt volger ${i+1} met vleugelsegment ${i+1}.`));
   if(D.heaveOn) L.push(`     Lijm de geleidebus over het ronde gat in het deksel. Het lijf deint ${(2*D.eh).toFixed(1)} mm op en neer.`);
   L.push(D.forced?'  8. Sluit de motor via de schakelaar aan op de batterijhouder.':'  8. Sluit de motor via de schakelaar aan op de batterijhouder. De vleugels zakken door hun eigen gewicht terug op de nokken.','');
