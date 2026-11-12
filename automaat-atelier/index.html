@@ -143,6 +143,10 @@ ul.hw li{margin:3px 0}
       <h2>Mechanisme</h2>
       <div class="tablewrap"><table id="mechTable"></table></div>
       <p class="note">Overbrengingshoek: hoek tussen stang en hefboom. Boven 40° loopt het licht, onder 25° gaat het klemmen.</p>
+      <h2>Motorbelasting</h2>
+      <canvas id="torque" style="width:100%;height:150px;display:block"></canvas>
+      <div class="tablewrap"><table id="forceTable"></table></div>
+      <p class="note">Berekend uit het gewicht van alle bewegende delen (PLA, ±80% vulling) en de zwaartekracht. Voor wrijving in pennen en nokken rekent de app met 50% rendement.</p>
     </div>
     <div id="paneP" role="tabpanel" hidden>
       <h2>Printer</h2>
@@ -188,7 +192,7 @@ const blobH=(b,x,z)=>{ const q=((x-b.x)/b.rx)**2+((z-b.z)/b.rz)**2; return q>=1?
 /* ------------------------------------------------------------------ */
 const PRESETS = {
   manta: { name:'Manta', w0Frac:0.11, colors:{wing:'#3f4954',body:'#363e48',belly:'#d9d6cf'},
-    def:{span:240,n:3,chord:105,sweep:30,thick:4,bulk:7,e:7,grow:35,lag:40,down:50,dihedral:4,attach:55,height:105,rpm:8,pitch:6,pphase:90},
+    def:{span:240,n:3,chord:105,sweep:30,thick:4,bulk:7,e:7,grow:35,lag:40,down:50,dihedral:4,attach:55,height:105,rpm:8,pitch:6,pphase:90,heave:4,hphase:270,forced:0,hole:2.0},
     plan(t,P){ const C=P.chord, le1=-P.sweep-C*0.05;
       const le=C*0.5*(1-Math.pow(t,1.7))+le1*Math.pow(t,2.2);
       const te=lerp(-C*0.5, le1-5, Math.pow(t,0.62));
@@ -205,7 +209,7 @@ const PRESETS = {
       {x:w0*0.86,z:le+12,rx:3.4,rz:3.4,h:Math.max(4,B*0.75),p:0.6},{x:-w0*0.86,z:le+12,rx:3.4,rz:3.4,h:Math.max(4,B*0.75),p:0.6}]; },
     belly(w0,le,te,P){ return {wb:w0-6,zm:(le+te)/2,Lz:(le-te)/2+4,depth:P.bulk*0.9,p:2.6}; } },
   vogel: { name:'Vogel', w0Frac:0.075, colors:{wing:'#6f4d30',body:'#82603f',belly:'#cdb497'},
-    def:{span:260,n:2,chord:72,sweep:20,thick:4,bulk:5,e:9,grow:30,lag:30,down:40,dihedral:8,attach:50,height:110,rpm:16,pitch:5,pphase:110},
+    def:{span:260,n:2,chord:72,sweep:20,thick:4,bulk:5,e:9,grow:30,lag:30,down:40,dihedral:8,attach:50,height:110,rpm:16,pitch:5,pphase:110,heave:5,hphase:0,forced:0,hole:2.0},
     plan(t,P){ const C=P.chord;
       const le=C*0.4+C*0.16*Math.sin(Math.PI*clamp(t/0.9,0,1))-P.sweep*Math.pow(t,2.2);
       let c = t<0.75 ? C*(1-0.25*t) : C*0.8125*Math.sqrt(Math.max(0,1-Math.pow((t-0.75)/0.25,2)));
@@ -225,7 +229,7 @@ const PRESETS = {
       {x:0,z:te-40,rx:w0*0.5,rz:30,h:3.2,p:0.8}]; },
     belly(w0,le,te,P){ return {wb:w0-4,zm:(le+te)/2+4,Lz:(le-te)/2+16,depth:P.bulk*2.2,p:2.2}; } },
   vlinder: { name:'Vlinder', w0Frac:0.04, colors:{wing:'#d8741c',body:'#2c2622',belly:'#2c2622'},
-    def:{span:200,n:1,chord:95,sweep:0,thick:4,bulk:2.8,e:10,grow:0,lag:0,down:45,dihedral:10,attach:40,height:100,rpm:12,pitch:4,pphase:90},
+    def:{span:200,n:1,chord:95,sweep:0,thick:4,bulk:2.8,e:10,grow:0,lag:0,down:45,dihedral:10,attach:40,height:100,rpm:12,pitch:4,pphase:90,heave:3,hphase:200,forced:0,hole:2.0},
     plan(t,P){ const C=P.chord;
       const le=C*(0.30+0.45*t)-C*0.55*Math.pow(t,6)-P.sweep*t;
       const tf=C*(-0.25+0.35*t)-P.sweep*t;
@@ -246,7 +250,7 @@ const PRESETS = {
       return b; },
     belly(w0,le,te,P){ return {wb:Math.max(3,w0-1.5),zm:(le+te)/2-8,Lz:(le-te)/2+22,depth:3.5,p:2.4}; } },
   vleermuis: { name:'Vleermuis', w0Frac:0.065, colors:{wing:'#4b3b33',body:'#3a2c26',belly:'#5a463c'},
-    def:{span:260,n:3,chord:80,sweep:15,thick:4,bulk:3.4,e:7,grow:25,lag:40,down:42,dihedral:2,attach:50,height:115,rpm:14,pitch:5,pphase:100},
+    def:{span:260,n:3,chord:80,sweep:15,thick:4,bulk:3.4,e:7,grow:25,lag:40,down:42,dihedral:2,attach:50,height:115,rpm:14,pitch:5,pphase:100,heave:4,hphase:200,forced:1,hole:2.0},
     plan(t,P){ const C=P.chord;
       const le=C*0.45+C*0.1*Math.sin(Math.PI*Math.min(t/0.8,1))-P.sweep*Math.pow(t,1.5)*0.6;
       const le1=C*0.45-P.sweep*0.6;
@@ -288,11 +292,16 @@ const CONTROLS = [
   {g:'Lijfbeweging'},
   {id:'pitch',label:'Kantelen lijf (neus op en neer)',min:0,max:12,step:0.5,unit:'°',hint:'Het lijf scharniert op de paal en wordt door een eigen nok gekanteld. 0° = vast lijf.'},
   {id:'pphase',label:'Timing kanteling t.o.v. vleugels',min:0,max:355,step:5,unit:'°'},
+  {id:'heave',label:'Deinen lijf (op en neer)',min:0,max:12,step:0.5,unit:'mm',hint:'De paal schuift op een eigen nok. Bij echte dieren komt het lijf omhoog tijdens de neerslag.'},
+  {id:'hphase',label:'Timing deinen t.o.v. vleugels',min:0,max:355,step:5,unit:'°'},
+  {g:'Constructie'},
+  {id:'forced',type:'check',label:'Gedwongen terugloop (groefnokken)',hint:'Een pen in de volger loopt in een groef: de vleugels worden ook omlaag getrokken en kunnen niet blijven hangen. Nokken worden groter.'},
+  {id:'hole',label:'Pengat (voor 1,75 mm filament)',min:1.85,max:2.4,step:0.05,unit:'mm',hint:'Print eerst de testset. Klemt de pen, maak het gat groter; rammelt hij, kleiner.'},
   {g:'Motor'},
   {id:'rpm',label:'Toerental nokas',min:2,max:40,step:1,unit:'rpm'}
 ];
 
-const STORE='automaat-atelier-v3';
+const STORE='automaat-atelier-v4';
 let P = loadParams() || Object.assign({preset:'manta'}, PRESETS.manta.def);
 function loadParams(){ try{ const s=localStorage.getItem(STORE); if(!s) return null; const o=JSON.parse(s); if(!PRESETS[o.preset]) return null; return Object.assign({},PRESETS[o.preset].def,o);}catch(e){return null;} }
 function saveParams(){ try{ localStorage.setItem(STORE,JSON.stringify(P)); }catch(e){} }
@@ -314,10 +323,10 @@ function wave(a){ return {
 /* Afgeleide maten van het mechanisme                                 */
 /* ------------------------------------------------------------------ */
 let D;
-function derive(){
+function derive(alt){
   const pre=PRESETS[P.preset];
   const d={pre};
-  d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=1.0; d.cl=0.5;
+  d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced; d.gap=d.forced?11:9;
   d.w0=Math.max(6,P.span*pre.w0Frac);
   d.Sw=P.span/2-d.w0; d.l=d.Sw/d.n;
   d.dihedral=P.dihedral*DEG;
@@ -328,45 +337,74 @@ function derive(){
   for(let i=0;i<d.n;i++){
     const e=P.e*(1+P.grow/100*i); d.e[i]=e; d.xp[i]=9+6*i; d.phi[i]=-i*P.lag*DEG;
     let mn=1e9, mx1=0; for(let k=0;k<360;k++){ const x=k*DEG; mn=Math.min(mn,e*(d.W.f(x)+d.W.f2(x))); mx1=Math.max(mx1,Math.abs(e*d.W.f1(x))); }
-    d.Rb[i]=Math.max(e+6, 4-mn);
-    let rm=0; for(let k=0;k<360;k++){ const x=k*DEG, s=d.Rb[i]+e*d.W.f(x), s1=e*d.W.f1(x); rm=Math.max(rm,Math.hypot(s,s1)); }
+    if(!d.forced) d.Rb[i]=Math.max(e+6, 4-mn);
+    else { // pen in groef: drukhoek max 30° -> s >= |s'|/tan30
+      let rb=e+7; for(let k=0;k<360;k++){ const x=k*DEG; rb=Math.max(rb, Math.abs(e*d.W.f1(x))/Math.tan(30*DEG)-e*d.W.f(x)); } d.Rb[i]=rb; }
+    let rm=0; for(let k=0;k<360;k++){ const x=k*DEG, s=d.Rb[i]+e*d.W.f(x), s1=e*d.W.f1(x); rm=Math.max(rm, d.forced? s+1.9+2.5 : Math.hypot(s,s1)); }
     d.Rmax[i]=rm; d.fw[i]=mx1+3;
   }
   d.s=(i,th)=>d.Rb[i]+d.e[i]*d.W.f(th+d.phi[i]);
   d.s1=(i,th)=>d.e[i]*d.W.f1(th+d.phi[i]);
-  // kantelmechanisme lijf
-  d.pitchOn=P.pitch>0; d.dzLug=22; d.zPost=0; // zPost volgt hieronder
-  d.ep=d.pitchOn?d.dzLug*Math.sin(P.pitch*DEG):0; d.Rbp=d.ep+6; d.pph=P.pphase*DEG;
-  d.sp=(th)=>d.Rbp+d.ep*Math.cos(th+d.pph); d.sp1=(th)=>-d.ep*Math.sin(th+d.pph);
-  const rmax=Math.max(...d.Rmax, d.pitchOn?d.Rbp+d.ep:0), top=Math.max(...d.e.map((e,i)=>d.Rb[i]+e), d.pitchOn?d.Rbp+d.ep:0);
-  d.yc=rmax+4;
-  d.Hb=Math.max(55, d.yc+top+9);
-  d.S=d.e.map((e,i)=>d.Hb+3-d.yc-d.Rb[i]+e);
-  d.yB=d.Hb+P.height;
+  // deinen: de paal schuift op een eigen nok (sinus)
+  d.heaveOn=P.heave>0; d.eh=P.heave/2; d.Rbh=d.eh+6; d.hph=P.hphase*DEG;
+  d.sh=(th)=>d.Rbh+d.eh*Math.cos(th+d.hph); d.sh1=(th)=>-d.eh*Math.sin(th+d.hph);
+  d.pitchOn=P.pitch>0;
   d.hTab=d.t/2+5;
   d.att=[];d.rho=[];d.beta=[];d.tAtt=[];
   for(let i=0;i<d.n;i++){ d.att[i]=P.attach/100*d.l; d.rho[i]=Math.hypot(d.att[i],d.hTab); d.beta[i]=Math.atan2(-d.hTab,d.att[i]); d.tAtt[i]=(i*d.l+d.att[i])/d.Sw; }
   // nokken achter elkaar op de as; richting zo kiezen dat elk oog binnen zijn vleugelsegment valt
   let best=null;
   for(const dir of [-1,1]){ let acc=0, lo=-1e9, hi=1e9, miss=0;
-    for(let i=0;i<d.n;i++){ const pf=d.plan(d.tAtt[i]); acc+=pf.zc-dir*9*i; lo=Math.max(lo,pf.te+5.5-dir*9*i-7.1); hi=Math.min(hi,pf.le-5.5-dir*9*i-7.1); }
+    for(let i=0;i<d.n;i++){ const pf=d.plan(d.tAtt[i]); acc+=pf.zc-dir*d.gap*i; lo=Math.max(lo,pf.te+5.5-dir*d.gap*i-7.1); hi=Math.min(hi,pf.le-5.5-dir*d.gap*i-7.1); }
     const z0= lo<=hi ? (lo+hi)/2 : acc/d.n-7.1;
-    for(let i=0;i<d.n;i++){ const pf=d.plan(d.tAtt[i]), zt=z0+dir*9*i+7.1; miss+=Math.max(0,pf.te+5.5-zt)+Math.max(0,zt-(pf.le-5.5)); }
+    for(let i=0;i<d.n;i++){ const pf=d.plan(d.tAtt[i]), zt=z0+dir*d.gap*i+7.1; miss+=Math.max(0,pf.te+5.5-zt)+Math.max(0,zt-(pf.le-5.5)); }
     if(!best||miss<best.miss-1e-6) best={dir,z0,miss}; }
   d.z0=best.z0; d.zdir=best.dir;
   d.z=[];d.zRod=[];d.zTab=[];
-  for(let i=0;i<d.n;i++){ d.z[i]=d.z0+d.zdir*9*i; d.zRod[i]=d.z[i]+3.8; d.zTab[i]=d.z[i]+7.1; }
-  const zmax=Math.max(...d.z), zmin=Math.min(...d.z);
-  // paal voor of achter de nokken; kantelstift aan de buitenkant daarvan. Kies wat het best onder de buik past.
-  const Bl=pre.belly(d.w0,hingeBandsRaw(d,0).le,hingeBandsRaw(d,0).te,P), lim=Bl.Lz*0.92;
-  const cands=[{zp:zmax+12,dz:22},{zp:zmin-12,dz:-22}].map(c=>{ const out=Math.max(0,Math.abs(c.zp-Bl.zm)-(lim-6))+(P.pitch>0?Math.max(0,Math.abs(c.zp+c.dz-Bl.zm)-(lim-5)):0); return Object.assign(c,{score:out*100+Math.abs(c.zp-Bl.zm)}); });
+  for(let i=0;i<d.n;i++){ d.z[i]=d.z0+d.zdir*d.gap*i; d.zRod[i]=d.z[i]+3.8; d.zTab[i]=d.z[i]+7.1; }
+  const zmax=Math.max(...d.z), zmin=Math.min(...d.z)-(d.forced?7:0);
+  // paal voor of achter de nokken; kantelstift aan de buitenkant daarvan
+  const hb=hingeBandsRaw(d,0); d.le0=hb.le; d.te0=hb.te;
+  d.belly=pre.belly(d.w0,d.le0,d.te0,P);
+  const B=d.belly, lim=B.Lz*0.92;
+  // vier opstellingen: paal voor/achter de nokken, stift aan dezelfde kant (buiten de paal) of aan de overkant van de nokkenrij
+  let cands=[{zp:zmax+12,ze:zmax+34},{zp:zmin-12,ze:zmin-34},{zp:zmax+12,ze:zmin-12},{zp:zmin-12,ze:zmax+12}];
+  if(!d.pitchOn) cands=cands.slice(0,2);
+  cands=cands.map(c=>{ const out=Math.max(0,Math.abs(c.zp-B.zm)-(lim-6))+(d.pitchOn?Math.max(0,Math.abs(c.ze-B.zm)-(lim-5)):0); return Object.assign(c,{dz:c.ze-c.zp,fits:out===0,score:out*100+Math.abs(c.zp-B.zm)+(Math.abs(c.ze-c.zp)>30?8:0)}); });
   cands.sort((a,b)=>a.score-b.score);
-  d.zPost=cands[0].zp; d.dzLug=cands[0].dz;
-  d.ze=d.zPost+d.dzLug; if(d.dzLug<0) d.pph+=Math.PI; // stift achter het draaipunt: zelfde timing van de neus
-  d.Wh=Math.max(38, rmax+8, Math.max(...d.fw)+8);
+  let pick=cands[0];
+  if(alt!=null&&d.pitchOn){ // alt = z van het zwaartepunt van lijf+vleugels: kies de stift aan die kant, met de grootste hefboom
+    const ok=cands.filter(c=>c.fits&&Math.sign(c.dz)===Math.sign(alt-c.zp)&&Math.abs(alt-c.zp)>2);
+    if(ok.length) pick=ok.sort((a,b)=>Math.abs(alt-b.zp)-Math.abs(alt-a.zp))[0]; }
+  d.zPost=pick.zp; d.dzLug=pick.dz; d.ze=pick.ze;
+  d.bellyIdeal=(x,z)=>{ const q=(x/B.wb)**2+((z-B.zm)/B.Lz)**2; return Math.max(1.6,B.depth*Math.pow(Math.max(0,1-q),0.45)); };
+  const bossDepth=(zc,hx,hz)=>{ let m=0; for(let x=-hx;x<=hx;x+=1) for(let z=zc-hz;z<=zc+hz;z+=1) m=Math.max(m,d.bellyIdeal(x,z)); return m+1; };
+  d.inBelly=(z,mar)=>Math.abs(z-B.zm)<lim-mar;
+  // kantelnok via inverse kinematica: gewenste kanteling + deinen -> benodigde stifthoogte
+  d.Rbp=0; d.RmaxP=0; d.fwp=0;
+  if(d.pitchOn){
+    d.hpPost=bossDepth(d.zPost,7,6); d.hpPad=bossDepth(d.ze,5,5);
+    d.yBar=-d.t/2-d.hpPost; d.yp=d.yBar-9; d.yPad=-d.t/2-d.hpPad; d.yPadRel=d.yPad-d.yp;
+    const N=360, amp=P.pitch*DEG, ph=P.pphase*DEG, Bz=d.dzLug, K=d.yPadRel-3, g=[];
+    for(let k=0;k<N;k++){ const th=k/N*2*Math.PI, phi=-amp*Math.cos(th+ph); g.push((K-Bz*Math.sin(phi))/Math.cos(phi)+(d.heaveOn?d.eh*Math.cos(th+d.hph):0)); }
+    const mean=g.reduce((a,b)=>a+b,0)/N, v=g.map(x=>x-mean), dt=2*Math.PI/N;
+    let c=6+Math.max(...v.map(x=>-x));
+    for(let k=0;k<N;k++){ const v2=(v[(k+1)%N]-2*v[k]+v[(k-1+N)%N])/(dt*dt); c=Math.max(c,4-(v[k]+v2)); }
+    const S=v.map(x=>x+c), S1=v.map((_,k)=>(v[(k+1)%N]-v[(k-1+N)%N])/(2*dt));
+    const at=(arr,th)=>{ let u=((th%(2*Math.PI))+2*Math.PI)%(2*Math.PI)/dt; const i0=Math.floor(u)%N, f=u-Math.floor(u); return arr[i0]*(1-f)+arr[(i0+1)%N]*f; };
+    d.sp=(th)=>at(S,th); d.sp1=(th)=>at(S1,th);
+    d.Rbp=c; d.pMean=mean; d.RmaxP=Math.max(...S.map((x,k)=>Math.hypot(x,S1[k]))); d.fwp=Math.max(...S1.map(Math.abs))+3; d.spMax=Math.max(...S);
+  }
+  const rmax=Math.max(...d.Rmax, d.RmaxP, d.heaveOn?d.Rbh+d.eh:0), top=Math.max(...d.e.map((e,i)=>d.Rb[i]+e+(d.forced?4:0)), d.pitchOn?d.spMax:0, d.heaveOn?d.Rbh+d.eh:0);
+  d.yc=rmax+4;
+  d.Hb=Math.max(55, d.yc+top+9);
+  d.S=d.e.map((e,i)=>d.Hb+3-d.yc-d.Rb[i]+e);
+  d.yB=d.Hb+P.height;
+  d.Wh=Math.max(38, rmax+8, Math.max(...d.fw)+8, d.fwp+8);
   d.zFront=Math.max(zmax+8, d.zPost+4.2+7, d.pitchOn? d.ze+10 : -1e9);
   d.zBack=Math.min(zmin-2-2-28-3, d.zPost-4.2-6-28, d.pitchOn? d.ze-10-28-3 : 1e9, d.zFront-70);
   d.pivotY=(i,th)=>d.Hb+7+d.e[i]+d.e[i]*d.W.f(th+d.phi[i]);
+  d.barY=(i,q)=>d.Hb+7+d.e[i]+(q-d.Rb[i]);   // hoogte dwarsbalk bij volgerstand q
   d.L=[]; let J={x:d.w0,y:d.yB};
   for(let i=0;i<d.n;i++){
     const g=d.dihedral+d.beta[i];
@@ -374,37 +412,37 @@ function derive(){
     d.L[i]=Math.hypot(Pp.x-d.xp[i], Pp.y-(d.Hb+7+d.e[i]));
     J={x:J.x+d.l*Math.cos(d.dihedral), y:J.y+d.l*Math.sin(d.dihedral)};
   }
-  const hb=hingeBandsRaw(d,0); d.le0=hb.le; d.te0=hb.te;
-  d.belly=pre.belly(d.w0,d.le0,d.te0,P);
-  const B=d.belly; d.bellyIdeal=(x,z)=>{ const q=(x/B.wb)**2+((z-B.zm)/B.Lz)**2; return Math.max(1.6,B.depth*Math.pow(Math.max(0,1-q),0.45)); };
-  const bossDepth=(zc,hx,hz)=>{ let m=0; for(let x=-hx;x<=hx;x+=1) for(let z=zc-hz;z<=zc+hz;z+=1) m=Math.max(m,d.bellyIdeal(x,z)); return m+1; };
-  d.inBelly=(z,mar)=>Math.abs(z-B.zm)<B.Lz*0.92-mar;
+  d.frame={y:d.yB, z:d.zPost};                     // draai-/verschuifpunt van het lijf
   if(d.pitchOn){
-    d.hpPost=bossDepth(d.zPost,7,6); d.hpPad=bossDepth(d.ze,5,5);
-    d.yBar=-d.t/2-d.hpPost; d.yp=d.yBar-9; d.yPad=-d.t/2-d.hpPad; d.yPadRel=d.yPad-d.yp;
     d.pivot={y:d.yB+d.yp, z:d.zPost};
-    d.Sp=(d.yB+d.yPad-3)-(d.yc+d.Rbp);                 // voet -> middelpunt stiftkop
-    d.postTop=d.pivot.y;                               // hart draaipen
+    d.Sp=d.pivot.y+d.pMean-d.yc-d.Rbp;              // voet -> middelpunt stiftkop
+    d.postTop=d.pivot.y;
+    d.frame=d.pivot;
   }
+  d.movesBody=d.pitchOn||d.heaveOn;
   return d;
 }
 
 function angDist(a,b){ let x=(a-b)%(2*Math.PI); if(x>Math.PI)x-=2*Math.PI; if(x<-Math.PI)x+=2*Math.PI; return Math.abs(x); }
-function pitchAt(theta){
+function drive(theta){ return {w:D.e.map((_,i)=>D.s(i,theta)), p:D.pitchOn?D.sp(theta):0, h:D.heaveOn?D.sh(theta):0}; }
+function driveRate(theta){ return {w:D.e.map((_,i)=>D.s1(i,theta)), p:D.pitchOn?D.sp1(theta):0, h:D.heaveOn?D.sh1(theta):0}; }
+const heaveOf=(q)=>D.heaveOn?q.h-D.Rbh:0;
+function pitchFrom(q){
   if(!D.pitchOn) return {phi:0,lock:false};
-  const A=D.yc+D.sp(theta)+D.Sp-D.pivot.y, Bz=D.dzLug, K=D.yPadRel-3, R=Math.hypot(A,Bz);
+  const A=D.yc+q.p+D.Sp-(D.pivot.y+heaveOf(q)), Bz=D.dzLug, K=D.yPadRel-3, R=Math.hypot(A,Bz);
   if(Math.abs(K/R)>1) return {phi:0,lock:true};
   return {phi:Math.atan2(Bz,A)-Math.sign(Bz)*Math.acos(K/R), lock:false};
 }
-// wereld -> lijfassenstelsel (draaiing om x door het draaipunt)
-function toBody(phi,y,z){ if(!D.pitchOn||!phi) return {y,z}; const py=D.pivot.y,pz=D.pivot.z, dy=y-py, dz=z-pz, c=Math.cos(-phi), s=Math.sin(-phi); return {y:py+dy*c-dz*s, z:pz+dy*s+dz*c}; }
-function toWorld(phi,y,z){ if(!D.pitchOn||!phi) return {y,z}; const py=D.pivot.y,pz=D.pivot.z, dy=y-py, dz=z-pz, c=Math.cos(phi), s=Math.sin(phi); return {y:py+dy*c-dz*s, z:pz+dy*s+dz*c}; }
-function solve(theta, prevA){
+// wereld <-> lijfassenstelsel: draaiing phi om x door het draaipunt, plus verschuiving h omhoog
+function toBody(phi,y,z,h){ h=h||0; const py=D.frame.y,pz=D.frame.z, dy=y-h-py, dz=z-pz, c=Math.cos(-phi), s=Math.sin(-phi); return {y:py+dy*c-dz*s, z:pz+dy*s+dz*c}; }
+function toWorld(phi,y,z,h){ h=h||0; const py=D.frame.y,pz=D.frame.z, dy=y-py, dz=z-pz, c=Math.cos(phi), s=Math.sin(phi); return {y:py+dy*c-dz*s+h, z:pz+dy*s+dz*c}; }
+function solve(theta, prevA){ return solveDrive(drive(theta), prevA); }
+function solveDrive(q, prevA){
   const out={a:[],J:[],P:[],B:[],Bw:[],lock:[],mu:[],tilt:[]};
-  const pt=pitchAt(theta); out.phi=pt.phi; out.plock=pt.lock;
+  const pt=pitchFrom(q); out.phi=pt.phi; out.plock=pt.lock; out.h=heaveOf(q); out.q=q;
   let J={x:D.w0,y:D.yB};
   for(let i=0;i<D.n;i++){
-    const yw=D.pivotY(i,theta), bb=toBody(out.phi,yw,D.zRod[i]);
+    const yw=D.barY(i,q.w[i]), bb=toBody(out.phi,yw,D.zRod[i],out.h);
     const B={x:D.xp[i], y:bb.y}; out.Bw.push({x:D.xp[i],y:yw,z:D.zRod[i]});
     const dzr=bb.z-D.zRod[i]; out.tilt.push(Math.asin(clamp(Math.abs(dzr)/D.L[i],0,1))/DEG);
     const rho=D.rho[i], beta=D.beta[i], L=Math.sqrt(Math.max(1,D.L[i]*D.L[i]-dzr*dzr));
@@ -593,6 +631,7 @@ function buildRod(L){
   return merge([plateXY(s,3)]);
 }
 function buildFollower(i){
+  if(D.forced) return buildPinFollower(i);
   const fw=D.fw[i], S=D.S[i], xp=D.xp[i], cw=xp+4.5;
   const pts=[[-fw,0],[fw,0],[fw,4],[3,4],[3,S],[cw,S],[cw,S+8],[-cw,S+8],[-cw,S],[-3,S],[-3,4],[-fw,4]];
   const s=shapeFrom(pts); s.holes.push(circlePath(xp,S+4,D.rh)); s.holes.push(circlePath(-xp,S+4,D.rh));
@@ -601,23 +640,52 @@ function buildFollower(i){
 // Nok voor vlakke volger: omhullende van de steunlijnen y=s(θ) in het draaiende assenstelsel
 function camProfile(i){ const o=[]; const n=144; for(let k=0;k<n;k++){ const th=k/n*2*Math.PI, s=D.s(i,th), s1=D.s1(i,th);
   o.push([s*Math.sin(th)+s1*Math.cos(th), s*Math.cos(th)-s1*Math.sin(th)]); } return o; }
+function dHole(){ const a0=Math.acos(1.2/1.6), hole=new THREE.Path(); hole.moveTo(1.6*Math.cos(a0),1.6*Math.sin(a0));
+  for(let k=1;k<=20;k++){ const a=a0+(2*Math.PI-2*a0)*k/20; hole.lineTo(1.6*Math.cos(a),1.6*Math.sin(a)); } hole.closePath(); return hole; }
 function buildCam(i){
-  const s=shapeFrom(camProfile(i));
-  const a0=Math.acos(1.2/1.6), hole=new THREE.Path(); hole.moveTo(1.6*Math.cos(a0),1.6*Math.sin(a0));
-  for(let k=1;k<=20;k++){ const a=a0+(2*Math.PI-2*a0)*k/20; hole.lineTo(1.6*Math.cos(a),1.6*Math.sin(a)); }
-  hole.closePath(); s.holes.push(hole);
+  if(D.forced) return buildGrooveCam(i);
+  const s=shapeFrom(camProfile(i)); s.holes.push(dHole());
   return merge([plateXY(s,4)]);
+}
+// Groefnok: middellijn van de groef = baan van de penmiddelpunt in het draaiende assenstelsel
+function grooveLocus(i){ const o=[], n=144; for(let k=0;k<n;k++){ const th=k/n*2*Math.PI, s=D.s(i,th); o.push([s*Math.sin(th), s*Math.cos(th)]); } return o; }
+function offsetLoop(L,dist){ const n=L.length, o=[]; for(let k=0;k<n;k++){ const a=L[(k-1+n)%n], b=L[(k+1)%n]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty)||1; let nx=ty/l, ny=-tx/l; if(nx*L[k][0]+ny*L[k][1]<0){ nx=-nx; ny=-ny; } o.push([L[k][0]+nx*dist, L[k][1]+ny*dist]); } return o; }
+function selfIntersects(L){ const n=L.length; const cr=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+  for(let i=0;i<n;i++) for(let j=i+2;j<n;j++){ if(i===0&&j===n-1) continue; const a=L[i],b=L[(i+1)%n],c=L[j],d=L[(j+1)%n];
+    if(cr(a,b,c)*cr(a,b,d)<0 && cr(c,d,a)*cr(c,d,b)<0) return true; } return false; }
+function buildGrooveCam(i){
+  const loc=grooveLocus(i), inner=offsetLoop(loc,-1.9), outer=offsetLoop(loc,1.9), Rout=D.Rmax[i];
+  const base=new THREE.Shape(); base.absarc(0,0,Rout,0,Math.PI*2,false); base.holes.push(dHole());
+  const isl=shapeFrom(inner); isl.holes.push(dHole());
+  const ring=new THREE.Shape(); ring.absarc(0,0,Rout,0,Math.PI*2,false); const hp=new THREE.Path(); hp.moveTo(outer[0][0],outer[0][1]); for(let k=1;k<outer.length;k++) hp.lineTo(outer[k][0],outer[k][1]); hp.closePath(); ring.holes.push(hp);
+  const gb=plateXY(base,2); gb.translate(0,0,-5.8); const gi=plateXY(isl,2.5); gi.translate(0,0,-3.55); const gr=plateXY(ring,2.5); gr.translate(0,0,-3.55);
+  D.grooveBad=D.grooveBad||selfIntersects(inner);
+  return merge([gb,gi,gr]);
+}
+function buildPinFollower(i){ // oorsprong = middelpunt van de pen
+  const S=D.S[i], xp=D.xp[i], cw=xp+4.5;
+  const pts=[[-3.5,0],[3.5,0],[3.5,S],[cw,S],[cw,S+8],[-cw,S+8],[-cw,S],[-3.5,S]];
+  const s=shapeFrom(pts); s.holes.push(circlePath(xp,S+4,D.rh)); s.holes.push(circlePath(-xp,S+4,D.rh));
+  const boss=new THREE.Shape(); boss.absarc(0,0,4.5,0,Math.PI*2,false);
+  const pin=new THREE.CylinderGeometry(1.6,1.6,2.6,20); pin.rotateX(Math.PI/2); pin.translate(0,0,-3.2);
+  return merge([plateXY(s,4),plateXY(boss,4),pin]);
 }
 // plaat in het yz-vlak (vorm-x = wereld z, vorm-y = wereld y), dikte langs x
 function plateYZ(shape,thick){ const g=new THREE.ExtrudeGeometry(shape,{depth:thick,bevelEnabled:false,curveSegments:18}); g.translate(0,0,-thick/2); g.rotateY(-Math.PI/2); return g; }
+// paal; oorsprong = onderkant (vast in het deksel, of de voet op de deinnok)
+const postFoot0=()=>D.heaveOn? D.yc+D.Rbh : D.Hb-3;
 function buildPost(){
-  if(!D.pitchOn){ const len=D.yB-D.t/2-(D.Hb-3); const g=new THREE.CylinderGeometry(4,4,len,28); g.translate(0,len/2,0); return merge([g]); }
-  // paal met platte tong en dwarsgat voor de draaipen; oorsprong = onderkant paal
-  const yTop=D.postTop-(D.Hb-3), len=yTop-8; const g=new THREE.CylinderGeometry(4,4,len,28); g.translate(0,len/2,0);
+  const y0=postFoot0(), foot=[];
+  if(D.heaveOn){ const fw=D.eh+3; const f=new THREE.BoxGeometry(2*fw,4,8); f.translate(0,2,0); foot.push(f); }
+  if(!D.pitchOn){ const len=D.yB-D.t/2-y0; const g=new THREE.CylinderGeometry(4,4,len,28); g.translate(0,len/2,0); return merge([g,...foot]); }
+  // paal met platte tong en dwarsgat voor de draaipen
+  const yTop=D.postTop-y0, len=yTop-8; const g=new THREE.CylinderGeometry(4,4,len,28); g.translate(0,len/2,0);
   const tg=new THREE.Shape(); tg.moveTo(-5,len-3); tg.lineTo(5,len-3); tg.lineTo(5,yTop); tg.absarc(0,yTop,5,0,Math.PI,false); tg.lineTo(-5,len-3);
   tg.holes.push(circlePath(0,yTop,D.rh));
-  return merge([g,plateYZ(tg,7.0)]);
+  return merge([g,plateYZ(tg,7.0),...foot]);
 }
+function buildBush(){ // geleidebus voor de schuivende paal, op het deksel gelijmd
+  const pts=[[4.35,0],[7,0],[7,14],[4.35,14],[4.35,0]].map(p=>new THREE.Vector2(p[0],p[1])); return merge([new THREE.LatheGeometry(pts,32)]); }
 function buildBracket(){ // U-beugel onder de buik; oorsprong = draaipunt
   const top=-D.yp+D.yBar; // = 9
   const bar=new THREE.BoxGeometry(14,3,12); bar.translate(0,top-1.5,0);
@@ -625,17 +693,16 @@ function buildBracket(){ // U-beugel onder de buik; oorsprong = draaipunt
   const a=plateYZ(cheek(),2.4); a.translate(5.0,0,0); const b=plateYZ(cheek(),2.4); b.translate(-5.0,0,0);
   return merge([bar,a,b]);
 }
-function buildPitchCam(){ const s=new THREE.Shape(); s.absarc(-D.ep*Math.sin(D.pph),D.ep*Math.cos(D.pph),D.Rbp,0,Math.PI*2,false);
-  const a0=Math.acos(1.2/1.6), hole=new THREE.Path(); hole.moveTo(1.6*Math.cos(a0),1.6*Math.sin(a0));
-  for(let k=1;k<=20;k++){ const a=a0+(2*Math.PI-2*a0)*k/20; hole.lineTo(1.6*Math.cos(a),1.6*Math.sin(a)); }
-  hole.closePath(); s.holes.push(hole); return merge([plateXY(s,4)]); }
-function buildPitchFollower(){ const fw=D.ep+3, S=D.Sp;
+function buildEccCam(e,Rb,ph){ const s=new THREE.Shape(); s.absarc(-e*Math.sin(ph),e*Math.cos(ph),Rb,0,Math.PI*2,false); s.holes.push(dHole()); return merge([plateXY(s,4)]); }
+function buildPitchCam(){ const o=[], n=180; for(let k=0;k<n;k++){ const th=k/n*2*Math.PI, s=D.sp(th), s1=D.sp1(th); o.push([s*Math.sin(th)+s1*Math.cos(th), s*Math.cos(th)-s1*Math.sin(th)]); }
+  const sh=shapeFrom(o); sh.holes.push(dHole()); return merge([plateXY(sh,4)]); }
+function buildPitchFollower(){ const fw=D.fwp, S=D.Sp;
   const pts=[[-fw,0],[fw,0],[fw,4],[3,4],[3,S]]; for(let k=1;k<12;k++){ const a=Math.PI*k/12; pts.push([3*Math.cos(a),S+3*Math.sin(a)]); } pts.push([-3,S],[-3,4],[-fw,4]);
   return merge([plateXY(shapeFrom(pts),4)]); }
 function buildBox(){
   const W=D.Wh, zb=D.zBack, zf=D.zFront, H=D.Hb;
   const rect=(x0,y0,x1,y1)=>shapeFrom([[x0,y0],[x1,y0],[x1,y1],[x0,y1]]);
-  const top=rect(-W,zb,W,zf); top.holes.push(circlePath(0,D.zPost,4.2));
+  const top=rect(-W,zb,W,zf); top.holes.push(circlePath(0,D.zPost,D.heaveOn?4.35:4.2));
   if(D.pitchOn){ const z=D.ze, h=new THREE.Path(); h.moveTo(-3.4,z-2.3); h.lineTo(3.4,z-2.3); h.lineTo(3.4,z+2.3); h.lineTo(-3.4,z+2.3); h.closePath(); top.holes.push(h); }
   for(let i=0;i<D.n;i++){ const z=D.z[i]; const h=new THREE.Path(); h.moveTo(-3.4,z-2.3); h.lineTo(3.4,z-2.3); h.lineTo(3.4,z+2.3); h.lineTo(-3.4,z+2.3); h.closePath(); top.holes.push(h); }
   const front=rect(-W,3,W,H-3); front.holes.push(circlePath(0,D.yc,1.8));
@@ -651,7 +718,7 @@ const rotX=(a)=>new THREE.Matrix4().makeRotationX(a), rotZ=(a)=>new THREE.Matrix
 let PARTS=[], G={};
 function buildParts(){
   for(const p of PARTS){ p.geo.dispose(); if(p.printGeo) p.printGeo.dispose(); }
-  PARTS=[]; G={seg:[],segL:[],rod:[],fol:[],cam:[]};
+  PARTS=[]; G={seg:[],segL:[],rod:[],fol:[],cam:[]}; D.grooveBad=false;
   const add=(id,name,qty,geo,rot,kind)=>{ const p={id,name,qty,geo,rot,kind}; PARTS.push(p); return p; };
   G.body=add('lijf_boven','Lijf bovenkant',1,buildBody(),I4(),'body').geo;
   const bl=buildBelly(); D.bellyHole=bl.hole; G.belly=add('lijf_onder','Lijf onderkant',1,bl.geo,rotX(Math.PI),'body').geo;
@@ -663,7 +730,11 @@ function buildParts(){
   for(let i=0;i<D.n;i++) G.rod[i]=add('stang_'+(i+1),'Stang '+(i+1),2,buildRod(D.L[i]),rotX(-Math.PI/2),'rod').geo;
   for(let i=0;i<D.n;i++) G.fol[i]=add('volger_'+(i+1),'Volger '+(i+1),1,buildFollower(i),rotX(-Math.PI/2),'mech').geo;
   for(let i=0;i<D.n;i++) G.cam[i]=add('nok_'+(i+1),'Nok '+(i+1)+' ('+Math.round(-D.phi[i]/DEG)+'°)',1,buildCam(i),rotX(-Math.PI/2),'mech').geo;
-  G.post=add('paal','Paal',1,buildPost(),I4(),'post').geo;
+  G.post=add('paal','Paal'+(D.heaveOn?' (met voet)':''),1,buildPost(),I4(),'post').geo;
+  if(D.heaveOn){
+    G.hcam=add('nok_deinen','Nok deinen',1,buildEccCam(D.eh,D.Rbh,D.hph),rotX(-Math.PI/2),'mech').geo;
+    G.bush=add('geleidebus','Geleidebus paal',1,buildBush(),I4(),'mech').geo;
+  }
   if(D.pitchOn){
     G.bracket=add('draaibeugel','Draaibeugel lijf',1,buildBracket(),rotX(Math.PI),'mech').geo;
     G.pcam=add('nok_kantel','Nok kanteling',1,buildPitchCam(),rotX(-Math.PI/2),'mech').geo;
@@ -678,7 +749,57 @@ function buildParts(){
     const bb=g.boundingBox; g.translate(-(bb.min.x+bb.max.x)/2,-bb.min.y,-(bb.min.z+bb.max.z)/2); g.computeBoundingBox();
     p.printGeo=g; const s=g.boundingBox.getSize(new THREE.Vector3()); p.size=[s.x,s.z,s.y];
     p.vol=Math.abs(signedVol(g.attributes.position.array))/1000;
+    p.mi=massInfo(p.geo);
   }
+  setupPhysics();
+}
+// massa (g, PLA bij ~80% vulling) en zwaartepunt (mm) in het eigen assenstelsel van het onderdeel
+const FILL=0.8;
+function massInfo(geo){ const a=geo.attributes.position.array; let V=0,cx=0,cy=0,cz=0;
+  for(let i=0;i<a.length;i+=9){ const v=(a[i]*(a[i+4]*a[i+8]-a[i+5]*a[i+7])-a[i+1]*(a[i+3]*a[i+8]-a[i+5]*a[i+6])+a[i+2]*(a[i+3]*a[i+7]-a[i+4]*a[i+6]))/6;
+    V+=v; cx+=v*(a[i]+a[i+3]+a[i+6])/4; cy+=v*(a[i+1]+a[i+4]+a[i+7])/4; cz+=v*(a[i+2]+a[i+5]+a[i+8])/4; }
+  if(Math.abs(V)<1e-9) return {m:0,c:[0,0,0]}; return {m:V/1000*1.24*FILL, c:[cx/V,cy/V,cz/V]}; }
+
+/* ------------------------------------------------------------------ */
+/* Krachten: potentiële energie van alle bewegende delen               */
+/* ------------------------------------------------------------------ */
+let PH=null;
+function setupPhysics(){
+  const get=(id)=>PARTS.find(p=>p.id===id);
+  const comb=(list)=>{ let m=0,c=[0,0,0]; for(const [mi,off] of list){ m+=mi.m; for(let k=0;k<3;k++) c[k]+=mi.m*(mi.c[k]+off[k]); } return {m, c:m?c.map(v=>v/m):[0,0,0]}; };
+  const body=comb([[get('lijf_boven').mi,[0,D.yB,0]],[get('lijf_onder').mi,[0,D.yB,0]]].concat(D.pitchOn?[[get('draaibeugel').mi,[0,D.pivot.y,D.zPost]]]:[]));
+  const eye=get('stangoog').mi;
+  PH={ body,
+    seg:D.e.map((_,i)=>comb([[get('vleugel_R'+(i+1)).mi,[0,0,0]],[eye,[D.att[i],-D.t/2,D.zTab[i]]]])),
+    rod:D.e.map((_,i)=>get('stang_'+(i+1)).mi.m),
+    fol:D.e.map((_,i)=>get('volger_'+(i+1)).mi),
+    pfol:D.pitchOn?get('volger_kantel').mi:null,
+    post:D.heaveOn?get('paal').mi:null };
+  PH.moving=2*PH.seg.reduce((a,b)=>a+b.m,0)+PH.body.m+2*PH.rod.reduce((a,b)=>a+b,0)+PH.fol.reduce((a,b)=>a+b.m,0)+(PH.pfol?PH.pfol.m:0)+(PH.post?PH.post.m:0);
+}
+// U in N·mm (massa in g)
+function energy(s){
+  const q=s.q, g=9.81/1000; let U=0;
+  const bw=toWorld(s.phi,PH.body.c[1],PH.body.c[2],s.h); U+=PH.body.m*bw.y;
+  for(let i=0;i<D.n;i++){
+    const c=PH.seg[i].c, a=s.a[i], J=s.J[i];
+    const yb=J.y+c[0]*Math.sin(a)+c[1]*Math.cos(a); U+=2*PH.seg[i].m*toWorld(s.phi,yb,c[2],s.h).y;
+    const tw=toWorld(s.phi,s.P[i].y,D.zRod[i],s.h); U+=2*PH.rod[i]*(s.Bw[i].y+tw.y)/2;
+    U+=PH.fol[i].m*(D.yc+q.w[i]+PH.fol[i].c[1]);
+  }
+  if(PH.pfol) U+=PH.pfol.m*(D.yc+q.p+PH.pfol.c[1]);
+  if(PH.post) U+=PH.post.m*(postFoot0()+s.h+PH.post.c[1]);
+  return U*g;
+}
+// kracht (N) die elke nok omhoog moet leveren = ∂U/∂q
+function camForces(s){
+  const q=s.q, dl=0.05, F={w:[],p:0,h:0};
+  const ev=(qq)=>energy(solveDrive(qq,s.a));
+  const cl=(o)=>({w:o.w.slice(),p:o.p,h:o.h});
+  for(let i=0;i<D.n;i++){ const a=cl(q), b=cl(q); a.w[i]+=dl; b.w[i]-=dl; F.w.push((ev(a)-ev(b))/(2*dl)); }
+  if(D.pitchOn){ const a=cl(q), b=cl(q); a.p+=dl; b.p-=dl; F.p=(ev(a)-ev(b))/(2*dl); }
+  if(D.heaveOn){ const a=cl(q), b=cl(q); a.h+=dl; b.h-=dl; F.h=(ev(a)-ev(b))/(2*dl); }
+  return F;
 }
 
 /* ------------------------------------------------------------------ */
@@ -694,7 +815,7 @@ function segDist(p1,p2,q1,q2){
 function analyze(){
   const N=180, n=D.n;
   const A={angles:[...Array(n)].map(()=>[]), muMin:Array(n).fill(90), relMax:Array(n).fill(0), aMin:Array(n).fill(1e9), aMax:Array(n).fill(-1e9),
-    lockAt:Array(n).fill(null), hitAt:Array(n).fill(null), minY:1e9, tipMin:1e9, tipMax:-1e9, tipR:[], pitch:[], pMin:0, pMax:0, plock:false, tiltMax:0};
+    lockAt:Array(n).fill(null), hitAt:Array(n).fill(null), minY:1e9, tipMin:1e9, tipMax:-1e9, tipR:[], pitch:[], pMin:0, pMax:0, plock:false, tiltMax:0, tau:[], heave:[], Fw:Array(n).fill(1e9), Fp:1e9, Fh:1e9};
   const zt=D.plan(1).zc;
   let prev=null;
   for(let k=0;k<=N;k++){
@@ -705,9 +826,11 @@ function analyze(){
       const rel=Math.abs(i===0?s.a[0]:s.a[i]-s.a[i-1])/DEG; A.relMax[i]=Math.max(A.relMax[i],rel);
       if(s.lock[i]&&A.lockAt[i]===null) A.lockAt[i]=Math.round(th/DEG);
       for(let j=0;j<i;j++){ if(segDist(s.B[i],s.P[i],s.J[j],s.J[j+1])<D.t/2+3.6 && A.hitAt[i]===null) A.hitAt[i]=Math.round(th/DEG); }
-      A.minY=Math.min(A.minY,s.J[i].y-D.t/2,s.J[i+1].y-D.t/2,s.P[i].y-3.5);
+      A.minY=Math.min(A.minY,s.J[i].y-D.t/2+s.h,s.J[i+1].y-D.t/2+s.h,s.P[i].y-3.5+s.h);
     }
-    const tip=s.J[n], tw=toWorld(s.phi,tip.y,zt); A.tipMin=Math.min(A.tipMin,tip.y); A.tipMax=Math.max(A.tipMax,tip.y); A.tipR.push({x:tip.x,y:tw.y,z:tw.z,yb:tip.y});
+    const tip=s.J[n], tw=toWorld(s.phi,tip.y,zt,s.h); A.tipMin=Math.min(A.tipMin,tip.y); A.tipMax=Math.max(A.tipMax,tip.y); A.tipR.push({x:tip.x,y:tw.y,z:tw.z,yb:tip.y});
+    if(k<N){ const F=camForces(s), r=driveRate(th); let tq=0; F.w.forEach((f,i)=>{ tq+=f*r.w[i]; A.Fw[i]=Math.min(A.Fw[i],f); }); tq+=F.p*r.p+F.h*r.h; A.Fp=Math.min(A.Fp,F.p); A.Fh=Math.min(A.Fh,F.h); A.tau.push(tq/10); }
+    A.heave.push(s.h);
     const pd=-s.phi/DEG; A.pitch.push(pd); A.pMin=Math.min(A.pMin,pd); A.pMax=Math.max(A.pMax,pd); if(s.plock) A.plock=true; A.tiltMax=Math.max(A.tiltMax,...s.tilt);
   }
   // duur neerslag van de vleugelpunt
@@ -732,7 +855,16 @@ function analyze(){
     if(A.tiltMax>5) msgs.push(['warn',`Door het kantelen staan de vleugelstangen tot ${A.tiltMax.toFixed(1)}° scheef. Boven 5° gaan de pennen wringen; verklein de kanteling.`]);
   }
   if(P.rpm>30) msgs.push(['warn','Boven 30 rpm ziet de beweging er gejaagd uit en slijten de pennen snel.']);
-  if(!msgs.some(m=>m[0]==='bad')) msgs.unshift(['ok',`Het mechanisme loopt vrij over een volle omwenteling. De vleugelpunt beweegt ${(A.tipMax-A.tipMin).toFixed(0)} mm; de neerslag duurt ${Math.round(A.downShare*100)}% van de cyclus.`+(D.pitchOn?` Het lijf kantelt van ${A.pMin.toFixed(1)}° tot +${A.pMax.toFixed(1)}° (neus omhoog is positief).`:'')]);
+  // krachten en motor
+  A.tauMax=Math.max(...A.tau); A.tauMin=Math.min(...A.tau); A.tauReq=Math.max(0.5,A.tauMax)/0.5; // rendement ~50% (wrijving pennen en nokken)
+  A.kgcm=Math.max(0.5,A.tauReq/9.81); // ondergrens: aanloopwrijving van nokken en pennen A.watt=A.tauReq/100*P.rpm/60*2*Math.PI;
+  if(!D.forced) A.Fw.forEach((f,i)=>{ if(f<0) msgs.push(['bad',`Volger ${i+1} komt los van zijn nok: de vleugel trekt hem omhoog (${f.toFixed(2)} N). Zet gedwongen terugloop aan of vergroot de V-stelling.`]); else if(f<0.05) msgs.push(['warn',`Volger ${i+1} drukt maar ${(f*102).toFixed(0)} g op zijn nok. Bij wrijving kan hij blijven hangen; overweeg gedwongen terugloop.`]); });
+  if(D.pitchOn&&A.Fp<0.08){ A.cw=Math.ceil((0.12-A.Fp)/9.81*1000); msgs.push(['warn',`Het lijf drukt te licht op de kantelstift (${(A.Fp*102).toFixed(0)} g). Lijm ongeveer ${A.cw} g gewicht in het lijf boven de stift.`]); }
+  if(D.heaveOn&&A.Fh<0.08) msgs.push(['warn',`De paal drukt te licht op de deinnok (${(A.Fh*102).toFixed(0)} g). Maak het lijf zwaarder of verklein het deinen.`]);
+  if(D.forced&&D.grooveBad) msgs.push(['bad','Een groef in de nok snijdt zichzelf: de slag is te scherp. Verklein de nokslag of maak de neerslag langer.']);
+  const wall=D.R-D.rh; if(wall<0.8) msgs.push(['warn',`De scharnierwand is maar ${wall.toFixed(2)} mm dik. Maak het scharnier dikker of het pengat kleiner.`]);
+  if(A.kgcm>3) msgs.push(['warn',`De motor moet ${A.kgcm.toFixed(1)} kg·cm leveren. Dat is veel voor een N20-motor: kies een zwaardere vertraging (lager toerental) of maak de vleugels lichter.`]);
+  if(!msgs.some(m=>m[0]==='bad')) msgs.unshift(['ok',`Het mechanisme loopt vrij over een volle omwenteling. De vleugelpunt beweegt ${(A.tipMax-A.tipMin).toFixed(0)} mm; de neerslag duurt ${Math.round(A.downShare*100)}% van de cyclus.`+(D.pitchOn?` Het lijf kantelt van ${A.pMin.toFixed(1)}° tot +${A.pMax.toFixed(1)}° (neus omhoog is positief).`:'')+(D.heaveOn?` Het lijf deint ${(2*D.eh).toFixed(1)} mm.`:'')]);
   A.msgs=msgs; AN=A;
 }
 
@@ -783,7 +915,7 @@ function buildScene(){
   const mk=(geo,mat,parent)=>{ const m=new THREE.Mesh(geo,mat); m.castShadow=true; m.receiveShadow=true; (parent||asm).add(m); return m; };
   // lijf + vleugels hangen in een kantelgroep rond het draaipunt
   M.tilt=new THREE.Group(); const inner=new THREE.Group(); M.tilt.add(inner); asm.add(M.tilt);
-  if(D.pitchOn){ M.tilt.position.set(0,D.pivot.y,D.pivot.z); inner.position.set(0,-D.pivot.y,-D.pivot.z); }
+  M.tilt.position.set(0,D.frame.y,D.frame.z); inner.position.set(0,-D.frame.y,-D.frame.z);
   M.body=mk(G.body,MAT.body,inner); M.body.position.set(0,D.yB,0);
   M.belly=mk(G.belly,MAT.belly,inner); M.belly.position.set(0,D.yB,0);
   if(D.pitchOn){
@@ -802,7 +934,8 @@ function buildScene(){
     M.fol[i]=mk(G.fol[i],MAT.seg[i]); M.fol[i].position.z=D.z[i];
     M.cam[i]=mk(G.cam[i],MAT.seg[i]); M.cam[i].position.set(0,D.yc,D.z[i]);
   }
-  const post=mk(G.post,MAT.body); post.position.y=D.Hb-3;
+  M.post=mk(G.post,MAT.body); M.post.position.set(0,postFoot0(),D.zPost);
+  if(D.heaveOn){ M.hcam=mk(G.hcam,MAT.motor); M.hcam.position.set(0,D.yc,D.zPost); const bu=mk(G.bush,MAT.motor); bu.position.set(0,D.Hb,D.zPost); }
   const b=G.box, bp=b.pos;
   M.box=[mk(b.top,MAT.wood),mk(b.bottom,MAT.wood),mk(b.front,MAT.wood),mk(b.back,MAT.wood),mk(b.side,MAT.wood),mk(b.side,MAT.wood)];
   M.box[0].position.set(...bp.top); M.box[1].position.set(...bp.bottom); M.box[2].position.set(...bp.front); M.box[3].position.set(...bp.back); M.box[4].position.set(...bp.sideR); M.box[5].position.set(...bp.sideL);
@@ -834,11 +967,11 @@ function pose(theta){
     M.segR[i].position.set(J.x,J.y,0); M.segR[i].rotation.z=a;
     M.segL[i].position.set(-J.x,J.y,0); M.segL[i].rotation.z=-a;
     const B=s.B[i], Pp=s.P[i], ang=Math.atan2(Pp.y-B.y,Pp.x-B.x);
-    if(!D.pitchOn){
+    if(!D.movesBody){
       M.rodR[i].position.x=B.x; M.rodR[i].position.y=B.y; M.rodR[i].rotation.z=ang;
       M.rodL[i].position.x=-B.x; M.rodL[i].position.y=B.y; M.rodL[i].rotation.z=Math.PI-ang;
     } else { // 3D: van dwarsbalk (wereld) naar oog (gekanteld lijf)
-      const Bw=s.Bw[i], tw=toWorld(s.phi,Pp.y,D.zRod[i]);
+      const Bw=s.Bw[i], tw=toWorld(s.phi,Pp.y,D.zRod[i],s.h);
       for(const sg of [1,-1]){ const m=sg>0?M.rodR[i]:M.rodL[i];
         const a=new THREE.Vector3(sg*Bw.x,Bw.y,Bw.z), b=new THREE.Vector3(sg*Pp.x,tw.y,tw.z), X=b.clone().sub(a).normalize();
         const Y=new THREE.Vector3(0,0,1).cross(X).normalize(), Z=X.clone().cross(Y);
@@ -848,7 +981,9 @@ function pose(theta){
     M.fol[i].position.y=D.yc+D.s(i,theta);
     M.cam[i].rotation.z=theta;
   }
-  if(D.pitchOn){ M.tilt.rotation.x=s.phi; M.pcam.rotation.z=theta; M.pfol.position.y=D.yc+D.sp(theta); }
+  M.tilt.rotation.x=s.phi; M.tilt.position.y=D.frame.y+s.h;
+  if(D.pitchOn){ M.pcam.rotation.z=theta; M.pfol.position.y=D.yc+D.sp(theta); }
+  if(D.heaveOn){ M.hcam.rotation.z=theta; M.post.position.y=postFoot0()+s.h; }
   return s;
 }
 
@@ -925,6 +1060,9 @@ function buildControls(){
   const host=document.getElementById('ctlGroups');
   for(const c of CONTROLS){
     if(c.g){ const h=document.createElement('h2'); h.textContent=c.g; host.appendChild(h); continue; }
+    if(c.type==='check'){ const w=document.createElement('div'); w.className='ctl';
+      w.innerHTML=`<label class="check" style="grid-column:1/-1;margin:0"><input type="checkbox" id="c_${c.id}"> ${c.label}</label>`+(c.hint?`<span class="hint">${c.hint}</span>`:'');
+      host.appendChild(w); const cb=w.querySelector('input'); cb.addEventListener('change',()=>{ P[c.id]=cb.checked?1:0; scheduleRebuild(); }); continue; }
     const w=document.createElement('div'); w.className='ctl';
     w.innerHTML=`<label for="c_${c.id}">${c.label}</label><output id="o_${c.id}"></output><input type="range" id="c_${c.id}" min="${c.min}" max="${c.max}" step="${c.step}">`+(c.hint?`<span class="hint">${c.hint}</span>`:'');
     host.appendChild(w);
@@ -933,18 +1071,23 @@ function buildControls(){
   }
   syncControls();
 }
-function showVal(c){ const v=P[c.id]; document.getElementById('o_'+c.id).textContent=(c.step<1?v.toFixed(1):v)+(c.unit?(c.unit==='°'||c.unit==='%'?c.unit:' '+c.unit):''); }
+function showVal(c){ if(c.type==='check') return; const v=P[c.id]; document.getElementById('o_'+c.id).textContent=(c.step<1?v.toFixed(1):v)+(c.unit?(c.unit==='°'||c.unit==='%'?c.unit:' '+c.unit):''); }
 function syncControls(){
   document.querySelectorAll('#presets button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===P.preset));
-  for(const c of CONTROLS){ if(c.g) continue; document.getElementById('c_'+c.id).value=P[c.id]; showVal(c); }
+  for(const c of CONTROLS){ if(c.g) continue; const el=document.getElementById('c_'+c.id); if(c.type==='check'){ el.checked=!!P[c.id]; continue; } el.value=P[c.id]; showVal(c); }
 }
 let rbTimer=null;
 function scheduleRebuild(){ clearTimeout(rbTimer); rbTimer=setTimeout(()=>rebuild(false),90); }
-function analyzeOnly(){ analyze(); renderStatus(); }
+function analyzeOnly(){ analyze(); renderStatus(); renderForces(); }
 function rebuild(reframe){
-  saveParams(); D=derive(); lastA=null; buildParts(); analyze(); buildScene();
+  saveParams(); D=derive(null); lastA=null; buildParts(); analyze();
+  if(D.pitchOn&&AN.Fp<0.08){ // zwaartepunt bepalen en de stift aan die kant zetten
+    let m=PH.body.m, mz=PH.body.m*PH.body.c[2]; PH.seg.forEach(sg=>{ m+=2*sg.m; mz+=2*sg.m*sg.c[2]; });
+    const zc=mz/m, prev={zp:D.zPost,ze:D.ze,F:AN.Fp}; D=derive(zc);
+    if(D.zPost!==prev.zp||D.ze!==prev.ze){ buildParts(); analyze(); if(AN.Fp<prev.F){ D=derive(null); buildParts(); analyze(); } } else D=derive(null)&&D; }
+  buildScene();
   if(viewMode==='bed') buildBedScene();
-  renderStatus(); renderMech(); renderParts(); drawGraph();
+  renderStatus(); renderMech(); renderForces(); renderParts(); drawGraph();
   if(reframe) frameCamera();
 }
 function renderStatus(){
@@ -977,12 +1120,14 @@ function renderParts(){
   document.getElementById('tBeds').textContent=BEDS.length;
   const pins=[]; for(let j=0;j<D.n;j++){ const hb=hingeBands(j); pins.push((hb.le-hb.te).toFixed(0)); }
   const hw=[
-    `Gelijkstroom-tandwielmotor N20, 3–6 V, ongeveer ${Math.max(5,Math.round(P.rpm/5)*5)} rpm, met 3 mm D-as`,
+    `Gelijkstroom-tandwielmotor N20, 3–6 V, ongeveer ${Math.max(5,Math.round(P.rpm/5)*5)} rpm, nominaal koppel ≥ ${AN.kgcm.toFixed(2)} kg·cm, met 3 mm D-as`,
     `As 3 mm met vlakke kant (D-profiel), lengte ${Math.round(D.zFront-(D.zBack+3+24))} mm, of een koppeling op de motoras`,
     `Batterijhouder 2× AA met schakelaar, en twee stukjes draad`,
     `Scharnierpennen van 1,75 mm filament: per vleugel ${pins.map(p=>p+' mm').join(', ')} (2 vleugels)`,
     `${4*D.n} korte pennen van 1,75 mm filament (± 12 mm) voor de stangen; uiteinden licht aansmelten`,
-    `Secondelijm of PLA-lijm voor de lijfhelften, paal, stangogen, sokkelwanden en nokken`
+    `Secondelijm of PLA-lijm voor de lijfhelften, paal, stangogen, sokkelwanden en nokken`,
+    `Droog smeermiddel: PTFE-spray of grafietpoeder op nokken en pennen (geen olie: die trekt stof en tast PLA aan)`,
+    `Optioneel voor een lange levensduur: messing buisjes 3 × 0,45 mm in de scharnierogen met messing pen 2 mm (zet het pengat dan op 3,0 mm)`
   ];
   document.getElementById('hwList').innerHTML=hw.map(x=>`<li>${x}</li>`).join('');
 }
@@ -1009,6 +1154,33 @@ function drawGraph(){
   if(D.pitchOn){ c.strokeStyle=css('--ink'); c.lineWidth=1.5; c.setLineDash([5,4]); c.beginPath(); AN.pitch.forEach((v,k)=>{ const x=X(k/(AN.pitch.length-1)*360), y=Y(v); k?c.lineTo(x,y):c.moveTo(x,y); }); c.stroke(); c.setLineDash([]); }
   const td=((curTheta/DEG)%360+360)%360; c.strokeStyle=css('--accent'); c.lineWidth=1.5; c.beginPath(); c.moveTo(X(td)+.5,padT); c.lineTo(X(td)+.5,padT+ih); c.stroke();
   for(let i=0;i<D.n;i++){ const k=Math.round(td/360*(AN.angles[i].length-1)), v=AN.angles[i][k]; c.fillStyle=SEGC[i]; c.beginPath(); c.arc(X(td),Y(v),3.5,0,Math.PI*2); c.fill(); }
+  drawTorque();
+}
+function drawTorque(){
+  const cv=document.getElementById('torque'); if(!cv||!AN.tau.length) return; const dpr=Math.min(2,window.devicePixelRatio||1);
+  const W=cv.clientWidth||300, H=cv.clientHeight||150; if(cv.width!==Math.round(W*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  const c=cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,W,H);
+  const padL=44,padR=8,padT=8,padB=22, iw=W-padL-padR, ih=H-padT-padB, T=AN.tau;
+  let lo=Math.min(0,...T), hi=Math.max(0,...T); const span=Math.max(0.2,hi-lo); const st=Math.pow(10,Math.floor(Math.log10(span/2))); const step=span/st>10?st*5:span/st>4?st*2:st;
+  lo=Math.floor(lo/step)*step; hi=Math.ceil(hi/step)*step; if(hi===lo) hi=lo+step;
+  const X=(d)=>padL+d/360*iw, Y=(v)=>padT+(hi-v)/(hi-lo)*ih;
+  c.font='11px "IBM Plex Mono", monospace'; c.fillStyle=css('--muted'); c.strokeStyle=css('--line'); c.lineWidth=1;
+  for(let v=lo;v<=hi+1e-9;v+=step){ c.beginPath(); c.moveTo(padL,Y(v)+.5); c.lineTo(W-padR,Y(v)+.5); c.stroke(); c.textAlign='right'; c.textBaseline='middle'; c.fillText((+v.toFixed(2))+'',padL-5,Y(v)); }
+  c.textAlign='center'; c.textBaseline='top'; for(let d=0;d<=360;d+=90) c.fillText(d+'°',clamp(X(d),padL+8,W-padR-12),H-padB+5);
+  c.save(); c.translate(10,padT+ih/2); c.rotate(-Math.PI/2); c.textAlign='center'; c.textBaseline='top'; c.fillText('N·cm',0,-6); c.restore();
+  const acc=css('--accent'); c.beginPath(); c.moveTo(X(0),Y(0)); T.forEach((v,k)=>c.lineTo(X(k/T.length*360),Y(v))); c.lineTo(X(360),Y(T[0])); c.lineTo(X(360),Y(0)); c.closePath();
+  c.globalAlpha=0.18; c.fillStyle=acc; c.fill(); c.globalAlpha=1;
+  c.strokeStyle=acc; c.lineWidth=2; c.beginPath(); T.forEach((v,k)=>{ const x=X(k/T.length*360), y=Y(v); k?c.lineTo(x,y):c.moveTo(x,y); }); c.lineTo(X(360),Y(T[0])); c.stroke();
+  c.strokeStyle=css('--muted'); c.beginPath(); c.moveTo(padL,Y(0)+.5); c.lineTo(W-padR,Y(0)+.5); c.stroke();
+  const td=((curTheta/DEG)%360+360)%360; c.strokeStyle=css('--ink'); c.lineWidth=1; c.beginPath(); c.moveTo(X(td)+.5,padT); c.lineTo(X(td)+.5,padT+ih); c.stroke();
+}
+function renderForces(){
+  const rows=[['Bewegende massa',`${Math.round(PH.moving)} g`],['Piekkoppel (zwaartekracht)',`${AN.tauMax.toFixed(2)} N·cm`],
+    ['Aanbevolen motorkoppel',`≥ ${AN.kgcm.toFixed(2)} kg·cm`],['Vermogen aan de as',`${(AN.watt*1000).toFixed(0)} mW`]];
+  D.e.forEach((_,i)=>rows.push([`Druk volger ${i+1} op nok (min.)`, D.forced?`${(AN.Fw[i]*102).toFixed(0)} g · groef`:`${(AN.Fw[i]*102).toFixed(0)} g`]));
+  if(D.pitchOn) rows.push(['Druk lijf op kantelstift (min.)',`${(AN.Fp*102).toFixed(0)} g`]);
+  if(D.heaveOn) rows.push(['Druk paal op deinnok (min.)',`${(AN.Fh*102).toFixed(0)} g`]);
+  document.getElementById('forceTable').innerHTML='<tbody>'+rows.map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td></tr>`).join('')+'</tbody>';
 }
 function updateHud(){
   const el=document.getElementById('hudInfo');
@@ -1060,21 +1232,29 @@ function readme(){
   L.push('MONTAGE');
   L.push('  1. Lijm bodem, voor-, achter- en zijwanden. Het deksel nog los laten.');
   L.push('  2. Zet de motor tegen de achterwand en schuif de as door de nokken naar het gat in de voorwand.');
-  L.push('     De D-gaten in de nokken bepalen de fase en de vorm van de slag. Nok 1 vooraan (bij de paal).');
+  L.push('     De D-gaten in de nokken bepalen de fase en de vorm van de slag. Nok 1 hoort onder volger 1 (segment 1 bij het lijf); volgorde zoals in de simulatie.');
   D.phi.forEach((ph,i)=>L.push(`     Nok ${i+1}: ${Math.round(-ph/DEG)} graden fase, slag ${(2*D.e[i]).toFixed(1)} mm, neerslag ${P.down}% van de omwenteling.`));
-  L.push('  3. Steek de volgers door de sleuven van het deksel (voet naar beneden) en plaats het deksel; de voeten rusten op de nokken.');
+  L.push(D.forced?'  3. Steek de pen van elke volger in de groef van zijn nok, steek de volgers door de sleuven van het deksel en plaats het deksel.':'  3. Steek de volgers door de sleuven van het deksel (voet naar beneden) en plaats het deksel; de voeten rusten op de nokken.');
   if(D.pitchOn){
-    L.push('  4. Lijm de onderkant van het lijf tegen de vlakke onderzijde van de bovenkant. Lijm de draaibeugel op het achterste vlakke blok onder de buik.');
-    L.push('     Lijm de paal in het deksel en verbind de tong van de paal met een pen van 1,75 mm (± 16 mm) met de draaibeugel: het lijf kantelt hierom.');
-    L.push(`     De kantelvolger (stift met ronde kop) steekt door de losse sleuf ${D.dzLug>0?'voor':'achter'} de paal en drukt tegen het tweede vlakke blok onder de buik. Kanteling: ${P.pitch}°, ${P.pphase}° na de vleugelslag.`);
-    L.push('     Zorg dat het lijf op de stift blijft rusten: lijm zo nodig een moertje M3 aan die kant van het lijf, of span een elastiekje naar de paal.');
-  } else L.push('  4. Lijm de onderkant van het lijf tegen de vlakke onderzijde van de bovenkant. Steek de paal door het gat en lijm hem vast.');
+    L.push('  4. Lijm de onderkant van het lijf tegen de vlakke onderzijde van de bovenkant. Lijm de draaibeugel op het vlakke blok boven de paal.');
+    L.push(D.heaveOn?'     Schuif de paal (voet naar beneden, op de deinnok) door het deksel en de geleidebus. Verbind de tong van de paal met een pen van 1,75 mm (± 16 mm) met de draaibeugel.':'     Lijm de paal in het deksel en verbind de tong van de paal met een pen van 1,75 mm (± 16 mm) met de draaibeugel: het lijf kantelt hierom.');
+    L.push(`     De kantelvolger (stift met ronde kop) steekt door zijn eigen sleuf, ${Math.abs(D.dzLug).toFixed(0)} mm ${D.dzLug>0?'voor':'achter'} de paal, en drukt tegen het tweede vlakke blok onder de buik. Kanteling: ${P.pitch}°, ${P.pphase}° na de vleugelslag.`);
+    L.push(AN.cw?`     Het lijf drukt te licht op de stift: lijm ongeveer ${AN.cw} g gewicht in het lijf boven de stift.`:`     Het lijf drukt met minstens ${(AN.Fp*102).toFixed(0)} g op de stift (berekend), extra gewicht is niet nodig.`);
+  } else L.push(D.heaveOn?'  4. Lijm de onderkant van het lijf tegen de bovenkant. Zet de paal met zijn voet op de deinnok, schuif hem door deksel en geleidebus en lijm hem in het lijf.':'  4. Lijm de onderkant van het lijf tegen de vlakke onderzijde van de bovenkant. Steek de paal door het gat en lijm hem vast.');
   L.push('  5. Lijm de stangogen onder de vleugelsegmenten (vlakke kant, gat evenwijdig aan de scharnierpennen):');
   for(let i=0;i<D.n;i++){ const pf=D.plan(D.tAtt[i]); L.push(`     Segment ${i+1}: midden van het oog ${D.att[i].toFixed(1)} mm vanaf de scharnieras aan lijfzijde, ${(pf.le-D.zTab[i]).toFixed(1)} mm achter de voorrand.`); }
   L.push('  6. Scharnier de vleugelsegmenten met filament-pennen aan het lijf en aan elkaar. Smelt de pen-uiteinden licht aan.');
   L.push('  7. Verbind elke stang met een pen aan de dwarsbalk van de volger en aan het stangoog.');
   D.L.forEach((l,i)=>L.push(`     Stang ${i+1}: ${l.toFixed(1)} mm hart-op-hart, verbindt volger ${i+1} met vleugelsegment ${i+1}.`));
-  L.push('  8. Sluit de motor via de schakelaar aan op de batterijhouder. De vleugels zakken door hun eigen gewicht terug op de nokken.','');
+  if(D.heaveOn) L.push(`     Lijm de geleidebus over het ronde gat in het deksel. Het lijf deint ${(2*D.eh).toFixed(1)} mm op en neer.`);
+  L.push(D.forced?'  8. Sluit de motor via de schakelaar aan op de batterijhouder.':'  8. Sluit de motor via de schakelaar aan op de batterijhouder. De vleugels zakken door hun eigen gewicht terug op de nokken.','');
+  L.push('MOTOR EN KRACHTEN (berekend)');
+  L.push(`  Bewegende massa ca. ${Math.round(PH.moving)} g. Piekkoppel door zwaartekracht ${AN.tauMax.toFixed(2)} N·cm; kies een motor met minstens ${AN.kgcm.toFixed(2)} kg·cm nominaal koppel (ondergrens 0,5 kg·cm voor aanloopwrijving).`);
+  if(AN.cw) L.push(`  Lijm ongeveer ${AN.cw} g extra gewicht in het lijf boven de kantelstift, zodat het lijf goed op de stift blijft drukken.`);
+  L.push('','ONDERHOUD');
+  L.push('  - Smeer nokken en pennen met droog smeermiddel (PTFE-spray of grafiet). Gebruik geen olie op PLA.');
+  L.push('  - Piept of hapert een scharnier: vervang de filamentpen; die slijt sneller dan het geprinte deel.');
+  L.push('  - Laat de motor niet blokkeren. Zit er iets vast, zet hem direct uit: een N20 wordt snel heet.','');
   L.push('Gecontroleerd in de simulatie:'); AN.msgs.forEach(m=>L.push('  - '+m[1]));
   return L.join('\r\n');
 }
