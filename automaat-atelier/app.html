@@ -323,8 +323,10 @@ const CONTROLS = [
   {id:'lever',label:'Hefboom op de sokkel (slagversterking)',min:1,max:5,step:0.5,unit:'×',hint:'Een tuimelaar per vleugelstang maakt van een kleine nokslag een grote stangslag; zo kunnen meerdere segmenten groot bewegen met een compacte sokkel. 1× = geen hefboom.'},
   {id:'forced',type:'check',label:'Gedwongen terugloop (groefnokken)',hint:'Een pen in de volger loopt in een groef: de vleugels worden ook omlaag getrokken en kunnen niet blijven hangen. Nokken worden groter.'},
   {id:'hole',label:'Pengat (voor 1,75 mm filament)',min:1.85,max:2.4,step:0.05,unit:'mm',hint:'Print eerst de testset. Klemt de pen, maak het gat groter; rammelt hij, kleiner.'},
-  {g:'Motor'},
-  {id:'rpm',label:'Toerental nokas',min:2,max:40,step:1,unit:'rpm'}
+  {g:'Aandrijving'},
+  {id:'crank',type:'check',label:'Handzwengel in plaats van motor',hint:'Een zwengel achter op de sokkel met een tandwielkast die de nokas sneller laat draaien dan je zwengelt.'},
+  {id:'ratio',label:'Versnelling zwengel → nokas',min:1,max:4,step:1,unit:'×',hint:'2× en 3×: één tandwielpaar (24:12 of 36:12). 4×: twee paren 24:12. Hoe hoger, hoe langzamer je zwengelt maar hoe zwaarder het draait.'},
+  {id:'rpm',label:'Toerental nokas',min:2,max:90,step:1,unit:'rpm',hint:'Een echte manta slaat 9–30 keer per minuut (0,15–0,5 Hz). Boven 40 rpm rekent de app de traagheid van de vleugels niet mee.'}
 ];
 
 const STORE='automaat-atelier-v14';
@@ -451,6 +453,7 @@ function derive(alt){
   }
   const rmax=Math.max(...d.Rmax, d.RmaxP, d.heaveOn?d.Rbh+d.eh:0), top=Math.max(...d.e.map((e,i)=>d.Rb[i]+e+(d.forced?4:0)), d.pitchOn?d.spMax:0, d.heaveOn?d.Rbh+d.eh:0);
   d.yc=rmax+4;
+  d.crankR=30; d.crank=!!P.crank; d.ratio=d.crank?clamp(Math.round(P.ratio||3),1,4):1; d.gst=({1:[],2:[[24,12]],3:[[36,12]],4:[[24,12],[24,12]]})[d.ratio]; d.gm=1.25; d.gw=5;
   d.Hb=Math.max(55, d.yc+top+9, d.yc+rmax+3+GUIDE_H+2);
   d.bMax=d.leverOn?Math.atan(Math.max(...d.e)/d.d0):0;
   d.lift=d.leverOn?Math.max(0,d.aL*Math.sin(d.bMax)+5-7-Math.min(...d.e)):0;
@@ -1164,7 +1167,7 @@ function buildBox(){
   const win=(x0,y0,x1,y1,r)=>{ const p=new THREE.Path(); p.moveTo(x0+r,y0); p.lineTo(x1-r,y0); p.absarc(x1-r,y0+r,r,-Math.PI/2,0,false); p.lineTo(x1,y1-r); p.absarc(x1-r,y1-r,r,0,Math.PI/2,false); p.lineTo(x0+r,y1); p.absarc(x0+r,y1-r,r,Math.PI/2,Math.PI,false); p.lineTo(x0,y0+r); p.absarc(x0+r,y0+r,r,Math.PI,Math.PI*1.5,false); return p; };
   const WT=2.4, front=rect(-W,3,W,H-3); front.holes.push(circlePath(0,D.yc,1.8));
   if(W-8>12){ front.holes.push(win(-W+7,9,-7,H-10,4)); front.holes.push(win(7,9,W-7,H-10,4)); }
-  const back=rect(-W,3,W,H-3); if(H>40) back.holes.push(win(-W+7,9,W-7,H-10,4));
+  const back=rect(-W,3,W,H-3); if(D.crank){ for(const c of gearCenters()) back.holes.push(circlePath(c.x,c.y,1.8)); } else if(H>40) back.holes.push(win(-W+7,9,W-7,H-10,4));
   const sideS=rect(zb+WT,3,zf-WT,H-3); if(zf-zb>40&&H>40) sideS.holes.push(win(zb+10,9,zf-10,H-10,5));
   return {
     top: merge([plateXZ(top,3)]), bottom: merge([plateXZ(rect(-W,zb,W,zf),3)]),
@@ -1181,10 +1184,32 @@ function buildGuide(zs){ const z0=zs[0]-4.6, z1=zs[zs.length-1]+4.6, sh=shapeFro
 // afstandsbusjes op de as tussen de nokken (houden ze op hun plek)
 function shaftItems(){ const it=[]; D.z.forEach(z=>it.push(D.forced?[z-6.8,z-2.3]:[z-2,z+2])); if(D.pitchOn) it.push([D.ze-6.8,D.ze-2.3]); if(D.heaveOn) it.push([D.zPost-2,D.zPost+2]);
   it.sort((a,b)=>a[0]-b[0]); return it; }
-function spacerList(){ const it=shaftItems(), zMot=D.zBack+2.4+24, zWall=D.zFront-2.4, out=[]; let prev=zMot;
+function spacerList(){ const it=shaftItems(), zMot=D.zBack+2.4+(D.crank?0:24), zWall=D.zFront-2.4, out=[]; let prev=zMot;
   for(const [a,b] of it){ const g=a-prev; if(g>0.8) out.push({z0:prev+0.2,len:Math.round((g-0.4)*10)/10}); prev=Math.max(prev,b); }
   const g=zWall-prev; if(g>0.8) out.push({z0:prev+0.2,len:Math.round((g-0.4)*10)/10}); return out; }
 function buildSpacer(len){ const pts=[[1.7,0],[SPACER_OD/2,0],[SPACER_OD/2,len],[1.7,len],[1.7,0]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,28); return merge([g]); }
+// handzwengel: tandwielkast achter op de sokkel. Assen: nokas (0,yc), eventueel een tussenas, en de zwengelas.
+function gearCenters(){ if(D._gc) return D._gc; const m=D.gm, st=D.gst, W=D.Wh, H=D.Hb, c0={x:0,y:D.yc};
+  if(!st.length) return (D._gc=[c0]);
+  const ok=(p,ra)=>Math.abs(p.x)<=W-6&&p.y<=H-6&&p.y-ra>=4;
+  let best=null; const step=Math.PI/36;
+  const rec=(cs,k,score)=>{ if(k===st.length){ if(!best||score<best.s) best={s:score,cs:cs.slice()}; return; }
+    const [Ng,Np]=st[k], a=m*(Ng+Np)/2, ra=m*Ng/2+m, prev=cs[cs.length-1];
+    for(let th=-Math.PI;th<Math.PI;th+=step){ const q={x:prev.x+a*Math.cos(th),y:prev.y+a*Math.sin(th)}; if(!ok(q,ra)) continue;
+      if(k>=1&&Math.hypot(q.x-cs[k-1].x,q.y-cs[k-1].y)<ra+2.5) continue; // groot tandwiel mag de as ervoor niet raken
+      rec([...cs,q],k+1,score+Math.abs(q.x)*0.2+Math.abs(q.y-D.yc)*0.1); } };
+  rec([c0],0,0); return (D._gc=best?best.cs:[c0,...st.map((_,k)=>({x:c0.x+(k+1)*20,y:c0.y}))]); }
+function gearPlate(N,hole){ const sh=shapeFrom(gearPts(N,D.gm)); if(hole==='D') sh.holes.push(dHole()); else sh.holes.push(circlePath(0,0,1.75)); return plateXY(sh,D.gw); }
+function gbZ(k){ return D.zBack-1-D.gw/2-k*(D.gw+1); }       // middenvlak van tandwieltrap k (achter de achterwand)
+function gbCoverZ(){ return D.zBack-1-Math.max(1,D.gst.length)*(D.gw+1)-1.2; }
+function gearRadii(){ const m=D.gm, R=[4]; D.gst.forEach(([Ng,Np],k)=>{ R[k]=Math.max(R[k]||0,m*Np/2+m); R[k+1]=Math.max(R[k+1]||0,m*Ng/2+m); }); return R; }
+function buildGearCover(){ const cs=gearCenters(), R=gearRadii(), x0=Math.min(...cs.map((c,k)=>c.x-R[k]))-7.5, x1=Math.max(...cs.map((c,k)=>c.x+R[k]))+7.5, y1=Math.max(...cs.map((c,k)=>c.y+R[k]))+7.5, sh=shapeFrom([[x0,3],[x1,3],[x1,y1],[x0,y1]]);
+  for(const c of cs) sh.holes.push(circlePath(c.x,c.y,1.8)); const items=[plateXY(sh,2.4)], L=D.zBack-(gbCoverZ()+1.2);
+  for(const [x,y] of [[x0+3.5,6.5],[x1-3.5,6.5],[x0+3.5,y1-3.5],[x1-3.5,y1-3.5]]){ const t=tubeZ(0.01,3,0,L,x,y); items.push(t); }
+  return merge(items); }
+function buildCrankArm(){ const r=D.crankR, sh=shapeFrom(dedupe(strokeOutline([[0,0],[r,0]],[9,7],12))); sh.holes.push(dHole()); sh.holes.push(circlePath(r,0,1.6));
+  return plateXY(sh,4); }
+function buildKnob(){ const pts=[[0.9,0],[4.5,0],[5,2],[5,16],[4,18],[0.9,18],[0.9,0]].map(q=>new THREE.Vector2(q[0],q[1])); return merge([new THREE.LatheGeometry(pts,28)]); }
 function buildMotorHolder(){ const y0=3, yt=D.yc+3, sh=shapeFrom([[-9,y0],[9,y0],[9,yt],[6.15,yt],[6.15,D.yc-5.15],[-6.15,D.yc-5.15],[-6.15,yt],[-9,yt]]); return merge([plateXY(sh,14)]); }
 const rotX=(a)=>new THREE.Matrix4().makeRotationX(a), rotZ=(a)=>new THREE.Matrix4().makeRotationZ(a), I4=()=>new THREE.Matrix4();
 let PARTS=[], G={};
@@ -1260,7 +1285,15 @@ function buildParts(){
   G.guides=guideGroups().map((zs,k)=>({zs,geo:add('geleideblok_'+(k+1),'Geleideblok volgers '+(k+1),1,buildGuide(zs),I4(),'mech').geo}));
   const sp={}; for(const x of spacerList()){ const k=x.len.toFixed(1); (sp[k]=sp[k]||[]).push(x); }
   G.spacers=Object.keys(sp).map(k=>({list:sp[k],geo:add('afstandsbus_'+k.replace('.','_')+'mm','Afstandsbus '+k.replace('.',',')+' mm',sp[k].length,buildSpacer(+k),I4(),'mech').geo}));
-  G.motorH=add('motorhouder','Motorhouder N20',1,buildMotorHolder(),rotX(-Math.PI/2),'mech').geo;
+  G.motorH=D.crank?null:add('motorhouder','Motorhouder N20',1,buildMotorHolder(),rotX(-Math.PI/2),'mech').geo;
+  G.gb=null; if(D.crank){ G.gb={gears:[]}; const cs=gearCenters();
+    D.gst.forEach(([Ng,Np],k)=>{ // trap k: rondsel Np op as k, tandwiel Ng op as k+1
+      const pin=k===0?add('rondsel_'+Np,`Rondsel ${Np} tanden (op de nokas, D-gat)`,1,gearPlate(Np,'D'),I4(),'mech').geo:null;
+      const last=k===D.gst.length-1, gear=last?add('tandwiel_'+Ng,`Tandwiel ${Ng} tanden (op de zwengelas, D-gat)`,1,gearPlate(Ng,'D'),I4(),'mech').geo:null;
+      G.gb.gears.push({k,Ng,Np,pin,gear}); });
+    if(D.gst.length===2){ const [Ng1,Np1]=D.gst[0], [Ng2,Np2]=D.gst[1]; const g=merge([gearPlate(Ng1,'o'),(()=>{ const p=gearPlate(Np2,'o'); p.translate(0,0,-(D.gw+1)); return p; })(),tubeZ(1.75,4,-(D.gw+1)-D.gw/2,D.gw/2,0,0)]); G.gb.comp=add('tandwiel_dubbel',`Dubbel tandwiel ${Ng1}/${Np2} tanden (losdraaiend op de tussenas)`,1,g,I4(),'mech').geo; }
+    G.gb.cover=add('tandwielkap','Tandwielkap met 4 afstandspootjes',1,buildGearCover(),I4(),'mech').geo;
+    G.gb.arm=add('zwengel','Zwengel (D-gat)',1,buildCrankArm(),I4(),'mech').geo; G.gb.knob=add('handvat','Handvat (draait los op een pen van 1,75 mm)',1,buildKnob(),rotX(-Math.PI/2),'mech').geo; }
   add('sokkel_deksel','Sokkel deksel',1,box.top,I4(),'box'); add('sokkel_bodem','Sokkel bodem',1,box.bottom,I4(),'box');
   add('sokkel_voor','Sokkel voorwand',1,box.front,rotX(-Math.PI/2),'box'); add('sokkel_achter','Sokkel achterwand',1,box.back,rotX(-Math.PI/2),'box');
   add('sokkel_zijwand','Sokkel zijwand',2,box.side,rotZ(Math.PI/2),'box');
@@ -1419,6 +1452,9 @@ function analyze(){
   if(D.leverOn&&D.bMax>38*DEG) msgs.push(['warn',`De tuimelaars draaien tot ${Math.round(D.bMax/DEG)}°; boven 38° gaat de pen in de sleuf haken. Verklein de nokslag en vergroot de hefboom.`]);
   if(A.rodSF<4) msgs.push(['warn',`De stangen hebben weinig marge tegen knikken (${A.rodSF.toFixed(1)}×). Gebruik 25% vulling of een kortere stang.`]);
   A.watt=A.tauReq/100*P.rpm/60*2*Math.PI;
+  if(P.rpm>40) msgs.push(['warn',`Boven 40 rpm worden de traagheidskrachten van de vleugels groot; de app rekent alleen met zwaartekracht en wrijving, dus de werkelijke kracht is hoger. Gebruik 25% vulling en controleer de pennen.`]);
+  if(D.crank){ const eta=Math.pow(0.9,D.gst.length), tq=A.tauReq*D.ratio/eta; A.crankRpm=P.rpm/D.ratio; A.crankN=tq/(D.crankR/10);
+    msgs.push(['ok',`Handzwengel met ${D.ratio}× versnelling: draai ${A.crankRpm<1?A.crankRpm.toFixed(1):Math.round(A.crankRpm)} keer per minuut voor ${P.rpm} rpm aan de nokas (${(P.rpm/60).toFixed(2).replace('.',',')} slagen per seconde). Kracht aan het handvat (30 mm arm) tot ±${A.crankN.toFixed(1).replace('.',',')} N (${Math.round(A.crankN/9.81*1000)} g).`+(A.crankRpm>90?' Dat is erg snel zwengelen: kies een hogere versnelling.':A.crankRpm<15&&D.ratio>1?' Dat is traag; een lagere versnelling draait lichter.':'')]); }
   if(!D.forced) A.Fw.forEach((f,i)=>{ if(f<0) msgs.push(['bad',`Volger ${i+1} komt los van zijn nok: de vleugel trekt hem omhoog (${f.toFixed(2)} N). Zet gedwongen terugloop aan of vergroot de V-stelling.`]); else if(f<0.05) msgs.push(['warn',`Volger ${i+1} drukt maar ${(f*102).toFixed(0)} g op zijn nok. Bij wrijving kan hij blijven hangen; overweeg gedwongen terugloop.`]); });
 
   if(D.heaveOn&&A.Fh<0.08) msgs.push(['warn',`De paal drukt te licht op de deinnok (${(A.Fh*102).toFixed(0)} g). Maak het lijf zwaarder of verklein het deinen.`]);
@@ -1439,7 +1475,7 @@ function analyze(){
   if(D.pitchOn===false&&P.headk>0&&D.split) msgs.push(['warn','Kop of staart beweegt alleen mee als het lijf kantelt. Zet kantelen lijf boven 0°.']);
   if(D.forced&&D.grooveBad) msgs.push(['bad','Een groef in de nok snijdt zichzelf: de slag is te scherp. Verklein de nokslag of maak de neerslag langer.']);
   const wall=D.R-D.rh; if(wall<0.8) msgs.push(['warn',`De scharnierwand is maar ${wall.toFixed(2)} mm dik. Maak het scharnier dikker of het pengat kleiner.`]);
-  if(A.kgcm>3) msgs.push(['warn',`De motor moet ${A.kgcm.toFixed(1)} kg·cm leveren. Dat is veel voor een N20-motor: kies een zwaardere vertraging (lager toerental) of maak de vleugels lichter.`]);
+  if(A.kgcm>3&&!D.crank) msgs.push(['warn',`De motor moet ${A.kgcm.toFixed(1)} kg·cm leveren. Dat is veel voor een N20-motor: kies een zwaardere vertraging (lager toerental) of maak de vleugels lichter.`]);
   if(!msgs.some(m=>m[0]==='bad')) msgs.unshift(['ok',`Het mechanisme loopt vrij over een volle omwenteling. De vleugelpunt beweegt ${(A.tipMax-A.tipMin).toFixed(0)} mm; de neerslag duurt ${Math.round(A.downShare*100)}% van de cyclus.`+(D.pitchOn?` Het lijf kantelt van ${A.pMin.toFixed(1)}° tot +${A.pMax.toFixed(1)}° (neus omhoog is positief).`:'')+(D.heaveOn?` Het lijf deint ${(2*D.eh).toFixed(1)} mm.`:'')+(D.tipOn?` De vleugelpunt buigt ${(A.tipRel[1]-A.tipRel[0]).toFixed(0)}° mee`+(D.skew>0?` en draait van ${A.twMin.toFixed(0)}° tot +${A.twMax.toFixed(0)}° om zijn lengteas.`:'.'):'')+(D.headOn&&A.head.length?` ${D.split.kind==='achterlijf'?'Het':'De'} ${D.split.kind} beweegt in de ruimte ${Math.min(...A.head).toFixed(1)}° tot ${Math.max(...A.head).toFixed(1)}° (t.o.v. het lijf ${(Math.max(...A.head)+A.pMax).toFixed(1)}°).`:'')]);
   A.msgs=msgs; AN=A;
 }
@@ -1551,10 +1587,20 @@ function buildScene(){
   M.box.forEach(m=>{ m.renderOrder=2; m.userData.tag='box'; });
   for(const gd of G.guides){ const m=mk(gd.geo,MAT.wood); m.position.set(0,D.Hb-3-GUIDE_H/2,0); m.renderOrder=2; M.box.push(m); m.userData.tag='guide'; }
   for(const sg of G.spacers) for(const x of sg.list){ const m=mk(sg.geo,MAT.steel); m.rotation.x=Math.PI/2; m.position.set(0,D.yc,x.z0); m.userData.tag='spacer'; }
-  M.motorH=mk(G.motorH,MAT.motor); M.motorH.position.set(0,0,D.zBack+2.4+12); M.motorH.userData.tag='motorh';
-  const zm=D.zBack+2.4, shaftLen=D.zFront-(zm+26);
-  const sh=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,shaftLen,12),MAT.steel); sh.userData.own=true; sh.rotation.x=Math.PI/2; sh.position.set(0,D.yc,zm+26+shaftLen/2); sh.castShadow=true; asm.add(sh);
-  const mo=new THREE.Mesh(new THREE.BoxGeometry(12,10,24),MAT.motor); mo.userData.own=true; mo.position.set(0,D.yc,zm+13); asm.add(mo);
+  M.gb=null;
+  if(!D.crank){ M.motorH=mk(G.motorH,MAT.motor); M.motorH.position.set(0,0,D.zBack+2.4+12); M.motorH.userData.tag='motorh';
+    const zm=D.zBack+2.4, shaftLen=D.zFront-(zm+26);
+    const sh=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,shaftLen,12),MAT.steel); sh.userData.own=true; sh.rotation.x=Math.PI/2; sh.position.set(0,D.yc,zm+26+shaftLen/2); sh.castShadow=true; asm.add(sh);
+    const mo=new THREE.Mesh(new THREE.BoxGeometry(12,10,24),MAT.motor); mo.userData.own=true; mo.position.set(0,D.yc,zm+13); asm.add(mo); }
+  else { const cs=gearCenters(), zc=gbCoverZ(), shaft=(x,y,z0,z1)=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,z1-z0,12),MAT.steel); m.userData.own=true; m.rotation.x=Math.PI/2; m.position.set(x,y,(z0+z1)/2); m.castShadow=true; asm.add(m); };
+    shaft(0,D.yc,zc-1.2,D.zFront); for(let k=1;k<cs.length;k++) shaft(cs[k].x,cs[k].y,(k===cs.length-1?zc-1.2-8:zc-1.2),D.zBack+2.4);
+    M.gb={rot:[],cs}; const cov=mk(G.gb.cover,MAT.wood); cov.position.set(0,0,zc); cov.userData.tag='gbox'; cov.renderOrder=2;
+    const mesh=(geo,mat,tag,x,y,z)=>{ const m=mk(geo,mat); m.position.set(x,y,z); m.userData.tag=tag; return m; };
+    D.gst.forEach(([Ng,Np],k)=>{ const g=G.gb.gears[k], ph=Math.atan2(cs[k+1].y-cs[k].y,cs[k+1].x-cs[k].x);
+      if(g.pin) M.gb.rot.push({m:mesh(g.pin,MAT.seg[0],'gp0',cs[0].x,cs[0].y,gbZ(0)),axis:0,off:ph});
+      if(g.gear) M.gb.rot.push({m:mesh(g.gear,MAT.seg[1],'gg'+k,cs[k+1].x,cs[k+1].y,gbZ(k)),axis:k+1,off:ph+Math.PI+Math.PI/Ng}); });
+    if(G.gb.comp){ const ph=Math.atan2(cs[1].y-cs[0].y,cs[1].x-cs[0].x), Ng=D.gst[0][0]; M.gb.rot.push({m:mesh(G.gb.comp,MAT.seg[2],'gc',cs[1].x,cs[1].y,gbZ(0)),axis:1,off:ph+Math.PI+Math.PI/Ng}); }
+    const cl=cs[cs.length-1]; M.gb.arm=mesh(G.gb.arm,MAT.seg[3],'crank',cl.x,cl.y,zc-1.2-2-2); M.gb.knob=mk(G.gb.knob,MAT.motor,M.gb.arm); M.gb.knob.rotation.x=-Math.PI/2; M.gb.knob.position.set(D.crankR,0,-2); M.gb.knob.userData.tag='knob'; }
   const ptsR=AN.tipR.map(p=>new THREE.Vector3(p.x,p.y,p.z)), ptsL=AN.tipR.map(p=>new THREE.Vector3(-p.x,p.y,p.z));
   const lm=new THREE.LineBasicMaterial({color:new THREE.Color(SEGC[(D.n-1)%4])});
   M.trail=new THREE.Group();
@@ -1589,7 +1635,9 @@ function poseTip3(s){ if(!M.tip3||!s.tip3) return; const n=D.n, T3=D.T3, zA=D.zA
       m.position.copy(pa).addScaledVector(Z,1); m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); m.material=s.tip3.ok?MAT.seg[3]:MAT.bad; } } }
 function poseTiles(s){ poseTip3(s); if(!M.tb||!s.R3) return; const Sx=new THREE.Matrix4().makeScale(-1,1,1);
   for(const b of M.tb.lay.bands){ if(b.dr) continue; const Mt=tileMat(s,M.tb.lay,b); M.tb.R[b.j].matrix.copy(Mt); M.tb.L[b.j].matrix.copy(Sx).multiply(Mt); } }
-function pose(theta){
+function poseGears(theta){ if(!M.gb) return; const ang=[theta]; D.gst.forEach(([Ng,Np])=>ang.push(-ang[ang.length-1]*Np/Ng));
+  for(const r of M.gb.rot) r.m.rotation.z=r.off+ang[r.axis]; M.gb.arm.rotation.z=ang[ang.length-1]; }
+function pose(theta){ poseGears(theta);
   const s=solve(theta,lastA); lastA=s.a; poseSkin(s); poseTiles(s);
   for(let i=0;i<D.n;i++){
     const J=s.J[i], a=s.a[i];
@@ -1665,13 +1713,13 @@ function voxelize(geo){
       for(let i=i0;i<=i1;i++){ const id=(i*ny+j)*nz+k; if(!occ[id]){ occ[id]=1; pts.push(mn.x+(i+0.5)*h, mn.y+(j+0.5)*h, mn.z+(k+0.5)*h); } } } }
   const v={mn,nx,ny,nz,occ,pts:new Float32Array(pts),bb}; VCACHE.set(geo.uuid,v); return v;
 }
-const STATIC_TAGS=new Set(['box','guide','motorh','bush','spacer']); const isPost=(t)=>/^pp\d/.test(t);
+const STATIC_TAGS=new Set(['box','guide','motorh','bush','spacer','gbox']); const isPost=(t)=>/^pp\d/.test(t);
 function allowedPair(a,b){
   if(D.horse) return hAllowed(a,b);
   const A=a.userData.tag, B=b.userData.tag, has=(x,y)=>(A===x&&B===y)||(A===y&&B===x), pre=(x,y)=>(A.startsWith(x)&&B.startsWith(y))||(A.startsWith(y)&&B.startsWith(x));
   if(a.parent===b||b.parent===a) return true;
   const fixed=[['body','belly'],['body','head'],['belly','head'],['belly','bracket'],['body','bracket'],['belly','lug'],['body','lug'],['bracket','post'],['post','bush'],['post','box'],['post','hcam'],['post','headrod'],
-    ['pfol','pcam'],['pfol','box'],['pfol','guide'],['pfol','plink'],['plink','lug'],['headrod','headeye'],['spacer','box'],['spacer','spacer'],['box','box'],['box','guide'],['box','motorh'],['guide','guide'],['motorh','spacer']];
+    ['pfol','pcam'],['pfol','box'],['pfol','guide'],['pfol','plink'],['plink','lug'],['headrod','headeye'],['spacer','box'],['spacer','spacer'],['box','box'],['box','guide'],['box','motorh'],['guide','guide'],['motorh','spacer'],['gbox','box'],['gp0','gg0'],['gp0','gc'],['gc','gg1'],['crank','knob']];
   for(const [x,y] of fixed) if(has(x,y)) return true;
   if(pre('fol','box')||pre('fol','guide')||pre('cam','spacer')||has('pcam','spacer')||has('hcam','spacer')) return true;
   if(pre('pp','box')||pre('pp','guide')) return true;
@@ -1697,7 +1745,7 @@ function allowedPair(a,b){
   if((A.startsWith('fol')&&B.startsWith('cam'))||(B.startsWith('fol')&&A.startsWith('cam'))){ if(num(A)===num(B)) return true; }
   return false;
 }
-function tagLabel(t){ if(D.horse) return hTagLabel(t); { const r=/^(tip3|tpb|tpa|rk3|c31|c32)([RL])$/.exec(t); if(r) return ({tip3:'Vinpunt',tpb:'Oog vinpunt',tpa:'Kogeloog koppelstang punt',rk3:'Tuimelaar vinpunt',c31:'Koppelstang punt 1',c32:'Koppelstang punt 2'})[r[1]]+(r[2]==='R'?' rechts':' links'); } { const r=/^tb(\d+)_(\d+)([RL])$/.exec(t); if(r){ const b=M.tb&&M.tb.lay.bands[+r[1]]; return 'Schub '+(b&&b.q||r[1])+(r[3]==='R'?' rechts':' links'); } } { const r=/^(crk|tlk|hnk|ark)(\d+)([RL])$/.exec(t); if(r) return ({crk:'Kruisstuk',tlk:'Draaistangetje',hnk:'Draaihoorn',ark:'Draaiarm'})[r[1]]+' '+r[2]+(r[3]==='R'?' rechts':' links'); } const n=(x)=>+x.replace(/\D/g,'')+1, sd=(x)=>x.endsWith('R')?' rechts':x.endsWith('L')?' links':'';
+function tagLabel(t){ if(D.horse) return hTagLabel(t); { const g={gbox:'Tandwielkap',gp0:'Rondsel nokas',gg0:'Groot tandwiel',gg1:'Groot tandwiel',gc:'Dubbel tandwiel',crank:'Zwengel',knob:'Handvat'}; if(g[t]) return g[t]; } { const r=/^(tip3|tpb|tpa|rk3|c31|c32)([RL])$/.exec(t); if(r) return ({tip3:'Vinpunt',tpb:'Oog vinpunt',tpa:'Kogeloog koppelstang punt',rk3:'Tuimelaar vinpunt',c31:'Koppelstang punt 1',c32:'Koppelstang punt 2'})[r[1]]+(r[2]==='R'?' rechts':' links'); } { const r=/^tb(\d+)_(\d+)([RL])$/.exec(t); if(r){ const b=M.tb&&M.tb.lay.bands[+r[1]]; return 'Schub '+(b&&b.q||r[1])+(r[3]==='R'?' rechts':' links'); } } { const r=/^(crk|tlk|hnk|ark)(\d+)([RL])$/.exec(t); if(r) return ({crk:'Kruisstuk',tlk:'Draaistangetje',hnk:'Draaihoorn',ark:'Draaiarm'})[r[1]]+' '+r[2]+(r[3]==='R'?' rechts':' links'); } const n=(x)=>+x.replace(/\D/g,'')+1, sd=(x)=>x.endsWith('R')?' rechts':x.endsWith('L')?' links':'';
   if(t.startsWith('seg')) return 'Vleugel'+sd(t)+' '+n(t); if(t.startsWith('eye')) return 'Stangoog '+n(t)+sd(t); if(t.startsWith('rod')) return 'Stang '+n(t)+sd(t);
   if(t.startsWith('fol')) return 'Volger '+n(t); if(t.startsWith('cam')) return 'Nok '+n(t);
   if(t.startsWith('rk')) return 'Tuimelaar '+n(t)+sd(t); if(/^pp\d/.test(t)) return 'Draaipuntsteun '+n(t)+sd(t);
@@ -1913,9 +1961,13 @@ function renderParts(){
   document.getElementById('tBeds').textContent=BEDS.length;
   const pins=[]; if(!D.horse) for(let j=0;j<D.n;j++){ const hb=hingeBands(j); pins.push((hb.le-hb.te).toFixed(0)); }
   const hw=D.horse?hHardware():[
-    `Gelijkstroom-tandwielmotor N20, 3–6 V, ongeveer ${Math.max(5,Math.round(P.rpm/5)*5)} rpm, nominaal koppel ≥ ${AN.kgcm.toFixed(2)} kg·cm, met 3 mm D-as`,
-    `As 3 mm met vlakke kant (D-profiel), lengte ${Math.round(D.zFront-(D.zBack+3+24))} mm, of een koppeling op de motoras`,
-    `Batterijhouder 2× AA met schakelaar, en twee stukjes draad`,
+    ...(D.crank?[`As 3 mm met vlakke kant (D-profiel) voor de nokas, lengte ${Math.round(D.zFront-gbCoverZ()+2)} mm`,
+       ...(D.gst.length===2?[`As 3 mm voor de tussenas, lengte ${Math.round(D.zBack+2.4-gbCoverZ()+1)} mm (het dubbele tandwiel draait er los op)`]:[]),
+       `As 3 mm met vlakke kant voor de zwengel, lengte ${Math.round(D.zBack+2.4-gbCoverZ()+10)} mm`,
+       `Pen van 1,75 mm filament (± 20 mm) voor het handvat`]:
+     [`Gelijkstroom-tandwielmotor N20, 3–6 V, ongeveer ${Math.max(5,Math.round(P.rpm/5)*5)} rpm, nominaal koppel ≥ ${AN.kgcm.toFixed(2)} kg·cm, met 3 mm D-as`,
+      `As 3 mm met vlakke kant (D-profiel), lengte ${Math.round(D.zFront-(D.zBack+3+24))} mm, of een koppeling op de motoras`,
+      `Batterijhouder 2× AA met schakelaar, en twee stukjes draad`]),
     `Scharnierpennen van 1,75 mm filament: per vleugel ${pins.map(p=>p+' mm').join(', ')} (2 vleugels)`,
     `${4*D.n} korte pennen van 1,75 mm filament (± 12 mm) voor de stangen; uiteinden licht aansmelten`,
     `Secondelijm of PLA-lijm voor de lijfhelften, paal, stangogen, sokkelwanden en nokken`,
@@ -2094,7 +2146,7 @@ function readme(){
   L.push('','PRINTEN','  - Alle bestanden liggen al in de juiste stand: vlakke kant op het bed, bolle kant omhoog. Geen support nodig.','  - PLA, 0,2 mm laaghoogte (0,12 mm voor mooiere rondingen), 3 wanden, 15-20% vulling.','  - Scharniergaten en stanggaten zijn 2,0 mm: precies ruimte voor een pen van 1,75 mm filament.','');
   L.push('MONTAGE');
   L.push('  1. Lijm bodem, voor-, achter- en zijwanden. Het deksel nog los laten.');
-  L.push('  2. Zet de motor tegen de achterwand en schuif de as door de nokken naar het gat in de voorwand.');
+  L.push(D.crank?`  2. Schuif de nokas van achteren door de achterwand en de nokken naar het gat in de voorwand. Druk achter de achterwand het rondsel op de nokas (D-gat).${D.gst.length===2?' Steek de tussenas door de achterwand en schuif het dubbele tandwiel erop.':''} Steek de zwengelas door de achterwand, druk het grote tandwiel erop en lijm de tandwielkap met zijn pootjes op de achterwand (alle assen door de gaten). Druk de zwengel op de zwengelas en zet het handvat met een pen van 1,75 mm vast; het handvat moet los kunnen draaien.`:'  2. Zet de motor tegen de achterwand en schuif de as door de nokken naar het gat in de voorwand.');
   L.push('     De D-gaten in de nokken bepalen de fase en de vorm van de slag. Nok 1 hoort onder volger 1 (segment 1 bij het lijf); volgorde zoals in de simulatie.');
   D.phi.forEach((ph,i)=>L.push(`     Nok ${i+1}: ${Math.round(-ph/DEG)} graden fase, slag ${(2*D.e[i]).toFixed(1)} mm, neerslag ${P.down}% van de omwenteling.`));
   L.push(D.forced?'  3. Steek de pen van elke volger in de groef van zijn nok, steek de volgers door de sleuven van het deksel en plaats het deksel.':'  3. Steek de volgers door de sleuven van het deksel (voet naar beneden) en plaats het deksel; de voeten rusten op de nokken.');
@@ -2124,7 +2176,7 @@ function readme(){
   else L.push('  7. Verbind elke stang met een pen aan de dwarsbalk van de volger en aan het stangoog.');
   D.L.forEach((l,i)=>L.push(`     Stang ${i+1}: ${l.toFixed(1)} mm hart-op-hart, verbindt volger ${i+1} met vleugelsegment ${i+1}.`));
   if(D.heaveOn) L.push(`     Lijm de geleidebus over het ronde gat in het deksel. Het lijf deint ${(2*D.eh).toFixed(1)} mm op en neer.`);
-  L.push(D.forced?'  8. Sluit de motor via de schakelaar aan op de batterijhouder.':'  8. Sluit de motor via de schakelaar aan op de batterijhouder. De vleugels zakken door hun eigen gewicht terug op de nokken.','');
+  L.push(D.crank?`  8. Zwengel rustig: ${Math.round(AN.crankRpm||0)} keer per minuut geeft ${P.rpm} rpm aan de nokas. Zwengel altijd dezelfde kant op; forceer niets als het vastloopt.`:D.forced?'  8. Sluit de motor via de schakelaar aan op de batterijhouder.':'  8. Sluit de motor via de schakelaar aan op de batterijhouder. De vleugels zakken door hun eigen gewicht terug op de nokken.','');
   L.push('MOTOR EN KRACHTEN (berekend)');
   L.push(`  Bewegende massa ca. ${Math.round(PH.moving)} g. Piekkoppel door zwaartekracht ${AN.tauMax.toFixed(2)} N·cm; kies een motor met minstens ${AN.kgcm.toFixed(2)} kg·cm nominaal koppel (ondergrens 0,5 kg·cm voor aanloopwrijving).`);
   L.push('','ONDERHOUD');
