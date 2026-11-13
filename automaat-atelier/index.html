@@ -293,7 +293,7 @@ const PRESETS = {
 
 // Manta 2.0: zelfde vorm als Manta 1.0, maar de vinpunt draait om een eigen as langs de spanwijdte (verenstand)
 { const o=Object.assign({},PRESETS); for(const k of Object.keys(PRESETS)) delete PRESETS[k];
-  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:130,e:7.5,down:44,dihedral:6,lag:18,skinMax:35})}); } } }
+  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:18,skinMax:40})}); } } }
 const CONTROLS = [
   {g:'Vorm'},
   {id:'span',label:'Spanwijdte',min:120,max:400,step:5,unit:'mm'},
@@ -994,7 +994,7 @@ function buildRod(L){
 function buildRocker(i){ const r=4, L=D.aLi[i], pts=[]; for(let k=0;k<=12;k++){ const a=-Math.PI/2+Math.PI*k/12; pts.push([L+r*Math.cos(a),r*Math.sin(a)]); }
   for(let k=0;k<=12;k++){ const a=Math.PI/2+Math.PI*k/12; pts.push([-r+r*Math.cos(a)+r,r*Math.sin(a)]); }
   const s=shapeFrom(dedupe(pts)); s.holes.push(circlePath(0,0,D.rh)); s.holes.push(circlePath(L,0,D.rh));
-  const r0=D.d0-0.6, r1=D.d0/Math.cos(Math.max(D.bMax,0.2))+0.8, w=D.rh+0.15, sl=new THREE.Path();
+  const r0=D.d0-0.6, w=D.rh+0.15, r1=Math.max(r0+0.5,Math.min(D.d0/Math.cos(Math.max(D.bMax,0.2))+0.8,L-D.rh-w-0.3)), sl=new THREE.Path(); // sleuf mag het eindgat niet raken
   sl.moveTo(r0,-w); sl.lineTo(r1,-w); sl.absarc(r1,0,w,-Math.PI/2,Math.PI/2,false); sl.lineTo(r0,w); sl.absarc(r0,0,w,Math.PI/2,Math.PI*1.5,false); s.holes.push(sl);
   return merge([plateXY(s,ROD.t)]); }
 // steun voor het draaipunt, op het deksel gelijmd; oorsprong = bovenkant deksel
@@ -1337,6 +1337,7 @@ function analyze(){
 
   if(D.heaveOn&&A.Fh<0.08) msgs.push(['warn',`De paal drukt te licht op de deinnok (${(A.Fh*102).toFixed(0)} g). Maak het lijf zwaarder of verklein het deinen.`]);
   if(D.skin&&A.skMax!=null){ const pc=(v)=>(v*100).toFixed(0)+'%'; msgs.push([A.skMax>(P.skinMax??25)/100+0.03?'warn':'ok',`TPU-huid: de vrije stukken tussen de ribben rekken maximaal ${pc(A.skMax)} en worden maximaal ${pc(-Math.min(0,A.skMin))} korter (gemeten langs voorrand, midden en achterrand, t.o.v. de vlak geprinte huid).`+(A.skMin<-0.04?' Korter worden geeft rimpels.':'')+' In de simulatie kleurt de huid rood waar hij het meest rekt (rood = de ingestelde grens) en blauw waar hij gestuikt wordt.']); delete A.skL; }
+  if(D.leverOn) for(let i=0;i<D.n;i++) if(D.d0/Math.cos(Math.max(D.bMax,0.2))+0.2>D.aLi[i]-D.rh-(D.rh+0.15)-0.3) msgs.push(['bad',`Tuimelaar ${i+1} is te kort voor deze nokslag: de pen loopt tegen het eind van de sleuf. Verklein de nokslag of de hefboom.`]);
   if(D.twist3&&A.twist.length){ A.twMin=Math.min(...A.twist); A.twMax=Math.max(...A.twist); A.feather=featherCorr(A.twist.slice(0,-1),A.tipYs.slice(0,-1)); if(D.tw3Fail) msgs.push(['bad','Manta 3.0: geen werkende draaiarmen gevonden bij deze vleugel. Verander spanwijdte of slag.']); }
   if(D.tipOn){ if(A.tipLock) msgs.push(['bad','De koppelstang van de vleugelpunt slaat door. Verklein het meebuigen of de nokslag.']);
     if(A.tipTiltMax>8) msgs.push(['warn',`Door de schuine scharnierlijn staat de koppelstang van de punt tot ${A.tipTiltMax.toFixed(0)}° scheef; boven 8° gaan de pennen wringen. Verklein de draaiing.`]);
