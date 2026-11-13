@@ -285,7 +285,7 @@ const PRESETS = {
       {x:0,z:le+21,rx:4,rz:5,h:6},{x:w0*0.35,z:le+16,rx:2.2,rz:2.2,h:8.2,p:0.6},{x:-w0*0.35,z:le+16,rx:2.2,rz:2.2,h:8.2,p:0.6}]; },
     belly(w0,le,te,P){ return {wb:w0-3,zm:(le+te)/2,Lz:(le-te)/2+8,depth:8,p:2.4}; } },
   paard: { name:'Paard', kind:'legs', pattern:true, colors:{wing:'#6d4226',body:'#7a4627',belly:'#4a2c18'},
-    def:{len:170,offRH:10,offLF:33,offRF:47,swing:50,ret:45,flexF:70,flexH:40,flexT:0,pitch:15,pphase:0,hole:2.0,rpm:30} }
+    def:{len:170,offRH:10,offLF:33,offRF:47,swing:50,ret:45,flexF:70,flexH:40,flexT:0,pitch:13,pphase:0,hole:2.0,rpm:30} }
 };
 
 const CONTROLS = [
@@ -1824,7 +1824,7 @@ const HCONTROLS=[
   {id:'flexH',label:'Buiging spronggewricht in de zwaaifase',min:10,max:45,step:1,unit:'°'},
   {id:'flexT',label:'Timing van het buigen',min:-60,max:60,step:5,unit:'°',hint:'0° = het been is gestrekt midden in de steunfase en het meest gebogen een halve slag later.'},
   {g:'Lijfbeweging'},
-  {id:'pitch',label:'Kantelen romp (piek tot piek)',min:0,max:20,step:0.5,unit:'°',hint:'Gemeten bij galopperende volbloeds: 11–19°, meer bij hogere snelheid.'},
+  {id:'pitch',label:'Kantelen romp (piek tot piek)',min:0,max:20,step:0.5,unit:'°',hint:'Gemeten bij galopperende volbloeds (Parsons e.a. 2008): 12,9–13,4° op vlakke grond, 16,7–17,4° bergop, bij 9–12 m/s.'},
   {id:'pphase',label:'Timing kanteling',min:0,max:355,step:5,unit:'°'},
   {g:'Constructie'},
   {id:'hole',label:'Pengat (voor 1,75 mm filament)',min:1.85,max:2.4,step:0.05,unit:'mm',hint:'Print eerst een proefstukje. Klemt de pen, maak het gat groter; rammelt hij, kleiner.'},
@@ -1910,9 +1910,9 @@ function hSynthThigh(g,S,ret){
   return best; }
 // knie: zoek hefboomhoek, krukstraal en -fase zodat de buiging een doelprofiel volgt:
 // gestrekt in de steunfase (28% van de pas, rond θs), het meest gebogen midden in de zwaaifase
-const DUTY_T=0.28; let HW_ST=10, HWIN=0.035;
+let DUTY_T=0.38; let HW_ST=10, HWIN=0.035, HSW=0.85, HDF=0.75;
 function hSynthKnee(g,S,thS,thArr,avoid){
-  const hs=DUTY_T/2, N=36, ts=thArr(thS);
+  const hs=(g.fore?DUTY_T*HDF:DUTY_T)/2, N=36, ts=thArr(thS);
   const target=(th)=>{ const u=wrap2pi(th-thS)/(2*Math.PI); if(u<hs||u>1-hs) return 0; const v=(u-hs)/(1-2*hs); return g.flex*Math.pow(Math.sin(Math.PI*v),2); };
   const Ks=add2(g.H,u2(ts.tau),g.L1);
   const evalP=(gk,rk,psiK,full)=>{
@@ -1952,7 +1952,7 @@ function hDerive(){
   const offs={LH:0,RH:P.offRH/100,LF:P.offLF/100,RF:P.offRF/100};
   const thA={};
   for(const l of HLEGS){
-    const g=Object.assign(hLegBase(l.fore,L),{id:l.id,s:l.s,sw:l.fore?sw:0.85*sw,flex:(l.fore?P.flexF:P.flexH)*DEG});
+    const g=Object.assign(hLegBase(l.fore,L),{id:l.id,s:l.s,sw:l.fore?sw:HSW*sw,flex:(l.fore?P.flexF:P.flexH)*DEG});
     const t=hSynthThigh(g,d.S,ret); if(!t){ d.fail=l.id; d.msgsD.push(['bad',`${LEGNAME[l.id]}: geen werkende stang voor de zwaai te vinden. Verklein de zwaai.`]); }
     const tt=t||{gam:0,rt:3,Lt:len2d(sub2(d.S,g.H)),pa1:0,pa2:Math.PI,rf:0.5,muMin:0,A1:add2(g.H,[0,g.lt])};
     const thP=2*Math.PI*offs[l.id];
@@ -2208,7 +2208,13 @@ function hAnalyze(){
   const meanOver=(arr,mask)=>{ let s=0,n=0; arr.forEach((v,k)=>{ if(mask[k]){ s+=v; n++; } }); return n?s/n:0; };
   const hindC=A.contact.LH.map((v,k)=>v||A.contact.RH[k]), foreC=A.contact.LF.map((v,k)=>v||A.contact.RF[k]);
   A.noseHind=meanOver(phi,hindC)-meanOver(phi,foreC);
-  A.dutyMean=ids.reduce((s,id)=>s+A.duty[id],0)/4;
+  A.dutyMean=ids.reduce((s,id)=>s+A.duty[id],0)/4; A.dutyF=(A.duty.LF+A.duty.RF)/2; A.dutyH=(A.duty.LH+A.duty.RH)/2;
+  A.overlap=Math.max(0,ids.reduce((s,id)=>s+A.duty[id],0)-(1-A.susp));
+  // hoek die het been (scharnier -> hoef) in de steunfase doorloopt
+  A.sweep={}; for(const id of ids){ const g=D.legs[id]; let lo=1e9, hi=-1e9; A.contact[id].forEach((c,k)=>{ if(!c) return; const a=Math.atan2(zH[id][k]-g.H[0],-(yH[id][k]-g.H[1]))/DEG; lo=Math.min(lo,a); hi=Math.max(hi,a); }); A.sweep[id]=hi>lo?hi-lo:0; }
+  A.sweepF=(A.sweep.LF+A.sweep.RF)/2; A.sweepH=(A.sweep.LH+A.sweep.RH)/2;
+  // zweeffase: benen verzameld onder het lijf? (achterhoeven voor de knie-as, voorhoeven erachter)
+  { let n=0, ok=0; for(let k=0;k<N;k++){ if(ids.some(id=>A.contact[id][k])) continue; n++; const hz=(zH.LH[k]+zH.RH[k])/2-D.Hh[0], fz=(zH.LF[k]+zH.RF[k])/2-D.Hf[0]; if(hz>0&&fz<0) ok++; } A.collected=n?ok/n:0; }
   A.muMin=Math.min(...ids.map(id=>Math.min(muT[id],muK[id])));
   // krukpennen niet te dicht op elkaar
   A.pinGap=1e9; for(const s of [1,-1]){ const pts=[[0,0],...D.pins[s]]; for(let k=0;k<4;k++) A.pinGap=Math.min(A.pinGap,len2d(sub2(pts[k+1],pts[k]))+(k===0?0.4:0)); }
@@ -2271,21 +2277,28 @@ function hRenderForces(){
   document.getElementById('forceTable').innerHTML='<tbody>'+rows.map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td></tr>`).join('')+'</tbody>';
 }
 const HREF=[
-  {l:'Volgorde van de hoeven',d:()=>AN.order.map(id=>LEGSHORT[id]).join(' → '),r:'AL → AR → VL → VR, dan zweeffase',ok:()=>AN.orderOK},
-  {l:'Zweeffase (alle hoeven los)',d:()=>Math.round(AN.susp*100)+'%',r:'± 28% van de pas',ok:()=>Math.abs(AN.susp*100-28)<=10},
-  {l:'Steunfase per been (duty factor)',d:()=>AN.dutyMean.toFixed(2).replace('.',','),r:'0,20 (snelle galop) – 0,30 (canter)',ok:()=>AN.dutyMean>=0.17&&AN.dutyMean<=0.33},
-  {l:'Kantelen romp (piek–piek)',d:()=>AN.pitchRange.toFixed(1).replace('.',',')+'°',r:'11–19° (volbloeds, 9–17 m/s)',ok:()=>AN.pitchRange>=11&&AN.pitchRange<=19},
-  {l:'Voorknie gestrekt bij neerzetten',d:()=>Math.round((AN.joint.LF.td+AN.joint.RF.td)/2)+'°',r:'181–182° (carpus bij hoefcontact)',ok:()=>(AN.joint.LF.td+AN.joint.RF.td)/2>=170},
-  {l:'Voorknie het meest gebogen',d:()=>Math.round((AN.joint.LF.min+AN.joint.RF.min)/2)+'°',r:'± 120° (piek in de zwaaifase)*',ok:()=>{ const v=(AN.joint.LF.min+AN.joint.RF.min)/2; return v>=105&&v<=135; }},
-  {l:'Spronggewricht het meest gebogen',d:()=>Math.round((AN.joint.LH.min+AN.joint.RH.min)/2)+'°',r:'± 128° (piek in de zwaaifase)*',ok:()=>{ const v=(AN.joint.LH.min+AN.joint.RH.min)/2; return v>=115&&v<=140; }},
-  {l:'Lijf deint op en neer',d:()=>'nee, alleen kantelen',r:'zwaartepunt 8–19 cm (17–7 m/s)',ok:()=>false},
-  {l:'Pasfrequentie',d:()=>(P.rpm/60).toFixed(2).replace('.',',')+' Hz',r:'2,47 Hz (automaat vertraagd)',ok:()=>null}];
+  {l:'Volgorde van de hoeven',d:()=>AN.order.map(id=>LEGSHORT[id]).join(' → '),r:'AL → AR → VL → VR, dan één zweeffase',ok:()=>AN.orderOK},
+  {l:'Zweeffase (alle hoeven los)',d:()=>Math.round(AN.susp*100)+'%',r:'27–28% van de pas, onafhankelijk van snelheid',ok:()=>Math.abs(AN.susp*100-27.5)<=6},
+  {l:'Benen verzameld onder het lijf tijdens het zweven',d:()=>Math.round(AN.collected*100)+'% van de zweeffase',r:'ja',ok:()=>AN.collected>=0.6},
+  {l:'Steunfase voorbeen (duty factor)',d:()=>AN.dutyF.toFixed(2).replace('.',','),r:'0,27 (9 m/s) – 0,18 (17 m/s)',ok:()=>AN.dutyF>=0.17&&AN.dutyF<=0.29},
+  {l:'Steunfase achterbeen (duty factor)',d:()=>AN.dutyH.toFixed(2).replace('.',','),r:'0,29 – 0,22, langer dan voor',ok:()=>AN.dutyH>=0.21&&AN.dutyH<=0.31&&AN.dutyH>=AN.dutyF-0.02},
+  {l:'Overlap (meer dan één hoef aan de grond)',d:()=>Math.round(AN.overlap*100)+'%',r:'36% (9 m/s) – 15% (17 m/s)',ok:()=>AN.overlap>=0.13&&AN.overlap<=0.38},
+  {l:'Zwaaihoek voorbeen in de steunfase',d:()=>Math.round(AN.sweepF)+'°',r:'46–52°',ok:()=>AN.sweepF>=42&&AN.sweepF<=56},
+  {l:'Zwaaihoek achterbeen in de steunfase',d:()=>Math.round(AN.sweepH)+'°',r:'50–64°, groter dan voor',ok:()=>AN.sweepH>=48&&AN.sweepH<=66&&AN.sweepH>AN.sweepF},
+  {l:'Kantelen romp (piek–piek)',d:()=>AN.pitchRange.toFixed(1).replace('.',',')+'°',r:'12,9–13,4° vlak, 16,7–17,4° bergop (9–12 m/s)',ok:()=>AN.pitchRange>=12.5&&AN.pitchRange<=17.5},
+  {l:'Voorknie gestrekt bij neerzetten',d:()=>Math.round((AN.joint.LF.td+AN.joint.RF.td)/2)+'°',r:'181–182° (carpus bij hoefcontact)*',ok:()=>(AN.joint.LF.td+AN.joint.RF.td)/2>=170},
+  {l:'Voorknie het meest gebogen',d:()=>Math.round((AN.joint.LF.min+AN.joint.RF.min)/2)+'°',r:'± 120°**',ok:()=>{ const v=(AN.joint.LF.min+AN.joint.RF.min)/2; return v>=105&&v<=135; }},
+  {l:'Spronggewricht het meest gebogen',d:()=>Math.round((AN.joint.LH.min+AN.joint.RH.min)/2)+'°',r:'± 128°**',ok:()=>{ const v=(AN.joint.LH.min+AN.joint.RH.min)/2; return v>=115&&v<=140; }},
+  {l:'Lijf deint op en neer',d:()=>'nee, alleen kantelen',r:()=>`9,1–10,3 cm bij 1,66 m schofthoogte (≈ ${Math.round(0.058*(D.yLift+0.31*D.L-D.baseTop))} mm op deze schaal)`,ok:()=>false},
+  {l:'Pasfrequentie',d:()=>(P.rpm/60).toFixed(2).replace('.',',')+' Hz',r:'2,02–2,41 Hz (9–17 m/s); 2,47 Hz bij de start van races',ok:()=>null}];
 function hRenderReal(){
   const el=document.getElementById('realPanel'), chip=(ok)=>`<span class="dot" style="background:var(${ok===null?'--muted':ok?'--ok':'--warn'})"></span>`;
-  const rows=HREF.map(r=>`<tr><td style="white-space:normal">${chip(r.ok())}${r.l}</td><td class="num" style="white-space:normal">${r.d()}</td><td class="num" style="white-space:normal">${r.r}</td></tr>`).join('');
+  const rows=HREF.map(r=>`<tr><td style="white-space:normal">${chip(r.ok())}${r.l}</td><td class="num" style="white-space:normal">${r.d()}</td><td class="num" style="white-space:normal">${typeof r.r==='function'?r.r():r.r}</td></tr>`).join('');
   el.innerHTML=`<h2>Vergelijking met een galopperend paard</h2><div class="tablewrap"><table><thead><tr><th>Kenmerk</th><th style="text-align:right">Ontwerp</th><th style="text-align:right">Gemeten</th></tr></thead><tbody>${rows}</tbody></table></div>
-  <p class="note">Bronnen: volgorde transversale galop: Hildebrand 1959 en <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2696142/" target="_blank" rel="noopener">Bertram &amp; Gutmann 2009</a>; duty factor: <a href="https://intechopen.com/chapters/83285" target="_blank" rel="noopener">overzicht paardenbiomechanica (IntechOpen)</a>; zweeffase en pasfrequentie: <a href="https://madbarn.com/research/multivariate-statistical-analysis-of-stride-timing-measurements-of-nonfatigued-racing-thoroughbreds" target="_blank" rel="noopener">pastiming renpaarden</a>; kanteling en zwaartepunt: <a href="https://journals.biologists.com/jeb/article/211/6/945/18067/High-speed-gallop-locomotion-in-the-Thoroughbred" target="_blank" rel="noopener">J. Exp. Biol. 211:945 (2008)</a> en <a href="https://dx.doi.org/10.1242/jeb.02439" target="_blank" rel="noopener">J. Exp. Biol. (2006)</a>; voorknie bij hoefcontact: <a href="https://pubmed.ncbi.nlm.nih.gov/8470468" target="_blank" rel="noopener">PubMed 8470468</a>.
-  * Piekbuiging uit een samenvatting waarvan de gang niet vermeld staat (mogelijk draf). Alle waarden komen uit samenvattingen; de volledige artikelen kon ik niet openen. De zwaaihoek van de benen in galop vond ik niet als getal; die is een ontwerpkeuze. Een grijze stip: niet na te bootsen in een automaat.</p>`;
+  <p class="note">Gelezen (volledige tekst): <a href="https://doi.org/10.1242/jeb.02518" target="_blank" rel="noopener">Witte, Hirst &amp; Wilson 2006</a> (9 volbloeds, 9–17 m/s: steunduur, duty factor, zweeffase, overlap, zwaaihoek), <a href="https://doi.org/10.1242/jeb.006692" target="_blank" rel="noopener">Parsons e.a. 2008</a> (kanteling romp, verticale beweging), <a href="https://doi.org/10.1098/rsif.2008.0328" target="_blank" rel="noopener">Bertram &amp; Gutmann 2009</a> (volgorde, één zweeffase met verzamelde benen) en <a href="https://doi.org/10.5772/intechopen.106490" target="_blank" rel="noopener">Renders &amp; Vincelette</a> (volgorde rechtsgalop LH-RH-LF-RF).
+  Samenvatting: <a href="https://pubmed.ncbi.nlm.nih.gov/3592394/" target="_blank" rel="noopener">Leach e.a.</a> (22 volbloeds, zweeffase 28,07%, 2,47 passen/s).
+  * Alleen uit een zoeksamenvatting: <a href="https://pubmed.ncbi.nlm.nih.gov/8470468" target="_blank" rel="noopener">PubMed 8470468</a>. ** Uit een zoeksamenvatting zonder bron of gang (mogelijk draf).
+  Zwaaihoek in de steunfase volgens Witte e.a.: 2·arcsin(½ staplengte / beenlengte). Die haalt de automaat niet: een star been rond een vast scharnier blijft maar ± 35° dicht bij zijn laagste punt; een echt paard veert in (de kogel zakt) en het lijf deint mee. Steunfase in de automaat: hoef binnen 3,5% van de lijflengte van zijn laagste punt en naar achter bewegend (eigen definitie, want er is geen grond). Een grijze stip: niet na te bootsen in een automaat.</p>`;
 }
 function hHardware(){ const Ly=D.Ly, nl=(x)=>Math.round(x);
   return [`Gelijkstroom-tandwielmotor N20, 3–6 V, ongeveer ${Math.max(10,Math.round(P.rpm*2/10)*10)} rpm (krukas ${P.rpm} rpm na de tandwielen 10:20), nominaal koppel ≥ ${AN.kgcm.toFixed(2)} kg·cm`,
@@ -2387,6 +2400,6 @@ resize(); applyTheme();
 rebuild(true); updateHud();
 setInterval(updateHud,1000);
 requestAnimationFrame(loop);
-window.__AA={hset:(a,b)=>{HW_ST=a;HWIN=b;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
+window.__AA={hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
 })();
 </script>
