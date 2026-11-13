@@ -108,6 +108,7 @@ ul.hw li{margin:3px 0}
     <h2>Weergave</h2>
     <label class="check"><input type="checkbox" id="optTrail" checked><span id="trailLbl"> Baan van de vleugelpunten</span></label>
     <label class="check"><input type="checkbox" id="optGhost" checked> Sokkel doorzichtig</label>
+    <label class="check"><input type="checkbox" id="optPins" checked> Assen, pennen en filament</label>
     <div class="ctl"><label for="finish">Afwerking</label><span></span>
       <select id="finish" style="grid-column:1/-1"><option value="natuur">Natuurlijke kleuren</option><option value="brons">Brons</option><option value="hout">Hout</option><option value="pla">Wit PLA</option></select></div>
     <div class="row" style="margin-top:10px"><button class="btn" id="resetBtn" type="button">Standaardwaarden dier</button></div>
@@ -168,7 +169,7 @@ ul.hw li{margin:3px 0}
         <div><span>Printbedden</span><strong id="tBeds">–</strong></div>
       </div>
       <div class="tablewrap"><table id="partsTable"></table></div>
-      <div class="row" style="margin-top:12px"><button class="btn primary" id="exportBtn" type="button">Download STL-bestanden (.zip)</button></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="exportBtn" type="button">Download STL-bestanden (.zip)</button><button class="btn" id="testBtn" type="button">Proefprintset (.zip)</button></div>
       <div id="exportMsg" class="note"></div>
       <h2>Ook nodig</h2>
       <ul class="hw" id="hwList"></ul>
@@ -1655,6 +1656,7 @@ function buildScene(){
       if(g.gear) M.gb.rot.push({m:mesh(g.gear,MAT.seg[1],'gg'+k,cs[k+1].x,cs[k+1].y,gbZ(k)),axis:k+1,off:ph+Math.PI+Math.PI/Ng}); });
     if(G.gb.comp){ const ph=Math.atan2(cs[1].y-cs[0].y,cs[1].x-cs[0].x), Ng=D.gst[0][0]; M.gb.rot.push({m:mesh(G.gb.comp,MAT.seg[2],'gc',cs[1].x,cs[1].y,gbZ(0)),axis:1,off:ph+Math.PI+Math.PI/Ng}); }
     const cl=cs[cs.length-1]; M.gb.arm=mesh(G.gb.arm,MAT.seg[3],'crank',cl.x,cl.y,zc-1.2-2-2); M.gb.knob=mk(G.gb.knob,MAT.motor,M.gb.arm); M.gb.knob.rotation.x=-Math.PI/2; M.gb.knob.position.set(D.crankR,0,-2); M.gb.knob.userData.tag='knob'; }
+  addPins(inner);
   const ptsR=AN.tipR.map(p=>new THREE.Vector3(p.x,p.y,p.z)), ptsL=AN.tipR.map(p=>new THREE.Vector3(-p.x,p.y,p.z));
   const lm=new THREE.LineBasicMaterial({color:new THREE.Color(SEGC[(D.n-1)%4])});
   M.trail=new THREE.Group();
@@ -1665,7 +1667,23 @@ function buildScene(){
   sun.target.position.set(0,D.yB*0.5,0);
   applyViewOpts(); applyFinish();
 }
+// pennen (1,75 mm filament) en de filamentdraad van de schubben tekenen; ze hangen aan het onderdeel waarin ze vastzitten
+const MAT_PIN=new THREE.MeshStandardMaterial({color:0xd9c27a,metalness:0.1,roughness:0.5});
+function pinMesh(parent,x,y,z,len,axis){ const g=new THREE.CylinderGeometry(0.875,0.875,len,10); if(axis==='x') g.rotateZ(Math.PI/2); else if(axis==='z') g.rotateX(Math.PI/2); const m=new THREE.Mesh(g,MAT_PIN); m.position.set(x,y,z); m.userData.pin=true; m.userData.own=true; parent.add(m); return m; }
+function addPins(inner){ M.pinList=[]; const P=(...a)=>M.pinList.push(pinMesh(...a));
+  if(D.horse) return;
+  for(let i=0;i<D.n;i++) for(const sd of ['R','L']){ const m=(sd==='R'?M.segR:M.segL)[i]; if(!m) continue;
+    if(!(D.twist3&&i>=1)){ const hb=hingeBands(i); P(m,0,0,(hb.le+hb.te)/2,hb.le-hb.te+2,'z'); }
+    if(D.tip3&&i===D.n-1) P(m,D.l,0,D.zA3,16,'z'); }
+  for(let i=0;i<D.n;i++) for(const r of [M.rodR[i],M.rodL[i]]){ if(!r) continue; const L=D.twist3&&i>=1?D.L3[i]:D.L[i]; P(r,0,0,0,10,'z'); P(r,L,0,0,10,'z'); }
+  if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const c=M.cr3[sd][i]; if(c) P(c,0,0,0,16,'z'); const t=M.tl3[sd][i]; if(t){ P(t,0,0,0,9,'z'); P(t,D.Lh3[i],0,0,9,'z'); } }
+  if(M.tip3) for(const sd of ['R','L']){ const o=M.tip3[sd]; P(o.rk,0,0,-1,7,'z'); P(o.rk,0,D.T3.a1,1,7,'z'); P(o.rk,0,-D.T3.a2,1,7,'z'); }
+  M.fil=null; if(D.tiles){ M.fil=[]; for(const sd of [1,-1]){ const l=new THREE.Mesh(new THREE.BufferGeometry(),MAT_PIN); l.userData.pin=true; l.userData.own=true; l.frustumCulled=false; inner.add(l); M.fil.push({l,sg:sd}); M.pinList.push(l); } } }
+function poseFilament(s){ if(!M.fil||!s.R3) return; const T=M.tb?M.tb.lay:tileLayout(), v=new THREE.Vector3(), pts=[];
+  for(const b of T.bands){ if(b.tip) continue; const um=(b.u0+b.u1)/2, sAbs=b.k*D.l+um; for(const du of [-3,3]){ v.set(um+du,-D.t/2-2.0,tileZf(sAbs)).applyMatrix4(tileMat(s,T,b)); pts.push(v.clone()); } }
+  if(pts.length<2) return; for(const f of M.fil){ const c=new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(f.sg*p.x,p.y,p.z))); f.l.geometry.dispose(); f.l.geometry=new THREE.TubeGeometry(c,Math.max(8,pts.length*3),0.875,6,false); } }
 function applyViewOpts(){
+  if(M.pinList){ const on=document.getElementById('optPins').checked; for(const m of M.pinList) m.visible=on; }
   if(M.trail) M.trail.visible=document.getElementById('optTrail').checked;
   const ghost=document.getElementById('optGhost').checked;
   MAT.wood.opacity=ghost?0.28:1; MAT.wood.transparent=ghost; MAT.wood.depthWrite=!ghost; MAT.wood.needsUpdate=true;
@@ -1695,7 +1713,7 @@ function poseUB(s){ if(!M.ub||!s.eye3) return; const Sx=new THREE.Matrix4().make
   for(let i=1;i<D.n;i++){ const ey=s.eye3[i], dw=new THREE.Vector3(ey.x-s.B[i].x,ey.y-s.B[i].y,ey.z-D.zRod[i]).normalize(), Ri=new THREE.Matrix4().extractRotation(s.R3[i]), dl=dw.clone().applyMatrix4(Ri.clone().transpose()), chi=Math.atan2(dl.z,dl.y);
     const Mb=new THREE.Matrix4().makeTranslation(ey.x,ey.y,ey.z).multiply(Ri).multiply(new THREE.Matrix4().makeRotationX(chi)); M.ub.R[i].matrix.copy(Mb); M.ub.L[i].matrix.copy(Sx).multiply(Mb); } }
 function pose(theta){ poseGears(theta);
-  const s=solve(theta,lastA); lastA=s.a; poseSkin(s); poseTiles(s); poseUB(s);
+  const s=solve(theta,lastA); lastA=s.a; poseSkin(s); poseTiles(s); poseUB(s); poseFilament(s);
   for(let i=0;i<D.n;i++){
     const J=s.J[i], a=s.a[i];
     if(D.twist3&&i>=1&&s.R3){ const Mi=new THREE.Matrix4().makeTranslation(s.O3[i].x,s.O3[i].y,s.O3[i].z).multiply(s.R3[i]).multiply(new THREE.Matrix4().makeTranslation(0,0,-D.zA3)), Sx=new THREE.Matrix4().makeScale(-1,1,1);
@@ -2246,6 +2264,37 @@ function readme(){
   L.push('Gecontroleerd in de simulatie:'); AN.msgs.forEach(m=>L.push('  - '+m[1]));
   return L.join('\r\n');
 }
+// proefprintset: kleine stukken om eerst de passingen te testen (pengaten, kruisstuk, stangkruisje, kantelpen, ligger met schubben)
+function testParts(){ const out=[], A=(id,name,geo,rot)=>out.push({id,name,geo,rot:rot||I4()}), t=D.t;
+  { const L=64, sh=shapeFrom([[0,0],[L,0],[L,9],[0,9]]), ds=[1.85,1.95,2.05,2.15,2.25,2.35]; ds.forEach((d,k)=>sh.holes.push(circlePath(6+k*10.4,4.5,d/2))); const g=plateXY(sh,3), dot=new THREE.CylinderGeometry(0.9,0.9,0.8,10); dot.rotateX(Math.PI/2); dot.translate(2.2,7.5,1.9);
+    A('pengat_strip','Pengat-strip: gaten 1,85 – 2,35 mm (stip = 1,85), voor pennen van 1,75 mm filament',merge([g,dot]),I4()); }
+  if(!D.horse) A('stang_proef','Stangstukje 30 mm met gewone pengaten',buildRod(30),rotX(-Math.PI/2));
+  if(D.twist3){ const l=D.l, zA=D.zA3, rh2=1.05;
+    const a=[profX(rectPts(zA-7.5,zA+7.5,-t/2,t/2),l-6.4,l-4.2,rh2),profX(circPts(zA,0,t/2),l-16,l-6.4,rh2)]; for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ a.push(tubeZ(D.rh,t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); a.push(br); }
+    A('proef_vork','Liggerstuk met vork (eind van een segment): lipjes voor de pen van het kruisstuk',merge(a),I4());
+    A('proef_lagerbus','Liggerstuk met lagerbus (begin van het volgende segment) en buisligger voor een staafje van 2 mm',merge([sleeveGeo(),profX(circPts(zA,0,t/2),7.3,24,rh2)]),I4());
+    A('kruisstuk','Kruisstuk',buildCross3(),rotZ(Math.PI/2)); A('borgring_kruis','Borgring kruisstuk',buildCollar(1.35,2.3,0.8),I4());
+    const dp=D.hTab-t/2; A('oogvork','Oogvorkje',buildEyeFork(dp),rotX(Math.PI)); A('klemlip','Klemlip oogvorkje',buildForkTab(-3.8,dp),rotZ(Math.PI/2)); A('stangkruisje','Stangkruisje',buildUBlock(),I4());
+    A('stang_kantel','Stangstukje 30 mm: kantelpen onderaan, gewoon gat bovenaan',buildRodHG(30,[true,false]),rotX(-Math.PI/2));
+    if(D.tiles){ const T=tileLayout(), ps=T.bands.filter(b=>!b.dr&&b.k===1).slice(0,2); ps.forEach((b,q)=>A('schub_proef_'+(q+1),`Losse schub ${q+1} (echt formaat, met ring en filamentoogje)`,merge(bandGeo(b,true)),rotZ(Math.PI/2)));
+      const c=T.clips.find(c=>c.k===1); if(c){ const L=Math.round((c.u1-c.u0)*10)/10, g=profX(circPts(zA,0,3.0,28),0,L,2.45); g.translate(-L/2,0,-zA); A('afstandsbus_proef','Afstandsbusje '+String(L).replace('.',',')+' mm',g,rotZ(Math.PI/2)); }
+      A('borgring_schub','Borgring lagerbus',buildCollar(2.45,3.0,0.6),I4()); } }
+  for(const p of out){ const g=p.geo.clone(); g.applyMatrix4(p.rot); g.computeBoundingBox(); const bb=g.boundingBox; g.translate(-(bb.min.x+bb.max.x)/2,-bb.min.y,-(bb.min.z+bb.max.z)/2); p.printGeo=g; p.qty=1; }
+  return out; }
+function testReadme(){ const L=['PROEFPRINTSET – '+(PRESETS[P.preset]?PRESETS[P.preset].name:P.preset),'',
+  'Print deze stukjes eerst (PLA, 0,2 mm, zoals ze in de bestanden liggen, zonder steun) en test de passing voordat je het hele model print.','',
+  '1. Pengat-strip: steek een stukje 1,75 mm filament in elk gat. Kies het kleinste gat waarin de pen nog draait zonder te rammelen en zet "Pengat" in de app op die maat (stip = 1,85 mm, daarna steeds 0,1 mm groter).',
+  '2. Stangstukje: de pen moet soepel draaien in beide gaten.'];
+  if(D.twist3) L.push('3. Kruisstuk: steek de spil in de lagerbus van het liggerstuk en lijm de borgring op het uiteinde van de spil. Steek een pen door de lipjes van het vorkstuk en het blokje. Het blokje moet om de pen en om de spil vrij kunnen draaien.',
+    '4. Stangkruisje: leg de asjes in het oogvorkje, lijm de klemlip ertegen en steek een pen door het kruisje en het stangstukje met de gewone gat-kant. Het stangetje moet alle kanten op kunnen kantelen. Aan de andere kant (zandlopergat) moet een pen ±35° kunnen kantelen.',
+    '5. Staafje: een staafje van 2 mm moet stroef in de buisligger schuiven (eventueel nabewerken met een boortje van 2 mm).');
+  if(D.tiles) L.push('6. Schubben: schuif borgring (lijmen op de lagerbus), schub 1, afstandsbusje en schub 2 over de ligger. Ze moeten licht om de ligger draaien zonder te wiebelen. Steek een stuk filament door beide oogjes: het moet glijden.');
+  L.push('','Klemt iets: maak het gat in de app groter (Pengat) of schuur licht. Rammelt het: kleiner.'); return L.join('\r\n'); }
+async function doTestExport(){ const msg=document.getElementById('exportMsg'), tp=testParts(); const files=tp.map((p,i)=>({name:`proef_${String(i+1).padStart(2,'0')}_${p.id}.stl`,data:stlBinary(p.printGeo,p.name)}));
+  files.push({name:'LEESMIJ_PROEF.txt',data:new TextEncoder().encode(testReadme())}); const blob=zip(files), fname=`proefprintset-${P.preset}.zip`;
+  let dl=null; try{ if(window.claude&&window.claude.use) dl=await window.claude.use('downloads'); }catch(e){ dl=null; }
+  if(dl){ try{ await dl.save({filename:fname,data:blob}); msg.textContent=`Opgeslagen: ${fname}`; }catch(err){ msg.textContent='Downloaden lukt hier niet.'; } }
+  else { const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); msg.textContent=`Download gestart: ${fname} (${files.length-1} proefstukjes + LEESMIJ).`; } }
 async function doExport(){
   const msg=document.getElementById('exportMsg'); msg.textContent='Bestanden worden gemaakt…';
   const files=PARTS.map((p,i)=>({name:stlName(p,i), data:stlBinary(p.printGeo,p.name)}));
@@ -2929,12 +2978,12 @@ setPlaying(playing);
 
 document.getElementById('vAsm').onclick=()=>setView('asm');
 document.getElementById('vBed').onclick=()=>setView('bed');
-document.getElementById('optTrail').onchange=applyViewOpts;
+document.getElementById('optTrail').onchange=applyViewOpts; document.getElementById('optPins').onchange=applyViewOpts;
 document.getElementById('optGhost').onchange=applyViewOpts;
 document.getElementById('finish').onchange=applyFinish;
 document.getElementById('resetBtn').onclick=()=>{ P=Object.assign({preset:P.preset},PRESETS[P.preset].def); syncControls(); rebuild(true); };
 document.getElementById('bed').onchange=()=>{ renderParts(); if(viewMode==='bed'){ buildBedScene(); frameCamera(); } updateHud(); };
-document.getElementById('exportBtn').onclick=doExport;
+document.getElementById('exportBtn').onclick=doExport; document.getElementById('testBtn').onclick=doTestExport;
 document.getElementById('fitBtn').onclick=()=>runFitCheck();
 document.getElementById('infill').onchange=(e)=>{ INFILL=+e.target.value; rebuild(false); };
 const tabA=document.getElementById('tabA'), tabP=document.getElementById('tabP');
@@ -2946,6 +2995,6 @@ resize(); applyTheme();
 rebuild(true); updateHud();
 setInterval(updateHud,1000);
 requestAnimationFrame(loop);
-window.__AA={toWorld:(...a)=>toWorld(...a),fcorr:(a,b)=>featherCorr(a,b),tw3:{chain:(...a)=>tw3Chain(...a),clear:(...a)=>tw3Clear(...a),lay:()=>skinLayout(),pts:(a,b)=>skinPoints(a,b),phi:(...a)=>skinPhi(...a),strain:(a,b)=>skinStrain(a,b),corr:(a,b)=>featherCorr(a,b)},solve:(t,p)=>solve(t,p),wingPoses:(N)=>{ const o=[]; let pv=null; for(let k=0;k<N;k++){ const s=solve(k/N*2*Math.PI,pv); pv=s.a; o.push({J:s.J.map(j=>[j.x,j.y]),a:s.a.slice(0,D.n),B:s.B.map(b=>[b.x,b.y])}); } return {poses:o,L:D.L.slice(),zRod:D.zRod.slice(),att:D.att.slice(),leAtt:D.tAtt.map(t=>D.plan(t).le),teAtt:D.tAtt.map(t=>D.plan(t).te),hTab:D.hTab,l:D.l,n:D.n,t:D.t,Sw:D.Sw,w0:D.w0,zq:Array.from({length:D.n+1},(_,i)=>{ const pf=D.plan(Math.min(1,(i+0.5)*D.l/D.Sw)); return pf.le-0.25*(pf.le-pf.te); })}; },mbk:(a,b)=>{MB_K=a;MV_K=b;},twk:(v)=>{TWK=v;},kin:()=>{const o=[];let p=null;for(let k=0;k<72;k+=6){p=hKin(k/72*2*Math.PI,p);o.push([p.h,p.phi/DEG,p.rho/DEG].map(v=>+v.toFixed(2)));}return o;},hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
+window.__AA={testParts:()=>testParts(),toWorld:(...a)=>toWorld(...a),fcorr:(a,b)=>featherCorr(a,b),tw3:{chain:(...a)=>tw3Chain(...a),clear:(...a)=>tw3Clear(...a),lay:()=>skinLayout(),pts:(a,b)=>skinPoints(a,b),phi:(...a)=>skinPhi(...a),strain:(a,b)=>skinStrain(a,b),corr:(a,b)=>featherCorr(a,b)},solve:(t,p)=>solve(t,p),wingPoses:(N)=>{ const o=[]; let pv=null; for(let k=0;k<N;k++){ const s=solve(k/N*2*Math.PI,pv); pv=s.a; o.push({J:s.J.map(j=>[j.x,j.y]),a:s.a.slice(0,D.n),B:s.B.map(b=>[b.x,b.y])}); } return {poses:o,L:D.L.slice(),zRod:D.zRod.slice(),att:D.att.slice(),leAtt:D.tAtt.map(t=>D.plan(t).le),teAtt:D.tAtt.map(t=>D.plan(t).te),hTab:D.hTab,l:D.l,n:D.n,t:D.t,Sw:D.Sw,w0:D.w0,zq:Array.from({length:D.n+1},(_,i)=>{ const pf=D.plan(Math.min(1,(i+0.5)*D.l/D.Sw)); return pf.le-0.25*(pf.le-pf.te); })}; },mbk:(a,b)=>{MB_K=a;MV_K=b;},twk:(v)=>{TWK=v;},kin:()=>{const o=[];let p=null;for(let k=0;k<72;k+=6){p=hKin(k/72*2*Math.PI,p);o.push([p.h,p.phi/DEG,p.rho/DEG].map(v=>+v.toFixed(2)));}return o;},hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
 })();
 </script>
