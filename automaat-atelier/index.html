@@ -223,7 +223,7 @@ const PRESETS = {
       const v=Math.exp(-((d/8.5)**2))*sstep(w0*0.3,w0*0.8,ax)*(1-0.6*along)*0.85;
       const dark=[0.20,0.23,0.27], light=[0.80,0.82,0.82]; return [lerp(dark[0],light[0],v),lerp(dark[1],light[1],v),lerp(dark[2],light[2],v)]; } },
   vogel: { name:'Vogel', w0Frac:0.075, blFull:true, split:{kind:'kop',side:1,cut:(le,te)=>le+27*0.62}, colors:{wing:'#6f4d30',body:'#82603f',belly:'#cdb497'},
-    def:{span:260,n:2,chord:72,sweep:20,thick:4,bulk:5,e:9,grow:30,lag:30,down:40,dihedral:8,attach:50,height:110,rpm:16,pitch:5,pphase:110,heave:5,hphase:0,forced:1,hole:2.0,tip:65,headk:100},
+    def:{span:360,n:2,chord:90,sweep:20,thick:4,bulk:5,e:5.5,grow:240,lag:9,down:42,dihedral:12,attach:45,height:105,rpm:16,pitch:5,pphase:110,heave:5,hphase:0,forced:1,hole:2.0,tip:45,headk:100,lever:3},
     plan(t,P){ const C=P.chord;
       const le=C*0.4+C*0.16*Math.sin(Math.PI*clamp(t/0.9,0,1))-P.sweep*Math.pow(t,2.2);
       let c = t<0.75 ? C*(1-0.25*t) : C*0.8125*Math.sqrt(Math.max(0,1-Math.pow((t-0.75)/0.25,2)));
@@ -243,7 +243,7 @@ const PRESETS = {
       {x:0,z:te-40*BK,rx:w0*0.5,rz:30*BK,h:3.2,p:0.8}]; },
     belly(w0,le,te,P){ return {wb:w0-4,zm:(le+te)/2+4,Lz:(le-te)/2+16,depth:P.bulk*2.2,p:2.2}; } },
   vlinder: { name:'Vlinder', w0Frac:0.04, split:{kind:'achterlijf',side:-1,cut:(le,te)=>te-7}, colors:{wing:'#d8741c',body:'#2c2622',belly:'#2c2622'},
-    def:{span:200,n:1,chord:95,sweep:0,thick:4,bulk:2.8,e:10,grow:0,lag:0,down:45,dihedral:10,attach:40,height:100,rpm:12,pitch:4,pphase:90,heave:3,hphase:200,forced:0,hole:2.0,tip:0,headk:200},
+    def:{span:220,n:1,chord:76,sweep:0,thick:4,bulk:2.8,e:14.5,grow:0,lag:0,down:40,dihedral:12,attach:21,height:105,rpm:12,pitch:4,pphase:90,heave:0,hphase:200,forced:0,hole:2.0,tip:0,headk:200,lever:1},
     plan(t,P){ const C=P.chord;
       const le=C*(0.30+0.45*t)-C*0.55*Math.pow(t,6)-P.sweep*t;
       const tf=C*(-0.25+0.35*t)-P.sweep*t;
@@ -264,7 +264,7 @@ const PRESETS = {
       return b; },
     belly(w0,le,te,P){ return {wb:Math.max(3,w0-1.5),zm:(le+te)/2-8,Lz:(le-te)/2+22,depth:3.5,p:2.4}; } },
   vleermuis: { name:'Vleermuis', w0Frac:0.065, split:{kind:'kop',side:1,cut:(le,te)=>le+7}, colors:{wing:'#4b3b33',body:'#3a2c26',belly:'#5a463c'},
-    def:{span:260,n:3,chord:80,sweep:15,thick:4,bulk:3.4,e:7,grow:25,lag:40,down:42,dihedral:2,attach:60,height:115,rpm:14,pitch:5,pphase:100,heave:4,hphase:200,forced:1,hole:2.0,tip:70,headk:80},
+    def:{span:290,n:2,chord:68,sweep:15,thick:4,bulk:3.4,e:4.5,grow:150,lag:15,down:42,dihedral:6,attach:54,height:90,rpm:14,pitch:5,pphase:100,heave:0,hphase:200,forced:1,hole:2.0,tip:40,headk:80,lever:3.5},
     plan(t,P){ const C=P.chord;
       const le=C*0.45+C*0.1*Math.sin(Math.PI*Math.min(t/0.8,1))-P.sweep*Math.pow(t,1.5)*0.6;
       const le1=C*0.45-P.sweep*0.6;
@@ -321,7 +321,7 @@ const CONTROLS = [
   {id:'rpm',label:'Toerental nokas',min:2,max:40,step:1,unit:'rpm'}
 ];
 
-const STORE='automaat-atelier-v11';
+const STORE='automaat-atelier-v12';
 let P = loadParams() || Object.assign({preset:'manta'}, PRESETS.manta.def);
 function loadParams(){ try{ const s=localStorage.getItem(STORE); if(!s) return null; const o=JSON.parse(s); if(!PRESETS[o.preset]) return null; return Object.assign({},PRESETS[o.preset].def,o);}catch(e){return null;} }
 function saveParams(){ try{ localStorage.setItem(STORE,JSON.stringify(P)); }catch(e){} }
