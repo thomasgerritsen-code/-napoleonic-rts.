@@ -293,7 +293,7 @@ const PRESETS = {
 
 // Manta 2.0: zelfde vorm als Manta 1.0, maar de vinpunt draait om een eigen as langs de spanwijdte (verenstand)
 { const o=Object.assign({},PRESETS); for(const k of Object.keys(PRESETS)) delete PRESETS[k];
-  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:18,skinMax:40})}); PRESETS.manta5=Object.assign({},o.manta,{name:'Manta 5.0 (schubben)',twist3:true,feather:true,tiles:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:10})}); } } }
+  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:18,skinMax:40})}); PRESETS.manta5=Object.assign({},o.manta,{name:'Manta 5.0 (schubben)',twist3:true,feather:true,tiles:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:10})}); PRESETS.manta51=Object.assign({},PRESETS.manta5,{name:'Manta 5.1 (schubben)',tileLook:true}); } } }
 const CONTROLS = [
   {g:'Vorm'},
   {id:'span',label:'Spanwijdte',min:120,max:400,step:5,unit:'mm'},
@@ -354,7 +354,7 @@ let D;
 function derive(alt){
   const pre=PRESETS[P.preset];
   const d={pre};
-  d.twist3=!!pre.twist3&&(P.n|0)>=2; d.skin=d.twist3&&!!pre.skin; d.tiles=d.twist3&&!!pre.tiles; d.skel=d.skin||d.tiles; d.feather=d.twist3&&!!pre.feather; d.sym=!!P.sym&&!d.twist3; d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced;
+  d.twist3=!!pre.twist3&&(P.n|0)>=2; d.skin=d.twist3&&!!pre.skin; d.tiles=d.twist3&&!!pre.tiles; d.tileLook=d.tiles&&!!pre.tileLook; d.skel=d.skin||d.tiles; d.feather=d.twist3&&!!pre.feather; d.sym=!!P.sym&&!d.twist3; d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced;
   // hefboom (tuimelaar): volgerpen in sleuf op afstand d0 van het draaipunt, stang aan het eind op aL = k·d0
   d.leverOn=(P.lever||1)>1.01; d.kLev=P.lever||1; d.d0=10; d.aLi=[]; for(let i=0;i<(P.n|0);i++) d.aLi[i]=d.kLev*(1+(P.grow||0)/100*i)*d.d0; d.aL=Math.max(...d.aLi);
   d.gap=d.leverOn?(d.forced?14:12):(d.forced?11:9); d.oRk=3.8; d.oRod=d.leverOn?6.5:3.8; d.oTab=d.leverOn?9.6:7.1;
@@ -917,7 +917,15 @@ function buildSegment(i){
   const pads=eyePads(i), inPad=(u,z)=>pads.some(p=>u>=p.u0&&u<=p.u1&&z>=p.z0&&z<=p.z1);
   const cf=D.pre.pattern?((u,z)=>D.pre.pattern(D.w0+s0+u,z,D.w0,D.le0,D.te0)):null, LIGHT=cf?[0.20,0.23,0.27]:null;
   if(!D.sym){
-    const items=heightSolid(pts,[],thick,2.0,-D.t/2,cf);
+    let items;
+    if(D.tileLook&&i===0){ // Manta 5.1: één stevige plaat met dezelfde banden en tegeltjes als de schubben (groeven 1 mm diep)
+      items=heightSolid(pts,[],(u,z,d)=>Math.max(0.8,thick(u,z,d)-1.0),2.0,-D.t/2,cf);
+      const ua0=Math.max(...root.map(p=>p[0]))+0.4, ue=(D.tiles?l-6-0.8:u1), nb=Math.max(1,Math.round((ue-ua0)/6.5)), bw=(ue-ua0)/nb;
+      for(let b=0;b<nb;b++){ const ua=ua0+b*bw+(b?0.3:0), ub=ua0+(b+1)*bw-(b<nb-1?0.3:0), N=Math.max(3,Math.ceil((ub-ua)/1.2)), pm=pfA((ua+ub)/2), nT=Math.max(1,Math.round((pm.le-pm.te)/11));
+        for(let q=0;q<nT;q++){ const f0=q/nT, f1=(q+1)/nT, lo=[], hi=[];
+          for(let j=0;j<=N;j++){ const u=ua+(ub-ua)*j/N, pf=pfA(u), w=pf.le-pf.te; lo.push([u,pf.te+w*f0+(q?0.3:0.05)]); hi.push([u,pf.te+w*f1-(q<nT-1?0.3:0.05)]); }
+          items.push(...heightSolid([...lo,...hi.reverse()],[],thick,1.2,-D.t/2,cf)); } } }
+    else items=heightSolid(pts,[],thick,2.0,-D.t/2,cf);
     if(!twRoot&&!t3R) items.push(...knucklesSk(hbR,0,1,skR,zr,0)); if(!last&&!t3T) items.push(...knucklesSk(hbT,l,0,skT,zr,0));
     if(t3R) items.push(tubeX(D.rh,D.t/2,1.2,7,0,D.zA3));
     if(t3T){ const zA=D.zA3; for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ items.push(tubeZ(D.rh,D.t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,D.t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); items.push(br); } }
@@ -1432,7 +1440,7 @@ function applyFinish(){
   const f=FINISH[document.getElementById('finish').value](PRESETS[P.preset]);
   const pat=document.getElementById('finish').value==='natuur'&&!!PRESETS[P.preset].pattern;
   for(const [m,c] of [[MAT.wing,f.wing],[MAT.body,f.body],[MAT.belly,f.belly]]){ m.color.set(c); m.metalness=f.metal; m.roughness=f.rough; m.vertexColors=false; m.needsUpdate=true; }
-  MAT.tile.color.set(pat?'#5a6672':f.wing); MAT.tile.metalness=f.metal; MAT.tile.roughness=f.rough; MAT.tile.needsUpdate=true;
+  MAT.tile.color.set(pat?'#55606b':f.wing); MAT.tile.metalness=f.metal; MAT.tile.roughness=f.rough; MAT.tile.needsUpdate=true;
   if(pat) for(const m of [MAT.wing,MAT.body]){ m.color.set('#ffffff'); m.vertexColors=true; }
 }
 let asm=new THREE.Group(), bedGroup=new THREE.Group(); scene.add(asm); scene.add(bedGroup);
@@ -1455,7 +1463,7 @@ function buildScene(){
   }
   for(let i=0;i<D.n;i++){
     for(const side of ['R','L']){
-      const m=mk(G.seg[i],D.skel&&i>=1?MAT.tile:MAT.wing,inner); if(side==='L') m.scale.x=-1; m.userData.tag='seg'+i+side;
+      const m=mk(G.seg[i],(D.skel&&i>=1)||(D.tileLook&&i===0)?MAT.tile:MAT.wing,inner); if(side==='L') m.scale.x=-1; m.userData.tag='seg'+i+side;
       const eye=mk(D.twist3&&i>=1?G.ballEye:G.eye,MAT.seg[i],m); eye.position.set(D.att[i],-D.t/2,D.twist3&&i>=1?D.zA3:D.zTab[i]); eye.userData.tag='eye'+i+side;
       if(D.twist3&&i>=1){ m.matrixAutoUpdate=false; const h=mk(G.horn3,MAT.seg[3],m); h.position.set(D.uH3,-D.t/2,D.zA3-D.e3[i]); h.userData.tag='hnk'+i+side; }
       if(D.twist3&&i<D.n-1){ const ar=mk(G.arm3[i+1],MAT.seg[3],m); ar.position.set(D.uA3,-D.t/2,D.zA3-D.e3[i+1]); ar.userData.tag='ark'+(i+1)+side; }
