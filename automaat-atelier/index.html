@@ -1257,9 +1257,17 @@ function buildBracket(){ // U-beugel onder de buik; oorsprong = draaipunt
   return merge([bar,a,b]);
 }
 function buildEccCam(e,Rb,ph){ const s=new THREE.Shape(); s.absarc(-e*Math.sin(ph),e*Math.cos(ph),Rb,0,Math.PI*2,false); s.holes.push(dHole()); return merge([plateXY(s,4)]); }
-function buildPitchCam(){ return buildGrooveCam(-1,grooveLocusFn(D.sp),D.RmaxP); }
+// kantelvolger met geleidearmpjes (5.2): pen in de groef, volger hangt aan een parallellogram; de x-verschuiving op het boogje wordt in de groef verwerkt
+const PLA=28;
+function pArmSetup(){ if(D._parm) return D._parm; const N=144; let sum=0, hi=-1e9; for(let k=0;k<N;k++){ const y=D.sp(k/N*2*Math.PI); sum+=y; hi=Math.max(hi,y); }
+  const mid=D.yc+sum/N, yHi=D.yc+hi, yTop=D.Hb-3.6-yHi-3.8; return (D._parm={mid,yG:[7.5,Math.max(13,Math.min(D.Sp-6,yTop))]}); }
+function pArmDx(th){ const A=pArmSetup(), dy=D.yc+D.sp(th)-A.mid; return -(PLA-Math.sqrt(Math.max(0,PLA*PLA-dy*dy))); }
+function buildPitchCam(){ if(D.armDrive){ const o=[], n=144; for(let k=0;k<n;k++){ const th=k/n*2*Math.PI, x=pArmDx(th), y=D.sp(th); o.push([x*Math.cos(th)+y*Math.sin(th),-x*Math.sin(th)+y*Math.cos(th)]); } return buildGrooveCam(-1,o,D.RmaxP+0.6); }
+  return buildGrooveCam(-1,grooveLocusFn(D.sp),D.RmaxP); }
+function buildPitchBracket(){ const A=pArmSetup(), x=-PLA, ys=A.yG.map(y=>A.mid+y), top=Math.max(...ys)+4, sh=shapeFrom([[x-4,3],[x+4,3],[x+4,top],[x-4,top]]);
+  for(const y of ys) sh.holes.push(circlePath(x,y,D.rh)); const g=plateXY(sh,2.2); g.translate(0,0,1.1); const ft=new THREE.BoxGeometry(8,3,4); ft.translate(x,4.5,1.1); return merge([g,ft]); }
 function buildPitchFollower(){ // pen onderaan (in de groef), oog bovenaan voor de kantelstang (gat langs x, op z=+1,5)
-  const S=D.Sp, st=shapeFrom([[-3,0],[3,0],[3,S],[-3,S]]);
+  const S=D.Sp, st=shapeFrom([[-3,0],[3,0],[3,S],[-3,S]]); if(D.armDrive) for(const y of pArmSetup().yG) st.holes.push(circlePath(0,y,D.rh));
   const boss=new THREE.Shape(); boss.absarc(0,0,4.5,0,Math.PI*2,false);
   const pin=new THREE.CylinderGeometry(1.6,1.6,2.6,20); pin.rotateX(Math.PI/2); pin.translate(0,0,-3.2);
   const ey=new THREE.Shape(); ey.moveTo(-2,S-7); ey.lineTo(5,S-7); ey.lineTo(5,S); ey.absarc(1.5,S,3.5,0,Math.PI,false); ey.lineTo(-2,S); ey.closePath(); ey.holes.push(circlePath(1.5,S,D.rh));
@@ -1397,11 +1405,12 @@ function buildParts(){
     G.bracket=add('draaibeugel','Draaibeugel lijf',1,buildBracket(),rotX(Math.PI),'mech').geo;
     G.pcam=add('nok_kantel','Nok kanteling',1,buildPitchCam(),rotX(-Math.PI/2),'mech').geo;
     G.pfol=add('volger_kantel','Volger kanteling',1,buildPitchFollower(),rotX(-Math.PI/2),'mech').geo;
+    if(D.armDrive){ G.pbr=add('geleidesteun_kantel','Steun geleidearmpjes kantelvolger (op de bodem lijmen)',1,buildPitchBracket(),I4(),'mech').geo; G.parm=add('geleidearm_kantel','Geleidearmpje kantelvolger ('+PLA+' mm)',2,buildRod(PLA),rotX(-Math.PI/2),'rod').geo; }
     G.plug=add('kanteloog','Kanteloog (onder buik)',1,buildEyeX(6),rotX(Math.PI),'mech').geo;
     G.plink=add('kantelstang','Kantelstang',1,buildRod(D.Lp),rotX(-Math.PI/2),'rod').geo;
   }
   const box=buildBox(); G.box=box;
-  G.guides=D.armDrive?(D.pitchOn?[{zs:[D.ze],geo:add('geleideblok_kantel','Geleideblok kantelvolger',1,buildGuide([D.ze]),I4(),'mech').geo}]:[]):guideGroups().map((zs,k)=>({zs,geo:add('geleideblok_'+(k+1),'Geleideblok volgers '+(k+1),1,buildGuide(zs),I4(),'mech').geo}));
+  G.guides=D.armDrive?[]:guideGroups().map((zs,k)=>({zs,geo:add('geleideblok_'+(k+1),'Geleideblok volgers '+(k+1),1,buildGuide(zs),I4(),'mech').geo}));
   const sp={}; for(const x of spacerList()){ const k=x.len.toFixed(1); (sp[k]=sp[k]||[]).push(x); }
   G.spacers=Object.keys(sp).map(k=>({list:sp[k],geo:add('afstandsbus_'+k.replace('.','_')+'mm','Afstandsbus '+k.replace('.',',')+' mm',sp[k].length,buildSpacer(+k),I4(),'mech').geo}));
   G.motorH=D.crank?null:add('motorhouder','Motorhouder N20',1,buildMotorHolder(),rotX(-Math.PI/2),'mech').geo;
@@ -1663,6 +1672,7 @@ function buildScene(){
     const br=mk(G.bracket,MAT.seg[3%4],inner); br.position.set(0,D.pivot.y,D.zPost); br.userData.tag='bracket';
     M.pcam=mk(G.pcam,MAT.motor); M.pcam.position.set(0,D.yc,D.ze); M.pcam.userData.tag='pcam';
     M.pfol=mk(G.pfol,MAT.motor); M.pfol.position.z=D.ze; M.pfol.userData.tag='pfol';
+    if(D.armDrive){ const b=mk(G.pbr,MAT.motor); b.position.z=D.ze; b.userData.tag='gpb'; M.parm=[0,1].map(k=>{ const m=mk(G.parm,MAT.seg[3]); m.userData.tag='gpa'+k; return m; }); }
     const lg=mk(G.plug,MAT.seg[3],inner); lg.position.set(0,D.yB+D.yPad,D.ze+1.5); lg.userData.tag='lug';
     M.plink=mk(G.plink,MAT.seg[3]); M.plink.userData.tag='plink';
   }
@@ -1840,6 +1850,7 @@ function pose(theta){ poseGears(theta);
     const a=new THREE.Vector3(D.xHeadRod,s.headA.y,s.headA.z), b=new THREE.Vector3(D.xHeadRod,s.headB.y,s.headB.z), X=b.clone().sub(a).normalize(), Z=new THREE.Vector3(1,0,0), Y=Z.clone().cross(X).normalize();
     M.headRod.position.copy(a); M.headRod.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); M.headRod.material=s.headLock?MAT.bad:MAT.seg[3]; }
   if(D.pitchOn){ M.pcam.rotation.z=theta; M.pfol.position.y=D.yc+D.sp(theta);
+    if(D.armDrive&&M.parm){ const A=pArmSetup(), dx=pArmDx(theta); M.pfol.position.x=dx; A.yG.forEach((yy,k)=>{ const g0=new THREE.Vector3(-PLA,A.mid+yy,D.ze+3.3), g1=new THREE.Vector3(dx,D.yc+D.sp(theta)+yy,D.ze+3.3); M.parm[k].position.copy(g0); M.parm[k].rotation.set(0,0,Math.atan2(g1.y-g0.y,g1.x-g0.x)); }); }
     const Ey=D.yc+D.sp(theta)+D.Sp, Lw=toWorld(s.phi,D.yB+D.yLug,D.ze,s.h);
     const a=new THREE.Vector3(3.3,Ey,D.ze+1.5), b=new THREE.Vector3(3.3,Lw.y,Lw.z+1.5), X=b.clone().sub(a).normalize(), Z=new THREE.Vector3(1,0,0), Y=Z.clone().cross(X).normalize();
     M.plink.position.copy(a); M.plink.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); M.plink.material=s.plock?MAT.bad:MAT.seg[3]; }
@@ -1869,7 +1880,7 @@ function voxelize(geo){
       for(let i=i0;i<=i1;i++){ const id=(i*ny+j)*nz+k; if(!occ[id]){ occ[id]=1; pts.push(mn.x+(i+0.5)*h, mn.y+(j+0.5)*h, mn.z+(k+0.5)*h); } } } }
   const v={mn,nx,ny,nz,occ,pts:new Float32Array(pts),bb}; VCACHE.set(geo.uuid,v); return v;
 }
-const STATIC_TAGS=new Set(['box','guide','motorh','bush','spacer','gbox']); const isPost=(t)=>/^pp\d/.test(t)||/^gbr\d/.test(t);
+const STATIC_TAGS=new Set(['box','guide','motorh','bush','spacer','gbox']); const isPost=(t)=>/^pp\d/.test(t)||/^gbr\d/.test(t)||t==='gpb';
 function allowedPair(a,b){
   if(D.horse) return hAllowed(a,b);
   const A=a.userData.tag, B=b.userData.tag, has=(x,y)=>(A===x&&B===y)||(A===y&&B===x), pre=(x,y)=>(A.startsWith(x)&&B.startsWith(y))||(A.startsWith(y)&&B.startsWith(x));
@@ -1877,7 +1888,7 @@ function allowedPair(a,b){
   const fixed=[['body','belly'],['body','head'],['belly','head'],['belly','bracket'],['body','bracket'],['belly','lug'],['body','lug'],['bracket','post'],['post','bush'],['post','box'],['post','hcam'],['post','headrod'],
     ['pfol','pcam'],['pfol','box'],['pfol','guide'],['pfol','plink'],['plink','lug'],['headrod','headeye'],['spacer','box'],['spacer','spacer'],['box','box'],['box','guide'],['box','motorh'],['guide','guide'],['motorh','spacer'],['gbox','box'],['gp0','gg0'],['gp0','gc'],['gc','gg1'],['crank','knob']];
   for(const [x,y] of fixed) if(has(x,y)) return true;
-  if(D.armDrive){ const ix=(t)=>t.replace(/\D/g,'')[0]; const pr=[['gar','fol'],['gar','gbr'],['lnk','fol'],['lnk','rk'],['fol','cam'],['gbr','box']];
+  if(D.armDrive){ const ix=(t)=>t.replace(/\D/g,'')[0]; const pr=[['gar','fol'],['gar','gbr'],['lnk','fol'],['lnk','rk'],['fol','cam'],['gbr','box']]; if(pre('gpa','pfol')||pre('gpa','gpb')||has('gpb','box')) return true;
     for(const [x,y] of pr) if(pre(x,y)){ const a=A.startsWith(x)?A:B, b=a===A?B:A; if(y==='box'||ix(a)===ix(b)){ if(y==='rk'&&a.slice(-1)!==b.slice(-1)) continue; return true; } } }
   if(pre('fol','box')||pre('fol','guide')||pre('cam','spacer')||has('pcam','spacer')||has('hcam','spacer')) return true;
   if(pre('pp','box')||pre('pp','guide')) return true;
@@ -1908,7 +1919,7 @@ function allowedPair(a,b){
   if((A.startsWith('fol')&&B.startsWith('cam'))||(B.startsWith('fol')&&A.startsWith('cam'))){ if(num(A)===num(B)) return true; }
   return false;
 }
-function tagLabel(t){ if(D.horse) return hTagLabel(t); { const r=/^(gar|lnk|gbr)(\d)(.*)$/.exec(t); if(r) return ({gar:'Geleidearmpje',lnk:'Volgerstangetje',gbr:'Geleidesteun'})[r[1]]+' '+(+r[2]+1)+(r[3]==='R'?' rechts':r[3]==='L'?' links':''); } { const r=/^ub(\d+)([RL])$/.exec(t); if(r) return 'Stangkruisje '+(+r[1]+1)+(r[2]==='R'?' rechts':' links'); } { const g={gbox:'Tandwielkap',gp0:'Rondsel nokas',gg0:'Groot tandwiel',gg1:'Groot tandwiel',gc:'Dubbel tandwiel',crank:'Zwengel',knob:'Handvat'}; if(g[t]) return g[t]; } { const r=/^(tip3|tpb|tpa|rk3|c31|c32)([RL])$/.exec(t); if(r) return ({tip3:'Vinpunt',tpb:'Oog vinpunt',tpa:'Kogeloog koppelstang punt',rk3:'Tuimelaar vinpunt',c31:'Koppelstang punt 1',c32:'Koppelstang punt 2'})[r[1]]+(r[2]==='R'?' rechts':' links'); } { const r=/^tb(\d+)_(\d+)([RL])$/.exec(t); if(r){ const b=M.tb&&M.tb.lay.bands[+r[1]]; return 'Schub '+(b&&b.q||r[1])+(r[3]==='R'?' rechts':' links'); } } { const r=/^(crk|tlk|hnk|ark)(\d+)([RL])$/.exec(t); if(r) return ({crk:'Kruisstuk',tlk:'Draaistangetje',hnk:'Draaihoorn',ark:'Draaiarm'})[r[1]]+' '+r[2]+(r[3]==='R'?' rechts':' links'); } const n=(x)=>+x.replace(/\D/g,'')+1, sd=(x)=>x.endsWith('R')?' rechts':x.endsWith('L')?' links':'';
+function tagLabel(t){ if(D.horse) return hTagLabel(t); { if(t==='gpb') return 'Steun kantelvolger'; if(/^gpa/.test(t)) return 'Geleidearmpje kantelvolger'; const r=/^(gar|lnk|gbr)(\d)(.*)$/.exec(t); if(r) return ({gar:'Geleidearmpje',lnk:'Volgerstangetje',gbr:'Geleidesteun'})[r[1]]+' '+(+r[2]+1)+(r[3]==='R'?' rechts':r[3]==='L'?' links':''); } { const r=/^ub(\d+)([RL])$/.exec(t); if(r) return 'Stangkruisje '+(+r[1]+1)+(r[2]==='R'?' rechts':' links'); } { const g={gbox:'Tandwielkap',gp0:'Rondsel nokas',gg0:'Groot tandwiel',gg1:'Groot tandwiel',gc:'Dubbel tandwiel',crank:'Zwengel',knob:'Handvat'}; if(g[t]) return g[t]; } { const r=/^(tip3|tpb|tpa|rk3|c31|c32)([RL])$/.exec(t); if(r) return ({tip3:'Vinpunt',tpb:'Oog vinpunt',tpa:'Kogeloog koppelstang punt',rk3:'Tuimelaar vinpunt',c31:'Koppelstang punt 1',c32:'Koppelstang punt 2'})[r[1]]+(r[2]==='R'?' rechts':' links'); } { const r=/^tb(\d+)_(\d+)([RL])$/.exec(t); if(r){ const b=M.tb&&M.tb.lay.bands[+r[1]]; return 'Schub '+(b&&b.q||r[1])+(r[3]==='R'?' rechts':' links'); } } { const r=/^(crk|tlk|hnk|ark)(\d+)([RL])$/.exec(t); if(r) return ({crk:'Kruisstuk',tlk:'Draaistangetje',hnk:'Draaihoorn',ark:'Draaiarm'})[r[1]]+' '+r[2]+(r[3]==='R'?' rechts':' links'); } const n=(x)=>+x.replace(/\D/g,'')+1, sd=(x)=>x.endsWith('R')?' rechts':x.endsWith('L')?' links':'';
   if(t.startsWith('seg')) return 'Vleugel'+sd(t)+' '+n(t); if(t.startsWith('eye')) return 'Stangoog '+n(t)+sd(t); if(t.startsWith('rod')) return 'Stang '+n(t)+sd(t);
   if(t.startsWith('fol')) return 'Volger '+n(t); if(t.startsWith('cam')) return 'Nok '+n(t);
   if(t.startsWith('rk')) return 'Tuimelaar '+n(t)+sd(t); if(/^pp\d/.test(t)) return 'Draaipuntsteun '+n(t)+sd(t);
@@ -2329,7 +2340,7 @@ function readme(){
   if(D.skin) L.push(`     Manta 4.0 (TPU): segment 2 t/m ${D.n} zijn geen vlakke platen maar een skelet: een ligger op de draaias met het kogeloog, één rib bij de draaihoorn en een beugel voor de draaiarm. De draaias ligt achter in de vleugel (binnen de omtrek tot aan de punt), het draaiwerk zit ervoor: zo kantelt de voorrand omlaag bij de neerslag en omhoog bij de opslag, zoals bij een echte vin. Print de twee TPU-huiden in TPU 95A (0,8 mm, ribbels naar boven op het bed, langzaam: ±20 mm/s), druk ze met de gaatjes over de nopjes op de rand van segment 1 en op de flens van elke rib, en klem ze vast met de PLA-klemstrips (gaatjes over dezelfde nopjes; buig de strip mee met het profiel). Zet de strips vast met een druppel secondelijm op elk nopje of smelt de nopkopjes plat met een soldeerbout. Lijm hoeft niet aan de TPU zelf te hechten. Tussen de ribben blijft de huid los, zodat de draaiing daar geleidelijk verloopt en de vleugel één geheel blijft. De ribbels onder de huid zijn vinstralen: ze houden de huid in koorderichting stijf.`);
   if(D.twist3) L.push(`     Losse onderdelen onder de vleugel (draaihoorns, draaiarmen, ogen) hebben twee gaatjes in hun lijmvlak. Steek er stukjes filament van 1,75 mm in (±3 mm) en zet ze in de bijpassende gaatjes in de vleugel, of druk ze op de nokjes onder de vaste schub; dan zitten ze meteen op de goede plek. Lijm daarna vast.${D.tiles?' Het oogvorkje zit al aan de ligger vast (print de ligger ondersteboven, zoals in de export), en bij een bol profiel zitten stangoog en draaiarm al aan de onderhelft van segment 1.':''}`);
   if(D.twist3) L.push(`     Scharnieren tussen de segmenten (3.x–5.x): elk kruisstuk heeft een gat langs de koorde en een spil langs de span. Steek een pen van 1,75 mm door de lipjes aan het eind van het vorige segment en door het blokje. Schuif de spil in de lagerbus aan het begin van het volgende segment en lijm de kleine borgring op het uiteinde van de spil (niet aan de bus). Bovenaan elke vleugelstang zit een stangkruisje: leg zijn asjes in het oogvorkje onder het zadel, lijm de klemlip ertegen en steek een pen van 1,75 mm door het kruisje en het stangoog. Onderaan hebben de stangen een kantelpen-gat (zandloper): de pen mag daarin ±35° kantelen.`);
-  if(D.armDrive) L.push(`     Aandrijving met volgarmen (5.2): lijm per nok de steun voor de geleidearmpjes op de bodem (naast de nok, aan de kant van de achterwand van het deksel). Lijm de volgervork met twee paspennen op de volgerstang en steek een pen van 1,75 mm door de vork in de groef van de nok. Verbind vork en steun met de twee geleidearmpjes (pennen van 1,75 mm): de volger hangt dan aan een parallellogram en blijft recht zonder te schuiven. Steek de volgerstang door de sleuf in het deksel en verbind de pennen van de dwarsbalk met de twee korte stangetjes naar de tuimelaars (pen in het gat op 10 mm van het draaipunt).`);
+  if(D.armDrive) L.push(`     Aandrijving met volgarmen (5.2): lijm per nok de steun voor de geleidearmpjes op de bodem (naast de nok, aan de kant van de achterwand van het deksel). Lijm de volgervork met twee paspennen op de volgerstang en steek een pen van 1,75 mm door de vork in de groef van de nok. Verbind vork en steun met de twee geleidearmpjes (pennen van 1,75 mm): de volger hangt dan aan een parallellogram en blijft recht zonder te schuiven. Steek de volgerstang door de sleuf in het deksel en verbind de pennen van de dwarsbalk met de twee korte stangetjes naar de tuimelaars (pen in het gat op 10 mm van het draaipunt).${D.pitchOn?' De kantelvolger van het lijf hangt op dezelfde manier aan twee geleidearmpjes met een eigen steun op de bodem.':''}`);
   if(D.tiles) L.push(`     Ligger (5.x): steek een staafje van 2 mm (staal of koolstof) door de buisligger van elk segment, van de lagerbus tot de vork, en zet het vast met een druppel lijm. Rijg dan vanaf de lagerbus: borgring (lijmen op de bus), schub 1, afstandsbusje, schub 2, ... tot aan het zadel. Lijm de vaste schub met zijn voet op het zadel. Segment 1 bestaat uit een boven- en onderhelft: lijm ze met de vlakke kanten op elkaar.`);
   if(D.twist3) L.push(`     Manta 3.0: segment 2 t/m ${D.n} hangen elk met een kruisstuk (cardan) aan het vorige segment, op één rechte draaias langs de spanwijdte. Steek een pen van 1,75 mm door de lipjes aan het eind van het vorige segment en het kruisstuk, en een tweede pen door het kruisstuk en het buisje aan het begin van het volgende segment. De vleugelstangen 2 t/m ${D.n} grijpen met een kogeloog op die as aan; druk de kogelkop in het stangoog. Lijm onder elk segment de draaihoorn (${D.uH3.toFixed(0)} mm vanaf het begin, ${D.e3.slice(1).join('/')} mm achter de as) en onder het vorige segment de draaiarm, aan het buitenste eind. Verbind arm en hoorn met het draaistangetje; de pennen lopen langs de spanwijdte. Zo draait elk segment een stukje verder dan het vorige: samen ${D.tw3Range?Math.round(D.tw3Range[0])+'° … +'+Math.round(D.tw3Range[1])+'°':'?'} aan de punt.`);
   if(D.twistOn) L.push(`     Manta 2.0: de vinpunt draait om een pen langs de spanwijdte (door de buisjes aan het eind van segment ${D.n} en het begin van de punt, ${((D.plan(D.n*D.l/D.Sw).le-D.zAx)).toFixed(1).replace('.',',')} mm achter de voorrand). Lijm de pen in het buisje van de punt.`,`     Lijm de draaiarm onder segment ${D.n-1} (${D.dTA} mm vóór zijn buitenste scharnier, ${(D.plan(D.n*D.l/D.Sw).le-D.twZH).toFixed(1).replace('.',',')} mm achter de voorrand) en de draaihoorn onder de punt (${D.twUH} mm voorbij de naad, zelfde afstand).`,`     Verbind arm en hoorn met het draaistangetje (${D.twL.toFixed(1).replace('.',',')} mm) en twee korte pennen langs de spanwijdte.`);
