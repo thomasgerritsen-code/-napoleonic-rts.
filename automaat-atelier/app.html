@@ -221,7 +221,7 @@ const PRESETS = {
       const d=segDist2(ax,z,w0*0.75,le-6,w0+46,le-44), along=clamp((ax-w0*0.75)/(46+w0*0.25),0,1);
       const v=Math.exp(-((d/8.5)**2))*sstep(w0*0.3,w0*0.8,ax)*(1-0.6*along)*0.85;
       const dark=[0.20,0.23,0.27], light=[0.80,0.82,0.82]; return [lerp(dark[0],light[0],v),lerp(dark[1],light[1],v),lerp(dark[2],light[2],v)]; } },
-  vogel: { name:'Vogel', w0Frac:0.075, split:{kind:'kop',side:1,cut:(le,te)=>le+27}, colors:{wing:'#6f4d30',body:'#82603f',belly:'#cdb497'},
+  vogel: { name:'Vogel', w0Frac:0.075, blFull:true, split:{kind:'kop',side:1,cut:(le,te)=>le+27*0.62}, colors:{wing:'#6f4d30',body:'#82603f',belly:'#cdb497'},
     def:{span:260,n:2,chord:72,sweep:20,thick:4,bulk:5,e:9,grow:30,lag:30,down:40,dihedral:8,attach:50,height:110,rpm:16,pitch:5,pphase:110,heave:5,hphase:0,forced:1,hole:2.0,tip:65,headk:100},
     plan(t,P){ const C=P.chord;
       const le=C*0.4+C*0.16*Math.sin(Math.PI*clamp(t/0.9,0,1))-P.sweep*Math.pow(t,2.2);
@@ -230,16 +230,16 @@ const PRESETS = {
       return {le, te: le-Math.max(c-notch, 0)}; },
     wing(tn,xc,s,z,P){ const tm=Math.max(1.6,P.bulk*(1-0.7*tn)); return Math.max(1.2, 1.2+(tm-1.2)*Math.pow(af(xc),0.5)-0.6*sstep(0.42,0.52,xc)); },
     ridges(){ return []; },
-    body(w0,le,te){ return {
-      front:[[0,le+63],[1.8,le+61],[w0*0.22,le+52],[w0*0.5,le+48],[w0*0.68,le+41],[w0*0.66,le+31],[w0*0.82,le+20],[w0*0.95,le+7]],
-      back:[[w0*0.72,te-10],[w0*0.45,te-24],[w0*1.15,te-56],[w0*0.95,te-61],[w0*0.9,te-68],[w0*0.64,te-66],[w0*0.56,te-74],[w0*0.32,te-70],[w0*0.2,te-77],[0,te-73]] }; },
-    blobs(w0,le,te,P){ const B=P.bulk; return [
+    body(w0,le,te){ const BK=0.62; return {
+      front:[[0,le+63*BK],[1.8,le+61*BK],[w0*0.22,le+52*BK],[w0*0.5,le+48*BK],[w0*0.68,le+41*BK],[w0*0.66,le+31*BK],[w0*0.82,le+20*BK],[w0*0.95,le+7*BK]],
+      back:[[w0*0.72,te-10*BK],[w0*0.45,te-24*BK],[w0*1.15,te-56*BK],[w0*0.95,te-61*BK],[w0*0.9,te-68*BK],[w0*0.64,te-66*BK],[w0*0.56,te-74*BK],[w0*0.32,te-70*BK],[w0*0.2,te-77*BK],[0,te-73*BK]] }; },
+    blobs(w0,le,te,P){ const B=P.bulk, BK=0.62; return [
       {x:0,z:(le+te)/2-3,rx:w0*1.0,rz:(le-te)*0.78,h:B*2.0},
-      {x:0,z:le-2,rx:w0*0.9,rz:18,h:B*1.9},
-      {x:0,z:le+36,rx:w0*0.66,rz:14,h:B*1.8},
-      {x:0,z:le+53,rx:3.6,rz:11,h:B*0.75,p:0.8},
-      {x:w0*0.47,z:le+39,rx:2.6,rz:2.6,h:B*1.5,p:0.6},{x:-w0*0.47,z:le+39,rx:2.6,rz:2.6,h:B*1.5,p:0.6},
-      {x:0,z:te-40,rx:w0*0.5,rz:30,h:3.2,p:0.8}]; },
+      {x:0,z:le-2*BK,rx:w0*0.9,rz:18*BK,h:B*1.9},
+      {x:0,z:le+36*BK,rx:w0*0.66,rz:14*BK,h:B*1.8},
+      {x:0,z:le+53*BK,rx:3.6,rz:11*BK,h:B*0.75,p:0.8},
+      {x:w0*0.47,z:le+39*BK,rx:2.6,rz:2.6,h:B*1.5,p:0.6},{x:-w0*0.47,z:le+39*BK,rx:2.6,rz:2.6,h:B*1.5,p:0.6},
+      {x:0,z:te-40*BK,rx:w0*0.5,rz:30*BK,h:3.2,p:0.8}]; },
     belly(w0,le,te,P){ return {wb:w0-4,zm:(le+te)/2+4,Lz:(le-te)/2+16,depth:P.bulk*2.2,p:2.2}; } },
   vlinder: { name:'Vlinder', w0Frac:0.04, split:{kind:'achterlijf',side:-1,cut:(le,te)=>te-7}, colors:{wing:'#d8741c',body:'#2c2622',belly:'#2c2622'},
     def:{span:200,n:1,chord:95,sweep:0,thick:4,bulk:2.8,e:10,grow:0,lag:0,down:45,dihedral:10,attach:40,height:100,rpm:12,pitch:4,pphase:90,heave:3,hphase:200,forced:0,hole:2.0,tip:0,headk:200},
@@ -391,7 +391,7 @@ function derive(alt){
   // paal voor of achter de nokken; kantelstift aan de buitenkant daarvan
   const hb=hingeBandsRaw(d,0); d.le0=hb.le; d.te0=hb.te;
   // vormmaten zoals Fish et al. 2016: lichaamslengte = rostrum (snuit, midden) tot staartbasis; aspectratio = spanwijdte² / oppervlak
-  { const bo=pre.body(d.w0,hb.le,hb.te), zR=bo.front[0][1], zT=hb.te-(pre.tailBase||0);
+  { const bo=pre.body(d.w0,hb.le,hb.te), zR=bo.front[0][1], zT=pre.blFull?Math.min(...bo.back.map(p=>p[1])):hb.te-(pre.tailBase||0);
     d.BL=zR-zT; d.zRostrum=zR; d.zTailBase=zT;
     let Sw=0; const N=200; for(let k=0;k<N;k++){ const p=d.plan((k+0.5)/N); Sw+=(p.le-p.te)*d.Sw/N; }
     const half=[[0,zR],...bo.front.slice(1),[d.w0,hb.le],[d.w0,hb.te],...bo.back.filter(p=>p[1]>=zT-0.01)]; if(half[half.length-1][0]>0) half.push([0,Math.max(zT,half[half.length-1][1])]);
@@ -1073,7 +1073,7 @@ function segDist(p1,p2,q1,q2){
 function analyze(){
   const N=180, n=D.n;
   const A={angles:[...Array(n)].map(()=>[]), muMin:Array(n).fill(90), relMax:Array(n).fill(0), aMin:Array(n).fill(1e9), aMax:Array(n).fill(-1e9),
-    lockAt:Array(n).fill(null), hitAt:Array(n).fill(null), minY:1e9, tipMin:1e9, tipMax:-1e9, tipR:[], pitch:[], pMin:0, pMax:0, plock:false, tiltMax:0, tau:[], heave:[], Fw:Array(n).fill(1e9), FwAbs:Array(n).fill(0), Fp:1e9, Fh:1e9, tipAng:[], tipRel:[0,0], tipLock:false, head:[], headLock:false, headHit:false, p30:[], tipVel:[], twist:[], tipTiltMax:0};
+    lockAt:Array(n).fill(null), hitAt:Array(n).fill(null), minY:1e9, tipMin:1e9, tipMax:-1e9, tipR:[], pitch:[], pMin:0, pMax:0, plock:false, tiltMax:0, tau:[], heave:[], Fw:Array(n).fill(1e9), FwAbs:Array(n).fill(0), Fp:1e9, Fh:1e9, tipAng:[], tipRel:[0,0], tipLock:false, head:[], headLock:false, headHit:false, p30:[], tipVel:[], twist:[], tipTiltMax:0, strokeAng:[], reach:[]};
   // punt op 30% van de halve spanwijdte (vanaf het midden van het lijf), langs de vleugelketen
   const s30=0.3*P.span/2-D.w0;
   const zt=D.plan(1).zc;
@@ -1093,6 +1093,7 @@ function analyze(){
       for(let t=0;t<=1.001;t+=0.1){ const y=lerp(s.headA.y,s.headB.y,t), z=lerp(s.headA.z,s.headB.z,t), b=toBody(s.phi,y,z,s.h), Bq=D.belly;
         if(Math.abs(b.z-Bq.zm)<Bq.Lz){ const bot=D.yB-D.t/2-D.bellyIdeal(D.xHeadRod*0,b.z)*1; if(b.y+3.5>bot-0.5&&t>0.15&&t<0.85) A.headHit=true; } } }
     { let rem=s30, y=D.yB; if(rem>0){ for(let i=0;i<n&&rem>0;i++){ const L=Math.min(rem,D.l); y=s.J[i].y+L*Math.sin(s.a[i]); rem-=L; } } A.p30.push(y); }
+    A.strokeAng.push(Math.atan2(s.tipEnd.y-s.J[0].y,s.tipEnd.x-s.J[0].x)/DEG); A.reach.push(s.tipEnd.x);
     const tip=s.tipEnd, tw=toWorld(s.phi,tip.y,zt,s.h); A.tipMin=Math.min(A.tipMin,tip.y); A.tipMax=Math.max(A.tipMax,tip.y); A.tipR.push({x:tip.x,y:tw.y,z:tw.z,yb:tip.y});
     if(k<N){ const F=camForces(s), r=driveRate(th); let tq=0; F.w.forEach((f,i)=>{ tq+=f*r.w[i]; A.Fw[i]=Math.min(A.Fw[i],f); A.FwAbs[i]=Math.max(A.FwAbs[i],Math.abs(f)); }); tq+=F.p*r.p+F.h*r.h; A.Fp=Math.min(A.Fp,F.p); A.FpAbs=Math.max(A.FpAbs||0,Math.abs(F.p)); A.Fh=Math.min(A.Fh,F.h); A.tau.push(tq/10); }
     A.heave.push(s.h);
@@ -1104,7 +1105,11 @@ function analyze(){
     A.ratio30=(Math.max(...A.p30)-Math.min(...A.p30))/Math.max(1e-6,A.tipMax-A.tipMin);
     let kv=0, vmin=1e9; for(let k=0;k<N;k++){ const v=A.tipR[k+1].yb-A.tipR[k].yb; if(v<vmin){ vmin=v; kv=k; } } A.thDown=(kv+0.5)/N*360;
     let kp=0, pmax=-1e9; A.pitch.forEach((v,k)=>{ if(v>pmax){ pmax=v; kp=k; } }); A.thNoseUp=kp/N*360;
-    A.pitchOK=D.pitchOn&&angDist(A.thDown*DEG,A.thNoseUp*DEG)<50*DEG; }
+    A.pitchOK=D.pitchOn&&angDist(A.thDown*DEG,A.thNoseUp*DEG)<50*DEG;
+    A.strokeAmp=Math.max(...A.strokeAng)-Math.min(...A.strokeAng);
+    // vleugel vouwen: gemiddelde reikwijdte van de punt tijdens opslag ÷ tijdens neerslag
+    let ru=0,nu=0,rd=0,nd=0; for(let k=0;k<N;k++){ const up=A.tipR[k+1].yb>A.tipR[k].yb; if(up){ ru+=A.reach[k]; nu++; } else { rd+=A.reach[k]; nd++; } }
+    A.spanRatio=(nu&&nd)?(ru/nu)/(rd/nd):1; }
   A.downShare=downN/N;
   const msgs=[];
   for(let i=0;i<n;i++){
@@ -1617,8 +1622,37 @@ function drawTorque(){
 }
 // meetwaarden uit Fish et al. 2016 (Aerospace 3, 20); 'afgelezen' = uit een figuur gemeten, geen getal in de tekst
 const MANTA_REF={spanBL:3.50/1.85, AR:3.5, tipPos:0.6, ampBL:0.824, ampSd:0.225, down:0.43, upFrac:0.62, r30:0.17};
+// referenties voor de andere dieren; 'samenvatting' = getal uit een zoekresultaat/samenvatting, volledige tekst niet gelezen
+const REFS={
+  vogel:{title:'rotsduif (Columba livia)', rows:[
+    {k:'shape',l:'Spanwijdte : lengte (snavel–staart)',d:()=>D.spanBL,f:2,r:'≈ 2,0 (62–68 / 30–35 cm)',ok:v=>v>=1.8&&v<=2.25},
+    {k:'motion',l:'Slaghoek (piek–piek)',d:()=>AN.strokeAmp,f:0,u:'°',r:'≈ 150° langzaam, minder bij kruisvlucht',ok:v=>v>=90},
+    {k:'motion',l:'Duur neerslag',d:()=>AN.downShare*100,f:0,u:'%',r:'≈ 45%',ok:v=>Math.abs(v-45)<=7},
+    {k:'motion',l:'Vleugel gevouwen bij opslag (reikwijdte op/neer)',d:()=>AN.spanRatio,f:2,r:'< 1 (vouwt in)',ok:v=>v<0.97},
+    {k:'motion',l:'Slagfrequentie',d:()=>P.rpm/60,f:2,u:' Hz',r:'6–9,6 Hz (automaat vertraagd)',ok:null}],
+    src:'Kinematica duif: hogesnelheidsfilm (slaghoek 150°, neerslag 0,45, 6,67 Hz) en Biewener-lab (opstijgen/landen); maten: BirdForum. Strouhal 0,2–0,4: Taylor, Nudds &amp; Thomas 2003, Nature 425:707.'},
+  vleermuis:{title:'vleermuizen (diverse soorten)', rows:[
+    {k:'shape',l:'Aspectratio (span² / opp.)',d:()=>D.AR,f:2,r:'≈ 6,1–7,0',ok:v=>v>=5.8&&v<=7.4},
+    {k:'motion',l:'Slaghoek (piek–piek)',d:()=>AN.strokeAmp,f:0,u:'°',r:'90–150° (meestal max. 140°)',ok:v=>v>=90&&v<=150},
+    {k:'motion',l:'Vleugel gevouwen bij opslag (reikwijdte op/neer)',d:()=>AN.spanRatio,f:2,r:'< 1 (vouwt in)',ok:v=>v<0.97},
+    {k:'motion',l:'Slagfrequentie',d:()=>P.rpm/60,f:2,u:' Hz',r:'4–13 Hz (automaat vertraagd)',ok:null}],
+    src:'Bullen &amp; McKenzie 2002, J. Exp. Biol. 205:2615 (23 soorten: max. slaghoek 90–150°, 4–13 Hz); aspectratio’s van Australische soorten (6,14–6,70) en Norberg &amp; Rayner-metingen (6,6–7,0); vouwen bij opslag: Riskin e.a. 2012.'},
+  vlinder:{title:'neotropische vlinders (37 soorten)', rows:[
+    {k:'motion',l:'Slaghoek (piek–piek)',d:()=>AN.strokeAmp,f:0,u:'°',r:'gem. 103° bij kruisvlucht (120–180° bij andere vluchten)',ok:v=>v>=85&&v<=130},
+    {k:'motion',l:'Lijf kantelt mee met de slag',d:()=>D.pitchOn?1:0,f:0,fmt:v=>v?'ja':'nee',r:'ja',ok:v=>v>0},
+    {k:'motion',l:'Achterlijf zwaait mee met de kanteling',d:()=>D.headOn?1:0,f:0,fmt:v=>v?'ja':'nee',r:'ja',ok:v=>v>0},
+    {k:'motion',l:'Slagfrequentie',d:()=>P.rpm/60,f:2,u:' Hz',r:'gem. 11 Hz (automaat vertraagd)',ok:null}],
+    src:'Dudley 1990, J. Exp. Biol. 150:37 (37 soorten, gem. 11 Hz en 103°); vrije-vluchtstudies naar lijf- en achterlijfkanteling (o.a. monarchvlinder).'}};
+function renderRealOther(el){
+  const R=REFS[P.preset]; if(!R){ el.innerHTML=''; return; }
+  const nl=(x,d)=>x.toFixed(d).replace('.',','), chip=(ok)=>`<span class="dot" style="background:var(${ok===null?'--muted':ok?'--ok':'--warn'})"></span>`;
+  const rows=R.rows.map(r=>{ const v=r.d(); const ok=r.ok?r.ok(v):null; const txt=r.fmt?r.fmt(v):nl(v,r.f)+(r.u||'');
+    return `<tr><td style="white-space:normal">${chip(ok)}${r.l}</td><td class="num">${txt}</td><td class="num" style="white-space:normal">${r.r}</td></tr>`; }).join('');
+  el.innerHTML=`<h2>Vergelijking met ${R.title}</h2><div class="tablewrap"><table><thead><tr><th>Kenmerk</th><th style="text-align:right">Ontwerp</th><th style="text-align:right">Gemeten</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="note">${R.src} Waarden komen uit samenvattingen van de artikelen; de volledige teksten heb ik niet kunnen lezen. Een grijze stip: niet na te bootsen in een automaat (te snel).</p>`;
+}
 function renderReal(){
-  const el=document.getElementById('realPanel'); if(P.preset!=='manta'){ el.innerHTML=''; return; }
+  const el=document.getElementById('realPanel'); if(P.preset!=='manta'){ renderRealOther(el); return; }
   const nl=(x,d)=>x.toFixed(d).replace('.',','), f=P.rpm/60, amp=(AN.tipMax-AN.tipMin)/D.BL, pr=Math.max(Math.abs(AN.pMin),Math.abs(AN.pMax));
   const chip=(ok)=>`<span class="dot" style="background:var(${ok?'--ok':'--warn'})"></span>`;
   const sec=(t)=>`<tr><th colspan="3" style="padding-top:10px">${t}</th></tr>`;
