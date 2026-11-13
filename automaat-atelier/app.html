@@ -363,7 +363,7 @@ function derive(alt){
   // hefboom (tuimelaar): volgerpen in sleuf op afstand d0 van het draaipunt, stang aan het eind op aL = k·d0
   d.leverOn=(P.lever||1)>1.01; d.kLev=P.lever||1; d.d0=10; d.aLi=[]; for(let i=0;i<(P.n|0);i++) d.aLi[i]=d.kLev*(1+(P.grow||0)/100*i)*d.d0; d.aL=Math.max(...d.aLi);
   d.armDrive=!!pre.armDrive&&(P.lever||1)>1.01; d.gap=d.leverOn?(d.forced?14:12):(d.forced?11:9); d.oRk=3.8; d.oRod=d.leverOn?6.5:3.8; d.oTab=d.leverOn?9.6:7.1;
-  if(d.armDrive){ d.Lk=14; d.La=32; d.rr=P.forced?0:3.5; d.zLk=8.8; }
+  if(d.armDrive){ d.Lk=14; d.La=32; d.rr=P.forced?0:3.5; d.zLk=8.8; d.gap+=3; } // 3 mm extra tussen de segmenten: ruimte voor de vorkkappen naast de geleidearmpjes
   d.w0=Math.max(6,P.span*(P.w0f||pre.w0Frac));
   d.Sw=P.span/2-d.w0;
   d.tipOn=P.tip>0&&!d.twist3; d.kTip=clamp(P.tip/100,0.3,1); d.tip3=!!(pre.tiles&&pre.twist3&&P.tip>0&&(P.n|0)>=2); d.tf=d.tipOn?0.24:d.tip3?0.16:0;
@@ -1164,7 +1164,13 @@ function buildRocker(i){ const r=4, L=D.aLi[i], pts=[]; for(let k=0;k<=12;k++){ 
   return merge([plateXY(s,ROD.t)]); }
 // steun voor het draaipunt, op het deksel gelijmd; oorsprong = bovenkant deksel
 function buildRockerPost(i){ const h=D.yr[i]-D.Hb, sh=new THREE.Shape(); sh.moveTo(-4,0); sh.lineTo(4,0); sh.lineTo(4,h); sh.absarc(0,h,4,0,Math.PI,false); sh.lineTo(-4,0); sh.holes.push(circlePath(0,h,D.rh));
-  const foot=new THREE.BoxGeometry(12,2,8); foot.translate(0,1,0); return merge([plateXY(sh,ROD.t),foot]); }
+  const foot=new THREE.BoxGeometry(12,2,8); foot.translate(0,1,0);
+  if(D.armDrive){ // vork: tweede wang aan de andere kant van de tuimelaar, met een brugje vlak boven het draaipunt (daar komt de tuimelaar nooit)
+    const zr=D.zRk[i]-D.zRod[i], zA=zr-1.2-0.15-ROD.t/2, wing=new THREE.Shape(); wing.absarc(0,h,4,0,Math.PI*2,false); wing.holes.push(circlePath(0,h,D.rh)); const wA=plateXY(wing,ROD.t); wA.translate(0,0,zA);
+    const lug=shapeFrom([[-2.6,h+3.0],[-0.5,h+3.0],[-0.5,h+6.8],[-2.6,h+6.8]]), lB=plateXY(lug,ROD.t), lA=plateXY(lug,ROD.t); lA.translate(0,0,zA);
+    const br=new THREE.BoxGeometry(2.1,2.4,(-ROD.t/2)-(zA+ROD.t/2)+0.2); br.translate(-1.55,h+5.6,((-ROD.t/2)+(zA+ROD.t/2))/2);
+    return merge([plateXY(sh,ROD.t),foot,wA,lB,lA,br]); }
+  return merge([plateXY(sh,ROD.t),foot]); }
 function buildFollower(i){
   if(D.forced) return buildPinFollower(i);
   const fw=D.fw[i], S=D.S[i], xp=D.xp[i], cw=xp+4.5;
@@ -1202,7 +1208,8 @@ function buildArmFollower(i){ const A=armSetup(), H=A.Hcr[i], yB=A.yBlk[i], xp=D
   if(D.forced) fs.holes.shift(); const fork=merge([plateXY(fs,2.2),...(D.forced?[(()=>{ const c=new THREE.CylinderGeometry(1.6,1.6,7.0,20); c.rotateX(Math.PI/2); c.translate(0,0,-4.6); return c; })()]:[])]); fork.translate(0,0,3.6);
   const us=shapeFrom([[-3,ov[0]],[3,ov[0]],[3,H-4],[cw,H-4],[cw,H+4],[-cw,H+4],[-cw,H-4],[-3,H-4]]); us.holes.push(circlePath(xp,H,D.rh)); us.holes.push(circlePath(-xp,H,D.rh)); for(const [x,y] of dw) us.holes.push(circlePath(x+1.6,y,D.rh));
   const pb=[xp,-xp].map(x=>{ const g=tubeZ(D.rh,3.0,2.0,D.zLk-1.4,x,H); return g; }); // kraagjes: dwarsbalk sluit vlak aan op de stangetjes
-  const up=merge([plateXY(us,4),...pb]), boss=(()=>{ const bs=shapeFrom([[-3,ov[0]],[3,ov[0]],[3,ov[1]],[-3,ov[1]]]); for(const [x,y] of dw) bs.holes.push(circlePath(x+1.6,y,D.rh)); const g=plateXY(bs,0.5); g.translate(0,0,2.25); return g; })();
+  const lobes=[xp,-xp].map(x=>{ const sh=new THREE.Shape(); sh.absarc(x,H-7.0,2.6,0,Math.PI*2,false); const g=plateXY(sh,4); const br=new THREE.BoxGeometry(5.2,3.2,4); br.translate(x,H-5.0,0); return merge([g,br]); }); // lipje onder elk pengat: plek voor het pootje van de vorkkap
+  const up=merge([plateXY(us,4),...pb,...lobes]), boss=(()=>{ const bs=shapeFrom([[-3,ov[0]],[3,ov[0]],[3,ov[1]],[-3,ov[1]]]); for(const [x,y] of dw) bs.holes.push(circlePath(x+1.6,y,D.rh)); const g=plateXY(bs,0.5); g.translate(0,0,2.25); return g; })();
   return {fork:merge([fork]),upper:merge([up,boss]),all:merge([fork.clone(),up.clone(),boss.clone()])}; }
 function buildRoller(){ const sh=shapeFrom(circPts(0,0,D.rr,28)); sh.holes.push(circlePath(0,0,D.rh)); return plateXY(sh,4); }
 // steun op de bodem met de twee draaipunten van de geleidearmpjes (vlak z = +8,5 t.o.v. de nok)
@@ -1398,7 +1405,7 @@ function buildParts(){
     for(let i=1;i<D.n;i++){ G.link3[i]=add('draaistang_'+i,`Draaistangetje ${i}→${i+1} (${D.Lh3[i].toFixed(1).replace('.',',')} mm, kantelpennen)`,2,buildRodHG(D.Lh3[i],[true,true]),rotX(-Math.PI/2),'rod').geo; } }
   G.rodS=[]; for(let i=0;i<D.n;i++){ if(D.twist3&&i>=1) G.rod[i]=add('stang_'+(i+1),`Stang ${i+1} (kantelpen onderaan)`,2,buildRodHG(D.L3[i],[true,false]),rotX(-Math.PI/2),'rod').geo;
     else G.rod[i]=add('stang_'+(i+1),'Stang '+(i+1),2,buildRod(D.L[i]),rotX(-Math.PI/2),'rod').geo; }
-  if(D.armDrive){ G.fol=[]; G.arm={}; for(let i=0;i<D.n;i++){ const f=buildArmFollower(i); add('volgervork_'+(i+1),'Volgervork '+(i+1)+(D.forced?' (met pen voor de groef; pen omhoog printen)':' (rolletje + geleidearmpjes)'),1,f.fork,D.forced?rotX(Math.PI/2):rotX(-Math.PI/2),'mech'); add('volgerstang_'+(i+1),'Volgerstang '+(i+1)+' (dwarsbalk; met 2 paspennen op de vork lijmen)',1,f.upper,rotX(-Math.PI/2),'mech'); G.fol[i]=f.all;
+  if(D.armDrive){ G.fol=[]; G.arm={}; for(let i=0;i<D.n;i++){ const f=buildArmFollower(i); G.folParts=G.folParts||[]; const pf=add('volgervork_'+(i+1),'Volgervork '+(i+1)+(D.forced?' (met pen voor de groef; pen omhoog printen)':' (rolletje + geleidearmpjes)'),1,f.fork,D.forced?rotX(Math.PI/2):rotX(-Math.PI/2),'mech'); const pu=add('volgerstang_'+(i+1),'Volgerstang '+(i+1)+' (dwarsbalk; met 2 paspennen op de vork lijmen)',1,f.upper,rotX(-Math.PI/2),'mech'); G.folParts[i]=[pf.geo,pu.geo]; G.fol[i]=f.all;
       G.arm['br'+i]=add('geleidesteun_'+(i+1),'Steun geleidearmpjes '+(i+1)+' (op de bodem lijmen)',1,buildGuideBracket(i),I4(),'mech').geo; }
     G.arm.roller=D.forced?null:add('rolletje','Rolletje volger (draait los op een pen van 1,75 mm)',D.n,buildRoller(),I4(),'mech').geo;
     G.arm.guide=add('geleidearm','Geleidearmpje ('+D.La.toFixed(0)+' mm)',2*D.n,buildRod(D.La),rotX(-Math.PI/2),'rod').geo;
@@ -1702,7 +1709,7 @@ function buildScene(){
     }
     M.rodR[i]=mk(G.rodS[i]||G.rod[i],MAT.seg[i]); M.rodR[i].position.z=D.zRod[i]; M.rodR[i].userData.tag='rod'+i+'R';
     M.rodL[i]=mk(G.rodS[i]||G.rod[i],MAT.seg[i]); M.rodL[i].position.z=D.zRod[i]; M.rodL[i].userData.tag='rod'+i+'L';
-    M.fol[i]=mk(G.fol[i],MAT.seg[i]); M.fol[i].position.z=D.z[i]; M.fol[i].userData.tag='fol'+i;
+    if(D.armDrive&&G.folParts&&G.folParts[i]){ M.fol[i]=mk(G.folParts[i][0],MAT.seg[i]); const up=mk(G.folParts[i][1],MAT.seg[i],M.fol[i]); up.userData.tag='fol'+i; } else M.fol[i]=mk(G.fol[i],MAT.seg[i]); M.fol[i].position.z=D.z[i]; M.fol[i].userData.tag='fol'+i;
     if(D.leverOn){ M.rk=M.rk||[]; M.rk[i]=[];
       for(const sg of [1,-1]){ const r=mk(G.rk[i],MAT.seg[i]); r.position.set(sg*D.xr[i],D.yr[i],D.zRk[i]); r.userData.tag='rk'+i+(sg>0?'R':'L'); M.rk[i].push(r);
         const p=mk(G.rkPost[i],MAT.motor); p.position.set(sg*D.xr[i],D.Hb,D.zRod[i]); p.userData.tag='pp'+i+(sg>0?'R':'L'); } }
@@ -1803,20 +1810,25 @@ function eigMin3(C){ // kleinste eigenvector van een symmetrische 3x3 (Jacobi)
     for(let k=0;k<3;k++){ const x=V[k][p], y=V[k][q]; V[k][p]=c*x-s*y; V[k][q]=s*x+c*y; } }
   const ev=[a[0][0],a[1][1],a[2][2]], k=ev.indexOf(Math.min(...ev)), mx=Math.max(...ev);
   const srt=ev.slice().sort((a,b)=>a-b); return {v:new THREE.Vector3(V[0][k],V[1][k],V[2][k]).normalize(), ratio:mx>1e-9?ev[k]/mx:1, round:mx>1e-9?srt[1]/mx:0}; }
-function hingeMembers(P,u,meshes,R,span,rl){ rl=rl||0; const mem=[], A=new THREE.Vector3(), B=new THREE.Vector3(), Cc=new THREE.Vector3(), n=new THREE.Vector3(), w=new THREE.Vector3();
-  const rad=(p)=>{ w.copy(p).sub(P); const t=w.dot(u); return {t,r:w.addScaledVector(u,-t).length()}; };
+function hingeMembers(P,u,meshes,R,span,rl){ rl=rl||0; const mem=[], R2=R*R, rl2=rl*rl, Rb2=(D.rh+1.6)**2, inv=new THREE.Matrix4();
   for(const m of meshes){ const bs=m.geometry.boundingSphere||(m.geometry.computeBoundingSphere(),m.geometry.boundingSphere), c=bs.center.clone().applyMatrix4(m.matrixWorld), sc=m.matrixWorld.getMaxScaleOnAxis(), dc=c.sub(P), tt=dc.dot(u), rr=dc.addScaledVector(u,-tt).length(); if(rr-bs.radius*sc>3.5||Math.abs(tt)-bs.radius*sc>span) continue;
-    const g=m.geometry, pa=g.attributes.position.array, ix=g.index?g.index.array:null, nt=ix?ix.length/3:pa.length/9, vi=(k)=>ix?ix[k]:k, mw=m.matrixWorld;
-    let lo=1e9,hi=-1e9,cnt=0,rmin=1e9; const C=[0,0,0,0,0,0], cen=new THREE.Vector3(), wt=[];
-    for(let f=0;f<nt;f++){ const i0=vi(3*f)*3,i1=vi(3*f+1)*3,i2=vi(3*f+2)*3; A.set(pa[i0],pa[i0+1],pa[i0+2]).applyMatrix4(mw); B.set(pa[i1],pa[i1+1],pa[i1+2]).applyMatrix4(mw); Cc.set(pa[i2],pa[i2+1],pa[i2+2]).applyMatrix4(mw);
-      const ra=rad(A), rb=rad(B), rc=rad(Cc); for(const q of [ra,rb,rc]) if(q.r<=D.rh+1.6&&Math.abs(q.t)<=span){ lo=Math.min(lo,q.t); hi=Math.max(hi,q.t); }
-      if(ra.r>R||rb.r>R||rc.r>R||ra.r<rl||rb.r<rl||rc.r<rl||Math.abs(ra.t)>span) continue; n.copy(B).sub(A).cross(w.copy(Cc).sub(A)); const ar=n.length(); if(ar<1e-9) continue; n.divideScalar(ar); if(Math.abs(n.dot(u))>0.7) continue; // eindvlakken en kraagranden niet meetellen
-      C[0]+=ar*n.x*n.x; C[1]+=ar*n.x*n.y; C[2]+=ar*n.x*n.z; C[3]+=ar*n.y*n.y; C[4]+=ar*n.y*n.z; C[5]+=ar*n.z*n.z; cen.add(A).add(B).add(Cc); wt.push(A.clone(),B.clone(),Cc.clone()); cnt++; rmin=Math.min(rmin,ra.r,rb.r,rc.r); }
-    if(cnt<6||lo>=hi) continue; const e=eigMin3(C); if(e.round<0.25) continue; /* vlak zijvlak, geen gat */ cen.divideScalar(3*cnt); if(e.v.dot(u)<0) e.v.negate(); if(e.v.angleTo(u)>40*DEG) continue; // gat dwars op de pen (bv. de spil van een kruisstuk): hoort niet bij dit scharnier
-    let wl=1e9,wh=-1e9; for(const q of wt){ const t=q.sub(cen).dot(e.v); wl=Math.min(wl,t); wh=Math.max(wh,t); }
-    mem.push({m,body:bodyOf(m),lo,hi,cnt,rmin,hg:!!(m.geometry.userData&&m.geometry.userData.hg),axis:e.v,straight:e.ratio<0.04&&wh-wl>=1.0&&!(m.geometry.userData&&m.geometry.userData.hg),wall:wh-wl,cen,tag:m.userData.tag||bodyOf(m).userData.tag||'?'}); }
+    // rekenen in het eigen assenstelsel van het onderdeel (snel: geen matrix per hoekpunt)
+    inv.copy(m.matrixWorld).invert(); const Pl=P.clone().applyMatrix4(inv), ul=u.clone().transformDirection(inv), px=Pl.x, py=Pl.y, pz=Pl.z, ux=ul.x, uy=ul.y, uz=ul.z;
+    const g=m.geometry, pa=g.attributes.position.array, ix=g.index?g.index.array:null, nt=ix?ix.length/3:pa.length/9;
+    let lo=1e9,hi=-1e9,cnt=0,rmin2=1e9; const C=[0,0,0,0,0,0]; let cx=0,cy=0,cz=0; const wt=[]; const T=[0,0,0], Rq=[0,0,0];
+    for(let f=0;f<nt;f++){ let skip=false;
+      for(let q=0;q<3;q++){ const i=(ix?ix[3*f+q]:3*f+q)*3, dx=pa[i]-px, dy=pa[i+1]-py, dz=pa[i+2]-pz, t=dx*ux+dy*uy+dz*uz, r2=dx*dx+dy*dy+dz*dz-t*t; T[q]=t; Rq[q]=r2; if(r2<=Rb2&&Math.abs(t)<=span){ if(t<lo) lo=t; if(t>hi) hi=t; } if(r2>R2||r2<rl2) skip=true; }
+      if(skip||Math.abs(T[0])>span) continue;
+      const i0=(ix?ix[3*f]:3*f)*3, i1=(ix?ix[3*f+1]:3*f+1)*3, i2=(ix?ix[3*f+2]:3*f+2)*3, ax=pa[i1]-pa[i0], ay=pa[i1+1]-pa[i0+1], az=pa[i1+2]-pa[i0+2], bx=pa[i2]-pa[i0], by=pa[i2+1]-pa[i0+1], bz=pa[i2+2]-pa[i0+2];
+      let nx=ay*bz-az*by, ny=az*bx-ax*bz, nz=ax*by-ay*bx; const ar=Math.hypot(nx,ny,nz); if(ar<1e-9) continue; nx/=ar; ny/=ar; nz/=ar; if(Math.abs(nx*ux+ny*uy+nz*uz)>0.7) continue; // eindvlakken en kraagranden niet meetellen
+      C[0]+=ar*nx*nx; C[1]+=ar*nx*ny; C[2]+=ar*nx*nz; C[3]+=ar*ny*ny; C[4]+=ar*ny*nz; C[5]+=ar*nz*nz; for(const i of [i0,i1,i2]){ cx+=pa[i]; cy+=pa[i+1]; cz+=pa[i+2]; wt.push(pa[i],pa[i+1],pa[i+2]); } cnt++; rmin2=Math.min(rmin2,Rq[0],Rq[1],Rq[2]); }
+    if(cnt<6||lo>=hi) continue; const e=eigMin3(C); if(e.round<0.25) continue; /* vlak zijvlak, geen gat */
+    cx/=3*cnt; cy/=3*cnt; cz/=3*cnt; let wl=1e9,wh=-1e9; for(let q=0;q<wt.length;q+=3){ const t=(wt[q]-cx)*e.v.x+(wt[q+1]-cy)*e.v.y+(wt[q+2]-cz)*e.v.z; if(t<wl) wl=t; if(t>wh) wh=t; }
+    const axis=e.v.clone().transformDirection(m.matrixWorld), cen=new THREE.Vector3(cx,cy,cz).applyMatrix4(m.matrixWorld); if(axis.dot(u)<0) axis.negate(); if(axis.angleTo(u)>40*DEG) continue; /* gat dwars op de pen: hoort niet bij dit scharnier */
+    const hgm=!!(m.geometry.userData&&m.geometry.userData.hg);
+    mem.push({m,body:bodyOf(m),lo,hi,cnt,rmin:Math.sqrt(rmin2),hg:hgm,axis,straight:e.ratio<0.04&&wh-wl>=1.0&&!hgm,wall:wh-wl,cen,tag:m.userData.tag||bodyOf(m).userData.tag||'?'}); }
   mem.sort((a,b)=>a.lo-b.lo); return mem; }
-function hingeMeshes(){ const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&!o.userData.pin&&!o.userData.ring&&o.visible!==false&&o.geometry&&o.geometry.attributes.position&&o.geometry.attributes.position.count>8) meshes.push(o); }); return meshes; }
+function hingeMeshes(){ const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&!o.userData.pin&&!o.userData.ring&&!o.userData.cap&&o.visible!==false&&o.geometry&&o.geometry.attributes.position&&o.geometry.attributes.position.count>8) meshes.push(o); }); return meshes; }
 function hingeOne(pin,meshes){ pin.updateMatrixWorld(true); const xs=0;
   const P0=new THREE.Vector3().setFromMatrixPosition(pin.matrixWorld), u0=new THREE.Vector3(0,1,0).transformDirection(pin.matrixWorld).normalize(), own=bodyOf(pin.parent), len0=pin.userData.len0||pin.userData.len;
   const m1=hingeMembers(P0,u0,meshes,D.rh+1.6,len0/2+4+xs).filter(x=>x.straight&&x.axis.angleTo(u0)<0.7);
@@ -1881,19 +1893,102 @@ function planRetention(){ const H=(M.hinges||[]).filter(h=>h.cl.length&&h.bodies
   for(const h of H){ const c=h.P.clone().addScaledVector(h.u,(h.lo+h.hi)/2), cm=h.ref&&h.ref.straight?h.cl.find(x=>x.m===h.ref.m):null, g=cm&&cm.m.geometry;
     const okGeo=g&&(partGeo.has(g)||mirr.has(g)); h.clampM=okGeo?cm:null; for(const x of h.cl) if(x!==h.clampM) free.add(key(x.m,c)); h.key=h.clampM?key(h.clampM.m,c):null; }
   for(const h of H) if(h.clampM&&free.has(h.key)) h.clampM=null; // zelfde gat elders als draaigat gebruikt: niet klemmen
-  const done=new Set(), touched=new Set(); let nRing=0; M.rings=[]; const RG=ringGeo();
+  const done=new Set(), touched=new Set(); let nRing=0; M.rings=[]; const RG=ringGeo(); M.caps=[]; planCaps(H,(x)=>{ const g=x.m.geometry; return (partGeo.has(g)||mirr.has(g)); });
   for(const h of H){ const first=h.cl[0], last=h.cl[h.cl.length-1], blind=(sg)=>h.blocked.some(b=>!b.off&&Math.sign(b.at)===sg);
     const cmB=h.clampM?h.clampM.body:null, needLo=!blind(-1)&&(!cmB||first.body!==cmB), needHi=!blind(1)&&(!cmB||last.body!==cmB);
     if(h.clampM&&!done.has(h.key)){ done.add(h.key); const m=h.clampM.m, lo=Math.max(h.lo,h.clampM.lo)+0.15, hi=Math.min(h.hi,h.clampM.hi)-0.15;
       if(hi-lo>0.6){ const inv=new THREE.Matrix4().copy(m.matrixWorld).invert(), cl=h.P.clone().addScaledVector(h.u,(lo+hi)/2).applyMatrix4(inv), ul=h.u.clone().transformDirection(inv).normalize();
         const T=new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),ul)).setPosition(cl); appendGeo(m.geometry,ribs(hi-lo).map(b=>b.applyMatrix4(T))); touched.add(m.geometry); } }
     h.rings=[]; const host=h.clampM?h.clampM.m:(h.ref?h.ref.m:first.m);
-    for(const [need,t0] of [[needLo,h.lo-0.1-RING.t/2],[needHi,h.hi+0.1+RING.t/2]]){ if(!need) continue; const r=new THREE.Mesh(RG,MAT_PIN), inv=new THREE.Matrix4().copy(host.matrixWorld).invert();
+    let capLo=0, capHi=0; for(const c of (h.caps||[])){ if(c.sg>0) capHi=c.tEnd; else capLo=c.tEnd; }
+    for(const [need,t0] of [[needLo&&!capLo,h.lo-0.1-RING.t/2],[needHi&&!capHi,h.hi+0.1+RING.t/2]]){ if(!need) continue; const r=new THREE.Mesh(RG,MAT_PIN), inv=new THREE.Matrix4().copy(host.matrixWorld).invert();
       r.position.copy(h.P.clone().addScaledVector(h.u,t0).applyMatrix4(inv)); r.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),h.u.clone().transformDirection(inv).normalize()); r.userData.ring=true; r.userData.own=true; r.userData.tag='ring'+(nRing++); r.userData.allow=new Set(h.cl.map(x=>x.m).concat(h.cl.map(x=>x.body))); host.add(r); h.rings.push(r); M.rings.push(r); }
-    const lo=h.lo-(needLo?RING.t+0.1:0), hi=h.hi+(needHi?RING.t+0.1:0); placePin(h.pin,h,h.pin.parent,lo,hi); h.pinLen=hi-lo;
-    h.pin.userData.tag='pen'+M.hinges.indexOf(h); h.pin.userData.allow=new Set(h.cl.map(x=>x.m).concat(h.cl.map(x=>x.body),h.rings)); h.pin.userData.host=host.userData.tag||bodyOf(host).userData.tag; for(const r of h.rings){ r.userData.host=h.pin.userData.host; r.userData.allow.add(h.pin); r.userData.hinge=h; } }
+    const lo=capLo?-capLo:h.lo-(needLo?RING.t+0.1:0), hi=capHi?capHi:h.hi+(needHi?RING.t+0.1:0); placePin(h.pin,h,h.pin.parent,lo,hi); h.pinLen=hi-lo;
+    h.pin.userData.tag='pen'+M.hinges.indexOf(h); h.pin.userData.allow=new Set(h.cl.map(x=>x.m).concat(h.cl.map(x=>x.body),h.rings,(h.caps||[]).map(c=>c.mesh))); h.pin.userData.host=host.userData.tag||bodyOf(host).userData.tag; for(const r of h.rings){ r.userData.host=h.pin.userData.host; r.userData.allow.add(h.pin); r.userData.hinge=h; } }
   for(const g of touched){ for(const p of PARTS) if(p.geo===g) finalizePart(p); for(const p of (mirr.get(g)||[])){ p.geo.dispose(); p.geo=mirrorX(g); finalizePart(p); } }
+  capParts();
+  PARTS=PARTS.filter(p=>p.id!=='klemring');
+  if(0){ const grp=new Map(); for(const c of M.caps){ const g=grp.get(c.key); if(g) g.qty++; else grp.set(c.key,{geo:c.printGeo,qty:1,len:c.len}); } let k=0; for(const [key,g] of grp){ const p={id:'vorkkap_'+(++k),name:`Vorkkap ${k} (pootje ${g.len.toFixed(1).replace('.',',')} mm; plaat op het bed, pootje op het onderdeel lijmen)`,qty:g.qty,geo:g.geo,rot:I4(),kind:'mech'}; finalizePart(p); PARTS.push(p); } }
   PARTS=PARTS.filter(p=>p.id!=='klemring'); if(nRing){ const p={id:'klemring',name:'Klemring voor pen (3 ribbels; op de pen drukken, platte kant tegen het onderdeel)',qty:nRing+Math.max(2,Math.ceil(nRing*0.15)),geo:RG.clone(),rot:I4(),kind:'mech'}; finalizePart(p); PARTS.push(p); } }
+// vorkkap: een kapje aan de andere kant van het draaiende onderdeel, met een pootje naar het onderdeel waarin de pen klemt.
+// De plek van het pootje is gekozen buiten het gebied dat het draaiende onderdeel over de hele omwenteling bestrijkt.
+function capParts(){ PARTS=PARTS.filter(p=>!/^vorkkap/.test(p.id)); const grp=new Map(); for(const c of (M.caps||[])){ if(c.mesh.userData.dropped) continue; const g=grp.get(c.key); if(g) g.qty++; else grp.set(c.key,{geo:c.printGeo,qty:1,len:c.len}); }
+  let k=0; for(const [key,g] of grp){ const p={id:'vorkkap_'+(++k),name:`Vorkkap ${k} (pootje ${g.len.toFixed(1).replace('.',',')} mm; plaat op het bed, pootje tegen het onderdeel lijmen)`,qty:g.qty,geo:g.geo,rot:I4(),kind:'mech'}; finalizePart(p); PARTS.push(p); } }
+function hullPts(P){ P=P.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]); const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]), lo=[], up=[];
+  for(const p of P){ while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); } for(const p of P.slice().reverse()){ while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0) up.pop(); up.push(p); }
+  return lo.slice(0,-1).concat(up.slice(0,-1)); }
+function planCaps(H,canClamp){ M.capFail=[]; M.capFail2=[]; if(D.horse) return; const jobs=[], T0=performance.now(), SC=new Map(), samp0=(m)=>{ let r=SC.get(m); if(r) return r; r=[]; const g=m.geometry, a=g.attributes.position.array, ix=g.index?g.index.array:null, nt=ix?ix.length/3:a.length/9, A=new THREE.Vector3(), B=new THREE.Vector3(), C=new THREE.Vector3(), e1=new THREE.Vector3(), e2=new THREE.Vector3();
+    let area=0; const ar=new Float32Array(nt); for(let f=0;f<nt;f++){ const i0=(ix?ix[3*f]:3*f)*3, i1=(ix?ix[3*f+1]:3*f+1)*3, i2=(ix?ix[3*f+2]:3*f+2)*3; A.fromArray(a,i0); B.fromArray(a,i1); C.fromArray(a,i2); ar[f]=e1.subVectors(B,A).cross(e2.subVectors(C,A)).length()/2; area+=ar[f]; }
+    const dens=Math.min(1.5,12000/Math.max(1,area)); let acc=0, seed=1; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; }; // punten over het hele oppervlak (ook midden in grote vlakken)
+    for(let f=0;f<nt;f++){ acc+=ar[f]*dens; const i0=(ix?ix[3*f]:3*f)*3, i1=(ix?ix[3*f+1]:3*f+1)*3, i2=(ix?ix[3*f+2]:3*f+2)*3; A.fromArray(a,i0); B.fromArray(a,i1); C.fromArray(a,i2); r.push(A.clone());
+      while(acc>=1){ acc-=1; let u=rnd(), v=rnd(); if(u+v>1){ u=1-u; v=1-v; } r.push(A.clone().addScaledVector(e1.subVectors(B,A),u).addScaledVector(e2.subVectors(C,A),v)); } }
+    SC.set(m,r); return r; };
+  const allM=[]; asm.traverse(o=>{ if(o.isMesh&&!o.userData.pin&&!o.userData.ring&&!o.userData.cap&&o.visible!==false&&o.geometry&&o.geometry.attributes.position) allM.push(o); });
+  const mk=(h,Hm,Ob,sg,alt)=>{ const u=h.u.clone().multiplyScalar(sg), w1=new THREE.Vector3(Math.abs(u.x)<0.9?1:0,Math.abs(u.x)<0.9?0:1,0).cross(u).normalize(), w2=u.clone().cross(w1);
+      const A=Hm.m, ivA=Hm.iv&&Hm.iv.length?Hm.iv:[[Hm.lo,Hm.hi]], tA=sg>0?Math.max(...ivA.map(v=>v[1])):-Math.min(...ivA.map(v=>v[0]));
+      const Bb=Ob, Bms=allM.filter(o=>bodyOf(o)===Bb);
+      const samp=[]; for(const m of Bms){ const inv=new THREE.Matrix4().copy(m.matrixWorld).invert(), pl=h.P.clone().applyMatrix4(inv), sc=m.matrixWorld.getMaxScaleOnAxis()||1, near=samp0(m).filter(q=>q.distanceTo(pl)*sc<16), st=Math.max(1,Math.floor(near.length/1500)); for(let j=0;j<near.length;j+=st) samp.push({m,v:near[j]}); }
+      const obs=[]; for(const o of allM){ const bo=bodyOf(o); if(bo===Bb||bo===Hm.body) continue;
+        const bs=o.geometry.boundingSphere||(o.geometry.computeBoundingSphere(),o.geometry.boundingSphere), sc=o.matrixWorld.getMaxScaleOnAxis()||1; if(bs.center.clone().applyMatrix4(o.matrixWorld).distanceTo(h.P)>bs.radius*sc+40) continue;
+        const inv=new THREE.Matrix4().copy(o.matrixWorld).invert(), pl=h.P.clone().applyMatrix4(inv), rot=/^(cam|pcam|hcam|gg|gp|gc|crank)/.test(o.userData.tag||''), near=rot?samp0(o):samp0(o).filter(q=>q.distanceTo(pl)*sc<28), st=Math.max(1,Math.floor(near.length/(rot?4000:1500))); for(let j=0;j<near.length;j+=st) obs.push({m:o,v:near[j]}); }
+      return {h,sg,u,w1,w2,A,Hm,tA,samp,obs,alt,A0:A.matrixWorld.clone(),pts:[],opts:[]}; };
+  for(const h of H){ h.caps=[]; if(!h.clampM) continue; const blind=(sg)=>h.blocked.some(b=>!b.off&&Math.sign(b.at)===sg);
+    for(const sg of [1,-1]){ const end=sg>0?h.cl[h.cl.length-1]:h.cl[0]; if(end.body===h.clampM.body||blind(sg)) continue;
+      const other=sg>0?h.cl[0]:h.cl[h.cl.length-1]; if(other.body!==h.clampM.body) continue; // pen klemt aan de andere kant
+      const J=mk(h,h.clampM,end.body,sg,null); jobs.push(J);
+      if(end.straight&&!end.hg&&canClamp(end)&&!blind(-sg)) jobs.push(mk(h,end,h.clampM.body,-sg,J)); } }
+  if(!jobs.length) return; const v=new THREE.Vector3(), Mi=new THREE.Matrix4(), Mc=new THREE.Matrix4(); const T1=performance.now();
+  const grp=(list)=>{ const by=new Map(); for(const s of list){ let a=by.get(s.m); if(!a){ a=[]; by.set(s.m,a); } a.push(s.v.x,s.v.y,s.v.z); } return [...by.entries()].map(([m,a])=>({m,a:Float32Array.from(a)})); };
+  for(const J of jobs){ J.gs=grp(J.samp); J.go=grp(J.obs); J.ptsA=[]; J.optsA=[]; }
+  for(let k=0;k<24;k++){ poseAny(k/24*2*Math.PI); asm.updateMatrixWorld(true);
+    for(const J of jobs){ Mi.copy(J.A.matrixWorld).invert().premultiply(J.A0); const Px=J.h.P.x, Py=J.h.P.y, Pz=J.h.P.z, U=J.u, W1=J.w1, W2=J.w2;
+      for(const [list,out,lim] of [[J.gs,J.pts,false],[J.go,J.opts,true]]) for(const G of list){ Mc.multiplyMatrices(Mi,G.m.matrixWorld); const e=Mc.elements, a=G.a;
+        // hinge-frame rijen: t = U·(M p − P), x = W1·(...), y = W2·(...)
+        const r=(V)=>[V.x*e[0]+V.y*e[1]+V.z*e[2], V.x*e[4]+V.y*e[5]+V.z*e[6], V.x*e[8]+V.y*e[9]+V.z*e[10], V.x*(e[12]-Px)+V.y*(e[13]-Py)+V.z*(e[14]-Pz)], ru=r(U), r1=r(W1), r2=r(W2);
+        for(let q=0;q<a.length;q+=3){ const x=a[q], y=a[q+1], z=a[q+2], t=ru[0]*x+ru[1]*y+ru[2]*z+ru[3]; if(lim&&(t<J.tA-1||t>J.tA+16)) continue; out.push(t, r1[0]*x+r1[1]*y+r1[2]*z+r1[3], r2[0]*x+r2[1]*y+r2[2]*z+r2[3]); } } } }
+  poseAny(0); asm.updateMatrixWorld(true); const T2=performance.now(); const rc=new THREE.Raycaster(), GR=0.4, GN=Math.round(32/GR), gi=(x)=>Math.floor((x+16)/GR);
+  for(const J of jobs){ if(J.alt&&!J.alt.failed) continue; const P=J.pts, O=J.opts, Bmax=new Float32Array(GN*GN).fill(-1e9), Omin=new Float32Array(GN*GN).fill(1e9), Omax=new Float32Array(GN*GN).fill(-1e9), OB=new Uint32Array(GN*GN*2), tb=(t)=>Math.max(0,Math.min(63,Math.floor((t-J.tA+0.4)/0.5)));
+    const Af=new Float32Array(GN*GN).fill(-1e9); { const Mw=J.A.matrixWorld, vv=new THREE.Vector3(); for(const q of samp0(J.A)){ vv.copy(q).applyMatrix4(Mw).sub(J.h.P); const t=vv.dot(J.u); if(t>J.tA+0.25||t<J.tA-8.6) continue; const a=gi(vv.dot(J.w1)), b=gi(vv.dot(J.w2)); if(a<0||b<0||a>=GN||b>=GN) continue; const k=a*GN+b; if(t>Af[k]) Af[k]=t; } for(let it=0;it<2;it++){ const o=Af.slice(); for(let a=1;a<GN-1;a++) for(let b=1;b<GN-1;b++){ const k=a*GN+b; for(const d of [-GN,GN,-1,1,-GN-1,-GN+1,GN-1,GN+1]) if(Af[k+d]>o[k]) o[k]=Af[k+d]; } Af.set(o); } }
+    const Bmin=new Float32Array(GN*GN).fill(1e9); for(let q=0;q<P.length;q+=3){ const a=gi(P[q+1]), b=gi(P[q+2]); if(a<0||b<0||a>=GN||b>=GN) continue; const k=a*GN+b; if(P[q]<Bmin[k]) Bmin[k]=P[q]; }
+    for(let q=0;q<P.length;q+=3){ if(P[q]<J.tA-0.3) continue; const a=gi(P[q+1]), b=gi(P[q+2]); if(a<0||b<0||a>=GN||b>=GN) continue; const k=a*GN+b; if(P[q]>Bmax[k]) Bmax[k]=P[q]; }
+    for(let q=0;q<O.length;q+=3){ if(O[q]<J.tA-0.2) continue; const a=gi(O[q+1]), b=gi(O[q+2]); if(a<0||b<0||a>=GN||b>=GN) continue; const k=a*GN+b; if(O[q]<Omin[k]) Omin[k]=O[q]; if(O[q]>Omax[k]) Omax[k]=O[q]; const bi=tb(O[q]); OB[2*k+(bi>>5)]|=(1<<(bi&31)); }
+    const dil=(G,mx)=>{ const o=G.slice(); for(let a=1;a<GN-1;a++) for(let b=1;b<GN-1;b++){ const k=a*GN+b; for(const d of [-GN,GN,-1,1]){ const v=G[k+d]; if(mx?v>o[k]:v<o[k]) o[k]=v; } } return o; };
+    { const b2=dil(Bmax,true), o1=dil(Omin,false), o2=dil(Omax,true); Bmax.set(b2); Omin.set(o1); Omax.set(o2); const ob=OB.slice(); for(let a=1;a<GN-1;a++) for(let b=1;b<GN-1;b++){ const k=a*GN+b; for(const d of [-GN,GN,-1,1]){ ob[2*k]|=OB[2*(k+d)]; ob[2*k+1]|=OB[2*(k+d)+1]; } } OB.set(ob); }
+    const hit=(k,t0,t1)=>{ for(let bi=tb(t0);bi<=tb(t1);bi++) if(OB[2*k+(bi>>5)]&(1<<(bi&31))) return true; return false; };
+    const cells=(test)=>{ const out=[]; for(let a=0;a<GN;a++) for(let b=0;b<GN;b++){ const x=-16+(a+0.5)*GR, y=-16+(b+0.5)*GR; if(test(x,y)) out.push(a*GN+b); } return out; };
+    const hullOf=(S)=>{ const hp=[]; for(let a=0;a<24;a++){ const t=a/24*2*Math.PI; hp.push([3.0*Math.cos(t),3.0*Math.sin(t)],[S[0]+2.0*Math.cos(t),S[1]+2.0*Math.sin(t)]); } return hullPts(hp); };
+    const inH=(hull,x,y,m)=>{ for(let i=0;i<hull.length;i++){ const a=hull[i], b=hull[(i+1)%hull.length], L=Math.hypot(b[0]-a[0],b[1]-a[1]); if(((b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0]))/L<-m) return false; } return true; };
+    const dSeg=(x,y,S)=>{ const L2=S[0]*S[0]+S[1]*S[1], t=Math.max(0,Math.min(1,(x*S[0]+y*S[1])/L2)); return Math.hypot(x-t*S[0],y-t*S[1]); };
+    const fits=(S)=>{ // eerst het pootje (snel), dan de plaat (capsule r 3 om pen en pootje)
+      for(let a=Math.max(0,gi(S[0]-2.2));a<=Math.min(GN-1,gi(S[0]+2.2));a++) for(let b=Math.max(0,gi(S[1]-2.2));b<=Math.min(GN-1,gi(S[1]+2.2));b++){ const x=-16+(a+0.5)*GR, y=-16+(b+0.5)*GR; if((x-S[0])**2+(y-S[1])**2>2.0*2.0) continue; const k=a*GN+b; if(Bmax[k]>-1e8){ J.f1=(J.f1||0)+1; return null; } }
+      let tB=J.tA; const hc=[]; const x0=Math.min(0,S[0])-3.5, x1=Math.max(0,S[0])+3.5, y0=Math.min(0,S[1])-3.5, y1=Math.max(0,S[1])+3.5;
+      for(let a=Math.max(0,gi(x0));a<=Math.min(GN-1,gi(x1));a++) for(let b=Math.max(0,gi(y0));b<=Math.min(GN-1,gi(y1));b++){ const x=-16+(a+0.5)*GR, y=-16+(b+0.5)*GR; if(dSeg(x,y,S)>3.3) continue; const k=a*GN+b; hc.push(k); if(Bmax[k]>tB) tB=Bmax[k]; }
+      const tc=tB+0.3; for(const k of hc){ if(Omax[k]<-1e8) continue; if(hit(k,tc-0.3,tc+1.9)){ J.f2=(J.f2||0)+1; return null; } }
+      for(let a=Math.max(0,gi(S[0]-2.2));a<=Math.min(GN-1,gi(S[0]+2.2));a++) for(let b=Math.max(0,gi(S[1]-2.2));b<=Math.min(GN-1,gi(S[1]+2.2));b++){ const x=-16+(a+0.5)*GR, y=-16+(b+0.5)*GR; if((x-S[0])**2+(y-S[1])**2>2.0*2.0) continue; const k=a*GN+b; if(Omax[k]>-1e8&&hit(k,J.tA-0.2,tc+0.2)){ J.f3=(J.f3||0)+1; return null; } }
+      return tc; };
+    let S=null; const side=J.A.material.side; J.A.material.side=THREE.DoubleSide;
+    for(let rs=4.4;rs<=12.01&&!S;rs+=0.4) for(let ang=0;ang<360&&!S;ang+=10){ const x=rs*Math.cos(ang*DEG), y=rs*Math.sin(ang*DEG); if(fits([x,y])==null) continue;
+      let base=-1e9, ok=true; // het pootje staat op het onderdeel: overal binnen r 1,3 moet een vlak zijn (hoogste vlak = voet van het pootje)
+      for(let a=Math.max(0,gi(x-1.4));a<=Math.min(GN-1,gi(x+1.4))&&ok;a++) for(let b=Math.max(0,gi(y-1.4));b<=Math.min(GN-1,gi(y+1.4));b++){ const xx=-16+(a+0.5)*GR, yy=-16+(b+0.5)*GR; if((xx-x)**2+(yy-y)**2>1.3*1.3) continue; const k=a*GN+b; if(Af[k]<-1e8){ ok=false; break; } base=Math.max(base,Af[k]); }
+      if(!ok){ J.f4=(J.f4||0)+1; continue; }
+      if(base<J.tA-0.05){ // het pootje reikt dieper: ook dat stuk moet vrij zijn van het draaiende deel en van andere onderdelen
+        let clear=true; for(let a=Math.max(0,gi(x-2.2));a<=Math.min(GN-1,gi(x+2.2))&&clear;a++) for(let b=Math.max(0,gi(y-2.2));b<=Math.min(GN-1,gi(y+2.2));b++){ const xx=-16+(a+0.5)*GR, yy=-16+(b+0.5)*GR; if((xx-x)**2+(yy-y)**2>4) continue; const k=a*GN+b; if(Omax[k]>-1e8&&hit(k,base,J.tA)){ clear=false; break; } }
+        if(clear) for(let a=Math.max(0,gi(x-2.2));a<=Math.min(GN-1,gi(x+2.2))&&clear;a++) for(let b=Math.max(0,gi(y-2.2));b<=Math.min(GN-1,gi(y+2.2));b++){ const xx=-16+(a+0.5)*GR, yy=-16+(b+0.5)*GR; if((xx-x)**2+(yy-y)**2>4) continue; const k=a*GN+b; if(Bmin[k]<J.tA-0.05&&Bmin[k]>base-0.3){ clear=false; break; } }
+        if(!clear){ J.f3=(J.f3||0)+1; continue; } }
+      S=[x,y]; J.base=base; }
+    J.A.material.side=side; if(!S){ J.failed=true; (M.capFail2=M.capFail2||[]).push((J.alt?'ALT ':'')+(J.A.userData.tag||bodyOf(J.A).userData.tag)+' over '+(J.h.cl.filter(x=>x.body!==J.Hm.body).map(x=>x.tag).join(','))+' B'+(J.f1||0)+' P'+(J.f2||0)+' S'+(J.f3||0)+' M'+(J.f4||0)+' tA'+J.tA.toFixed(1)); if(!J.alt){ continue; } (M.capFail=M.capFail||[]).push((J.A.userData.tag||bodyOf(J.A).userData.tag)+'/'+(J.h.cl.find(x=>x.body!==J.h.clampM.body)||{}).tag+' B'+(J.f1||0)+' P'+(J.f2||0)+' S'+(J.f3||0)+' M'+(J.f4||0)); continue; }
+    const hp=[]; for(let a=0;a<24;a++){ const t=a/24*2*Math.PI; hp.push([3.0*Math.cos(t),3.0*Math.sin(t)],[S[0]+2.0*Math.cos(t),S[1]+2.0*Math.sin(t)]); } const hull=hullPts(hp);
+    const inHull=(x,y)=>{ for(let i=0;i<hull.length;i++){ const a=hull[i], b=hull[(i+1)%hull.length]; if((b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0])<-0.3) return false; } return true; };
+    let tB=J.tA; for(let q=0;q<P.length;q+=3) if(P[q]>J.tA-0.3&&inHull(P[q+1],P[q+2])) tB=Math.max(tB,P[q]); const tc=tB+0.3, L=tc-J.tA;
+    const sh=shapeFrom(hull); sh.holes.push(circlePath(0,0,D.rh)); const plate=plateXY(sh,1.6); plate.translate(0,0,tc+0.8);
+    const b0=Math.min(J.tA,J.base==null?J.tA:J.base), L2=tc-b0; const sp=new THREE.CylinderGeometry(1.6,1.6,L2+0.05,18); sp.rotateX(Math.PI/2); sp.translate(S[0],S[1],b0+L2/2); const rb=ribs(1.6).map(b=>{ b.rotateX(Math.PI/2); b.translate(0,0,tc+0.8); return b; });
+    const g=merge([plate,sp,...rb]); const Mw=new THREE.Matrix4().makeBasis(J.w1,J.w2,J.u).setPosition(J.h.P), Ml=new THREE.Matrix4().copy(J.A.matrixWorld).invert().multiply(Mw);
+    const mesh=new THREE.Mesh(g,MAT.seg[3]||MAT_PIN); mesh.matrixAutoUpdate=false; mesh.matrix.copy(Ml); mesh.userData.cap=true; mesh.userData.own=true; mesh.userData.tag='kap'+M.caps.length; mesh.userData.host=J.A.userData.tag||bodyOf(J.A).userData.tag;
+    mesh.userData.allow=new Set([J.A,bodyOf(J.A),J.h.pin,...J.h.cl.map(x=>x.m),...J.h.cl.map(x=>x.body)]); J.A.add(mesh);
+    const pg=g.clone(); pg.applyMatrix4(new THREE.Matrix4().makeTranslation(0,0,-(tc+1.6))); pg.applyMatrix4(rotX(Math.PI)); // plaat op het bed, pootje omhoog
+    if(J.alt){ J.h.clampM=J.Hm; J.h.key=null; } // pen klemt nu in het andere onderdeel
+    const c={h:J.h,sg:J.sg,alt:!!J.alt,mesh,tEnd:tc+1.6,printGeo:pg,len:L2,key:Math.round(Math.hypot(S[0],S[1])*5)+':'+Math.round(L2*10)}; J.h.caps.push(c); M.caps.push(c); }
+  M.capTime=[T1-T0,T2-T1,performance.now()-T2].map(x=>Math.round(x)); M.capJobs=jobs.length; }
 function hingeAnalysis(){ return M.hinges||[]; }
 function poseFilament(s){ if(!M.fil||!s.R3) return; const T=M.tb?M.tb.lay:tileLayout(), v=new THREE.Vector3(), pts=[];
   for(const b of T.bands){ if(b.tip) continue; const um=(b.u0+b.u1)/2, sAbs=b.k*D.l+um; for(const du of [-3,3]){ v.set(um+du,-D.t/2-2.0,tileZf(sAbs)).applyMatrix4(tileMat(s,T,b)); pts.push(v.clone()); } }
@@ -2059,9 +2154,9 @@ function tagLabel(t){ if(D.horse) return hTagLabel(t); { const pr=/^(pen|ring)(\
   const m={body:'Lijf',belly:'Buik',head:D.split?({kop:'Kop',staart:'Staart',achterlijf:'Achterlijf'}[D.split.kind]):'Kop',bracket:'Draaibeugel',lug:'Kanteloog',plink:'Kantelstang',pfol:'Kantelvolger',pcam:'Kantelnok',post:'Paal',hcam:'Deinnok',bush:'Geleidebus',box:'Sokkel',guide:'Geleideblok',spacer:'Afstandsbus',motorh:'Motorhouder',headrod:'Kopstang',headeye:'Kopoog',tipR:'Vleugelpunt rechts',tipL:'Vleugelpunt links',tiprodR:'Koppelstang punt rechts',tiprodL:'Koppelstang punt links',tipeyeR:'Puntoog rechts',tipeyeL:'Puntoog links',tipAR:'Koppeloog rechts',tipAL:'Koppeloog links'};
   return m[t]||t; }
 let FIT={state:'idle',res:null}, fitToken=0;
-function runFitCheck(){
+function runFitCheck(){ runPins();
   const token=++fitToken; FIT={state:'busy',res:null}; renderFit();
-  const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&o.userData.tag&&o.visible!==false&&!(o.userData.ring&&o.userData.dropped)) meshes.push(o); });
+  const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&o.userData.tag&&o.visible!==false&&!o.userData.dropped) meshes.push(o); });
   const isStatic=(m)=>STATIC_TAGS.has(m.userData.tag)||m.userData.tag==='hpost'||isPost(m.userData.tag)||(m.userData.tag==='post'&&!D.heaveOn);
   const pairs=[]; for(let i=0;i<meshes.length;i++) for(let j=i+1;j<meshes.length;j++){ const a=meshes[i], b=meshes[j]; if(isStatic(a)&&isStatic(b)) continue; if(allowedPair(a,b)) continue; pairs.push([a,b]); }
   const steps=24, hits=new Map(); let k=0;
@@ -2083,7 +2178,9 @@ function runFitCheck(){
     }
     k++; FIT.progress=k/steps; renderFit();
     if(k<steps) setTimeout(step,0); else { poseAny(curTheta); let res=[...hits.values()]; const drop=new Set();
-      for(const h of res) for(const t of [h.a,h.b]) if(/^ring\d+$/.test(t)) drop.add(t);
+      for(const h of res) for(const t of [h.a,h.b]) if(/^(ring|kap)\d+$/.test(t)) drop.add(t);
+      M.dropLog=res.filter(h=>/^(ring|kap)\d+$/.test(h.a)||/^(ring|kap)\d+$/.test(h.b)).map(h=>h.a+'|'+h.b+':'+h.max);
+      if(drop.size&&M.caps){ for(const c of M.caps) if(drop.has(c.mesh.userData.tag)){ c.mesh.visible=false; c.mesh.userData.dropped=true; } capParts(); }
       if(drop.size&&M.rings){ for(const r of M.rings) if(drop.has(r.userData.tag)){ r.visible=false; r.userData.dropped=true; } res=res.filter(h=>!drop.has(h.a)&&!drop.has(h.b)); const kp=PARTS.find(p=>p.id==='klemring'); if(kp){ const n=M.rings.filter(r=>!r.userData.dropped).length; kp.qty=n+Math.max(2,Math.ceil(n*0.15)); if(!n) PARTS=PARTS.filter(p=>p!==kp); renderParts(); } }
       FIT={state:'done',res,pairs:pairs.length,steps,melt:drop.size}; renderFit(); renderHinges(); }
   };
@@ -2092,10 +2189,10 @@ function runFitCheck(){
 // pennenlijst en scharniercontrole
 function pinHw(){ const L=new Map(); for(const h of M.hinges){ if(!h.pinLen) continue; const k=Math.ceil(h.pinLen*2)/2; L.set(k,(L.get(k)||0)+1); }
   const n=[...L.values()].reduce((a,b)=>a+b,0); return `${n} pennen van 1,75 mm filament, op lengte geknipt: `+[...L.entries()].sort((a,b)=>a[0]-b[0]).map(([k,c])=>`${c}× ${String(k).replace('.',',')} mm`).join(', ')+'. Knip ze 0,5 mm langer en schuur of smelt het uiteinde rond.'; }
-function renderHinges(){ const el=document.getElementById('hingeList'); if(!el) return; if(D.horse||!M.hinges){ el.innerHTML=''; return; }
+function renderHinges(){ const el=document.getElementById('hingeList'); if(!el) return; if(!D.horse&&M.pinsPending){ el.innerHTML='<div class="status warn"><b>Bezig</b><span>Pennen, klemgaten en vorkkappen berekenen…</span></div>'; return; } if(D.horse||!M.hinges){ el.innerHTML=''; return; }
   const H=M.hinges, lbl=(t)=>tagLabel(t), uniq=(a)=>[...new Set(a)], st=(c,b,t)=>`<div class="status ${c}"><b>${b}</b><span>${t}</span></div>`, out=[];
-  const used=H.filter(h=>h.pinLen), clamp=used.filter(h=>h.clampM).length, rings=(M.rings||[]).filter(r=>!r.userData.dropped).length, melt=(M.rings||[]).filter(r=>r.userData.dropped).length, blindBoth=used.filter(h=>!h.rings.length&&!h.clampM).length;
-  out.push(st('ok','Pennen',`${used.length} scharnieren met een pen van 1,75 mm. ${clamp} pennen klemmen in een gat met drie ribbels (iets te nauw, de pen wordt erin gedrukt); ${rings} klemringen houden het vrije eind vast${melt?`; op ${melt} plekken is geen ruimte voor een klemring: smelt daar het uiteinde met de soldeerbout tot een kopje`:''}${blindBoth?`; ${blindBoth} pennen zitten opgesloten in een blind gat`:''}.`));
+  const used=H.filter(h=>h.pinLen), clamp=used.filter(h=>h.clampM).length, caps=(M.caps||[]).filter(c=>!c.mesh.userData.dropped).length, rings=(M.rings||[]).filter(r=>!r.userData.dropped).length, melt=(M.rings||[]).filter(r=>r.userData.dropped).length+(M.caps||[]).filter(c=>c.mesh.userData.dropped).length, forks=used.filter(h=>h.cl.length>=3&&h.cl[0].body===h.cl[h.cl.length-1].body).length, blindBoth=used.filter(h=>!h.rings.length&&!h.clampM).length;
+  out.push(st('ok','Pennen',`${used.length} scharnieren met een pen van 1,75 mm. ${clamp} pennen klemmen in een gat met drie ribbels (iets te nauw, de pen wordt erin gedrukt). Aan twee kanten gedragen: ${forks} in een vork van het onderdeel zelf en ${caps} met een vorkkap (kapje met pootje op het klemmende onderdeel)${rings?`; ${rings} klemringen houden een vrij eind vast`:''}${melt?`; op ${melt} plekken is geen ruimte voor een klemring: smelt daar het uiteinde met de soldeerbout tot een kopje`:''}${blindBoth?`; ${blindBoth} pennen zitten opgesloten in een blind gat`:''}.`));
   const SIDE=(t)=>/L$/.test(t)?null:t; const issues=[];
   if(D.tlkPerp){ const sl=Math.max(0,...(D.tlkK||[]).filter(k=>k).map(k=>k[1]-k[0])); out.push(st('warn','Schuiven',`In dit ontwerp moeten de draaistangetjes tot ${sl.toFixed(0)} mm langs hun pen schuiven, omdat de segmenten ver doorbuigen ten opzichte van de draaiarm. Buisje en oog staan daarvoor ver uit elkaar, maar deze scharnieren kan de app niet goed nameten en ze slijten sneller. Bij Manta 5.x zit het draaistangetje vast tussen buisje en oog en kantelt het alleen.`)); }
   for(const h of H){ if(h.pin.userData.dup) continue; const own=h.pin.userData.host||(h.pin.parent&&h.pin.parent.userData.tag)||''; if(/L$/.test(own)) continue; if(D.tlkPerp&&(h.cl.some(x=>x.hg)||/^(tlk|ark|hnk)/.test(own)||h.cl.some(x=>/^(tlk|ark|hnk)/.test(x.tag)))) continue;
@@ -2245,12 +2342,14 @@ function syncControls(){
   for(const c of ctls()){ if(c.g) continue; const el=document.getElementById('c_'+c.id); if(c.type==='check'){ el.checked=!!P[c.id]; continue; } el.value=P[c.id]; showVal(c); }
 }
 let rbTimer=null, fitTimer=null;
+let pinTimer=null;
+function runPins(){ if(!M.pinsPending) return; M.pinsPending=false; const t0=performance.now(); fitPins(); window.__pinMs=Math.round(performance.now()-t0); renderParts(); renderHinges(); if(viewMode==='bed') buildBedScene(); }
 function scheduleRebuild(){ clearTimeout(rbTimer); rbTimer=setTimeout(()=>rebuild(false),90); }
 function analyzeOnly(){ if(D.horse){ hAnalyze(); renderStatus(); hRenderForces(); hRenderReal(); return; } analyze(); renderStatus(); renderForces(); renderReal(); }
 function rebuild(reframe){
   if(isH()) return hRebuild(reframe);
-  saveParams(); D=derive(null); lastA=null; buildParts(); analyze();
-  buildScene(); fitPins();
+  const _t0=performance.now(); saveParams(); D=derive(null); const _t1=performance.now(); lastA=null; buildParts(); const _t2=performance.now(); analyze(); const _t3=performance.now();
+  buildScene(); M.pinsPending=!D.horse; clearTimeout(pinTimer); pinTimer=setTimeout(()=>runPins(),300); // pennen en vorkkappen pas uitrekenen als het schuiven stopt
   if(viewMode==='bed') buildBedScene();
   renderStatus(); renderMech(); renderForces(); renderReal(); renderParts(); renderHinges(); drawGraph();
   VCACHE.clear(); fitToken++; FIT={state:'idle'}; renderFit(); clearTimeout(fitTimer); fitTimer=setTimeout(runFitCheck,900);
@@ -2547,12 +2646,12 @@ function testReadme(){ const L=['PROEFPRINTSET – '+(PRESETS[P.preset]?PRESETS[
     '5. Staafje: een staafje van 2 mm moet stroef in de buisligger schuiven (eventueel nabewerken met een boortje van 2 mm).');
   if(D.tiles) L.push('6. Schubben: schuif borgring (lijmen op de lagerbus), schub 1, afstandsbusje en schub 2 over de ligger. Ze moeten licht om de ligger draaien zonder te wiebelen. Steek een stuk filament door beide oogjes: het moet glijden.');
   L.push('','Klemt iets: maak het gat in de app groter (Pengat) of schuur licht. Rammelt het: kleiner.'); return L.join('\r\n'); }
-async function doTestExport(){ const msg=document.getElementById('exportMsg'), tp=testParts(); const files=tp.map((p,i)=>({name:`proef_${String(i+1).padStart(2,'0')}_${p.id}.stl`,data:stlBinary(p.printGeo,p.name)}));
+async function doTestExport(){ runPins(); const msg=document.getElementById('exportMsg'), tp=testParts(); const files=tp.map((p,i)=>({name:`proef_${String(i+1).padStart(2,'0')}_${p.id}.stl`,data:stlBinary(p.printGeo,p.name)}));
   files.push({name:'LEESMIJ_PROEF.txt',data:new TextEncoder().encode(testReadme())}); const blob=zip(files), fname=`proefprintset-${P.preset}.zip`;
   let dl=null; try{ if(window.claude&&window.claude.use) dl=await window.claude.use('downloads'); }catch(e){ dl=null; }
   if(dl){ try{ await dl.save({filename:fname,data:blob}); msg.textContent=`Opgeslagen: ${fname}`; }catch(err){ msg.textContent='Downloaden lukt hier niet.'; } }
   else { const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); msg.textContent=`Download gestart: ${fname} (${files.length-1} proefstukjes + LEESMIJ).`; } }
-async function doExport(){
+async function doExport(){ runPins();
   const msg=document.getElementById('exportMsg'); msg.textContent='Bestanden worden gemaakt…';
   const files=PARTS.map((p,i)=>({name:stlName(p,i), data:stlBinary(p.printGeo,p.name)}));
   files.push({name:'LEESMIJ.txt',data:new TextEncoder().encode(readme())});
