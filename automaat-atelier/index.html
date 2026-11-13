@@ -890,7 +890,7 @@ function buildSkeleton(i){ const l=D.l, zA=D.zA3, t=D.t, items=[], last=i===D.n-
   return merge(items); }
 // tuimelaarsteun (Manta 5.1): los onderdeel, gelijmd onder de vork aan het eind van het laatste segment
 function buildTipPost(){ const T=D.T3, zA=D.zA3, zT=zA+T.cT, items=[]; const sh=shapeFrom(dedupe(strokeOutline([[zT,-D.t/2-0.2],[zT,-T.hP]],[3.2,3.2],10))); const g=plateYZ(sh,2); g.translate(T.uP,0,0); items.push(g);
-  const tab=new THREE.Shape(); tab.absarc(T.uP,-T.hP,3,0,Math.PI*2,false); tab.holes.push(circlePath(T.uP,-T.hP,D.rh)); const tg=plateXY(tab,2.6); tg.translate(0,0,zT+0.4); items.push(tg);
+  const tab=new THREE.Shape(); tab.absarc(T.uP,-T.hP,3,0,Math.PI*2,false); tab.holes.push(circlePath(T.uP,-T.hP,D.rh)); const tg=plateXY(tab,2.6); tg.translate(0,0,zT+0.1); items.push(tg);
   const pad=new THREE.BoxGeometry(2.2,1.2,7); pad.translate(T.uP,-D.t/2-0.6,zT); items.push(pad); return merge(items); }
 // Manta 5.0: schubben. Vaste banden (mee met segment 1 en met de rib van elk segment) en losse banden die met een ring op de ronde ligger draaien.
 // Een draad 1,75 mm filament door oogjes bij de achterrand neemt de losse banden mee, zodat de draaiing geleidelijk verloopt.
@@ -1034,7 +1034,7 @@ function hangers(i){ const t=D.t, zA=D.zA3, out=[]; if(!D.twist3) return out;
   if(i>=1) H('horn',D.tiles?'band':D.skel?'skel':'plate',D.uH3,zA-D.e3[i],(dw)=>buildEyeX(D.dH3-t/2,dw),[[-2.7,0],[2.7,0]],'hnk'+i,'Draaihoorn segment '+(i+1));
   if(i<D.n-1){ const ap=arm3Pad(i+1), cx=(ap.du0+ap.du1)/2, dw=[]; for(const z of [ap.dz0+1.4,ap.dz1-1.4]) if(Math.abs(z)>=2.6) dw.push([cx,z]);
     H('arm',i===0?'plate':D.tiles?'band':D.skel?'skel':'plate',D.uA3,zA-D.e3[i+1],(dw)=>buildArm3(i+1,dw),dw,'ark'+(i+1),'Draaiarm onder segment '+(i+1)); }
-  if(D.tip3&&i===D.n-2){ const T=D.T3; H('tipA',i===0?'plate':D.tiles?'band':'plate',D.l-T.dA,zA+T.zL+2.6,(dw)=>buildEye(T.hA-t/2,dw),[[0,-2.6],[0,2.6]],'tpa','Oog koppelstang punt'); }
+  if(D.tip3&&i===D.n-2){ const T=D.T3; H('tipA',i===0?'plate':D.tiles?'band':'plate',D.l-T.dA,zA+T.zL+3.6,(dw)=>buildEye(T.hA-t/2,dw),[[0,-2.6],[0,2.6]],'tpa','Oog koppelstang punt'); }
   return out; }
 // vastgeprint (true) of los met paspennen: zonder steun kan dat bij het oogvorkje aan de ligger en alles onder de onderhelft van segment 1; 'Alles vastprinten' doet de rest (met steun)
 function fusedH(h){ if(D.fuseAll) return true; if(D.tiles){ if(h.kind==='fork') return true; if(h.i===0&&D.tileSym) return true; } return false; }
@@ -1147,7 +1147,7 @@ function buildRod(L){
 function buildRocker(i){ const r=4, L=D.aLi[i], pts=[]; for(let k=0;k<=12;k++){ const a=-Math.PI/2+Math.PI*k/12; pts.push([L+r*Math.cos(a),r*Math.sin(a)]); }
   for(let k=0;k<=12;k++){ const a=Math.PI/2+Math.PI*k/12; pts.push([-r+r*Math.cos(a)+r,r*Math.sin(a)]); }
   const s=shapeFrom(dedupe(pts)); s.holes.push(circlePath(0,0,D.rh)); s.holes.push(circlePath(L,0,D.rh));
-  if(D.armDrive){ s.holes.push(circlePath(D.d0,0,D.rh)); return merge([plateXY(s,ROD.t)]); }
+  if(D.armDrive){ s.holes.push(circlePath(D.d0,0,D.rh)); return merge([plateXY(s,ROD.t),tubeZ(D.rh,3.0,ROD.t/2-0.1,D.zLk-D.oRk-ROD.t/2,D.d0,0)]); } // kraag: het volgerstangetje ligt vlak op de tuimelaar, over de stang heen
   const r0=D.d0-0.6, w=D.rh+0.15, r1=Math.max(r0+0.5,Math.min(D.d0/Math.cos(Math.max(D.bMax,0.2))+0.8,L-D.rh-w-0.3)), sl=new THREE.Path(); // sleuf mag het eindgat niet raken
   sl.moveTo(r0,-w); sl.lineTo(r1,-w); sl.absarc(r1,0,w,-Math.PI/2,Math.PI/2,false); sl.lineTo(r0,w); sl.absarc(r0,0,w,Math.PI/2,Math.PI*1.5,false); s.holes.push(sl);
   return merge([plateXY(s,ROD.t)]); }
@@ -1188,9 +1188,10 @@ function camProfileArm(i){ const N=180, P=[]; for(let k=0;k<N;k++){ const th=k/N
 // volger in twee platte delen: vorkplaat (rolletje + geleidegaten, naast de nok) en volgerstang (door de sleuf, dwarsbalk met twee pennen); op elkaar lijmen met 2 paspennen
 function buildArmFollower(i){ const A=armSetup(), H=A.Hcr[i], yB=A.yBlk[i], xp=D.xp[i], cw=xp+4.5, ov=[yB-7,yB], dw=[[0,yB-5],[0,yB-2]];
   const fs=shapeFrom([[-3,-6.8],[3,-6.8],[3,yB],[-3,yB]]); fs.holes.push(circlePath(0,0,D.rh)); for(const y of A.yG[i]) fs.holes.push(circlePath(-1.5,y,D.rh)); for(const [x,y] of dw) fs.holes.push(circlePath(x+1.6,y,D.rh));
-  const fork=plateXY(fs,2.2); fork.translate(0,0,3.6);
+  if(D.forced) fs.holes.shift(); const fork=merge([plateXY(fs,2.2),...(D.forced?[(()=>{ const c=new THREE.CylinderGeometry(1.6,1.6,7.0,20); c.rotateX(Math.PI/2); c.translate(0,0,-4.6); return c; })()]:[])]); fork.translate(0,0,3.6);
   const us=shapeFrom([[-3,ov[0]],[3,ov[0]],[3,H-4],[cw,H-4],[cw,H+4],[-cw,H+4],[-cw,H-4],[-3,H-4]]); us.holes.push(circlePath(xp,H,D.rh)); us.holes.push(circlePath(-xp,H,D.rh)); for(const [x,y] of dw) us.holes.push(circlePath(x+1.6,y,D.rh));
-  const up=plateXY(us,4), boss=(()=>{ const bs=shapeFrom([[-3,ov[0]],[3,ov[0]],[3,ov[1]],[-3,ov[1]]]); for(const [x,y] of dw) bs.holes.push(circlePath(x+1.6,y,D.rh)); const g=plateXY(bs,0.5); g.translate(0,0,2.25); return g; })();
+  const pb=[xp,-xp].map(x=>{ const g=tubeZ(D.rh,3.0,2.0,D.zLk-1.4,x,H); return g; }); // kraagjes: dwarsbalk sluit vlak aan op de stangetjes
+  const up=merge([plateXY(us,4),...pb]), boss=(()=>{ const bs=shapeFrom([[-3,ov[0]],[3,ov[0]],[3,ov[1]],[-3,ov[1]]]); for(const [x,y] of dw) bs.holes.push(circlePath(x+1.6,y,D.rh)); const g=plateXY(bs,0.5); g.translate(0,0,2.25); return g; })();
   return {fork:merge([fork]),upper:merge([up,boss]),all:merge([fork.clone(),up.clone(),boss.clone()])}; }
 function buildRoller(){ const sh=shapeFrom(circPts(0,0,D.rr,28)); sh.holes.push(circlePath(0,0,D.rh)); return plateXY(sh,4); }
 // steun op de bodem met de twee draaipunten van de geleidearmpjes (vlak z = +8,5 t.o.v. de nok)
@@ -1346,7 +1347,7 @@ function buildParts(){
     G.tip3=add('vinpunt','Vinpunt (scharniert aan het laatste segment)',2,merge(it),I4(),'wing').geo;
     
     { const r=3, pts=[]; for(let q=0;q<=12;q++){ const a=Math.PI-Math.PI*q/12; pts.push([r*Math.cos(a),T3.a1+r*Math.sin(a)]); } for(let q=0;q<=12;q++){ const a=-Math.PI*q/12; pts.push([r*Math.cos(a),-T3.a2+r*Math.sin(a)]); } const sh=shapeFrom(dedupe(pts));
-      sh.holes.push(circlePath(0,0,D.rh)); sh.holes.push(circlePath(0,-T3.a2,D.rh)); sh.holes.push(circlePath(0,T3.a1,D.rh)); const g=plateXY(sh,1.6); G.rk3=add('tuimelaar_punt','Tuimelaar vinpunt',2,merge([g]),I4(),'mech').geo; }
+      sh.holes.push(circlePath(0,0,D.rh)); sh.holes.push(circlePath(0,-T3.a2,D.rh)); sh.holes.push(circlePath(0,T3.a1,D.rh)); const g=plateXY(sh,1.6), bs=tubeZ(D.rh,2.6,0.8,1.75,0,T3.a1); G.rk3=add('tuimelaar_punt','Tuimelaar vinpunt (kraagje aan de kant van koppelstang 1)',2,merge([g,bs]),I4(),'mech').geo; }
     G.c31=add('koppel_punt_1',`Koppelstang punt 1 (${T3.L1.toFixed(1).replace('.',',')} mm, kantelpennen)`,2,buildRodHG(T3.L1,[true,true]),rotX(-Math.PI/2),'rod').geo;
     G.c32=add('koppel_punt_2',`Koppelstang punt 2 (${T3.L2.toFixed(1).replace('.',',')} mm)`,2,buildRod(T3.L2),rotX(-Math.PI/2),'rod').geo; }
   if(D.tiles){ const T=tileLayout(); G.tbd=[]; for(const b of T.bands){ if(!b.dr||b.k<1||b.tip) continue; const g=merge(bandGeo(b,false)); add('vaste_schub_R'+(b.k+1),`Vaste schub segment ${b.k+1} rechts (op het zadel lijmen)`,1,g,rotZ(Math.PI/2),'wing'); add('vaste_schub_L'+(b.k+1),`Vaste schub segment ${b.k+1} links`,1,mirrorX(g),rotZ(-Math.PI/2),'wing'); G.tbd[b.k]=g; }
@@ -1383,10 +1384,10 @@ function buildParts(){
     G.forkTab=add('klemlip','Klemlip oogvorkje (na het inleggen van het stangkruisje lijmen)',2*(D.n-1),buildForkTab(-3.8,dp),rotZ(Math.PI/2),'mech').geo;
     G.ublock=add('stangkruisje','Stangkruisje (pen 1,75 mm naar de stang, asjes in het oogvorkje)',2*(D.n-1),buildUBlock(),I4(),'mech').geo;
     G.cross3=add('kruisstuk','Kruisstuk (cardan) tussen segmenten: pen van 1,75 mm door het blokje, spil in de lagerbus',2*(D.n-1),buildCross3(),rotZ(Math.PI/2),'mech').geo; G.collarX=add('borgring_kruis','Borgring op de spil van het kruisstuk (lijmen)',2*(D.n-1),buildCollar(1.35,2.3,0.8),I4(),'mech').geo; G.collarT=D.tiles?add('borgring_schub','Borgring op de lagerbus (houdt de eerste losse schub op zijn plaats; lijmen)',2*(D.n-1),buildCollar(2.45,3.0,0.6),I4(),'mech').geo:null; G.arm3=[];  G.link3=[];
-    for(let i=1;i<D.n;i++){ G.link3[i]=add('draaistang_'+i,`Draaistangetje ${i}→${i+1} (${D.Lh3[i].toFixed(1).replace('.',',')} mm)`,2,buildRod(D.Lh3[i]),rotX(-Math.PI/2),'rod').geo; } }
+    for(let i=1;i<D.n;i++){ G.link3[i]=add('draaistang_'+i,`Draaistangetje ${i}→${i+1} (${D.Lh3[i].toFixed(1).replace('.',',')} mm, kantelpennen)`,2,buildRodHG(D.Lh3[i],[true,true]),rotX(-Math.PI/2),'rod').geo; } }
   G.rodS=[]; for(let i=0;i<D.n;i++){ if(D.twist3&&i>=1) G.rod[i]=add('stang_'+(i+1),`Stang ${i+1} (kantelpen onderaan)`,2,buildRodHG(D.L3[i],[true,false]),rotX(-Math.PI/2),'rod').geo;
     else G.rod[i]=add('stang_'+(i+1),'Stang '+(i+1),2,buildRod(D.L[i]),rotX(-Math.PI/2),'rod').geo; }
-  if(D.armDrive){ G.fol=[]; G.arm={}; for(let i=0;i<D.n;i++){ const f=buildArmFollower(i); add('volgervork_'+(i+1),'Volgervork '+(i+1)+' (rolletje + geleidearmpjes)',1,f.fork,rotX(-Math.PI/2),'mech'); add('volgerstang_'+(i+1),'Volgerstang '+(i+1)+' (dwarsbalk; met 2 paspennen op de vork lijmen)',1,f.upper,rotX(-Math.PI/2),'mech'); G.fol[i]=f.all;
+  if(D.armDrive){ G.fol=[]; G.arm={}; for(let i=0;i<D.n;i++){ const f=buildArmFollower(i); add('volgervork_'+(i+1),'Volgervork '+(i+1)+(D.forced?' (met pen voor de groef; pen omhoog printen)':' (rolletje + geleidearmpjes)'),1,f.fork,D.forced?rotX(Math.PI/2):rotX(-Math.PI/2),'mech'); add('volgerstang_'+(i+1),'Volgerstang '+(i+1)+' (dwarsbalk; met 2 paspennen op de vork lijmen)',1,f.upper,rotX(-Math.PI/2),'mech'); G.fol[i]=f.all;
       G.arm['br'+i]=add('geleidesteun_'+(i+1),'Steun geleidearmpjes '+(i+1)+' (op de bodem lijmen)',1,buildGuideBracket(i),I4(),'mech').geo; }
     G.arm.roller=D.forced?null:add('rolletje','Rolletje volger (draait los op een pen van 1,75 mm)',D.n,buildRoller(),I4(),'mech').geo;
     G.arm.guide=add('geleidearm','Geleidearmpje ('+D.La.toFixed(0)+' mm)',2*D.n,buildRod(D.La),rotX(-Math.PI/2),'rod').geo;
@@ -1758,15 +1759,29 @@ function buildScene(){
 // pennen (1,75 mm filament) en de filamentdraad van de schubben tekenen; ze hangen aan het onderdeel waarin ze vastzitten
 const MAT_PIN=new THREE.MeshStandardMaterial({color:0xd9c27a,metalness:0.1,roughness:0.5});
 function pinMesh(parent,x,y,z,len,axis){ const g=new THREE.CylinderGeometry(0.875,0.875,len,10); if(axis==='x') g.rotateZ(Math.PI/2); else if(axis==='z') g.rotateX(Math.PI/2); const m=new THREE.Mesh(g,MAT_PIN); m.position.set(x,y,z); m.userData.pin=true; m.userData.own=true; parent.add(m); return m; }
-function addPins(inner){ M.pinList=[]; const P=(...a)=>M.pinList.push(pinMesh(...a));
+function addPins(inner){ M.pinList=[]; const P=(par,x,y,z,len,axis)=>{ if(!par) return; const m=pinMesh(par,x,y,z,len,axis); m.userData.axis=axis; m.userData.len=len; M.pinList.push(m); };
   if(D.horse) return;
   for(let i=0;i<D.n;i++) for(const sd of ['R','L']){ const m=(sd==='R'?M.segR:M.segL)[i]; if(!m) continue;
     if(!(D.twist3&&i>=1)){ const hb=hingeBands(i); P(m,0,0,(hb.le+hb.te)/2,hb.le-hb.te+2,'z'); }
     if(D.tip3&&i===D.n-1) P(m,D.l,0,D.zA3,16,'z'); }
   for(let i=0;i<D.n;i++) for(const r of [M.rodR[i],M.rodL[i]]){ if(!r) continue; const L=D.twist3&&i>=1?D.L3[i]:D.L[i]; P(r,0,0,0,10,'z'); P(r,L,0,0,10,'z'); }
+  if(D.leverOn&&M.rk) for(let i=0;i<D.n;i++) for(const r of (M.rk[i]||[])){ P(r,0,0,0,10,'z'); if(D.armDrive) P(r,D.d0,0,0,10,'z'); }
+  if(D.armDrive&&M.armx) for(let i=0;i<D.n;i++){ const o=M.armx[i]; P(M.fol[i],0,0,0,12,'z'); for(const g of o.g){ P(g,0,0,0,9,'z'); P(g,D.La,0,0,9,'z'); } for(const l of o.lk){ P(l,0,0,0,9,'z'); P(l,D.Lk,0,0,9,'z'); } }
+  if(M.parm) for(const g of M.parm){ P(g,0,0,0,9,'z'); P(g,PLA,0,0,9,'z'); }
+  if(M.plink){ P(M.plink,0,0,0,9,'z'); P(M.plink,D.Lp,0,0,9,'z'); }
+  if(M.headRod&&D.headL){ P(M.headRod,0,0,0,9,'z'); P(M.headRod,D.headL,0,0,9,'z'); }
   if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const c=M.cr3[sd][i]; if(c) P(c,0,0,0,16,'z'); const t=M.tl3[sd][i]; if(t){ P(t,0,0,0,9,'z'); P(t,D.Lh3[i],0,0,9,'z'); } }
-  if(M.tip3) for(const sd of ['R','L']){ const o=M.tip3[sd]; P(o.rk,0,0,-1,7,'z'); P(o.rk,0,D.T3.a1,1,7,'z'); P(o.rk,0,-D.T3.a2,1,7,'z'); }
+  if(M.tip3) for(const sd of ['R','L']){ const o=M.tip3[sd]; P(o.rk,0,0,-1,7,'z'); P(o.rk,0,D.T3.a1,1,7,'z'); P(o.rk,0,-D.T3.a2,1,7,'z'); P(o.c1,0,0,0,9,'z'); P(o.c1,D.T3.L1,0,0,9,'z'); P(o.c2,0,0,0,9,'z'); P(o.c2,D.T3.L2,0,0,9,'z'); }
   M.fil=null; if(D.tiles){ M.fil=[]; for(const sd of [1,-1]){ const l=new THREE.Mesh(new THREE.BufferGeometry(),MAT_PIN); l.userData.pin=true; l.userData.own=true; l.frustumCulled=false; inner.add(l); M.fil.push({l,sg:sd}); M.pinList.push(l); } } }
+// per pen: welke onderdelen zitten eromheen (binnen 4 mm van de pen-as) en waar zit een kier tussen twee opeenvolgende onderdelen
+function pinStacks(){ const out=[], v=new THREE.Vector3(); asm.updateMatrixWorld(true); const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&!o.userData.pin&&o.geometry&&o.geometry.attributes.position&&o.visible!==false) meshes.push(o); });
+  for(const pin of (M.pinList||[])){ if(!pin.userData.axis) continue; const P=new THREE.Vector3().setFromMatrixPosition(pin.matrixWorld), u=(pin.userData.axis==='x'?new THREE.Vector3(1,0,0):new THREE.Vector3(0,0,1)).transformDirection(pin.matrixWorld).normalize(), iv=[];
+    for(const m of meshes){ if(!m.geometry.boundingSphere) m.geometry.computeBoundingSphere(); const bs=m.geometry.boundingSphere, c=bs.center.clone().applyMatrix4(m.matrixWorld), sc=m.matrixWorld.getMaxScaleOnAxis(); const dc=c.clone().sub(P), tt=dc.dot(u), rr=dc.clone().addScaledVector(u,-tt).length(); if(rr-bs.radius*sc>4.2||Math.abs(tt)-bs.radius*sc>15) continue;
+      const a=m.geometry.attributes.position.array; let lo=1e9,hi=-1e9; for(let k=0;k<a.length;k+=3){ v.set(a[k],a[k+1],a[k+2]).applyMatrix4(m.matrixWorld).sub(P); const t=v.dot(u); if(Math.abs(t)>15) continue; const r=v.addScaledVector(u,-t).length(); if(r>4.0) continue; lo=Math.min(lo,t); hi=Math.max(hi,t); }
+      if(lo<hi) iv.push({m,lo,hi,tag:m.userData.tag||(m.parent&&m.parent.userData.tag)||'?'}); }
+    iv.sort((a,b)=>a.lo-b.lo); const gaps=[]; let end=-1e9, last=null; for(const x of iv){ if(last&&x.lo-end>0.6) gaps.push({a:last.tag,b:x.tag,gap:x.lo-end}); if(x.hi>end){ end=x.hi; last=x; } }
+    out.push({pin,iv,gaps,lo:iv.length?iv[0].lo:0,hi:end}); }
+  return out; }
 function poseFilament(s){ if(!M.fil||!s.R3) return; const T=M.tb?M.tb.lay:tileLayout(), v=new THREE.Vector3(), pts=[];
   for(const b of T.bands){ if(b.tip) continue; const um=(b.u0+b.u1)/2, sAbs=b.k*D.l+um; for(const du of [-3,3]){ v.set(um+du,-D.t/2-2.0,tileZf(sAbs)).applyMatrix4(tileMat(s,T,b)); pts.push(v.clone()); } }
   if(pts.length<2) return; for(const f of M.fil){ const c=new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(f.sg*p.x,p.y,p.z))); f.l.geometry.dispose(); f.l.geometry=new THREE.TubeGeometry(c,Math.max(8,pts.length*3),0.875,6,false); } }
@@ -1785,14 +1800,15 @@ function skinColors(P,L,out){ const base=MAT.wing.vertexColors?new THREE.Color(0
 const P_skinLim=()=>(P.skinMax??25)/100;
 function poseSkin(s){ if(!M.skin||!s.R3) return; const P=skinPoints(s,M.skin.lay);
   for(const sd of ['R','L']){ const g=M.skin[sd].geometry, a=g.attributes.position.array; a.set(P); if(sd==='L') for(let k=0;k<a.length;k+=3) a[k]=-a[k]; g.attributes.position.needsUpdate=true; skinColors(P,M.skin.lay,g.attributes.color.array); g.attributes.color.needsUpdate=true; g.computeVertexNormals(); g.computeBoundingSphere(); } }
+let TIPDZ=[0.9,-0.1];
 function poseTip3(s){ if(!M.tip3||!s.tip3) return; const n=D.n, T3=D.T3, zA=D.zA3, Sx=new THREE.Matrix4().makeScale(-1,1,1), V=(x,y,z)=>new THREE.Vector3(x,y,z);
   const Mt=new THREE.Matrix4().makeTranslation(s.O3[n].x,s.O3[n].y,s.O3[n].z).multiply(s.R3[n]).multiply(new THREE.Matrix4().makeTranslation(0,0,-zA));
-  const Mr=new THREE.Matrix4().makeTranslation(s.O3[n-1].x,s.O3[n-1].y,s.O3[n-1].z).multiply(s.R3[n-1]).multiply(new THREE.Matrix4().makeTranslation(T3.uP,-T3.hP,T3.cT+2.6)).multiply(new THREE.Matrix4().makeRotationZ(s.tip3.beta));
+  const Mr=new THREE.Matrix4().makeTranslation(s.O3[n-1].x,s.O3[n-1].y,s.O3[n-1].z).multiply(s.R3[n-1]).multiply(new THREE.Matrix4().makeTranslation(T3.uP,-T3.hP,T3.cT+2.2)).multiply(new THREE.Matrix4().makeRotationZ(s.tip3.beta));
   const zc=V(0,0,1).applyMatrix4(new THREE.Matrix4().extractRotation(s.R3[n-1]));
   for(const sg of [1,-1]){ const o=M.tip3[sg>0?'R':'L'], F=(m)=>sg>0?m:new THREE.Matrix4().copy(Sx).multiply(m);
     o.body.matrix.copy(F(Mt)); o.rk.matrix.copy(F(Mr));
-    for(const [m,a,b] of [[o.c1,s.tip3.A,s.tip3.R1],[o.c2,s.tip3.R2,s.tip3.B]]){ const pa=V(sg*a.x,a.y,a.z), pb=V(sg*b.x,b.y,b.z), X=pb.clone().sub(pa).normalize(), zz=V(sg*zc.x,zc.y,zc.z), Z=zz.addScaledVector(X,-zz.dot(X)).normalize(), Y=Z.clone().cross(X);
-      m.position.copy(pa).addScaledVector(Z,1); m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); m.material=s.tip3.ok?MAT.seg[3]:MAT.bad; } } }
+    for(const [m,a,b,dz] of [[o.c1,s.tip3.A,s.tip3.R1,TIPDZ[0]],[o.c2,s.tip3.R2,s.tip3.B,TIPDZ[1]]]){ const pa=V(sg*a.x,a.y,a.z), pb=V(sg*b.x,b.y,b.z), X=pb.clone().sub(pa).normalize(), zz=V(sg*zc.x,zc.y,zc.z), Z=zz.addScaledVector(X,-zz.dot(X)).normalize(), Y=Z.clone().cross(X);
+      m.position.copy(pa).addScaledVector(Z,dz); m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); m.material=s.tip3.ok?MAT.seg[3]:MAT.bad; } } }
 function poseTiles(s){ poseTip3(s); if(!M.tb||!s.R3) return; const Sx=new THREE.Matrix4().makeScale(-1,1,1);
   for(const b of M.tb.lay.bands){ if(b.dr) continue; const Mt=tileMat(s,M.tb.lay,b); M.tb.R[b.j].matrix.copy(Mt); M.tb.L[b.j].matrix.copy(Sx).multiply(Mt); } }
 function poseGears(theta){ if(!M.gb) return; const ang=[theta]; D.gst.forEach(([Ng,Np])=>ang.push(-ang[ang.length-1]*Np/Ng));
@@ -3095,7 +3111,7 @@ resize(); applyTheme();
 rebuild(true); updateHud();
 setInterval(updateHud,1000);
 requestAnimationFrame(loop);
-window.__AA={arm:()=>armSetup(),camLoc:(i)=>camPitchArm(i),get M(){return M;},testParts:()=>testParts(),toWorld:(...a)=>toWorld(...a),fcorr:(a,b)=>featherCorr(a,b),tw3:{chain:(...a)=>tw3Chain(...a),clear:(...a)=>tw3Clear(...a),lay:()=>skinLayout(),pts:(a,b)=>skinPoints(a,b),phi:(...a)=>skinPhi(...a),strain:(a,b)=>skinStrain(a,b),corr:(a,b)=>featherCorr(a,b)},solve:(t,p)=>solve(t,p),wingPoses:(N)=>{ const o=[]; let pv=null; for(let k=0;k<N;k++){ const s=solve(k/N*2*Math.PI,pv); pv=s.a; o.push({J:s.J.map(j=>[j.x,j.y]),a:s.a.slice(0,D.n),B:s.B.map(b=>[b.x,b.y])}); } return {poses:o,L:D.L.slice(),zRod:D.zRod.slice(),att:D.att.slice(),leAtt:D.tAtt.map(t=>D.plan(t).le),teAtt:D.tAtt.map(t=>D.plan(t).te),hTab:D.hTab,l:D.l,n:D.n,t:D.t,Sw:D.Sw,w0:D.w0,zq:Array.from({length:D.n+1},(_,i)=>{ const pf=D.plan(Math.min(1,(i+0.5)*D.l/D.Sw)); return pf.le-0.25*(pf.le-pf.te); })}; },mbk:(a,b)=>{MB_K=a;MV_K=b;},twk:(v)=>{TWK=v;},kin:()=>{const o=[];let p=null;for(let k=0;k<72;k+=6){p=hKin(k/72*2*Math.PI,p);o.push([p.h,p.phi/DEG,p.rho/DEG].map(v=>+v.toFixed(2)));}return o;},hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
+window.__AA={tipdz:(a,b)=>{TIPDZ=[a,b];},pinStacks:()=>pinStacks().map(p=>({par:p.pin.parent.userData.tag||'?',n:p.iv.length,tags:p.iv.map(x=>x.tag+'['+x.lo.toFixed(1)+','+x.hi.toFixed(1)+']').join(' '),gaps:p.gaps.map(g=>g.a+'|'+g.b+':'+g.gap.toFixed(1))})),arm:()=>armSetup(),camLoc:(i)=>camPitchArm(i),get M(){return M;},testParts:()=>testParts(),toWorld:(...a)=>toWorld(...a),fcorr:(a,b)=>featherCorr(a,b),tw3:{chain:(...a)=>tw3Chain(...a),clear:(...a)=>tw3Clear(...a),lay:()=>skinLayout(),pts:(a,b)=>skinPoints(a,b),phi:(...a)=>skinPhi(...a),strain:(a,b)=>skinStrain(a,b),corr:(a,b)=>featherCorr(a,b)},solve:(t,p)=>solve(t,p),wingPoses:(N)=>{ const o=[]; let pv=null; for(let k=0;k<N;k++){ const s=solve(k/N*2*Math.PI,pv); pv=s.a; o.push({J:s.J.map(j=>[j.x,j.y]),a:s.a.slice(0,D.n),B:s.B.map(b=>[b.x,b.y])}); } return {poses:o,L:D.L.slice(),zRod:D.zRod.slice(),att:D.att.slice(),leAtt:D.tAtt.map(t=>D.plan(t).le),teAtt:D.tAtt.map(t=>D.plan(t).te),hTab:D.hTab,l:D.l,n:D.n,t:D.t,Sw:D.Sw,w0:D.w0,zq:Array.from({length:D.n+1},(_,i)=>{ const pf=D.plan(Math.min(1,(i+0.5)*D.l/D.Sw)); return pf.le-0.25*(pf.le-pf.te); })}; },mbk:(a,b)=>{MB_K=a;MV_K=b;},twk:(v)=>{TWK=v;},kin:()=>{const o=[];let p=null;for(let k=0;k<72;k+=6){p=hKin(k/72*2*Math.PI,p);o.push([p.h,p.phi/DEG,p.rho/DEG].map(v=>+v.toFixed(2)));}return o;},hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
 })();
 </script>
 
