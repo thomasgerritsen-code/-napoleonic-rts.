@@ -292,7 +292,7 @@ const PRESETS = {
 
 // Manta 2.0: zelfde vorm als Manta 1.0, maar de vinpunt draait om een eigen as langs de spanwijdte (verenstand)
 { const o=Object.assign({},PRESETS); for(const k of Object.keys(PRESETS)) delete PRESETS[k];
-  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:18,skinMax:40})}); PRESETS.manta5=Object.assign({},o.manta,{name:'Manta 5.0 (schubben)',twist3:true,feather:true,tiles:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:10})}); PRESETS.manta51=Object.assign({},PRESETS.manta5,{name:'Manta 5.1 (schubben)',tileLook:true}); } } }
+  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:18,skinMax:40})}); PRESETS.manta5=Object.assign({},o.manta,{name:'Manta 5.0 (schubben)',twist3:true,feather:true,tiles:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:10,tip:0,sym:1})}); PRESETS.manta51=Object.assign({},PRESETS.manta5,{name:'Manta 5.1 (schubben)',tileLook:true,def:Object.assign({},PRESETS.manta5.def,{tip:80})}); } } }
 const CONTROLS = [
   {g:'Vorm'},
   {id:'span',label:'Spanwijdte',min:120,max:400,step:5,unit:'mm'},
@@ -353,14 +353,17 @@ let D;
 function derive(alt){
   const pre=PRESETS[P.preset];
   const d={pre};
-  d.twist3=!!pre.twist3&&(P.n|0)>=2; d.skin=d.twist3&&!!pre.skin; d.tiles=d.twist3&&!!pre.tiles; d.tileLook=d.tiles&&!!pre.tileLook; d.skel=d.skin||d.tiles; d.feather=d.twist3&&!!pre.feather; d.sym=!!P.sym&&!d.twist3; d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced;
+  d.twist3=!!pre.twist3&&(P.n|0)>=2; d.skin=d.twist3&&!!pre.skin; d.tiles=d.twist3&&!!pre.tiles; d.tileLook=d.tiles&&!!pre.tileLook; d.tileSym=d.tiles&&!!P.sym; d.skel=d.skin||d.tiles; d.feather=d.twist3&&!!pre.feather; d.sym=!!P.sym&&!d.twist3; d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced;
   // hefboom (tuimelaar): volgerpen in sleuf op afstand d0 van het draaipunt, stang aan het eind op aL = k·d0
   d.leverOn=(P.lever||1)>1.01; d.kLev=P.lever||1; d.d0=10; d.aLi=[]; for(let i=0;i<(P.n|0);i++) d.aLi[i]=d.kLev*(1+(P.grow||0)/100*i)*d.d0; d.aL=Math.max(...d.aLi);
   d.gap=d.leverOn?(d.forced?14:12):(d.forced?11:9); d.oRk=3.8; d.oRod=d.leverOn?6.5:3.8; d.oTab=d.leverOn?9.6:7.1;
   d.w0=Math.max(6,P.span*(P.w0f||pre.w0Frac));
   d.Sw=P.span/2-d.w0;
-  d.tipOn=P.tip>0&&!d.twist3; d.kTip=clamp(P.tip/100,0.3,1); d.tf=d.tipOn?0.24:0;
+  d.tipOn=P.tip>0&&!d.twist3; d.kTip=clamp(P.tip/100,0.3,1); d.tip3=!!(pre.tiles&&pre.twist3&&P.tip>0&&(P.n|0)>=2); d.tf=d.tipOn?0.24:d.tip3?0.16:0;
   d.l=d.Sw*(1-d.tf)/d.n; d.lt=d.Sw*d.tf;
+  if(d.tip3){ // Manta 5.x: vinpunt met tuimelaar onder het laatste segment, zodat de punt mét de vleugel meebuigt (achterloopt)
+    const k=clamp(P.tip/100,0.2,0.9), T={dA:8,hA:9,uP:8,hP:16,a1:6,dB:4,cT:2,k}; T.a2=k*T.a1*T.hP/(T.hA-k*T.a1); T.hB=T.hP+T.a2; T.zL=T.cT+4.4;
+    T.L1=Math.hypot(T.uP+T.dA,T.hA-(T.hP-T.a1)); T.L2=d.l+T.dB-T.uP; d.T3=T; }
   d.dihedral=P.dihedral*DEG;
   d.plan=(t)=>{ const r=pre.plan(clamp(t,0,1),P); let le=r.le, te=r.te; if(le-te<6){const m=(le+te)/2; le=m+3; te=m-3;} return {le,te,zc:(le+te)/2}; };
   d.ridges=pre.ridges(d,P);
@@ -532,6 +535,14 @@ function twistSolve(Jpp,aPP,Jn,aL,dl0){ const uE=(D.n-D.twK)*D.l+D.twUH-4, c=Mat
 // Manta 3.0: elk segment vanaf het tweede hangt met een kruisstuk (cardan) aan het vorige, op een rechte draaias (z = zA3).
 // De vleugelstang grijpt met een kogel op die as aan; een draaistangetje (pennen langs de span) van een arm onder het vorige segment
 // naar een hoorn onder dit segment laat het segment draaien. Per segment twee onbekenden (slag δ, draaiing ψ), opgelost met Newton.
+function tip3Solve(R,O,prev,out){ const V=(x,y,z)=>new THREE.Vector3(x,y,z), n=D.n, l=D.l, T=D.T3, zL=T.zL;
+  const A=V(l-T.dA,-T.hA,zL).applyMatrix4(R[n-2]).add(O[n-2]), Pv=V(T.uP,-T.hP,zL), Rn=R[n-1], On=O[n-1];
+  const rk=(b,y)=>V(T.uP-y*Math.sin(b),-T.hP+y*Math.cos(b),zL).applyMatrix4(Rn).add(On);
+  const newton=(f,x0)=>{ let x=x0; for(let it=0;it<40;it++){ const f0=f(x); if(Math.abs(f0)<1e-5) return {x,ok:true}; const df=(f(x+1e-5)-f(x-1e-5))/2e-5; if(Math.abs(df)<1e-9) break; x-=clamp(f0/df,-0.2,0.2); } return {x,ok:Math.abs(f(x))<2e-3}; };
+  const b=newton((b)=>rk(b,T.a1).distanceTo(A)-T.L1,prev?prev[0]:0), R2=rk(b.x,-T.a2), Ot=V(l,0,0).applyMatrix4(Rn).add(On);
+  const Rt=(t)=>new THREE.Matrix4().copy(Rn).multiply(new THREE.Matrix4().makeRotationZ(t)), Bt=(t)=>V(T.dB,-T.hB,zL).applyMatrix4(Rt(t)).add(Ot);
+  const t=newton((t)=>Bt(t).distanceTo(R2)-T.L2,prev?prev[1]:0), ok=b.ok&&t.ok&&Math.abs(b.x)<1.3&&Math.abs(t.x)<1.3;
+  R.push(Rt(t.x)); O.push(Ot); out.push(b.x,t.x); return {beta:b.x,tau:t.x,ok,A,R1:rk(b.x,T.a1),R2,B:Bt(t.x)}; }
 function tw3Chain(J0,a0,B,prev){ const V=(x,y,z)=>new THREE.Vector3(x,y,z), n=D.n, l=D.l, zA=D.zA3;
   let Rp=new THREE.Matrix4().makeRotationZ(a0), Op=V(J0.x,J0.y,zA); const R=[Rp], O=[Op], dd=[0,0], eye=[null], E=[null], H=[null], C=[null], ok=[true];
   for(let i=1;i<n;i++){ const Oi=V(l,0,0).applyMatrix4(Rp).add(Op), Rpi=Rp;
@@ -548,7 +559,8 @@ function tw3Chain(J0,a0,B,prev){ const V=(x,y,z)=>new THREE.Vector3(x,y,z), n=D.
     eye.push(V(D.att[i],-D.hTab,0).applyMatrix4(Ri).add(Oi)); E.push(Ei); H.push(V(D.uH3,-D.dH3,-D.e3[i]).applyMatrix4(Ri).add(Oi));
     C.push(new THREE.Matrix4().copy(Rpi).multiply(new THREE.Matrix4().makeRotationZ(dl)));
     Rp=Ri; Op=Oi; }
-  return {R,O,d:dd,eye,E,H,C,ok}; }
+  let tip=null; if(D.tip3&&n>=2){ tip=tip3Solve(R,O,prev?[prev[2*n],prev[2*n+1]]:null,dd); ok.push(tip.ok); }
+  return {R,O,d:dd,eye,E,H,C,ok,tip}; }
 // kleinste afstand tussen vleugelstang i en de draaiarm + het draaistangetje van segment i (min. stangbreedte/2 + armdikte/2)
 function tw3Clear(c,B){ let m=1e9; const V=(x,y,z)=>new THREE.Vector3(x,y,z);
   const segD=(p,a,b)=>{ const ab=b.clone().sub(a), t=clamp(p.clone().sub(a).dot(ab)/ab.lengthSq(),0,1); return p.distanceTo(a.clone().addScaledVector(ab,t)); };
@@ -556,7 +568,8 @@ function tw3Clear(c,B){ let m=1e9; const V=(x,y,z)=>new THREE.Vector3(x,y,z);
     const pl=[[0,-1.5],[7,ey*0.6],[14,ey],[ex-2,ey],[ex,ey]], pts=[];
     for(let k=0;k+1<pl.length;k++) for(let s=0;s<=4;s++){ const x=pl[k][0]+(pl[k+1][0]-pl[k][0])*s/4, y=pl[k][1]+(pl[k+1][1]-pl[k][1])*s/4; pts.push(V(D.uA3+x,-D.t/2+y,z).applyMatrix4(c.R[i-1]).add(c.O[i-1])); }
     for(let s=0;s<=6;s++) pts.push(c.E[i].clone().lerp(c.H[i],s/6));
-    for(const p of pts) m=Math.min(m,segD(p,a,b)-ROD.w/2-1.5-0.6); }
+    for(const p of pts) m=Math.min(m,segD(p,a,b)-ROD.w/2-1.5-0.6);
+    if(c.tip&&i===D.n-1) for(const [qa,qb] of [[c.tip.A,c.tip.R1],[c.tip.R2,c.tip.B],[c.tip.R1,c.tip.R2]]) for(const p of pts) m=Math.min(m,segD(p,qa,qb)-ROD.w/2-1.5-1.0); }
   return m; }
 // samenhang tussen draaiing en de verticale snelheid van de punt: > 0 betekent voorrand omlaag bij de neerslag en omhoog bij de opslag
 const nl1=(x)=>x.toFixed(1).replace('.',',');
@@ -667,7 +680,7 @@ function solveDrive(q, prevA){
     for(let i=1;i<D.n;i++){ const sp=new THREE.Vector3(1,0,0).applyMatrix4(r.R[i]); out.a[i]=Math.atan2(sp.y,Math.hypot(sp.x,sp.z)); out.J[i]={x:r.O[i].x,y:r.O[i].y}; out.lock[i]=!r.ok[i]; }
     const On=new THREE.Vector3(D.l,0,0).applyMatrix4(r.R[D.n-1]).add(r.O[D.n-1]); out.J[D.n]={x:On.x,y:On.y};
     const ch=new THREE.Vector3(0,0,1).applyMatrix4(r.R[D.n-1]); out.tipTwist=Math.atan2(ch.y,ch.z);
-    const e=new THREE.Vector3(D.l,0,D.plan(1).zc-D.zA3).applyMatrix4(r.R[D.n-1]).add(r.O[D.n-1]); out.tipEnd={x:e.x,y:e.y,z:e.z}; }
+    const e=D.tip3&&r.tip?new THREE.Vector3(D.lt,0,D.plan(1).zc-D.zA3).applyMatrix4(r.R[D.n]).add(r.O[D.n]):new THREE.Vector3(D.l,0,D.plan(1).zc-D.zA3).applyMatrix4(r.R[D.n-1]).add(r.O[D.n-1]); out.tipEnd={x:e.x,y:e.y,z:e.z}; out.tip3=r.tip; if(r.tip&&!r.tip.ok) out.tipLock=true; }
   if(D.headOn){ // wereld, yz-vlak (u=z, v=y)
     const H=toWorld(out.phi,D.yB,D.zCut,out.h), A={x:D.pivot.z+D.hdz, y:D.pivot.y+out.h-D.rHA};
     const ref=(prevA&&prevA.head!=null)?prevA.head:0;
@@ -828,25 +841,39 @@ function ribFlange(i,u){ const s=i*D.l+u, pf=D.plan(s/D.Sw), sh=new THREE.Shape(
 function ribGeo(i,u,w){ const s=i*D.l+u, pf=D.plan(s/D.Sw), sh=new THREE.Shape(), N=16, z0=pf.te+0.4, z1=pf.le-0.4, y0=-D.t/2;
   sh.moveTo(z0,y0); sh.lineTo(z1,y0); for(let k=N;k>=0;k--){ const z=z0+(z1-z0)*k/N; sh.lineTo(z,y0+Math.max(1.2,wingIdeal(s,z))); }
   const g=new THREE.ExtrudeGeometry(sh,{depth:w,bevelEnabled:false}); g.translate(0,0,-w/2); g.rotateY(-Math.PI/2); g.translate(u,0,0); return g; }
-function buildSkeleton(i){ const l=D.l, zA=D.zA3, t=D.t, items=[], last=i===D.n-1, box=(u0,u1,y0,y1,z0,z1)=>{ const b=new THREE.BoxGeometry(u1-u0,y1-y0,z1-z0); b.translate((u0+u1)/2,(y0+y1)/2,(z0+z1)/2); items.push(b); };
+function buildSkeleton(i){ const l=D.l, zA=D.zA3, t=D.t, items=[], last=i===D.n-1&&!D.tip3, armNext=i<D.n-1, box=(u0,u1,y0,y1,z0,z1)=>{ const b=new THREE.BoxGeometry(u1-u0,y1-y0,z1-z0); b.translate((u0+u1)/2,(y0+y1)/2,(z0+z1)/2); items.push(b); };
   items.push(tubeX(D.rh,t/2,1.2,7,0,zA));
   const uEnd=last?l-3:l-6.4; if(D.tiles) items.push(tubeX(0.01,t/2,6.5,uEnd,0,zA)); else box(6.5,uEnd,-t/2,t/2,zA-1.8,zA+1.8);
   box(D.att[i]-5,D.att[i]+5,-t/2,t/2,zA-4,zA+4);
   if(D.tiles){ items.push(ribGeo(i,D.uH3,2)); const T=tileLayout(), b=T.bands.find(b=>b.dr&&b.k===i); if(b) items.push(...bandGeo(b,false)); } else items.push(ribGeo(i,D.uH3,2),...ribFlange(i,D.uH3)); box(D.uH3-4.5,D.uH3+4.5,-t/2,-t/2+1.5,Math.min(zA-D.e3[i]-6,zA-1.8),Math.max(zA-D.e3[i]+6,zA+1.8)); 
-  if(!last){ const ap=arm3Pad(i+1), zc=zA-D.e3[i+1]; box(D.uA3+ap.du0,D.uA3+ap.du1,-t/2,-t/2+1.5,Math.min(zc+ap.dz0,zA-1.8),Math.max(zc+ap.dz1,zA+1.8));
+  if(!last){ if(armNext){ const ap=arm3Pad(i+1), zc=zA-D.e3[i+1]; box(D.uA3+ap.du0,D.uA3+ap.du1,-t/2,-t/2+1.5,Math.min(zc+ap.dz0,zA-1.8),Math.max(zc+ap.dz1,zA+1.8)); }
     box(l-6.4,l-4.2,-t/2,t/2,zA-7.5,zA+7.5);
     for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ items.push(tubeZ(D.rh,t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); items.push(br); } }
-  else { if(D.tiles) items.push(ribGeo(i,l-4,2)); else items.push(ribGeo(i,l-4,2),...ribFlange(i,l-4)); const pf=D.plan((i*l+l-4)/D.Sw); box(l-5,l-3,-t/2,-t/2+1.5,pf.te+0.4,zA+1.8); }
+  if(D.tip3&&i===D.n-1){ const T=D.T3, zT=zA+T.cT, sh=shapeFrom(dedupe(strokeOutline([[zA,-0.5],[zA,-6],[zT-0.5,-T.hP]],[1.8,1.8,2.6],10))); const g=plateYZ(sh,3); g.translate(T.uP,0,0); items.push(g);
+    const tab=new THREE.Shape(); tab.absarc(T.uP,-T.hP,3,0,Math.PI*2,false); tab.holes.push(circlePath(T.uP,-T.hP,D.rh)); const tg=plateXY(tab,2.6); tg.translate(0,0,zT+0.4); items.push(tg); }
+  else if(last) { if(D.tiles) items.push(ribGeo(i,l-4,2)); else items.push(ribGeo(i,l-4,2),...ribFlange(i,l-4)); const pf=D.plan((i*l+l-4)/D.Sw); box(l-5,l-3,-t/2,-t/2+1.5,pf.te+0.4,zA+1.8); }
   return merge(items); }
 // Manta 5.0: schubben. Vaste banden (mee met segment 1 en met de rib van elk segment) en losse banden die met een ring op de ronde ligger draaien.
 // Een draad 1,75 mm filament door oogjes bij de achterrand neemt de losse banden mee, zodat de draaiing geleidelijk verloopt.
 function tileLayout(){ const l=D.l, n=D.n, piv=[];
   for(let k=1;k<n;k++){ for(let u=3.8;u<=Math.min(D.att[k]-7,D.uH3-5.2-7)+1e-6;u+=6.5) piv.push({k,u0:u,s0:k*l+u,dr:false}); piv.push({k,u0:D.uH3-5.2,s0:k*l+D.uH3-5.2,dr:true}); }
+  if(D.tip3) piv.push({k:n,u0:2.8,s0:n*l+2.8,dr:true,tip:true});
   piv.sort((a,b)=>a.s0-b.s0); const bands=[{k:0,u0:l-6,s0:l-6,dr:true},...piv];
-  for(let j=0;j<bands.length;j++){ const nx=bands[j+1], g=(D.tileGap&&D.tileGap[j])||0.8; bands[j].s1=nx?nx.s0-g:n*l-0.3; bands[j].u1=bands[j].s1-bands[j].k*l; bands[j].j=j; }
+  for(let j=0;j<bands.length;j++){ const nx=bands[j+1], g=(D.tileGap&&D.tileGap[j])||0.8; bands[j].s1=nx?nx.s0-g:D.Sw-0.3; bands[j].u1=bands[j].s1-bands[j].k*l; bands[j].j=j; }
   const rig=[{a:0,s0:-1e9,s1:l-3}]; for(const b of piv) if(b.dr) rig.push({a:b.k,s0:b.s0,s1:b.k===n-1?1e9:b.s1});
   return {bands,rig}; }
-const tileTop=(s,z)=>Math.max(-D.t/2+Math.max(1.2,wingIdeal(s,z)),Math.abs(z-D.zA3)<7.5?2.5+1.2:-1e9);
+const symTop=(h)=>h<=D.t?h:Math.max(D.t,h/2+D.t/2), symBot=(h)=>Math.max(0,h/2-D.t/2); // symmetrisch profiel: hoogte boven en onder het middenvlak gelijk
+const tileTop=(s,z)=>{ const h=Math.max(1.2,wingIdeal(s,z)); return Math.max(-D.t/2+(D.tileSym?symTop(h):h),Math.abs(z-D.zA3)<7.5?2.5+1.2:-1e9); };
+function flipDown(items,y0){ for(const it of items){ const g=it.g||it, a=g.attributes.position.array; for(let k=1;k<a.length;k+=3) a[k]=2*y0-a[k];
+    if(g.index){ const ix=g.index.array; for(let k=0;k<ix.length;k+=3){ const t=ix[k+1]; ix[k+1]=ix[k+2]; ix[k+2]=t; } } else flipTris(a);
+    g.attributes.position.needsUpdate=true; if(g.attributes.normal) g.deleteAttribute('normal'); if(g.index) g.computeVertexNormals(); } return items; }
+// lijmvlakken onder een band (blijven vlak bij een symmetrisch profiel)
+function bandPads(b){ const P=[], zA=D.zA3, n=D.n, l=D.l, T3=D.T3, add=(u0,u1,z0,z1)=>P.push({u0,u1,z0,z1});
+  if(b.dr&&b.k>=1&&!b.tip){ add(D.uH3-5,D.uH3+5,zA-D.e3[b.k]-6.5,zA-D.e3[b.k]+6.5); }
+  if(b.dr&&!b.tip&&b.k<n-1){ const ap=arm3Pad(b.k+1), zc=zA-D.e3[b.k+1]; add(D.uA3+ap.du0-0.5,D.uA3+ap.du1+0.5,zc+ap.dz0-0.5,zc+ap.dz1+0.5); }
+  if(D.tip3&&b.dr&&b.k===n-2) add(l-T3.dA-5.3,l-T3.dA+5.3,zA+T3.zL+2.6-4.3,zA+T3.zL+2.6+4.3);
+  if(b.tip) add(T3.dB-5.3,T3.dB+5.3,zA+T3.zL+2.6-4.3,zA+T3.zL+2.6+4.3);
+  return P; }
 function tileMat(sol,T,b){ const ph=b.dr?0:skinPhi(sol,T,b.s0,b.k); return new THREE.Matrix4().makeTranslation(sol.O3[b.k].x,sol.O3[b.k].y,sol.O3[b.k].z).multiply(sol.R3[b.k]).multiply(new THREE.Matrix4().makeRotationX(ph)).multiply(new THREE.Matrix4().makeTranslation(0,0,-D.zA3)); }
 function tileZf(s){ const pf=D.plan(s/D.Sw); return pf.te+3.2; }
 function bandGeo(b,stem){ const l=D.l, k=b.k, zA=D.zA3, t=D.t, items=[], u0=b.u0, u1=b.u1, S=(u)=>k*l+u, pf=(u)=>D.plan(S(u)/D.Sw), N=Math.max(3,Math.ceil((u1-u0)/1.2));
@@ -854,11 +881,13 @@ function bandGeo(b,stem){ const l=D.l, k=b.k, zA=D.zA3, t=D.t, items=[], u0=b.u0
   const solid=(pts,base,minH)=>{ if(!pts) return; items.push(...heightSolid(pts,[],(u,z,d)=>finishH(Math.max(minH,tileTop(S(u),z)-base),d,0),1.2,base,null).map(it=>it.g||it)); };
   const te=(u)=>pf(u).te+0.3, le=(u)=>pf(u).le-0.3, cF=(u)=>Math.min(le(u),zA+6), cA=(u)=>Math.max(te(u),zA-6);
   // tegeltjes (±11 mm koorde, 0,6 mm groef) op een dun grondvlak, voor en achter de ligger; dak over de ligger
-  const tiles=(lo,hi)=>{ const um=(u0+u1)/2, w=hi(um)-lo(um); if(w<1) return; solid(poly(lo,hi),-t/2,0.8); const nT=Math.max(1,Math.round(w/11));
+  const pads=bandPads(b), inPad=(u,z)=>pads.some(p=>u>=p.u0&&u<=p.u1&&z>=p.z0&&z<=p.z1);
+  const bulge=(pts)=>{ if(!pts||!D.tileSym) return; items.push(...flipDown(heightSolid(pts,[],(u,z,d)=>inPad(u,z)?0.02:Math.max(0.02,finishH(symBot(Math.max(1.2,wingIdeal(S(u),z))),d,0)),1.2,-t/2,null),-t/2).map(it=>it.g||it)); };
+  const tiles=(lo,hi)=>{ const um=(u0+u1)/2, w=hi(um)-lo(um); if(w<1) return; solid(poly(lo,hi),-t/2,0.8); bulge(poly(lo,hi)); const nT=Math.max(1,Math.round(w/11));
     for(let q=0;q<nT;q++){ const f0=q/nT, f1=(q+1)/nT; solid(poly(u=>lo(u)+(hi(u)-lo(u))*f0+(q?0.3:0),u=>lo(u)+(hi(u)-lo(u))*f1-(q<nT-1?0.3:0)),-t/2+0.8,0.6); } };
   tiles(te,cA); tiles(cF,le); solid(poly(cA,cF),2.5,1.2);
   // oogje voor het filament (achterrand)
-  const um=(u0+u1)/2, ew=Math.min(3,(u1-u0)/2-0.3), zf=tileZf(S(um)); items.push(tubeX(1.0,1.9,um-ew,um+ew,-t/2-1.9,zf)); { const bx=new THREE.BoxGeometry(2*ew,1.2,2.4); bx.translate(um,-t/2-0.6,zf); items.push(bx); }
+  const um=(u0+u1)/2, ew=Math.min(3,(u1-u0)/2-0.3), zf=tileZf(S(um)); if(!b.tip) items.push(tubeX(1.0,1.9,um-ew,um+ew,-t/2-1.9,zf)); if(!b.tip){ const bx=new THREE.BoxGeometry(2*ew,1.2,2.4); bx.translate(um,-t/2-0.6,zf); items.push(bx); }
   if(stem){ const yt=tileTop(S(u0),zA)-1.2, ring=[[zA-3.6,yt]]; for(let q=0;q<=16;q++){ const a=Math.PI+Math.PI*q/16; ring.push([zA+3.6*Math.cos(a),3.6*Math.sin(a)]); } ring.push([zA+3.6,yt]); const sh=shapeFrom(dedupe(ring)); sh.holes.push(circlePath(zA,0,D.t/2+0.35));
     const g=new THREE.ExtrudeGeometry(sh,{depth:1.6,bevelEnabled:false,curveSegments:20}); g.rotateY(-Math.PI/2); g.translate(u0+1.6,0,0); items.push(g); }
   return items; }
@@ -912,7 +941,8 @@ function buildSegment(i){
   for(let k=N-1;k>=1;k--){ const u=u0b+(u1b-u0b)*k/N; trail.push([u,D.plan((s0+u)/D.Sw).te]); }
   const pts=dedupe([...root,...lead,...tip.slice().reverse(),...trail]);
   const cR=Math.cos(Math.atan(skR)), cT=Math.cos(Math.atan(skT));
-  const thick=(u,z,d)=>{ const da=Math.min(twRoot||t3R?1e9:Math.abs(u-skR*(z-zr))*cR, last||t3T?1e9:Math.abs(l+skT*(z-zr)-u)*cT); return finishH(wingIdeal(s0+u,z),d,hingeK(da)); };
+  const thickRaw=(u,z,d)=>{ const da=Math.min(twRoot||t3R?1e9:Math.abs(u-skR*(z-zr))*cR, last||t3T?1e9:Math.abs(l+skT*(z-zr)-u)*cT); return finishH(wingIdeal(s0+u,z),d,hingeK(da)); };
+  const thick=(u,z,d)=>D.tileSym&&i===0?symTop(thickRaw(u,z,d)):thickRaw(u,z,d);
   const pads=eyePads(i), inPad=(u,z)=>pads.some(p=>u>=p.u0&&u<=p.u1&&z>=p.z0&&z<=p.z1);
   const cf=D.pre.pattern?((u,z)=>D.pre.pattern(D.w0+s0+u,z,D.w0,D.le0,D.te0)):null, LIGHT=cf?[0.20,0.23,0.27]:null;
   if(!D.sym){
@@ -925,6 +955,7 @@ function buildSegment(i){
           for(let j=0;j<=N;j++){ const u=ua+(ub-ua)*j/N, pf=pfA(u), w=pf.le-pf.te; lo.push([u,pf.te+w*f0+(q?0.3:0.05)]); hi.push([u,pf.te+w*f1-(q<nT-1?0.3:0.05)]); }
           items.push(...heightSolid([...lo,...hi.reverse()],[],thick,1.2,-D.t/2,cf)); } } }
     else items=heightSolid(pts,[],thick,2.0,-D.t/2,cf);
+    if(D.tileSym&&i===0) items.push(...flipDown(heightSolid(pts,[],(u,z,d)=>inPad(u,z)?0.02:Math.max(0.02,symBot(thickRaw(u,z,d))),2.0,-D.t/2,cf),-D.t/2));
     if(!twRoot&&!t3R) items.push(...knucklesSk(hbR,0,1,skR,zr,0)); if(!last&&!t3T) items.push(...knucklesSk(hbT,l,0,skT,zr,0));
     if(t3R) items.push(tubeX(D.rh,D.t/2,1.2,7,0,D.zA3));
     if(t3T){ const zA=D.zA3; for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ items.push(tubeZ(D.rh,D.t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,D.t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); items.push(br); } }
@@ -968,7 +999,8 @@ function buildArm3(i){ const ex=(D.l+D.uH3)-D.uA3, ey=-(D.dE3-D.t/2), ap=arm3Pad
   const o=dedupe(strokeOutline([[0,-1.5],[7,ey*0.6],[14,ey],[ex-2,ey]],[3,3,3,3],10));
   const tube=tubeX(D.rh,2.7,ex-3,ex,ey,0), pad=new THREE.BoxGeometry(ap.du1-ap.du0,1.5,ap.dz1-ap.dz0); pad.translate((ap.du0+ap.du1)/2,-0.75,(ap.dz0+ap.dz1)/2);
   return merge([plateXY(shapeFrom(o),3),tube,pad]); }
-function buildBallEye(){ const g=buildEye(), b=new THREE.SphereGeometry(2.4,16,12); b.translate(0,-D.hTab+D.t/2,0); return merge([g,b]); }
+const items0=(a,g)=>a.push(g);
+function buildBallEye(depth){ const g=buildEye(depth), b=new THREE.SphereGeometry(2.4,16,12); b.translate(0,-(depth||D.hTab-D.t/2),0); return merge([g,b]); }
 function buildCross3(){ const b=new THREE.BoxGeometry(4.4,4.4,4.4), a=tubeX(D.rh,2.2,-3.5,3.5,0,0), c=tubeZ(D.rh,2.2,-2.4,2.4,0,0); return merge([b,a,c]); }
 function buildTwistArm(){ const ex=((D.n-D.twK)*D.l+D.twUH-4)-(D.l-D.dTA), ey=-(D.twDE-D.t/2);
   const o=dedupe(strokeOutline([[0,-1.5],[7,ey*0.6],[14,ey],[ex-2,ey]],[3,3,3,3],10));
@@ -1170,6 +1202,15 @@ function buildParts(){
     return res.full; };
   G.segMI=[];
   for(let i=0;i<D.n;i++){ const r=buildSegment(i), sk=D.skin&&i>=1; G.seg[i]=wing((sk?'skelet_R':'vleugel_R')+(i+1),(sk?'skelet_L':'vleugel_L')+(i+1),(sk?'Skelet (ligger + ribben) rechts ':'Vleugel rechts ')+(i+1),(sk?'Skelet (ligger + ribben) links ':'Vleugel links ')+(i+1),r); G.segMI[i]=massInfo(r.full); }
+  if(D.tip3){ const T3=D.T3, zA=D.zA3, t=D.t, Ti=tileLayout(), tb=Ti.bands.find(b=>b.tip), it=[...bandGeo(tb,false)];
+    it.push(tubeZ(D.rh,t/2,zA-2.4,zA+2.4,0,0)); { const b=new THREE.BoxGeometry(3.2,t+0.6,4.4); b.translate(1.6+1.6,0.3,zA); items0(it,b); }
+    G.tip3=add('vinpunt','Vinpunt (scharniert aan het laatste segment)',2,merge(it),I4(),'wing').geo;
+    G.tipEyeA=add('oog_punt_a','Kogeloog koppelstang punt (onder segment '+(D.n-1)+')',2,buildBallEye(T3.hA-t/2),rotX(Math.PI),'mech').geo;
+    G.tipEyeB=add('oog_punt_b','Oog vinpunt',2,buildEye(T3.hB-t/2),rotX(Math.PI),'mech').geo;
+    { const r=3, pts=[]; for(let q=0;q<=12;q++){ const a=Math.PI-Math.PI*q/12; pts.push([r*Math.cos(a),T3.a1+r*Math.sin(a)]); } for(let q=0;q<=12;q++){ const a=-Math.PI*q/12; pts.push([r*Math.cos(a),-T3.a2+r*Math.sin(a)]); } const sh=shapeFrom(dedupe(pts));
+      sh.holes.push(circlePath(0,0,D.rh)); sh.holes.push(circlePath(0,-T3.a2,D.rh)); const g=plateXY(sh,1.6), ball=new THREE.SphereGeometry(2.2,14,10); ball.translate(0,T3.a1,1.6); G.rk3=add('tuimelaar_punt','Tuimelaar vinpunt',2,merge([g,ball]),I4(),'mech').geo; }
+    G.c31=add('koppel_punt_1',`Koppelstang punt 1 (${T3.L1.toFixed(1).replace('.',',')} mm, kogel aan beide kanten)`,2,buildRod(T3.L1),rotX(-Math.PI/2),'rod').geo;
+    G.c32=add('koppel_punt_2',`Koppelstang punt 2 (${T3.L2.toFixed(1).replace('.',',')} mm)`,2,buildRod(T3.L2),rotX(-Math.PI/2),'rod').geo; }
   if(D.tiles){ const T=tileLayout(); G.tb=[]; let q=0; for(const b of T.bands){ if(b.dr) continue; q++; const g=merge(bandGeo(b,true)); b.q=q;
       add('schub_R'+q,`Schub ${q} rechts (${(b.u1-b.u0).toFixed(1).replace('.',',')} mm breed)`,1,g,rotZ(Math.PI/2),'wing'); const gl=mirrorX(g); add('schub_L'+q,`Schub ${q} links`,1,gl,rotZ(-Math.PI/2),'wing'); G.tb[b.j]={R:g,L:gl}; } }
   if(D.skin){ const strip=(s,id,name)=>{ const pf=D.plan(s/D.Sw), z0=pf.te+0.4, z1=pf.le-0.4, N=60, arc=[0]; for(let k=1;k<=N;k++){ const za=z0+(z1-z0)*(k-1)/N, zb=z0+(z1-z0)*k/N; arc.push(arc[k-1]+Math.hypot(zb-za,skinTop(s,zb)-skinTop(s,za))); }
@@ -1324,6 +1365,7 @@ function analyze(){
       A.minY=Math.min(A.minY,s.J[i].y-D.t/2+s.h,s.J[i+1].y-D.t/2+s.h,s.P[i].y-3.5+s.h);
     }
     if(D.twist3){ A.twist.push(s.tipTwist/DEG); (A.tipYs=A.tipYs||[]).push(s.tipEnd.y); }
+    (A.tipYAll=A.tipYAll||[]).push(s.tipEnd.y); if(D.tip3&&s.tip3){ (A.tipRelArr=A.tipRelArr||[]).push(s.tip3.tau/DEG); if(!s.tip3.ok) A.tip3Lock=true; } if(D.tipOn) (A.tipRelArr=A.tipRelArr||[]).push((s.a.tip-s.a[n-1])/DEG);
     if(D.skin&&s.R3){ A.skL=A.skL||skinLayout(); const e=skinStrain(s,A.skL); A.skMax=Math.max(A.skMax??-1e9,e.max); A.skMin=Math.min(A.skMin??1e9,e.min); }
     if(D.tipOn){ A.twist.push(s.tipTwist/DEG); A.tipTiltMax=Math.max(A.tipTiltMax,s.tipTilt/DEG); A.tipAng.push(s.a.tip/DEG); const rel=(s.a.tip-s.a[n-1])/DEG; A.tipRel[0]=Math.min(A.tipRel[0],rel); A.tipRel[1]=Math.max(A.tipRel[1],rel); if(s.tipLock) A.tipLock=true; A.minY=Math.min(A.minY,s.tipEnd.y+s.h-D.t/2); }
     if(D.headOn&&s.headH){ A.head.push(-s.a.head/DEG); if(s.headLock) A.headLock=true;
@@ -1383,6 +1425,8 @@ function analyze(){
   if(D.tiles&&D.tileGap){ const T=tileLayout(), nP=T.bands.filter(b=>!b.dr).length; msgs.push(['ok',`Schubben: ${nP} losse en ${T.bands.length-nP} vaste banden per vleugel. De spleten tussen de banden zijn ${nl1(Math.min(...D.tileGap))}–${nl1(Math.max(...D.tileGap))} mm (zo breed dat ze nooit klemmen) en gaan tijdens de slag tot ${nl1(Math.max(...D.tileOpen))} mm verder open. Het filament door de oogjes bij de achterrand neemt de losse banden mee.`]); }
   if(D.skin&&A.skMax!=null){ const pc=(v)=>(v*100).toFixed(0)+'%'; msgs.push([A.skMax>(P.skinMax??25)/100+0.03?'warn':'ok',`TPU-huid: de vrije stukken tussen de ribben rekken maximaal ${pc(A.skMax)} en worden maximaal ${pc(-Math.min(0,A.skMin))} korter (gemeten langs voorrand, midden en achterrand, t.o.v. de vlak geprinte huid).`+(A.skMin<-0.04?' Korter worden geeft rimpels.':'')+' In de simulatie kleurt de huid rood waar hij het meest rekt (rood = de ingestelde grens) en blauw waar hij gestuikt wordt.']); delete A.skL; }
   if(D.leverOn) for(let i=0;i<D.n;i++) if(D.d0/Math.cos(Math.max(D.bMax,0.2))+0.2>D.aLi[i]-D.rh-(D.rh+0.15)-0.3) msgs.push(['bad',`Tuimelaar ${i+1} is te kort voor deze nokslag: de pen loopt tegen het eind van de sleuf. Verklein de nokslag of de hefboom.`]);
+  if(A.tipRelArr&&A.tipRelArr.length>4){ const r=A.tipRelArr.slice(0,-1); A.tipLag=featherCorr(r,A.tipYAll.slice(0,-1)); A.tipBend=[Math.min(...r),Math.max(...r)]; }
+  if(A.tip3Lock) msgs.push(['bad','De koppelstangen van de vinpunt slaan door. Verklein het meebuigen.']);
   if(D.twist3&&A.twist.length){ A.twMin=Math.min(...A.twist); A.twMax=Math.max(...A.twist); A.feather=featherCorr(A.twist.slice(0,-1),A.tipYs.slice(0,-1)); if(D.tw3Fail) msgs.push(['bad','Manta 3.0: geen werkende draaiarmen gevonden bij deze vleugel. Verander spanwijdte of slag.']); }
   if(D.tipOn){ if(A.tipLock) msgs.push(['bad','De koppelstang van de vleugelpunt slaat door. Verklein het meebuigen of de nokslag.']);
     if(A.tipTiltMax>8) msgs.push(['warn',`Door de schuine scharnierlijn staat de koppelstang van de punt tot ${A.tipTiltMax.toFixed(0)}° scheef; boven 8° gaan de pennen wringen. Verklein de draaiing.`]);
@@ -1477,7 +1521,13 @@ function buildScene(){
     M.cam[i]=mk(G.cam[i],MAT.seg[i]); M.cam[i].position.set(0,D.yc,D.z[i]); M.cam[i].userData.tag='cam'+i;
   }
   M.post=mk(G.post,MAT.body); M.post.position.set(0,postFoot0(),D.zPost); M.post.userData.tag='post';
-  M.cr3={R:[],L:[]}; M.tl3={R:[],L:[]}; M.skin=null; M.tb=null;
+  M.cr3={R:[],L:[]}; M.tl3={R:[],L:[]}; M.skin=null; M.tb=null; M.tip3=null;
+  if(D.tip3&&G.tip3){ const T3=D.T3, zA=D.zA3; M.tip3={R:{},L:{}}; for(const sd of ['R','L']){ const o=M.tip3[sd], segP=(sd==='R'?M.segR:M.segL)[D.n-2];
+      o.body=mk(G.tip3,MAT.tile,inner); o.body.matrixAutoUpdate=false; o.body.userData.tag='tip3'+sd;
+      const eb=mk(G.tipEyeB,MAT.seg[3],o.body); eb.position.set(T3.dB,-D.t/2,zA+T3.zL+2.6); eb.userData.tag='tpb'+sd;
+      const ea=mk(G.tipEyeA,MAT.seg[3],segP); ea.position.set(D.l-T3.dA,-D.t/2,zA+T3.zL+2.6); ea.userData.tag='tpa'+sd;
+      o.rk=mk(G.rk3,MAT.seg[2],inner); o.rk.matrixAutoUpdate=false; o.rk.userData.tag='rk3'+sd;
+      o.c1=mk(G.c31,MAT.seg[3],inner); o.c1.userData.tag='c31'+sd; o.c2=mk(G.c32,MAT.seg[3],inner); o.c2.userData.tag='c32'+sd; } }
   if(D.tiles&&G.tb){ M.tb={lay:tileLayout(),R:[],L:[]}; for(const b of M.tb.lay.bands){ if(b.dr) continue; for(const sd of ['R','L']){ const m=mk(G.tb[b.j].R,MAT.tile,inner); m.matrixAutoUpdate=false; m.userData.tag='tb'+b.j+'_'+b.k+sd; M.tb[sd][b.j]=m; } } }
   if(D.skin){ const L=skinLayout(), idx=[]; for(let a=0;a<L.NS;a++) for(let j=0;j<L.NC-1;j++){ const p=a*L.NC+j; idx.push(p,p+1,p+L.NC, p+1,p+L.NC+1,p+L.NC); }
     M.skin={lay:L}; for(const sd of ['R','L']){ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(new Float32Array((L.NS+1)*L.NC*3),3)); g.setAttribute('color',new THREE.BufferAttribute(new Float32Array((L.NS+1)*L.NC*3),3)); g.setIndex(sd==='R'?idx:idx.map((v,k)=>k%3===1?idx[k+1]:k%3===2?idx[k-1]:v));
@@ -1529,7 +1579,15 @@ function skinColors(P,L,out){ const base=MAT.wing.vertexColors?new THREE.Color(0
 const P_skinLim=()=>(P.skinMax??25)/100;
 function poseSkin(s){ if(!M.skin||!s.R3) return; const P=skinPoints(s,M.skin.lay);
   for(const sd of ['R','L']){ const g=M.skin[sd].geometry, a=g.attributes.position.array; a.set(P); if(sd==='L') for(let k=0;k<a.length;k+=3) a[k]=-a[k]; g.attributes.position.needsUpdate=true; skinColors(P,M.skin.lay,g.attributes.color.array); g.attributes.color.needsUpdate=true; g.computeVertexNormals(); g.computeBoundingSphere(); } }
-function poseTiles(s){ if(!M.tb||!s.R3) return; const Sx=new THREE.Matrix4().makeScale(-1,1,1);
+function poseTip3(s){ if(!M.tip3||!s.tip3) return; const n=D.n, T3=D.T3, zA=D.zA3, Sx=new THREE.Matrix4().makeScale(-1,1,1), V=(x,y,z)=>new THREE.Vector3(x,y,z);
+  const Mt=new THREE.Matrix4().makeTranslation(s.O3[n].x,s.O3[n].y,s.O3[n].z).multiply(s.R3[n]).multiply(new THREE.Matrix4().makeTranslation(0,0,-zA));
+  const Mr=new THREE.Matrix4().makeTranslation(s.O3[n-1].x,s.O3[n-1].y,s.O3[n-1].z).multiply(s.R3[n-1]).multiply(new THREE.Matrix4().makeTranslation(T3.uP,-T3.hP,T3.cT+2.6)).multiply(new THREE.Matrix4().makeRotationZ(s.tip3.beta));
+  const zc=V(0,0,1).applyMatrix4(new THREE.Matrix4().extractRotation(s.R3[n-1]));
+  for(const sg of [1,-1]){ const o=M.tip3[sg>0?'R':'L'], F=(m)=>sg>0?m:new THREE.Matrix4().copy(Sx).multiply(m);
+    o.body.matrix.copy(F(Mt)); o.rk.matrix.copy(F(Mr));
+    for(const [m,a,b] of [[o.c1,s.tip3.A,s.tip3.R1],[o.c2,s.tip3.R2,s.tip3.B]]){ const pa=V(sg*a.x,a.y,a.z), pb=V(sg*b.x,b.y,b.z), X=pb.clone().sub(pa).normalize(), zz=V(sg*zc.x,zc.y,zc.z), Z=zz.addScaledVector(X,-zz.dot(X)).normalize(), Y=Z.clone().cross(X);
+      m.position.copy(pa).addScaledVector(Z,1); m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); m.material=s.tip3.ok?MAT.seg[3]:MAT.bad; } } }
+function poseTiles(s){ poseTip3(s); if(!M.tb||!s.R3) return; const Sx=new THREE.Matrix4().makeScale(-1,1,1);
   for(const b of M.tb.lay.bands){ if(b.dr) continue; const Mt=tileMat(s,M.tb.lay,b); M.tb.R[b.j].matrix.copy(Mt); M.tb.L[b.j].matrix.copy(Sx).multiply(Mt); } }
 function pose(theta){
   const s=solve(theta,lastA); lastA=s.a; poseSkin(s); poseTiles(s);
@@ -1620,6 +1678,9 @@ function allowedPair(a,b){
   if((A.startsWith('rk')||B.startsWith('rk'))){ const r=A.startsWith('rk')?A:B, o=r===A?B:A, ri=+r.replace(/\D/g,''), sd=r.slice(-1);
     if(o==='fol'+ri||o==='rod'+ri+sd||o==='pp'+ri+sd) return true; }
   const num=(t)=>+t.replace(/\D/g,''), side=(t)=>t.slice(-1);
+  { const m=(t)=>{ const r=/^(tip3|tpb|tpa|rk3|c31|c32)([RL])$/.exec(t); return r?{k:r[1],s:r[2]}:null; }, a=m(A), b=m(B), n=D.n, ok=[['tip3','seg'+(n-1)],['tip3','tpb'],['rk3','seg'+(n-1)],['tpa','seg'+(n-2)],['c31','tpa'],['c31','rk3'],['c32','rk3'],['c32','tpb'],['c32','tip3']];
+    const key=(x,t)=>x?x.k:t.replace(/[RL]$/,''), sd=(x,t)=>x?x.s:t.slice(-1);
+    if((a||b)&&sd(a,A)===sd(b,B)){ const ka=key(a,A), kb=key(b,B); if(ok.some(([p,q])=>(p===ka&&q===kb)||(p===kb&&q===ka))) return true; } }
   { const tb=(t)=>{ const r=/^tb(\d+)_(\d+)([RL])$/.exec(t); return r?{k:+r[2],s:r[3]}:null; }; for(const [x,o] of [[tb(A),B],[tb(B),A]]) if(x&&o==='seg'+x.k+x.s) return true; }
   if(D.twist3){ const m3=(t)=>{ const r=/^(crk|tlk|hnk|ark)(\d+)([RL])$/.exec(t); return r?{k:r[1],i:+r[2],s:r[3]}:null; }, a3=m3(A), b3=m3(B);
     for(const [x,y,o] of [[a3,b3,B],[b3,a3,A]]){ if(!x) continue;
@@ -1636,7 +1697,7 @@ function allowedPair(a,b){
   if((A.startsWith('fol')&&B.startsWith('cam'))||(B.startsWith('fol')&&A.startsWith('cam'))){ if(num(A)===num(B)) return true; }
   return false;
 }
-function tagLabel(t){ if(D.horse) return hTagLabel(t); { const r=/^tb(\d+)_(\d+)([RL])$/.exec(t); if(r){ const b=M.tb&&M.tb.lay.bands[+r[1]]; return 'Schub '+(b&&b.q||r[1])+(r[3]==='R'?' rechts':' links'); } } { const r=/^(crk|tlk|hnk|ark)(\d+)([RL])$/.exec(t); if(r) return ({crk:'Kruisstuk',tlk:'Draaistangetje',hnk:'Draaihoorn',ark:'Draaiarm'})[r[1]]+' '+r[2]+(r[3]==='R'?' rechts':' links'); } const n=(x)=>+x.replace(/\D/g,'')+1, sd=(x)=>x.endsWith('R')?' rechts':x.endsWith('L')?' links':'';
+function tagLabel(t){ if(D.horse) return hTagLabel(t); { const r=/^(tip3|tpb|tpa|rk3|c31|c32)([RL])$/.exec(t); if(r) return ({tip3:'Vinpunt',tpb:'Oog vinpunt',tpa:'Kogeloog koppelstang punt',rk3:'Tuimelaar vinpunt',c31:'Koppelstang punt 1',c32:'Koppelstang punt 2'})[r[1]]+(r[2]==='R'?' rechts':' links'); } { const r=/^tb(\d+)_(\d+)([RL])$/.exec(t); if(r){ const b=M.tb&&M.tb.lay.bands[+r[1]]; return 'Schub '+(b&&b.q||r[1])+(r[3]==='R'?' rechts':' links'); } } { const r=/^(crk|tlk|hnk|ark)(\d+)([RL])$/.exec(t); if(r) return ({crk:'Kruisstuk',tlk:'Draaistangetje',hnk:'Draaihoorn',ark:'Draaiarm'})[r[1]]+' '+r[2]+(r[3]==='R'?' rechts':' links'); } const n=(x)=>+x.replace(/\D/g,'')+1, sd=(x)=>x.endsWith('R')?' rechts':x.endsWith('L')?' links':'';
   if(t.startsWith('seg')) return 'Vleugel'+sd(t)+' '+n(t); if(t.startsWith('eye')) return 'Stangoog '+n(t)+sd(t); if(t.startsWith('rod')) return 'Stang '+n(t)+sd(t);
   if(t.startsWith('fol')) return 'Volger '+n(t); if(t.startsWith('cam')) return 'Nok '+n(t);
   if(t.startsWith('rk')) return 'Tuimelaar '+n(t)+sd(t); if(/^pp\d/.test(t)) return 'Draaipuntsteun '+n(t)+sd(t);
@@ -1965,7 +2026,7 @@ function renderReal(){
     row('Draaiing vinpunt om lengteas',(D.tipOn&&D.skew>0)||D.twist3?`${nl(AN.twMin,0)}° … +${nl(AN.twMax,0)}°`:'geen','max. 30° bij 3/4 span (model, blz. 6); −50° … +70° bij 0,85 (Fig. 17c2)',((D.tipOn&&D.skew>0)||D.twist3)&&Math.max(Math.abs(AN.twMin),Math.abs(AN.twMax))>=25)+
     (D.twist3?row('Voorrand omlaag bij neerslag, omhoog bij opslag',AN.feather>0.3?'ja':AN.feather<-0.3?'nee, omgekeerd':'nauwelijks','ja – de achterrand loopt achter; nodig voor stuwkracht (vinhydrodynamica, niet uit Fish e.a.)',AN.feather>0.3):'')+
     row('Symmetrisch vinprofiel',D.sym?'ja (2 helften)':'nee (vlakke onderkant)','ja (blz. 1)',D.sym)+
-    row('Punt loopt achter, buigt omlaag bij opslag',D.tipOn?`${nl(AN.tipRel[1]-AN.tipRel[0],0)}° buiging`:'nee','ja (blz. 2, 9)',D.tipOn)+
+    row('Punt loopt achter, buigt omlaag bij opslag',(D.tipOn||D.tip3)&&AN.tipBend?`${nl(AN.tipBend[1]-AN.tipBend[0],0)}° buiging, `+(AN.tipLag<-0.3?'ja':AN.tipLag>0.3?'buigt juist omhoog':'nauwelijks'):'nee','ja (blz. 2, 9)',(D.tipOn||D.tip3)&&AN.tipLag<-0.3)+
     `</tbody></table></div>
     <p class="note">Bron: Fish, Schreiber, Moored, Liu, Dong &amp; Bart-Smith (2016), <a href="https://doi.org/10.3390/aerospace3030020" target="_blank" rel="noopener">Hydrodynamic Performance of Aquatic Flapping: Efficiency of Underwater Flight in the Manta</a>, Aerospace 3(3):20. Lijflengte gemeten van rostrum tot staartbasis, zoals in het artikel. * Lijfdikte: morfometrie van <i>Mobula birostris</i> in een taxonomische studie uit 2023 (<a href="https://zenodo.org/records/16739803" target="_blank" rel="noopener">Zenodo, tabel 6</a>; uit een samenvatting, tabel niet zelf gelezen). Niet na te bootsen met scharnierende platen: de golf langs de koorde (de vin zelf buigt niet).</p>`;
 }
@@ -2049,6 +2110,7 @@ function readme(){
     L.push('      halve scharnierogen terwijl de lijm uithardt, zodat de gaten precies in lijn komen; trek de pen er daarna uit.'); }
   L.push('  6. Scharnier de vleugelsegmenten met filament-pennen aan het lijf en aan elkaar. Smelt de pen-uiteinden licht aan.');
   if(D.tiles){ const T=tileLayout(), fl=T.bands[T.bands.length-1].s1-T.bands[0].s0+20; L.push(`     Manta 5.0 (schubben): segment 2 t/m ${D.n} zijn een skelet met een ronde ligger; de vaste schubben zitten aan segment 1 (over het eerste scharnier) en aan de rib van elk segment. Schuif de losse schubben in volgorde met hun ring over de ligger voordat je het volgende kruisstuk plaatst (de ring zit aan de binnenkant van elke schub). Steek daarna per vleugel een stuk filament van 1,75 mm (±${fl.toFixed(0)} mm) door de oogjes onder de achterrand van alle schubben, van segment 1 tot de punt. Zet het filament alleen vast in het oogje van segment 1 (druppel secondelijm); in de andere oogjes moet het kunnen glijden. Het filament buigt mee en neemt de losse schubben mee, zodat de draaiing geleidelijk van band tot band verloopt. Print de schubben staand (ring op het bed), zoals ze in de export liggen.`); }
+  if(D.tip3){ const T3=D.T3; L.push(`     Vinpunt (5.x): de punt scharniert met een pen van 1,75 mm door de lipjes aan het eind van segment ${D.n} en het buisje van de punt. Schroef/pin de tuimelaar op het lipje onder segment ${D.n} (${T3.uP} mm na het begin). Koppelstang 1 (${T3.L1.toFixed(1).replace('.',',')} mm) loopt van het kogeloog onder segment ${D.n-1} naar de kogel op de tuimelaar, koppelstang 2 (${T3.L2.toFixed(1).replace('.',',')} mm) van de tuimelaar naar het oog onder de punt. De tuimelaar keert de beweging om, zodat de punt mét de vleugel meebuigt en bij de opslag achterblijft (omlaag buigt).`); }
   if(D.skin) L.push(`     Manta 4.0 (TPU): segment 2 t/m ${D.n} zijn geen vlakke platen maar een skelet: een ligger op de draaias met het kogeloog, één rib bij de draaihoorn en een beugel voor de draaiarm. De draaias ligt achter in de vleugel (binnen de omtrek tot aan de punt), het draaiwerk zit ervoor: zo kantelt de voorrand omlaag bij de neerslag en omhoog bij de opslag, zoals bij een echte vin. Print de twee TPU-huiden in TPU 95A (0,8 mm, ribbels naar boven op het bed, langzaam: ±20 mm/s), druk ze met de gaatjes over de nopjes op de rand van segment 1 en op de flens van elke rib, en klem ze vast met de PLA-klemstrips (gaatjes over dezelfde nopjes; buig de strip mee met het profiel). Zet de strips vast met een druppel secondelijm op elk nopje of smelt de nopkopjes plat met een soldeerbout. Lijm hoeft niet aan de TPU zelf te hechten. Tussen de ribben blijft de huid los, zodat de draaiing daar geleidelijk verloopt en de vleugel één geheel blijft. De ribbels onder de huid zijn vinstralen: ze houden de huid in koorderichting stijf.`);
   if(D.twist3) L.push(`     Manta 3.0: segment 2 t/m ${D.n} hangen elk met een kruisstuk (cardan) aan het vorige segment, op één rechte draaias langs de spanwijdte. Steek een pen van 1,75 mm door de lipjes aan het eind van het vorige segment en het kruisstuk, en een tweede pen door het kruisstuk en het buisje aan het begin van het volgende segment. De vleugelstangen 2 t/m ${D.n} grijpen met een kogeloog op die as aan; druk de kogelkop in het stangoog. Lijm onder elk segment de draaihoorn (${D.uH3.toFixed(0)} mm vanaf het begin, ${D.e3.slice(1).join('/')} mm achter de as) en onder het vorige segment de draaiarm, aan het buitenste eind. Verbind arm en hoorn met het draaistangetje; de pennen lopen langs de spanwijdte. Zo draait elk segment een stukje verder dan het vorige: samen ${D.tw3Range?Math.round(D.tw3Range[0])+'° … +'+Math.round(D.tw3Range[1])+'°':'?'} aan de punt.`);
   if(D.twistOn) L.push(`     Manta 2.0: de vinpunt draait om een pen langs de spanwijdte (door de buisjes aan het eind van segment ${D.n} en het begin van de punt, ${((D.plan(D.n*D.l/D.Sw).le-D.zAx)).toFixed(1).replace('.',',')} mm achter de voorrand). Lijm de pen in het buisje van de punt.`,`     Lijm de draaiarm onder segment ${D.n-1} (${D.dTA} mm vóór zijn buitenste scharnier, ${(D.plan(D.n*D.l/D.Sw).le-D.twZH).toFixed(1).replace('.',',')} mm achter de voorrand) en de draaihoorn onder de punt (${D.twUH} mm voorbij de naad, zelfde afstand).`,`     Verbind arm en hoorn met het draaistangetje (${D.twL.toFixed(1).replace('.',',')} mm) en twee korte pennen langs de spanwijdte.`);
@@ -2119,7 +2181,7 @@ const HCONTROLS=[
 const isH=()=>!!(PRESETS[P.preset]&&PRESETS[P.preset].kind==='legs');
 const TWIST_CTL={id:'skew',label:'Draaiing vinpunt (verenstand, piek–piek)',min:0,max:140,step:5,unit:'°',hint:'Manta 2.0: de punt draait om een eigen as langs de spanwijdte. Een draaistangetje vanaf een arm onder het voorlaatste segment duwt hem rond als de vleugel buigt. Fish e.a. 2016 meten −50° … +70° bij 0,85 halve span (Fig. 17c2). 0° = geen draaiing.'};
 const SKIN_CTL={id:'skinMax',label:'Max. rek TPU-huid',min:10,max:60,step:5,unit:'%',hint:'Manta 4.0: hoeveel de losse huid tussen de ribben mag uitrekken. Meer rek geeft meer draaiing van de vinpunt, minder rek spaart de huid.'};
-const ctls=()=>isH()?HCONTROLS:(PRESETS[P.preset]&&PRESETS[P.preset].twist?CONTROLS.map(c=>c.id==='skew'?TWIST_CTL:c):PRESETS[P.preset]&&PRESETS[P.preset].skin?CONTROLS.filter(c=>!['skew','sym'].includes(c.id)).map(c=>c.id==='tip'?SKIN_CTL:c):PRESETS[P.preset]&&PRESETS[P.preset].twist3?CONTROLS.filter(c=>!['skew','tip','sym'].includes(c.id)):CONTROLS);
+const ctls=()=>isH()?HCONTROLS:(PRESETS[P.preset]&&PRESETS[P.preset].twist?CONTROLS.map(c=>c.id==='skew'?TWIST_CTL:c):PRESETS[P.preset]&&PRESETS[P.preset].tiles?CONTROLS.filter(c=>!['skew'].includes(c.id)):PRESETS[P.preset]&&PRESETS[P.preset].skin?CONTROLS.filter(c=>!['skew','sym'].includes(c.id)).map(c=>c.id==='tip'?SKIN_CTL:c):PRESETS[P.preset]&&PRESETS[P.preset].twist3?CONTROLS.filter(c=>!['skew','tip','sym'].includes(c.id)):CONTROLS);
 const HLEGS=[{id:'LH',fore:false,s:-1,off:null},{id:'RH',fore:false,s:1,off:'offRH'},{id:'LF',fore:true,s:-1,off:'offLF'},{id:'RF',fore:true,s:1,off:'offRF'}];
 const LEGNAME={LH:'Achter links',RH:'Achter rechts',LF:'Voor links',RF:'Voor rechts'};
 const LEGSHORT={LH:'AL',RH:'AR',LF:'VL',RF:'VR'};
@@ -2772,6 +2834,6 @@ resize(); applyTheme();
 rebuild(true); updateHud();
 setInterval(updateHud,1000);
 requestAnimationFrame(loop);
-window.__AA={tw3:{chain:(...a)=>tw3Chain(...a),clear:(...a)=>tw3Clear(...a),lay:()=>skinLayout(),pts:(a,b)=>skinPoints(a,b),phi:(...a)=>skinPhi(...a),strain:(a,b)=>skinStrain(a,b),corr:(a,b)=>featherCorr(a,b)},solve:(t,p)=>solve(t,p),wingPoses:(N)=>{ const o=[]; let pv=null; for(let k=0;k<N;k++){ const s=solve(k/N*2*Math.PI,pv); pv=s.a; o.push({J:s.J.map(j=>[j.x,j.y]),a:s.a.slice(0,D.n),B:s.B.map(b=>[b.x,b.y])}); } return {poses:o,L:D.L.slice(),zRod:D.zRod.slice(),att:D.att.slice(),leAtt:D.tAtt.map(t=>D.plan(t).le),teAtt:D.tAtt.map(t=>D.plan(t).te),hTab:D.hTab,l:D.l,n:D.n,t:D.t,Sw:D.Sw,w0:D.w0,zq:Array.from({length:D.n+1},(_,i)=>{ const pf=D.plan(Math.min(1,(i+0.5)*D.l/D.Sw)); return pf.le-0.25*(pf.le-pf.te); })}; },mbk:(a,b)=>{MB_K=a;MV_K=b;},twk:(v)=>{TWK=v;},kin:()=>{const o=[];let p=null;for(let k=0;k<72;k+=6){p=hKin(k/72*2*Math.PI,p);o.push([p.h,p.phi/DEG,p.rho/DEG].map(v=>+v.toFixed(2)));}return o;},hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
+window.__AA={fcorr:(a,b)=>featherCorr(a,b),tw3:{chain:(...a)=>tw3Chain(...a),clear:(...a)=>tw3Clear(...a),lay:()=>skinLayout(),pts:(a,b)=>skinPoints(a,b),phi:(...a)=>skinPhi(...a),strain:(a,b)=>skinStrain(a,b),corr:(a,b)=>featherCorr(a,b)},solve:(t,p)=>solve(t,p),wingPoses:(N)=>{ const o=[]; let pv=null; for(let k=0;k<N;k++){ const s=solve(k/N*2*Math.PI,pv); pv=s.a; o.push({J:s.J.map(j=>[j.x,j.y]),a:s.a.slice(0,D.n),B:s.B.map(b=>[b.x,b.y])}); } return {poses:o,L:D.L.slice(),zRod:D.zRod.slice(),att:D.att.slice(),leAtt:D.tAtt.map(t=>D.plan(t).le),teAtt:D.tAtt.map(t=>D.plan(t).te),hTab:D.hTab,l:D.l,n:D.n,t:D.t,Sw:D.Sw,w0:D.w0,zq:Array.from({length:D.n+1},(_,i)=>{ const pf=D.plan(Math.min(1,(i+0.5)*D.l/D.Sw)); return pf.le-0.25*(pf.le-pf.te); })}; },mbk:(a,b)=>{MB_K=a;MV_K=b;},twk:(v)=>{TWK=v;},kin:()=>{const o=[];let p=null;for(let k=0;k<72;k+=6){p=hKin(k/72*2*Math.PI,p);o.push([p.h,p.phi/DEG,p.rho/DEG].map(v=>+v.toFixed(2)));}return o;},hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
 })();
 </script>
