@@ -293,7 +293,7 @@ const PRESETS = {
 
 // Manta 2.0: zelfde vorm als Manta 1.0, maar de vinpunt draait om een eigen as langs de spanwijdte (verenstand)
 { const o=Object.assign({},PRESETS); for(const k of Object.keys(PRESETS)) delete PRESETS[k];
-  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); } } }
+  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5,skinMax:25})}); } } }
 const CONTROLS = [
   {g:'Vorm'},
   {id:'span',label:'Spanwijdte',min:120,max:400,step:5,unit:'mm'},
@@ -558,13 +558,13 @@ function tw3Clear(c,B){ let m=1e9; const V=(x,y,z)=>new THREE.Vector3(x,y,z);
 function designTwist3(d){ const Ds=D; D=d; d.twist3=false; const n=d.n, l=d.l, poses=[]; let pv=null;
   try{ for(let k=0;k<24;k++){ const s=solve(k/24*2*Math.PI,pv); pv=s.a; poses.push({J0:s.J[0],a0:s.a[0],B:s.B.map(b=>({x:b.x,y:b.y}))}); } }catch(e){}
   d.twist3=true; d.dH3=d.t/2+4.5; d.uA3=l-3; let best=null;
-  const G3=d.skin?{uH:[l-17,l-15,l-12,l-9],zA:[16,18,22],e1:[22,26,30],e2:[12,13,15],dE:[20,22]}:{uH:[l-17,l-15],zA:[18,20,22],e1:[14,15,16],e2:[12,13],dE:[20,22]};
+  const G3=d.skin?{uH:[l-17,l-15,l-12,l-9],zA:[16,22],e1:[14,18,22,26,30,34],e2:[12,13,15],dE:[20,22]}:{uH:[l-17,l-15],zA:[18,20,22],e1:[14,15,16],e2:[12,13],dE:[20,22]};
   for(const uH of G3.uH) for(const zA of G3.zA) for(const e1 of G3.e1) for(const e2 of G3.e2) for(const dE of G3.dE) for(const alt of (n>3?[0,12]:[0])){ d.uH3=uH; const Ly=d.skin?skinLayout():null; let sMax=0;
     d.zA3=zA; d.e3=[0,e1]; for(let i=2;i<n;i++) d.e3.push(i%2?e2+alt:e2); d.dE3=dE; d.L3=d.L.map((L,i)=>Math.hypot(L,zA-d.zRod[i])); d.Lh3=d.e3.map(()=>dE-d.dH3);
     let prev=null, lo=1e9, hi=-1e9, ok=true, clr=1e9;
     for(let i=1;i<n-1;i++) if(uH+4>d.uA3-8+0.2&&Math.abs(d.e3[i]-d.e3[i+1])<12) ok=false; // hoorn en volgende arm onder hetzelfde segment mogen niet overlappen
     for(let r=0;r<2&&ok;r++) for(const q of poses){ const c=tw3Chain(q.J0,q.a0,q.B,prev); if(c.ok.some(v=>!v)){ ok=false; break; } prev=c.d; if(r){ clr=Math.min(clr,tw3Clear(c,q.B)); if(Ly) sMax=Math.max(sMax,skinStrain({R3:c.R,O3:c.O},Ly).max); const ch=new THREE.Vector3(0,0,1).applyMatrix4(c.R[n-1]); const t=Math.atan2(ch.y,ch.z)/DEG; lo=Math.min(lo,t); hi=Math.max(hi,t); } }
-    if(!ok||clr<1.5) continue; const sc=Math.abs(lo+50)+Math.abs(hi-70)+150*Math.max(0,sMax-0.22); if(!best||sc<best.sc) best={sc,uH,zA,e1,e2,alt,dE,lo,hi}; }
+    if(!ok||clr<1.5) continue; const sc=Math.abs(lo+50)+Math.abs(hi-70)+(d.skin?400*Math.max(0,sMax-((P.skinMax??25)/100-0.02)):0); if(!best||sc<best.sc) best={sc,uH,zA,e1,e2,alt,dE,lo,hi}; }
   const b=best||{uH:l-17,zA:20,e1:16,e2:13,alt:0,dE:20}; d.uH3=b.uH; d.zA3=b.zA; d.e3=[0,b.e1]; for(let i=2;i<n;i++) d.e3.push(i%2?b.e2+b.alt:b.e2); d.dE3=b.dE; d.L3=d.L.map((L,i)=>Math.hypot(L,b.zA-d.zRod[i])); d.Lh3=d.e3.map(()=>b.dE-d.dH3);
   d.tw3Fail=!best; d.tw3Range=best?[best.lo,best.hi]:null; D=Ds; }
 function designTwist(d){ const Dsave=D; D=d; d.twistOn=false; const n=d.n; let lo=1e9, hi=-1e9, prev=null;
@@ -808,6 +808,14 @@ function eyePads(i){ const P=[], pad=(u,z)=>P.push({u0:u-5.3,u1:u+5.3,z0:z-4.3,z
   return P; }
 // Manta 4.0: buitensegment als skelet onder de TPU-huid: wortelbuisje, ligger op de draaias, zadel voor het kogeloog,
 // een rib bij de draaihoorn, een rib bij de draaiarm (of aan de punt) en de vork met lipjes voor het volgende kruisstuk.
+function skinPegZ(s){ const pf=D.plan(s/D.Sw), z0=pf.te+5, z1=pf.le-5, o=[]; if(z1-z0<4) return [(pf.te+pf.le)/2]; const k=Math.max(1,Math.round((z1-z0)/14)); for(let j=0;j<=k;j++) o.push(z0+(z1-z0)*j/k); return o; }
+const skinTop=(s,z)=>-D.t/2+Math.max(1.2,wingIdeal(s,z));
+// flens (8 mm breed) op de rib met nopjes voor de huid en de klemstrip
+function ribFlange(i,u){ const s=i*D.l+u, pf=D.plan(s/D.Sw), sh=new THREE.Shape(), N=20, z0=pf.te+0.4, z1=pf.le-0.4, items=[];
+  sh.moveTo(z0,skinTop(s,z0)); for(let k=1;k<=N;k++){ const z=z0+(z1-z0)*k/N; sh.lineTo(z,skinTop(s,z)); } for(let k=N;k>=0;k--){ const z=z0+(z1-z0)*k/N; sh.lineTo(z,skinTop(s,z)-1.4); }
+  const g=new THREE.ExtrudeGeometry(sh,{depth:8,bevelEnabled:false}); g.translate(0,0,-4); g.rotateY(-Math.PI/2); g.translate(u,0,0); items.push(g);
+  for(const z of skinPegZ(s)){ const c=new THREE.CylinderGeometry(0.75,0.75,2.2,10); c.translate(u,skinTop(s,z)+1.1,z); items.push(c); }
+  return items; }
 function ribGeo(i,u,w){ const s=i*D.l+u, pf=D.plan(s/D.Sw), sh=new THREE.Shape(), N=16, z0=pf.te+0.4, z1=pf.le-0.4, y0=-D.t/2;
   sh.moveTo(z0,y0); sh.lineTo(z1,y0); for(let k=N;k>=0;k--){ const z=z0+(z1-z0)*k/N; sh.lineTo(z,y0+Math.max(1.2,wingIdeal(s,z))); }
   const g=new THREE.ExtrudeGeometry(sh,{depth:w,bevelEnabled:false}); g.translate(0,0,-w/2); g.rotateY(-Math.PI/2); g.translate(u,0,0); return g; }
@@ -815,11 +823,11 @@ function buildSkeleton(i){ const l=D.l, zA=D.zA3, t=D.t, items=[], last=i===D.n-
   items.push(tubeX(D.rh,t/2,1.2,7,0,zA));
   const uEnd=last?l-1:l-6.4; box(6.5,uEnd,-t/2,t/2,zA-1.8,zA+1.8);
   box(D.att[i]-5,D.att[i]+5,-t/2,t/2,zA-4,zA+4);
-  items.push(ribGeo(i,D.uH3,2)); box(D.uH3-4.5,D.uH3+4.5,-t/2,-t/2+1.5,zA-D.e3[i]-6,Math.max(zA-D.e3[i]+6,zA)); 
+  items.push(ribGeo(i,D.uH3,2),...ribFlange(i,D.uH3)); box(D.uH3-4.5,D.uH3+4.5,-t/2,-t/2+1.5,zA-D.e3[i]-6,Math.max(zA-D.e3[i]+6,zA)); 
   if(!last){ const ap=arm3Pad(i+1), zc=zA-D.e3[i+1]; box(D.uA3+ap.du0,D.uA3+ap.du1,-t/2,-t/2+1.5,Math.min(zc+ap.dz0,zA-1.8),Math.max(zc+ap.dz1,zA+1.8));
     box(l-6.4,l-4.2,-t/2,t/2,zA-7.5,zA+7.5);
     for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ items.push(tubeZ(D.rh,t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); items.push(br); } }
-  else { items.push(ribGeo(i,l-1.5,2)); const pf=D.plan((i*l+l-1.5)/D.Sw); box(l-2.5,l-0.5,-t/2,-t/2+1.5,pf.te+0.4,zA+1.8); }
+  else { items.push(ribGeo(i,l-4,2),...ribFlange(i,l-4)); const pf=D.plan((i*l+l-4)/D.Sw); box(l-5,l-3,-t/2,-t/2+1.5,pf.te+0.4,zA+1.8); }
   return merge(items); }
 // TPU-huid: stations langs de span, vaste stukken (gelijmd op segment 1 of op de ribben) en vrije stukken waar de draaiing geleidelijk verloopt
 function skinLayout(){ const l=D.l, n=D.n, s0=l-6, s1=n*l-0.3, NS=Math.max(20,Math.ceil((s1-s0)/1.5)), NC=14, st=[];
@@ -827,7 +835,10 @@ function skinLayout(){ const l=D.l, n=D.n, s0=l-6, s1=n*l-0.3, NS=Math.max(20,Ma
     for(let c=0;c<NC;c++){ const z=pf.te+0.3+(pf.le-pf.te-0.6)*c/(NC-1); zs.push(z); ys.push(-D.t/2+Math.max(1.2,wingIdeal(s,z))+0.45); }
     st.push({s,k:Math.min(n-1,Math.floor(s/l)),u:s-Math.min(n-1,Math.floor(s/l))*l,zs,ys}); }
   const rig=[{a:0,s0:-1e9,s1:l-3}]; for(let i=1;i<n;i++) rig.push({a:i,s0:i*l+D.uH3-1,s1:i<n-1?i*l+D.uH3+1:1e9});
-  return {st,NS,NC,rig}; }
+  const free=[]; let cur=null; st.forEach((p,a)=>{ const isF=!rig.some(r=>p.s>=r.s0&&p.s<=r.s1); if(isF){ if(!cur){ cur=[Math.max(0,a-1),a]; free.push(cur); } else cur[1]=a; } else if(cur){ cur[1]=a; cur=null; } });
+  return {st,NS,NC,rig,free}; }
+// rek per vrije strook en per koordelijn (de huid is tussen de ribben los, dus de rek verdeelt zich over de hele strook)
+function skinZoneStrain(P,L,a0,a1,j){ let Ld=0,L0=0; for(let a=a0;a<a1;a++){ const i=(a*L.NC+j)*3, k=((a+1)*L.NC+j)*3; Ld+=Math.hypot(P[i]-P[k],P[i+1]-P[k+1],P[i+2]-P[k+2]); L0+=Math.hypot(L.st[a].s-L.st[a+1].s,L.st[a].zs[j]-L.st[a+1].zs[j]); } return (Ld-L0)/L0; }
 function skinPhi(sol,L,s,k){ const rel=(a)=>{ if(a===k) return 0; const c=new THREE.Vector3(0,0,1).applyMatrix4(sol.R3[a]).applyMatrix4(new THREE.Matrix4().copy(sol.R3[k]).transpose()); return Math.atan2(-c.y,c.z); };
   let A=null,B=null; for(const r of L.rig){ if(s>=r.s0&&s<=r.s1) return rel(r.a); if(r.s1<s) A=r; else if(!B&&r.s0>s) B=r; }
   if(!B) return rel(A.a); const t=(s-A.s1)/(B.s0-A.s1); return (1-t)*rel(A.a)+t*rel(B.a); }
@@ -837,12 +848,13 @@ function skinPoints(sol,L){ const out=new Float32Array((L.NS+1)*L.NC*3), zA=D.zA
   return out; }
 function skinStrain(sol,L){ const P=skinPoints(sol,L), res={max:-1e9,min:1e9};
   const d3=(a,b,j)=>{ const i=(a*L.NC+j)*3, k=(b*L.NC+j)*3; return Math.hypot(P[i]-P[k],P[i+1]-P[k+1],P[i+2]-P[k+2]); }, d0=(a,b,j)=>Math.hypot(L.st[a].s-L.st[b].s,L.st[a].zs[j]-L.st[b].zs[j]);
-  const free=[]; let cur=null; L.st.forEach((p,a)=>{ const isF=!L.rig.some(r=>p.s>=r.s0&&p.s<=r.s1); if(isF){ if(!cur){ cur=[Math.max(0,a-1),a]; free.push(cur); } else cur[1]=a; } else if(cur){ cur[1]=a; cur=null; } });
-  for(const [a0,a1] of free) for(const j of [0,L.NC>>1,L.NC-1]){ let Ld=0,L0=0; for(let a=a0;a<a1;a++){ Ld+=d3(a,a+1,j); L0+=d0(a,a+1,j); } const e=(Ld-L0)/L0; res.max=Math.max(res.max,e); res.min=Math.min(res.min,e); }
+  for(const [a0,a1] of L.free) for(const j of [0,L.NC>>1,L.NC-1]){ const e=skinZoneStrain(P,L,a0,a1,j); res.max=Math.max(res.max,e); res.min=Math.min(res.min,e); }
   return res; }
-function buildSkinPart(){ const L=skinLayout(), up=L.st.map(p=>[p.s,p.zs[L.NC-1]+0.3]), dn=L.st.map(p=>[p.s,p.zs[0]-0.3]).reverse(), items=[plateXY(shapeFrom(dedupe([...dn,...up].map(q=>[q[0],q[1]]))),0.8)];
+function skinPegs(){ const o=[], l=D.l; for(const z of skinPegZ(l-4.5)) o.push([l-4.5,z]); for(let i=1;i<D.n;i++){ for(const z of skinPegZ(i*l+D.uH3)) o.push([i*l+D.uH3,z]); if(i===D.n-1) for(const z of skinPegZ(i*l+l-4)) o.push([i*l+l-4,z]); } return o; }
+function buildSkinPart(){ const L=skinLayout(), up=L.st.map(p=>[p.s,p.zs[L.NC-1]+0.3]), dn=L.st.map(p=>[p.s,p.zs[0]-0.3]).reverse(), sh=shapeFrom(dedupe([...dn,...up].map(q=>[q[0],q[1]])));
+  for(const [ps,pz] of skinPegs()) sh.holes.push(circlePath(ps,pz,0.85)); const items=[plateXY(sh,0.8)];
   // vinstralen: TPU-ribbels onder de huid in de vrije stukken, achter de draaias (raken het draaiwerk niet)
-  for(let s=L.st[0].s+3;s<L.st[L.NS].s-1;s+=5){ if(L.rig.some(r=>s>=r.s0-2.5&&s<=r.s1+2.5)) continue; const pf=D.plan(s/D.Sw), z0=pf.te+1.5, z1=Math.min(pf.le-1.5,D.zA3-9); if(z1-z0<6) continue;
+  for(let s=L.st[0].s+3;s<L.st[L.NS].s-1;s+=5){ if(L.rig.some(r=>s>=r.s0-4.5&&s<=r.s1+4.5)) continue; const pf=D.plan(s/D.Sw), z0=pf.te+1.5, z1=Math.min(pf.le-1.5,D.zA3-9); if(z1-z0<6) continue;
     const b=new THREE.BoxGeometry(1.2,z1-z0,1.4); b.translate(s,(z0+z1)/2,-0.4-0.7); items.push(b); }
   return merge(items); }
 function buildSegment(i){
@@ -868,6 +880,7 @@ function buildSegment(i){
     if(t3R) items.push(tubeX(D.rh,D.t/2,1.2,7,0,D.zA3));
     if(t3T){ const zA=D.zA3; for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ items.push(tubeZ(D.rh,D.t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,D.t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); items.push(br); } }
     if(twEnd) items.push(tubeX(D.rh,D.t/2,l-6.5,l-0.3,0,D.zAx)); if(twRoot) items.push(tubeX(D.rh,D.t/2,0.3,6.5,0,D.zAx));
+    if(D.skin&&i===0){ const s=l-4.5; for(const z of skinPegZ(s)){ const c=new THREE.CylinderGeometry(0.75,0.75,3.2,10); c.translate(s,skinTop(s,z)+0.6,z); items.push(c); } }
     const g=merge(items,LIGHT); return {full:g};
   }
   // symmetrisch profiel: bovenhelft vanaf het middenvlak omhoog, onderhelft omlaag (vlak onder de ogen op -t/2)
@@ -1107,7 +1120,11 @@ function buildParts(){
     return res.full; };
   G.segMI=[];
   for(let i=0;i<D.n;i++){ const r=buildSegment(i), sk=D.skin&&i>=1; G.seg[i]=wing((sk?'skelet_R':'vleugel_R')+(i+1),(sk?'skelet_L':'vleugel_L')+(i+1),(sk?'Skelet (ligger + ribben) rechts ':'Vleugel rechts ')+(i+1),(sk?'Skelet (ligger + ribben) links ':'Vleugel links ')+(i+1),r); G.segMI[i]=massInfo(r.full); }
-  if(D.skin){ const g=buildSkinPart(); add('tpu_huid_R','TPU-huid rechts (print in TPU 95A)',1,g,rotX(Math.PI/2),'wing'); add('tpu_huid_L','TPU-huid links (print in TPU 95A)',1,mirrorX(g),rotX(Math.PI/2),'wing'); }
+  if(D.skin){ const strip=(s,id,name)=>{ const pf=D.plan(s/D.Sw), z0=pf.te+0.4, z1=pf.le-0.4, N=60, arc=[0]; for(let k=1;k<=N;k++){ const za=z0+(z1-z0)*(k-1)/N, zb=z0+(z1-z0)*k/N; arc.push(arc[k-1]+Math.hypot(zb-za,skinTop(s,zb)-skinTop(s,za))); }
+      const at=(z)=>{ const f=(z-z0)/(z1-z0)*N, k=Math.min(N-1,Math.floor(f)); return arc[k]+(arc[k+1]-arc[k])*(f-k); }, Lr=arc[N], sh=shapeFrom([[0,-3],[Lr,-3],[Lr,3],[0,3]]);
+      for(const z of skinPegZ(s)) sh.holes.push(circlePath(at(z),0,0.95)); add(id,name+` (${Lr.toFixed(0)} mm)`,2,plateXY(sh,0.8),rotX(-Math.PI/2),'mech'); };
+    strip(D.l-4.5,'klemstrip_1','Klemstrip huid op segment 1'); for(let i=1;i<D.n;i++) strip(i*D.l+D.uH3,'klemstrip_'+(i+1),'Klemstrip rib segment '+(i+1)); strip((D.n-1)*D.l+D.l-4,'klemstrip_punt','Klemstrip rib vinpunt');
+    const g=buildSkinPart(); add('tpu_huid_R','TPU-huid rechts (print in TPU 95A)',1,g,rotX(Math.PI/2),'wing'); add('tpu_huid_L','TPU-huid links (print in TPU 95A)',1,mirrorX(g),rotX(Math.PI/2),'wing'); }
   if(D.tipOn){
     const r=buildSegment(D.n); G.tipSeg=wing('vleugelpunt_R','vleugelpunt_L','Vleugelpunt rechts','Vleugelpunt links',r); G.tipMI=massInfo(r.full);
     if(D.twistOn){
@@ -1311,7 +1328,7 @@ function analyze(){
   if(!D.forced) A.Fw.forEach((f,i)=>{ if(f<0) msgs.push(['bad',`Volger ${i+1} komt los van zijn nok: de vleugel trekt hem omhoog (${f.toFixed(2)} N). Zet gedwongen terugloop aan of vergroot de V-stelling.`]); else if(f<0.05) msgs.push(['warn',`Volger ${i+1} drukt maar ${(f*102).toFixed(0)} g op zijn nok. Bij wrijving kan hij blijven hangen; overweeg gedwongen terugloop.`]); });
 
   if(D.heaveOn&&A.Fh<0.08) msgs.push(['warn',`De paal drukt te licht op de deinnok (${(A.Fh*102).toFixed(0)} g). Maak het lijf zwaarder of verklein het deinen.`]);
-  if(D.skin&&A.skMax!=null){ const pc=(v)=>(v*100).toFixed(0)+'%'; msgs.push([A.skMax>0.3?'warn':'ok',`TPU-huid: de vrije stukken tussen de ribben rekken maximaal ${pc(A.skMax)} en worden maximaal ${pc(-Math.min(0,A.skMin))} korter (gemeten langs voorrand, midden en achterrand, t.o.v. de vlak geprinte huid).`+(A.skMin<-0.04?' Korter worden geeft rimpels.':'')]); delete A.skL; }
+  if(D.skin&&A.skMax!=null){ const pc=(v)=>(v*100).toFixed(0)+'%'; msgs.push([A.skMax>(P.skinMax??25)/100+0.03?'warn':'ok',`TPU-huid: de vrije stukken tussen de ribben rekken maximaal ${pc(A.skMax)} en worden maximaal ${pc(-Math.min(0,A.skMin))} korter (gemeten langs voorrand, midden en achterrand, t.o.v. de vlak geprinte huid).`+(A.skMin<-0.04?' Korter worden geeft rimpels.':'')+' In de simulatie kleurt de huid rood waar hij het meest rekt (rood = de ingestelde grens) en blauw waar hij gestuikt wordt.']); delete A.skL; }
   if(D.twist3&&A.twist.length){ A.twMin=Math.min(...A.twist); A.twMax=Math.max(...A.twist); if(D.tw3Fail) msgs.push(['bad','Manta 3.0: geen werkende draaiarmen gevonden bij deze vleugel. Verander spanwijdte of slag.']); }
   if(D.tipOn){ if(A.tipLock) msgs.push(['bad','De koppelstang van de vleugelpunt slaat door. Verklein het meebuigen of de nokslag.']);
     if(A.tipTiltMax>8) msgs.push(['warn',`Door de schuine scharnierlijn staat de koppelstang van de punt tot ${A.tipTiltMax.toFixed(0)}° scheef; boven 8° gaan de pennen wringen. Verklein de draaiing.`]);
@@ -1354,7 +1371,7 @@ const FINISH={
   pla:()=>({wing:'#e9e6df',body:'#dcd8cf',belly:'#cfcac0',metal:0,rough:0.55})
 };
 const MAT={
-  wing:new THREE.MeshStandardMaterial({side:THREE.FrontSide}), skin:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,transparent:true,opacity:0.88}),
+  wing:new THREE.MeshStandardMaterial({side:THREE.FrontSide}), skin:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,transparent:true,opacity:0.92,vertexColors:true}),
   body:new THREE.MeshStandardMaterial(), belly:new THREE.MeshStandardMaterial(),
   wood:new THREE.MeshStandardMaterial({color:0x6e4b2e,metalness:0.05,roughness:0.8,transparent:true,opacity:0.28,depthWrite:false}),
   steel:new THREE.MeshStandardMaterial({color:0x8a9096,metalness:0.7,roughness:0.35}),
@@ -1367,7 +1384,7 @@ const MAT={
 function applyFinish(){
   const f=FINISH[document.getElementById('finish').value](PRESETS[P.preset]);
   const pat=document.getElementById('finish').value==='natuur'&&!!PRESETS[P.preset].pattern;
-  for(const [m,c] of [[MAT.wing,f.wing],[MAT.body,f.body],[MAT.belly,f.belly],[MAT.skin,f.wing]]){ m.color.set(c); m.metalness=f.metal; m.roughness=f.rough; m.vertexColors=false; m.needsUpdate=true; }
+  for(const [m,c] of [[MAT.wing,f.wing],[MAT.body,f.body],[MAT.belly,f.belly]]){ m.color.set(c); m.metalness=f.metal; m.roughness=f.rough; m.vertexColors=false; m.needsUpdate=true; }
   if(pat) for(const m of [MAT.wing,MAT.body]){ m.color.set('#ffffff'); m.vertexColors=true; }
 }
 let asm=new THREE.Group(), bedGroup=new THREE.Group(); scene.add(asm); scene.add(bedGroup);
@@ -1407,7 +1424,7 @@ function buildScene(){
   M.post=mk(G.post,MAT.body); M.post.position.set(0,postFoot0(),D.zPost); M.post.userData.tag='post';
   M.cr3={R:[],L:[]}; M.tl3={R:[],L:[]}; M.skin=null;
   if(D.skin){ const L=skinLayout(), idx=[]; for(let a=0;a<L.NS;a++) for(let j=0;j<L.NC-1;j++){ const p=a*L.NC+j; idx.push(p,p+1,p+L.NC, p+1,p+L.NC+1,p+L.NC); }
-    M.skin={lay:L}; for(const sd of ['R','L']){ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(new Float32Array((L.NS+1)*L.NC*3),3)); g.setIndex(sd==='R'?idx:idx.map((v,k)=>k%3===1?idx[k+1]:k%3===2?idx[k-1]:v));
+    M.skin={lay:L}; for(const sd of ['R','L']){ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(new Float32Array((L.NS+1)*L.NC*3),3)); g.setAttribute('color',new THREE.BufferAttribute(new Float32Array((L.NS+1)*L.NC*3),3)); g.setIndex(sd==='R'?idx:idx.map((v,k)=>k%3===1?idx[k+1]:k%3===2?idx[k-1]:v));
       const m=new THREE.Mesh(g,MAT.skin); m.castShadow=true; m.receiveShadow=true; m.frustumCulled=false; inner.add(m); M.skin[sd]=m; } }
   if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const c=mk(G.cross3,MAT.steel,inner); c.matrixAutoUpdate=false; c.userData.tag='crk'+i+sd; M.cr3[sd][i]=c;
     const t=mk(G.link3[i],MAT.seg[3],inner); t.userData.tag='tlk'+i+sd; M.tl3[sd][i]=t; }
@@ -1449,8 +1466,13 @@ function applyViewOpts(){
   if(M.box) M.box.forEach(m=>{ m.castShadow=!ghost; });
 }
 let lastA=null;
+function skinColors(P,L,out){ const base=MAT.wing.vertexColors?new THREE.Color(0x4f5964):MAT.wing.color, hot=new THREE.Color(0xd8402f), cold=new THREE.Color(0x3d7fd1), lim=Math.max(0.05,(P_skinLim())), c=new THREE.Color();
+  for(let q=0;q<out.length;q+=3){ out[q]=base.r; out[q+1]=base.g; out[q+2]=base.b; }
+  for(const [a0,a1] of L.free) for(let j=0;j<L.NC;j++){ const v=skinZoneStrain(P,L,a0,a1,j); c.copy(base); if(v>0.02) c.lerp(hot,clamp((v-0.02)/(lim-0.02),0,1)); else if(v<-0.03) c.lerp(cold,clamp((-v-0.03)/0.07,0,1));
+    for(let a=a0+1;a<a1;a++){ const q=(a*L.NC+j)*3; out[q]=c.r; out[q+1]=c.g; out[q+2]=c.b; } } }
+const P_skinLim=()=>(P.skinMax??25)/100;
 function poseSkin(s){ if(!M.skin||!s.R3) return; const P=skinPoints(s,M.skin.lay);
-  for(const sd of ['R','L']){ const g=M.skin[sd].geometry, a=g.attributes.position.array; a.set(P); if(sd==='L') for(let k=0;k<a.length;k+=3) a[k]=-a[k]; g.attributes.position.needsUpdate=true; g.computeVertexNormals(); g.computeBoundingSphere(); } }
+  for(const sd of ['R','L']){ const g=M.skin[sd].geometry, a=g.attributes.position.array; a.set(P); if(sd==='L') for(let k=0;k<a.length;k+=3) a[k]=-a[k]; g.attributes.position.needsUpdate=true; skinColors(P,M.skin.lay,g.attributes.color.array); g.attributes.color.needsUpdate=true; g.computeVertexNormals(); g.computeBoundingSphere(); } }
 function pose(theta){
   const s=solve(theta,lastA); lastA=s.a; poseSkin(s);
   for(let i=0;i<D.n;i++){
@@ -1966,7 +1988,7 @@ function readme(){
   if(D.sym){ L.push('  5b. Symmetrisch profiel: lijm elke bovenhelft op de bijbehorende onderhelft (vlakke kanten op elkaar). Leg een filament-pen door de');
     L.push('      halve scharnierogen terwijl de lijm uithardt, zodat de gaten precies in lijn komen; trek de pen er daarna uit.'); }
   L.push('  6. Scharnier de vleugelsegmenten met filament-pennen aan het lijf en aan elkaar. Smelt de pen-uiteinden licht aan.');
-  if(D.skin) L.push(`     Manta 4.0 (TPU): segment 2 t/m ${D.n} zijn geen vlakke platen maar een skelet: een ligger op de draaias met het kogeloog, één rib bij de draaihoorn en een beugel voor de draaiarm. Print de twee TPU-huiden in TPU 95A (0,8 mm, ribbels naar boven op het bed), leg ze over de vleugel en lijm ze op de buitenste 6 mm van segment 1 en op de bovenkant van elke rib (TPU hecht slecht: gebruik contactlijm of secondelijm met primer). Tussen de ribben blijft de huid los, zodat de draaiing daar geleidelijk verloopt en de vleugel één geheel blijft. De ribbels onder de huid zijn vinstralen: ze houden de huid in koorderichting stijf.`);
+  if(D.skin) L.push(`     Manta 4.0 (TPU): segment 2 t/m ${D.n} zijn geen vlakke platen maar een skelet: een ligger op de draaias met het kogeloog, één rib bij de draaihoorn en een beugel voor de draaiarm. Print de twee TPU-huiden in TPU 95A (0,8 mm, ribbels naar boven op het bed, langzaam: ±20 mm/s), druk ze met de gaatjes over de nopjes op de rand van segment 1 en op de flens van elke rib, en klem ze vast met de PLA-klemstrips (gaatjes over dezelfde nopjes; buig de strip mee met het profiel). Zet de strips vast met een druppel secondelijm op elk nopje of smelt de nopkopjes plat met een soldeerbout. Lijm hoeft niet aan de TPU zelf te hechten. Tussen de ribben blijft de huid los, zodat de draaiing daar geleidelijk verloopt en de vleugel één geheel blijft. De ribbels onder de huid zijn vinstralen: ze houden de huid in koorderichting stijf.`);
   if(D.twist3) L.push(`     Manta 3.0: segment 2 t/m ${D.n} hangen elk met een kruisstuk (cardan) aan het vorige segment, op één rechte draaias langs de spanwijdte. Steek een pen van 1,75 mm door de lipjes aan het eind van het vorige segment en het kruisstuk, en een tweede pen door het kruisstuk en het buisje aan het begin van het volgende segment. De vleugelstangen 2 t/m ${D.n} grijpen met een kogeloog op die as aan; druk de kogelkop in het stangoog. Lijm onder elk segment de draaihoorn (${D.uH3.toFixed(0)} mm vanaf het begin, ${D.e3.slice(1).join('/')} mm achter de as) en onder het vorige segment de draaiarm, aan het buitenste eind. Verbind arm en hoorn met het draaistangetje; de pennen lopen langs de spanwijdte. Zo draait elk segment een stukje verder dan het vorige: samen ${D.tw3Range?Math.round(D.tw3Range[0])+'° … +'+Math.round(D.tw3Range[1])+'°':'?'} aan de punt.`);
   if(D.twistOn) L.push(`     Manta 2.0: de vinpunt draait om een pen langs de spanwijdte (door de buisjes aan het eind van segment ${D.n} en het begin van de punt, ${((D.plan(D.n*D.l/D.Sw).le-D.zAx)).toFixed(1).replace('.',',')} mm achter de voorrand). Lijm de pen in het buisje van de punt.`,`     Lijm de draaiarm onder segment ${D.n-1} (${D.dTA} mm vóór zijn buitenste scharnier, ${(D.plan(D.n*D.l/D.Sw).le-D.twZH).toFixed(1).replace('.',',')} mm achter de voorrand) en de draaihoorn onder de punt (${D.twUH} mm voorbij de naad, zelfde afstand).`,`     Verbind arm en hoorn met het draaistangetje (${D.twL.toFixed(1).replace('.',',')} mm) en twee korte pennen langs de spanwijdte.`);
   else if(D.tipOn&&D.skew>0) L.push(`     Het scharnier van de vinpunt staat ${Math.round(D.skew/DEG)}° schuin: daardoor draait de punt mee om zijn lengteas. Steek de pen er schuin in.`);
@@ -2035,7 +2057,8 @@ const HCONTROLS=[
 ];
 const isH=()=>!!(PRESETS[P.preset]&&PRESETS[P.preset].kind==='legs');
 const TWIST_CTL={id:'skew',label:'Draaiing vinpunt (verenstand, piek–piek)',min:0,max:140,step:5,unit:'°',hint:'Manta 2.0: de punt draait om een eigen as langs de spanwijdte. Een draaistangetje vanaf een arm onder het voorlaatste segment duwt hem rond als de vleugel buigt. Fish e.a. 2016 meten −50° … +70° bij 0,85 halve span (Fig. 17c2). 0° = geen draaiing.'};
-const ctls=()=>isH()?HCONTROLS:(PRESETS[P.preset]&&PRESETS[P.preset].twist?CONTROLS.map(c=>c.id==='skew'?TWIST_CTL:c):PRESETS[P.preset]&&PRESETS[P.preset].twist3?CONTROLS.filter(c=>!['skew','tip','sym'].includes(c.id)):CONTROLS);
+const SKIN_CTL={id:'skinMax',label:'Max. rek TPU-huid',min:10,max:60,step:5,unit:'%',hint:'Manta 4.0: hoeveel de losse huid tussen de ribben mag uitrekken. Meer rek geeft meer draaiing van de vinpunt, minder rek spaart de huid.'};
+const ctls=()=>isH()?HCONTROLS:(PRESETS[P.preset]&&PRESETS[P.preset].twist?CONTROLS.map(c=>c.id==='skew'?TWIST_CTL:c):PRESETS[P.preset]&&PRESETS[P.preset].skin?CONTROLS.filter(c=>!['skew','sym'].includes(c.id)).map(c=>c.id==='tip'?SKIN_CTL:c):PRESETS[P.preset]&&PRESETS[P.preset].twist3?CONTROLS.filter(c=>!['skew','tip','sym'].includes(c.id)):CONTROLS);
 const HLEGS=[{id:'LH',fore:false,s:-1,off:null},{id:'RH',fore:false,s:1,off:'offRH'},{id:'LF',fore:true,s:-1,off:'offLF'},{id:'RF',fore:true,s:1,off:'offRF'}];
 const LEGNAME={LH:'Achter links',RH:'Achter rechts',LF:'Voor links',RF:'Voor rechts'};
 const LEGSHORT={LH:'AL',RH:'AR',LF:'VL',RF:'VR'};
