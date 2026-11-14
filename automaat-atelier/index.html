@@ -296,7 +296,7 @@ const PRESETS = {
 
 // Manta 2.0: zelfde vorm als Manta 1.0, maar de vinpunt draait om een eigen as langs de spanwijdte (verenstand)
 { const o=Object.assign({},PRESETS); for(const k of Object.keys(PRESETS)) delete PRESETS[k];
-  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:18,skinMax:40})}); PRESETS.manta5=Object.assign({},o.manta,{name:'Manta 5.0 (schubben)',twist3:true,feather:true,tiles:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:10,tip:80,sym:1})}); PRESETS.manta51=Object.assign({},PRESETS.manta5,{name:'Manta 5.1 (schubben)',tileLook:true,def:Object.assign({},PRESETS.manta5.def,{tip:80})}); PRESETS.manta52=Object.assign({},PRESETS.manta51,{name:'Manta 5.2 (volgarmen)',armDrive:true}); PRESETS.manta60=Object.assign({},PRESETS.manta52,{name:'Manta 6.0 (vorken)',v6:true,def:Object.assign({},PRESETS.manta52.def,{attach:75})}); /* stangvork naar buiten: ruimte voor smalle losse schubben */ } } }
+  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:18,skinMax:40})}); PRESETS.manta5=Object.assign({},o.manta,{name:'Manta 5.0 (schubben)',twist3:true,feather:true,tiles:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:10,tip:80,sym:1})}); PRESETS.manta51=Object.assign({},PRESETS.manta5,{name:'Manta 5.1 (schubben)',tileLook:true,def:Object.assign({},PRESETS.manta5.def,{tip:80})}); PRESETS.manta52=Object.assign({},PRESETS.manta51,{name:'Manta 5.2 (volgarmen)',armDrive:true}); PRESETS.manta60=Object.assign({},PRESETS.manta52,{name:'Manta 6.0 (vorken)',v6:true,def:Object.assign({},PRESETS.manta52.def,{attach:75,smooth:1})}); /* stangvork naar buiten: ruimte voor smalle losse schubben */ } } }
 const CONTROLS = [
   {g:'Vorm'},
   {id:'span',label:'Spanwijdte',min:120,max:400,step:5,unit:'mm'},
@@ -326,6 +326,7 @@ const CONTROLS = [
   {g:'Constructie'},
   {id:'lever',label:'Hefboom op de sokkel (slagversterking)',min:1,max:5,step:0.5,unit:'×',hint:'Een tuimelaar per vleugelstang maakt van een kleine nokslag een grote stangslag; zo kunnen meerdere segmenten groot bewegen met een compacte sokkel. 1× = geen hefboom.'},
   {id:'forced',type:'check',label:'Gedwongen terugloop (groefnokken)',hint:'Een pen in de volger loopt in een groef: de vleugels worden ook omlaag getrokken en kunnen niet blijven hangen. Nokken worden groter.'},
+  {id:'smooth',type:'check',label:'Gladde vleugels (geen tegelpatroon)',hint:'Manta 6.0: de schubben krijgen een glad oppervlak zoals een echte manta. Alleen dunne naadlijntjes blijven zichtbaar; tijdens de slag zie je aan voor- en achterrand kleine trapjes van 1 à 4 mm.'},
   {id:'fuse',type:'check',label:'Alles vastprinten (met steun)',hint:'Manta 3.x–5.x: draaihoorns, draaiarmen en ogen worden aan de vleugel of schub vastgeprint in plaats van los gelijmd. Die onderdelen hebben dan steunmateriaal nodig.'},
   {id:'hole',label:'Pengat (voor 1,75 mm filament)',min:1.85,max:2.4,step:0.05,unit:'mm',hint:'Print eerst de testset. Klemt de pen, maak het gat groter; rammelt hij, kleiner.'},
   {g:'Aandrijving'},
@@ -360,7 +361,7 @@ let D;
 function derive(alt){
   const pre=PRESETS[P.preset];
   const d={pre};
-  d.twist3=!!pre.twist3&&(P.n|0)>=2; d.skin=d.twist3&&!!pre.skin; d.tiles=d.twist3&&!!pre.tiles; d.tileLook=d.tiles&&!!pre.tileLook; d.tileSym=d.tiles&&!!P.sym; d.fuseAll=d.twist3&&!!P.fuse; d.skel=d.skin||d.tiles; d.feather=d.twist3&&!!pre.feather; d.sym=!!P.sym&&!d.twist3; d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced;
+  d.twist3=!!pre.twist3&&(P.n|0)>=2; d.skin=d.twist3&&!!pre.skin; d.tiles=d.twist3&&!!pre.tiles; d.tileLook=d.tiles&&!!pre.tileLook; d.smooth=!!pre.v6&&!!P.smooth; d.tileSym=d.tiles&&!!P.sym; d.fuseAll=d.twist3&&!!P.fuse; d.skel=d.skin||d.tiles; d.feather=d.twist3&&!!pre.feather; d.sym=!!P.sym&&!d.twist3; d.n=P.n|0; d.t=P.thick; d.R=d.t/2; d.rh=P.hole/2; d.cl=0.5; d.forced=!!P.forced;
   // hefboom (tuimelaar): volgerpen in sleuf op afstand d0 van het draaipunt, stang aan het eind op aL = k·d0
   d.leverOn=(P.lever||1)>1.01; d.kLev=P.lever||1; d.d0=10; d.aLi=[]; for(let i=0;i<(P.n|0);i++) d.aLi[i]=d.kLev*(1+(P.grow||0)/100*i)*d.d0; d.aL=Math.max(...d.aLi);
   d.armDrive=!!pre.armDrive&&(P.lever||1)>1.01; d.gap=d.leverOn?(d.forced?14:12):(d.forced?11:9); d.oRk=3.8; d.oRod=d.leverOn?6.5:3.8; d.oTab=d.leverOn?9.6:7.1;
@@ -919,7 +920,7 @@ function mosaicRows(ua,ub){ const out=[]; const n0=Math.floor((ua-MOS.org)/MOS.p
   for(let n=n0;n<=n1;n++){ let a=MOS.org+n*MOS.pitch, b=a+MOS.pitch-MOS.groove; a=Math.max(a,ua); b=Math.min(b,ub); if(b-a>0.5) out.push([a,b,n]); } return out; }
 function mosaicCuts(n,nT){ const off=((n%2)+2)%2?0.5:0, f=[0]; for(let q=1;q<=nT+1;q++){ const v=(q-off)/nT; if(v>0.08&&v<0.92) f.push(v); } f.push(1); return f; }
 const symTop=(h)=>h<=D.t?h:Math.max(D.t,h/2+D.t/2), symBot=(h)=>Math.max(0,h/2-D.t/2); // symmetrisch profiel: hoogte boven en onder het middenvlak gelijk
-const tileTop=(s,z)=>{ const h=Math.max(1.2,wingIdeal(s,z)); return Math.max(-D.t/2+(D.tileSym?symTop(h):h),Math.abs(z-D.zA3)<7.5?3.2+1.2:-1e9); };
+const tileTop=(s,z)=>{ const h=Math.max(1.2,wingIdeal(s,z)), base=-D.t/2+(D.tileSym?symTop(h):h); if(D.smooth){ const w=sstep(4.5,13,Math.abs(z-D.zA3)); return Math.max(base,4.4*(1-w)+base*w); } return Math.max(base,Math.abs(z-D.zA3)<7.5?3.2+1.2:-1e9); }; // glad: de bult over de ligger loopt geleidelijk op
 function flipDown(items,y0){ for(const it of items){ const g=it.g||it, a=g.attributes.position.array; for(let k=1;k<a.length;k+=3) a[k]=2*y0-a[k];
     if(g.index){ const ix=g.index.array; for(let k=0;k<ix.length;k+=3){ const t=ix[k+1]; ix[k+1]=ix[k+2]; ix[k+2]=t; } } else flipTris(a);
     g.attributes.position.needsUpdate=true; if(g.attributes.normal) g.deleteAttribute('normal'); if(g.index) g.computeVertexNormals(); } return items; }
@@ -941,7 +942,9 @@ function bandGeo(b,stem,part){ const l=D.l, k=b.k, zA=D.zA3, t=D.t, items=[], lo
   const bulge=(pts)=>{ if(!pts||!D.tileSym) return; low.push(...flipDown(heightSolid(pts,[],(u,z,d)=>inPad(u,z)?0.02:Math.max(0.02,finishH(symBot(Math.max(1.2,wingIdeal(S(u),z))),d,0)),1.2,-t/2,null),-t/2).map(it=>it.g||it)); };
   const polyR=(ra,rb,lo,hi)=>{ const a=[],c=[], M=Math.max(2,Math.ceil((rb-ra)/0.6)); for(let j=0;j<=M;j++){ const u=ra+(rb-ra)*j/M, z0=lo(u), z1=hi(u); if(z1-z0<0.8) return null; a.push([u,z0]); c.push([u,z1]); } return [...a,...c.reverse()]; };
   const solidF=(pts,base,minH)=>{ if(!pts) return; items.push(...heightSolid(pts,[],(u,z,d)=>finishH(Math.max(minH,tileTop(S(u),z)-base),d,0),MOS.grid,base,null).map(it=>it.g||it)); };
-  if(D.v6){ const tilesV=(lo,hi)=>{ const um=(u0+u1)/2, w=hi(um)-lo(um); if(w<1) return; solid(poly(lo,hi),-t/2,0.8); bulge(poly(lo,hi));
+  if(D.v6&&D.smooth){ const sm=(pts,base)=>{ if(pts) items.push(...heightSolid(pts,[],(u,z,d)=>Math.max(0.6,tileTop(S(u),z)-base),MOS.grid,base,null).map(it=>it.g||it)); }; // glad oppervlak, zonder tegels
+    for(const [lo,hi] of [[te,cA],[cF,le]]){ const pp=poly(lo,hi); sm(pp,-t/2); bulge(pp); } sm(poly(cA,cF),3.2); }
+  else if(D.v6){ const tilesV=(lo,hi)=>{ const um=(u0+u1)/2, w=hi(um)-lo(um); if(w<1) return; solid(poly(lo,hi),-t/2,0.8); bulge(poly(lo,hi));
       for(const [ra,rb,n] of mosaicRows(u0,u1)){ const nT=Math.max(1,Math.round(w/MOS.len)), f=mosaicCuts(n,nT);
         for(let q=0;q+1<f.length;q++){ const f0=f[q], f1=f[q+1]; solidF(polyR(ra,rb,u=>lo(u)+(hi(u)-lo(u))*f0+(q?MOS.groove/2:0),u=>lo(u)+(hi(u)-lo(u))*f1-(q<f.length-2?MOS.groove/2:0)),-t/2+0.8,0.6); } } };
     tilesV(te,cA); tilesV(cF,le); { const rp=poly(cA,cF); if(rp) items.push(...heightSolid(rp,[],(u,z,d)=>0.6,1.2,3.2,null).map(it=>it.g||it)); } for(const [ra,rb] of mosaicRows(u0,u1)) solidF(polyR(ra,rb,cA,cF),3.8,0.6); }
@@ -1050,7 +1053,8 @@ function buildSegment(i){
     if(D.tileLook&&i===0){ // Manta 5.1: één stevige plaat met dezelfde banden en tegeltjes als de schubben (groeven 1 mm diep)
       items=heightSolid(pts,[],(u,z,d)=>Math.max(0.8,thick(u,z,d)-1.0),2.0,-D.t/2,cf);
       const ua0=Math.max(...root.map(p=>p[0]))+0.4, ue=(D.tiles?l-6-0.8:u1), nb=D.v6?0:Math.max(1,Math.round((ue-ua0)/6.5)), bw=(ue-ua0)/Math.max(1,nb);
-      if(D.v6) for(const [ua,ub,n] of mosaicRows(ua0,ue)){ const pm=pfA((ua+ub)/2), nT=Math.max(1,Math.round((pm.le-pm.te)/MOS.len)), f=mosaicCuts(n,nT), N=Math.max(2,Math.ceil((ub-ua)/0.6)); // 6.0: hetzelfde mozaïek als op de schubben
+      if(D.v6&&D.smooth) items=heightSolid(pts,[],thick,MOS.grid,-D.t/2,cf);
+      else if(D.v6) for(const [ua,ub,n] of mosaicRows(ua0,ue)){ const pm=pfA((ua+ub)/2), nT=Math.max(1,Math.round((pm.le-pm.te)/MOS.len)), f=mosaicCuts(n,nT), N=Math.max(2,Math.ceil((ub-ua)/0.6)); // 6.0: hetzelfde mozaïek als op de schubben
         for(let q=0;q+1<f.length;q++){ const f0=f[q], f1=f[q+1], lo=[], hi=[];
           for(let j=0;j<=N;j++){ const u=ua+(ub-ua)*j/N, pf=pfA(u), w=pf.le-pf.te; lo.push([u,pf.te+w*f0+(q?MOS.groove/2:0.05)]); hi.push([u,pf.te+w*f1-(q<f.length-2?MOS.groove/2:0.05)]); }
           items.push(...heightSolid([...lo,...hi.reverse()],[],thick,MOS.grid,-D.t/2,cf)); } }
