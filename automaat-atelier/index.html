@@ -394,7 +394,7 @@ function derive(alt){
   d.heaveOn=P.heave>0; d.eh=P.heave/2; d.Rbh=d.eh+6; d.hph=P.hphase*DEG;
   d.sh=(th)=>d.Rbh+d.eh*Math.cos(th+d.hph); d.sh1=(th)=>-d.eh*Math.sin(th+d.hph);
   d.pitchOn=P.pitch>0;
-  d.hTab=d.t/2+5;
+  d.hTab=d.t/2+(d.v6?7.5:5); /* 6.0: kruisje dieper, zodat het stangoog ernaast bij het kantelen niet in de vleugel komt */
   d.att=[];d.rho=[];d.beta=[];d.tAtt=[];
   for(let i=0;i<d.n;i++){ d.att[i]=P.attach/100*d.l; d.rho[i]=Math.hypot(d.att[i],d.hTab); d.beta[i]=Math.atan2(-d.hTab,d.att[i]); d.tAtt[i]=(i*d.l+d.att[i])/d.Sw; }
   // nokken achter elkaar op de as; richting zo kiezen dat elk oog binnen zijn vleugelsegment valt
@@ -1102,7 +1102,7 @@ function buildSegment(i){
 // alle onderdelen die onder een vleugeldeel hangen (Manta 3.x–5.x): plaats in segmentcoördinaten, paspennen (lokaal) en wat het gastonderdeel is
 function hangers(i){ const t=D.t, zA=D.zA3, out=[]; if(!D.twist3) return out;
   const H=(kind,host,u,z,geo,dw,tag,name)=>out.push({kind,host,i,pos:[u,-t/2,z],geo:()=>geo(dw),dw,tag,name});
-  if(i===0) H('eye','plate',D.att[0],D.v6?D.zRod[0]:D.zTab[0],(dw)=>D.v6?buildEyeV6(5,dw):buildEye(5,dw),D.v6?[[-3.6,0],[3.6,0]]:[[0,-2.6],[0,2.6]],'eye0',D.v6?'Oogvork segment 1 (stang ertussen)':'Stangoog segment 1');
+  if(i===0) H('eye','plate',D.att[0],D.v6?D.zRod[0]:D.zTab[0],(dw)=>D.v6?buildEyeV6(D.hTab-t/2,dw):buildEye(5,dw),D.v6?[[-3.6,0],[3.6,0]]:[[0,-2.6],[0,2.6]],'eye0',D.v6?'Oogvork segment 1 (stang ertussen)':'Stangoog segment 1');
   else H('fork',D.skel?'skel':'plate',D.att[i],zA,(dw)=>buildEyeFork(D.hTab-t/2,dw),[[-3.2,-2.4],[-3.2,2.4]],'eye'+i,'Oogvorkje segment '+(i+1));
   if(i>=1) H('horn',D.tiles?'band':D.skel?'skel':'plate',D.uH3,zA-D.e3[i],(dw)=>v6Tl()?buildHornV6(i,D.dH3-t/2,dw):buildEyeX(D.dH3-t/2,dw,tlkXo(i)),v6Tl()?[[0,-4.2],[0,4.2]]:[[-2.7,0],[2.7,0]],'hnk'+i,v6Tl()?'Draaihoornvork segment '+(i+1):'Draaihoorn segment '+(i+1));
   if(i<D.n-1){ const ap=arm3Pad(i+1), cx=(ap.du0+ap.du1)/2, dw=[]; for(const z of [ap.dz0+1.4,ap.dz1-1.4]) if(Math.abs(z)>=2.6) dw.push([cx,z]);
