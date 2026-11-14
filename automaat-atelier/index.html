@@ -296,7 +296,7 @@ const PRESETS = {
 
 // Manta 2.0: zelfde vorm als Manta 1.0, maar de vinpunt draait om een eigen as langs de spanwijdte (verenstand)
 { const o=Object.assign({},PRESETS); for(const k of Object.keys(PRESETS)) delete PRESETS[k];
-  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:18,skinMax:40})}); PRESETS.manta5=Object.assign({},o.manta,{name:'Manta 5.0 (schubben)',twist3:true,feather:true,tiles:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:10,tip:80,sym:1})}); PRESETS.manta51=Object.assign({},PRESETS.manta5,{name:'Manta 5.1 (schubben)',tileLook:true,def:Object.assign({},PRESETS.manta5.def,{tip:80})}); PRESETS.manta52=Object.assign({},PRESETS.manta51,{name:'Manta 5.2 (volgarmen)',armDrive:true}); } } }
+  for(const k of Object.keys(o)){ PRESETS[k]=o[k]; if(k==='manta'){ PRESETS.manta2=Object.assign({},o.manta,{name:'Manta 2.0',twist:true,def:Object.assign({},o.manta.def,{skew:120})}); PRESETS.manta3=Object.assign({},o.manta,{name:'Manta 3.0',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0})}); PRESETS.manta31=Object.assign({},o.manta,{name:'Manta 3.1',twist3:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:4,span:320,attach:65,grow:60,e:5.5})}); PRESETS.manta4=Object.assign({},o.manta,{name:'Manta 4.0 (TPU)',twist3:true,skin:true,feather:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:18,skinMax:40})}); PRESETS.manta5=Object.assign({},o.manta,{name:'Manta 5.0 (schubben)',twist3:true,feather:true,tiles:true,def:Object.assign({},o.manta.def,{tip:0,sym:0,skew:0,n:3,span:240,attach:60,grow:143,e:6.5,down:44,dihedral:6,lag:10,tip:80,sym:1})}); PRESETS.manta51=Object.assign({},PRESETS.manta5,{name:'Manta 5.1 (schubben)',tileLook:true,def:Object.assign({},PRESETS.manta5.def,{tip:80})}); PRESETS.manta52=Object.assign({},PRESETS.manta51,{name:'Manta 5.2 (volgarmen)',armDrive:true}); PRESETS.manta60=Object.assign({},PRESETS.manta52,{name:'Manta 6.0 (vorken)',v6:true}); } } }
 const CONTROLS = [
   {g:'Vorm'},
   {id:'span',label:'Spanwijdte',min:120,max:400,step:5,unit:'mm'},
@@ -364,7 +364,8 @@ function derive(alt){
   // hefboom (tuimelaar): volgerpen in sleuf op afstand d0 van het draaipunt, stang aan het eind op aL = k·d0
   d.leverOn=(P.lever||1)>1.01; d.kLev=P.lever||1; d.d0=10; d.aLi=[]; for(let i=0;i<(P.n|0);i++) d.aLi[i]=d.kLev*(1+(P.grow||0)/100*i)*d.d0; d.aL=Math.max(...d.aLi);
   d.armDrive=!!pre.armDrive&&(P.lever||1)>1.01; d.gap=d.leverOn?(d.forced?14:12):(d.forced?11:9); d.oRk=3.8; d.oRod=d.leverOn?6.5:3.8; d.oTab=d.leverOn?9.6:7.1;
-  if(d.armDrive){ d.Lk=14; d.La=32; d.rr=P.forced?0:3.5; d.zLk=8.8; d.gap+=3; } // 3 mm extra tussen de segmenten: ruimte voor de vorkkappen naast de geleidearmpjes
+  if(d.armDrive){ d.Lk=14; d.La=32; d.rr=P.forced?0:3.5; d.zLk=8.8; d.gap+=3; }
+  d.v6=d.armDrive&&!!pre.v6; if(d.v6){ d.aLi=d.aLi.map(a=>Math.max(a,d.d0+7.8)); d.aL=Math.max(...d.aLi); d.gap=V6.pitch; /* stang en volgerstangetje liggen in dezelfde laag: minstens 7,8 mm uit elkaar op de tuimelaar */ d.oRk=d.oRod=V6.zM; d.zLk=V6.zM; d.oTab=V6.zM+3.1; } // Manta 6.0: lagen nok / A / M / B, alle staven in M // 3 mm extra tussen de segmenten: ruimte voor de vorkkappen naast de geleidearmpjes
   d.w0=Math.max(6,P.span*(P.w0f||pre.w0Frac));
   d.Sw=P.span/2-d.w0;
   d.tipOn=P.tip>0&&!d.twist3; d.kTip=clamp(P.tip/100,0.3,1); d.tip3=!!(pre.tiles&&pre.twist3&&P.tip>0&&(P.n|0)>=2); d.tf=d.tipOn?0.24:d.tip3?0.16:0;
@@ -1075,6 +1076,38 @@ function buildArm3(i,dw){ const ex=(D.l+D.uH3)-D.uA3, ey=-(D.dE3-D.t/2), ap=arm3
   const tube=tubeX(D.rh,2.7,ex-3-sA,ex-sA,ey,0), pad=dw?padGeo(ap.du0,ap.du1,ap.dz0,ap.dz1,dw):(()=>{ const b=new THREE.BoxGeometry(ap.du1-ap.du0,1.5,ap.dz1-ap.dz0); b.translate((ap.du0+ap.du1)/2,-0.75,(ap.dz0+ap.dz1)/2); return b; })();
   return merge([plateXY(shapeFrom(o),3),tube,pad]); }
 const items0=(a,g)=>a.push(g);
+// Manta 6.0: vaste lagen per segment (t.o.v. D.z[i]; de nok ligt op -6,8 … -2,3). Wangen 1,6 in A en B, staven 2,4 in M (spleet 2,7).
+const V6={pitch:13, zA:-1.1, zM:1.05, zB:3.2, tw:1.6, gap:2.7};
+function v6Gap(phi){ return Math.max(V6.gap,2.4*Math.cos(phi*DEG)+ROD.w*Math.sin(phi*DEG)+0.3); } // spleet van een (kantel)vork voor een staaf die phi graden kantelt
+function v6Pair(shape,gap,zc){ const a=plateXY(shape,V6.tw), b=plateXY(shape,V6.tw); a.translate(0,0,zc-gap/2-V6.tw/2); b.translate(0,0,zc+gap/2+V6.tw/2); return [a,b]; }
+function v6Boss(x,y,from,to){ return tubeZ(D.rh,3.0,Math.min(from,to),Math.max(from,to),x,y); } // kraagje binnen een wijdere vork, zodat een rechte staaf geen speling heeft
+// volger: plaat A (met groefpen) en plaat B (met bruggetjes), samen een vork om de geleidearmpjes en de volgerstangetjes
+function buildArmFollowerV6(i){ const A=armSetup(), H=A.Hcr[i], xp=D.xp[i], cw=xp+4.5, yG=A.yG[i];
+  const S=shapeFrom([[-4.5,-6.8],[3,-6.8],[3,H-4],[cw,H-4],[cw,H+4],[-cw,H+4],[-cw,H-4],[-4.5,H-4]]);
+  const dw=[[-0.8,(yG[0]+yG[1])/2],[0,H]]; const holes=(sh,pin)=>{ for(const y of yG) sh.holes.push(circlePath(-1.5,y,D.rh)); sh.holes.push(circlePath(xp,H,D.rh)); sh.holes.push(circlePath(-xp,H,D.rh)); for(const [x,y] of dw) sh.holes.push(circlePath(x,y,D.rh)); if(pin) sh.holes.push(circlePath(0,0,D.rh)); };
+  const SA=shapeFrom([[-4.5,-6.8],[3,-6.8],[3,H-4],[cw,H-4],[cw,H+4],[-cw,H+4],[-cw,H-4],[-4.5,H-4]]); holes(SA,!D.forced); holes(S,!D.forced);
+  const a=plateXY(SA,V6.tw); a.translate(0,0,V6.zA); const it=[a];
+  if(D.forced){ const c=new THREE.CylinderGeometry(1.6,1.6,2.8,20); c.rotateX(Math.PI/2); c.translate(0,0,-4.5+1.3); it.push(c); } // groefpen, steekt in de groef van de nok
+  const b=plateXY(S,V6.tw); b.translate(0,0,V6.zB); const zb0=V6.zA+V6.tw/2, zb1=V6.zB-V6.tw/2;
+  const br=(x0,x1,y0,y1,dx,dy)=>{ const sh=shapeFrom([[x0,y0],[x1,y0],[x1,y1],[x0,y1]]); sh.holes.push(circlePath(dx,dy,D.rh)); const g=plateXY(sh,zb1-zb0); g.translate(0,0,(zb0+zb1)/2); return g; };
+  const bridges=[br(-4.2,2.7,dw[0][1]-2.8,dw[0][1]+2.8,dw[0][0],dw[0][1]),br(-1.2,1.2,H-3.6,H+3.6,0,H)]; // bruggetjes: tussen de geleidegaten en midden in de dwarsbalk
+  return {a:merge(it),b:merge([b,...bridges]),all:merge([...it.map(g=>g.clone()),b.clone(),...bridges.map(g=>g.clone())])}; }
+// geleidesteun: twee wangen (A en B) op een voet, met een rug aan de kant van de achterwand
+function buildGuideBracketV6(i){ const A=armSetup(), yMid=A.yCm[i]-A.Hcr[i], x=-1.5-D.La, ys=A.yG[i].map(y=>yMid+y), top=Math.max(...ys)+4;
+  const sh=shapeFrom([[x-6.5,3],[x+4,3],[x+4,top],[x-6.5,top]]); for(const y of ys) sh.holes.push(circlePath(x,y,D.rh));
+  const it=[]; for(const zc of [V6.zA,V6.zB]){ const g=plateXY(sh,V6.tw); g.translate(0,0,zc); it.push(g); }
+  const z0=V6.zA-V6.tw/2, z1=V6.zB+V6.tw/2, ft=new THREE.BoxGeometry(10.5,3,z1-z0); ft.translate(x-1.25,1.5,(z0+z1)/2); const rug=new THREE.BoxGeometry(2.6,top-3,z1-z0); rug.translate(x-5.2,3+(top-3)/2,(z0+z1)/2);
+  return merge([...it,ft,rug]); }
+// tuimelaar: twee platen (A en B) met een bruggetje vlak boven het draaipunt; kraagjes binnen de vork waar de spleet wijder is dan de staaf
+function buildRockerV6(i){ const r=4, L=D.aLi[i], phi=(D.leanB&&D.leanB[i])||0, g=v6Gap(phi>4?phi:0), pts=[];
+  for(let k=0;k<=12;k++){ const a=-Math.PI/2+Math.PI*k/12; pts.push([L+r*Math.cos(a),r*Math.sin(a)]); } for(let k=0;k<=12;k++){ const a=Math.PI/2+Math.PI*k/12; pts.push([r*Math.cos(a),r*Math.sin(a)]); }
+  const lug=[[-1.9,3],[1.9,3],[1.9,7.6],[-1.9,7.6]]; const sh=shapeFrom(hullPts(pts.concat(lug))); for(const x of [0,D.d0,L]) sh.holes.push(circlePath(x,0,D.rh)); sh.holes.push(circlePath(0,5.6,D.rh));
+  const [a,b]=v6Pair(sh,g,0), it=[]; if(g>V6.gap+0.05) for(const x of [0,D.d0]) for(const sg of [-1,1]) it.push(v6Boss(x,0,sg*g/2,sg*V6.gap/2)); // kraagjes bij draaipunt en volgerstangetje
+  const bsh=shapeFrom([[-1.6,3.6],[1.6,3.6],[1.6,7.4],[-1.6,7.4]]); bsh.holes.push(circlePath(0,5.6,D.rh)); const brg=plateXY(bsh,g); // bruggetje (op plaat A geprint)
+  return {a:merge([a,brg,...it.filter((_,k)=>k%2===0)]),b:merge([b,...it.filter((_,k)=>k%2===1)]),gap:g}; }
+// draaipuntsteun: één lip in laag M, op het deksel gelijmd
+function buildRockerPostV6(i){ const h=D.yr[i]-D.Hb, sh=new THREE.Shape(); sh.moveTo(-4,0); sh.lineTo(4,0); sh.lineTo(4,h); sh.absarc(0,h,4,0,Math.PI,false); sh.lineTo(-4,0); sh.holes.push(circlePath(0,h,D.rh));
+  const sg=1, foot=new THREE.BoxGeometry(10,2,ROD.t); foot.translate(1.5,1,0); return merge([plateXY(sh,ROD.t),foot]); } // voetje alleen in laag M en naar buiten: de volger gaat er vlak langs
 let TLK_SA=0, TLK_SH=0, TLK_XO=2.5;
 const tlkXo=(i)=>D.tlkPerp?Math.min(TLK_XO,(D.tlkG&&D.tlkG[i])||0):0; // schuivend stangetje: oog van de hoorn een stukje naar buiten, buisje minder ver naar binnen // draaistangetje ligt tussen het buisje van de arm en het oog van de hoorn
 function buildBallEye(depth){ const g=buildEye(depth), b=new THREE.SphereGeometry(2.4,16,12); b.translate(0,-(depth||D.hTab-D.t/2),0); return merge([g,b]); }
@@ -1297,7 +1330,7 @@ function buildBox(){
   const rect=(x0,y0,x1,y1)=>shapeFrom([[x0,y0],[x1,y0],[x1,y1],[x0,y1]]);
   const top=rect(-W,zb,W,zf); top.holes.push(circlePath(0,D.zPost,D.heaveOn?4.35:4.2));
   if(D.pitchOn){ const z=D.ze, h=new THREE.Path(); h.moveTo(-3.4,z-2.3); h.lineTo(3.4,z-2.3); h.lineTo(3.4,z+2.3); h.lineTo(-3.4,z+2.3); h.closePath(); top.holes.push(h); }
-  for(let i=0;i<D.n;i++){ const z=D.z[i]; const h=new THREE.Path(); h.moveTo(-3.4,z-2.3); h.lineTo(3.4,z-2.3); h.lineTo(3.4,z+2.3); h.lineTo(-3.4,z+2.3); h.closePath(); top.holes.push(h); }
+  for(let i=0;i<D.n;i++){ const z=D.z[i], x0=D.v6?-5.4:-3.4, x1=D.v6?3.9:3.4, z0=D.v6?z+V6.zA-V6.tw/2-0.5:z-2.3, z1=D.v6?z+V6.zB+V6.tw/2+0.5:z+2.3; const h=new THREE.Path(); h.moveTo(x0,z0); h.lineTo(x1,z0); h.lineTo(x1,z1); h.lineTo(x0,z1); h.closePath(); top.holes.push(h); }
   const win=(x0,y0,x1,y1,r)=>{ const p=new THREE.Path(); p.moveTo(x0+r,y0); p.lineTo(x1-r,y0); p.absarc(x1-r,y0+r,r,-Math.PI/2,0,false); p.lineTo(x1,y1-r); p.absarc(x1-r,y1-r,r,0,Math.PI/2,false); p.lineTo(x0+r,y1); p.absarc(x0+r,y1-r,r,Math.PI/2,Math.PI,false); p.lineTo(x0,y0+r); p.absarc(x0+r,y0+r,r,Math.PI,Math.PI*1.5,false); return p; };
   const WT=2.4, front=rect(-W,3,W,H-3); front.holes.push(circlePath(0,D.yc,1.8));
   if(W-8>12){ front.holes.push(win(-W+7,9,-7,H-10,4)); front.holes.push(win(7,9,W-7,H-10,4)); }
@@ -1406,14 +1439,21 @@ function buildParts(){
     for(let i=1;i<D.n;i++){ G.link3[i]=add('draaistang_'+i,`Draaistangetje ${i}→${i+1} (${D.Lh3[i].toFixed(1).replace('.',',')} mm, kantelpennen)`,2,buildRodHG(D.Lh3[i],[true,true]),rotX(-Math.PI/2),'rod').geo; } }
   G.rodS=[]; for(let i=0;i<D.n;i++){ if(D.twist3&&i>=1) G.rod[i]=add('stang_'+(i+1),`Stang ${i+1} (kantelpen onderaan)`,2,buildRodHG(D.L3[i],[true,false]),rotX(-Math.PI/2),'rod').geo;
     else G.rod[i]=add('stang_'+(i+1),'Stang '+(i+1),2,buildRod(D.L[i]),rotX(-Math.PI/2),'rod').geo; }
-  if(D.armDrive){ G.fol=[]; G.arm={}; for(let i=0;i<D.n;i++){ const f=buildArmFollower(i); G.folParts=G.folParts||[]; const pf=add('volgervork_'+(i+1),'Volgervork '+(i+1)+(D.forced?' (met pen voor de groef; pen omhoog printen)':' (rolletje + geleidearmpjes)'),1,f.fork,D.forced?rotX(Math.PI/2):rotX(-Math.PI/2),'mech'); const pu=add('volgerstang_'+(i+1),'Volgerstang '+(i+1)+' (dwarsbalk; met 2 paspennen op de vork lijmen)',1,f.upper,rotX(-Math.PI/2),'mech'); G.folParts[i]=[pf.geo,pu.geo]; G.fol[i]=f.all;
+  if(D.v6){ G.fol=[]; G.arm={}; G.folParts=[]; for(let i=0;i<D.n;i++){ const f=buildArmFollowerV6(i);
+      const pa=add('volger_a_'+(i+1),'Volger '+(i+1)+', plaat A (met groefpen; pen omhoog printen)',1,f.a,I4(),'mech'), pb=add('volger_b_'+(i+1),'Volger '+(i+1)+', plaat B (met bruggetjes; op plaat A lijmen, paspennen)',1,f.b,rotX(Math.PI),'mech'); G.folParts[i]=[pa.geo,pb.geo]; G.fol[i]=f.all;
+      G.arm['br'+i]=add('geleidesteun_'+(i+1),'Geleidesteun '+(i+1)+' (vork; op de bodem lijmen)',1,buildGuideBracketV6(i),rotZ(Math.PI/2),'mech').geo; }
+    G.arm.roller=null; G.arm.guide=add('geleidearm','Geleidearmpje ('+D.La.toFixed(0)+' mm)',2*D.n,buildRod(D.La),rotX(-Math.PI/2),'rod').geo;
+    G.arm.link=add('volgerstangetje','Volgerstangetje ('+D.Lk.toFixed(0)+' mm)',2*D.n,buildRod(D.Lk),rotX(-Math.PI/2),'rod').geo; }
+  else if(D.armDrive){ G.fol=[]; G.arm={}; for(let i=0;i<D.n;i++){ const f=buildArmFollower(i); G.folParts=G.folParts||[]; const pf=add('volgervork_'+(i+1),'Volgervork '+(i+1)+(D.forced?' (met pen voor de groef; pen omhoog printen)':' (rolletje + geleidearmpjes)'),1,f.fork,D.forced?rotX(Math.PI/2):rotX(-Math.PI/2),'mech'); const pu=add('volgerstang_'+(i+1),'Volgerstang '+(i+1)+' (dwarsbalk; met 2 paspennen op de vork lijmen)',1,f.upper,rotX(-Math.PI/2),'mech'); G.folParts[i]=[pf.geo,pu.geo]; G.fol[i]=f.all;
       G.arm['br'+i]=add('geleidesteun_'+(i+1),'Steun geleidearmpjes '+(i+1)+' (op de bodem lijmen)',1,buildGuideBracket(i),I4(),'mech').geo; }
     G.arm.roller=D.forced?null:add('rolletje','Rolletje volger (draait los op een pen van 1,75 mm)',D.n,buildRoller(),I4(),'mech').geo;
     G.arm.guide=add('geleidearm','Geleidearmpje ('+D.La.toFixed(0)+' mm)',2*D.n,buildRod(D.La),rotX(-Math.PI/2),'rod').geo;
     G.arm.link=add('volgerstangetje','Stangetje volger → tuimelaar ('+D.Lk.toFixed(0)+' mm)',2*D.n,buildRod(D.Lk),rotX(-Math.PI/2),'rod').geo; }
   else for(let i=0;i<D.n;i++) G.fol[i]=add('volger_'+(i+1),'Volger '+(i+1),1,buildFollower(i),rotX(-Math.PI/2),'mech').geo;
   G.rk=null; G.rkPost=[];
-  if(D.leverOn){ G.rk=[]; for(let i=0;i<D.n;i++){ G.rk[i]=add('tuimelaar_'+(i+1),'Tuimelaar '+(i+1)+' ('+(D.aLi[i]/D.d0).toFixed(1).replace('.',',')+'×)',2,buildRocker(i),rotX(-Math.PI/2),'mech').geo;
+  if(D.leverOn&&D.v6){ G.rk=[]; G.rkB=[]; for(let i=0;i<D.n;i++){ const r=buildRockerV6(i); G.rk[i]=add('tuimelaar_a_'+(i+1),'Tuimelaar '+(i+1)+', plaat A (met bruggetje)',2,r.a,I4(),'mech').geo; G.rkB[i]=add('tuimelaar_b_'+(i+1),'Tuimelaar '+(i+1)+', plaat B (op het bruggetje lijmen, paspen)',2,r.b,rotX(Math.PI),'mech').geo;
+    G.rkPost[i]=add('draaipunt_'+(i+1),'Draaipuntlip '+(i+1)+' (op het deksel lijmen)',2,buildRockerPostV6(i),rotX(-Math.PI/2),'mech').geo; } }
+  else if(D.leverOn){ G.rk=[]; for(let i=0;i<D.n;i++){ G.rk[i]=add('tuimelaar_'+(i+1),'Tuimelaar '+(i+1)+' ('+(D.aLi[i]/D.d0).toFixed(1).replace('.',',')+'×)',2,buildRocker(i),rotX(-Math.PI/2),'mech').geo;
     G.rkPost[i]=add('draaipunt_'+(i+1),'Draaipuntsteun '+(i+1),2,buildRockerPost(i),rotX(-Math.PI/2),'mech').geo; } }
   for(let i=0;i<D.n;i++) G.cam[i]=add('nok_'+(i+1),'Nok '+(i+1)+' ('+Math.round(-D.phi[i]/DEG)+'°)',1,buildCam(i),rotX(-Math.PI/2),'mech').geo;
   G.post=add('paal','Paal'+(D.heaveOn?' (met voet)':''),1,buildPost(),I4(),'post').geo;
@@ -1478,7 +1518,7 @@ function setupPhysics(){
   PH={ body,
     seg:D.e.map((_,i)=>comb([[G.segMI[i],[0,0,0]],[eye,[D.att[i],-D.t/2,D.zTab[i]]]])),
     rod:D.e.map((_,i)=>get('stang_'+(i+1)).mi.m),
-    fol:D.e.map((_,i)=>(get('volger_'+(i+1))||get('volgerstang_'+(i+1))).mi), rk:D.leverOn?D.e.map((_,i)=>get('tuimelaar_'+(i+1)).mi):null,
+    fol:D.e.map((_,i)=>(get('volger_'+(i+1))||get('volgerstang_'+(i+1))||get('volger_b_'+(i+1))).mi), rk:D.leverOn?D.e.map((_,i)=>(get('tuimelaar_'+(i+1))||get('tuimelaar_a_'+(i+1))).mi):null,
     pfol:D.pitchOn?get('volger_kantel').mi:null, plink:D.pitchOn?get('kantelstang').mi.m:0,
     post:D.heaveOn?get('paal').mi:null,
     tip:D.tipOn?comb([[G.tipMI,[0,0,0]],[get('puntoog').mi,[D.bLocX,-D.t/2,D.zTipEye]]]):null, tipRod:D.tipOn?get('puntstang').mi.m:0,
@@ -1712,7 +1752,7 @@ function buildScene(){
     M.rodL[i]=mk(G.rodS[i]||G.rod[i],MAT.seg[i]); M.rodL[i].position.z=D.zRod[i]; M.rodL[i].userData.tag='rod'+i+'L';
     if(D.armDrive&&G.folParts&&G.folParts[i]){ M.fol[i]=mk(G.folParts[i][0],MAT.seg[i]); const up=mk(G.folParts[i][1],MAT.seg[i],M.fol[i]); up.userData.tag='fol'+i; } else M.fol[i]=mk(G.fol[i],MAT.seg[i]); M.fol[i].position.z=D.z[i]; M.fol[i].userData.tag='fol'+i;
     if(D.leverOn){ M.rk=M.rk||[]; M.rk[i]=[];
-      for(const sg of [1,-1]){ const r=mk(G.rk[i],MAT.seg[i]); r.position.set(sg*D.xr[i],D.yr[i],D.zRk[i]); r.userData.tag='rk'+i+(sg>0?'R':'L'); M.rk[i].push(r);
+      for(const sg of [1,-1]){ const r=mk(G.rk[i],MAT.seg[i]); r.position.set(sg*D.xr[i],D.yr[i],D.zRk[i]); r.userData.tag='rk'+i+(sg>0?'R':'L'); M.rk[i].push(r); if(G.rkB&&G.rkB[i]){ const rb=mk(G.rkB[i],MAT.seg[i],r); rb.userData.tag=r.userData.tag; }
         const p=mk(G.rkPost[i],MAT.motor); p.position.set(sg*D.xr[i],D.Hb,D.zRod[i]); p.userData.tag='pp'+i+(sg>0?'R':'L'); } }
     M.cam[i]=mk(G.cam[i],MAT.seg[i]); M.cam[i].position.set(0,D.yc,D.z[i]); M.cam[i].userData.tag='cam'+i;
     if(D.armDrive){ M.armx=M.armx||[]; const o={}; M.armx[i]=o; if(G.arm.roller){ const ro=mk(G.arm.roller,MAT.steel,M.fol[i]); ro.position.set(0,0,0); }
@@ -1888,16 +1928,21 @@ const RING={ro:2.2,t:1.6};
 function ribs(len){ const out=[], r0=0.78, r1=D.rh+0.15, h=r1-r0; for(let k=0;k<3;k++){ const b=new THREE.BoxGeometry(0.5,len,h); b.translate(0,0,r0+h/2); b.rotateY(k*2*Math.PI/3); out.push(b); } return out; }
 function ringGeo(){ const sh=shapeFrom(circPts(0,0,RING.ro,28)); sh.holes.push(circlePath(0,0,D.rh)); const g=plateXY(sh,RING.t), rb=ribs(RING.t); rb.forEach(b=>b.rotateX(Math.PI/2)); return merge([g,...rb]); }
 function appendGeo(g,items){ const m=merge([g,...items]); for(const k of Object.keys(m.attributes)) g.setAttribute(k,m.attributes[k]); g.setIndex(null); g.boundingBox=null; g.boundingSphere=null; }
+// welk onderdeel zit aan de onderkant en welk aan de bovenkant van de stapel (per wang, niet per onderdeel: een vork uit één stuk heeft twee wangen)
+function endBodies(h){ const iv=[]; for(const x of h.cl) for(const v of (x.iv&&x.iv.length?x.iv:[[x.lo,x.hi]])) iv.push({b:x.body,x,lo:v[0],hi:v[1]}); if(!iv.length) return {lo:null,hi:null};
+  let a=iv[0], z=iv[0]; for(const v of iv){ if(v.lo<a.lo) a=v; if(v.hi>z.hi) z=v; } return {lo:a.b,hi:z.b,loX:a.x,hiX:z.x}; }
 function planRetention(){ const H=(M.hinges||[]).filter(h=>h.cl.length&&h.bodies>=2), key=(m,pt)=>{ const v=pt.clone().applyMatrix4(new THREE.Matrix4().copy(m.matrixWorld).invert()); return m.geometry.uuid+':'+[v.x,v.y,v.z].map(a=>Math.round(a*5)).join(','); };
   const partGeo=new Set(), mirr=new Map(); for(const p of PARTS){ partGeo.add(p.geo); const src=p.geo.userData&&p.geo.userData.mirrorSrc; if(src) mirr.set(src,(mirr.get(src)||[]).concat([p])); }
   const free=new Set(), want=[];
-  for(const h of H){ const c=h.P.clone().addScaledVector(h.u,(h.lo+h.hi)/2), cm=h.ref&&h.ref.straight?h.cl.find(x=>x.m===h.ref.m):null, g=cm&&cm.m.geometry;
-    const okGeo=g&&(partGeo.has(g)||mirr.has(g)); h.clampM=okGeo?cm:null; for(const x of h.cl) if(x!==h.clampM) free.add(key(x.m,c)); h.key=h.clampM?key(h.clampM.m,c):null; }
+  const okG=(g)=>g&&(partGeo.has(g)||mirr.has(g));
+  for(const h of H){ const c=h.P.clone().addScaledVector(h.u,(h.lo+h.hi)/2), eb=endBodies(h), f0=eb.loX, f1=eb.hiX, fork=h.bodies>=2&&f0&&f1&&eb.lo===eb.hi&&f0.straight&&f1.straight&&okG(f0.m.geometry)&&okG(f1.m.geometry); // vork: pen klemt in beide wangen
+    const cm=fork?f0:(h.ref&&h.ref.straight?h.cl.find(x=>x.m===h.ref.m):null), g=cm&&cm.m.geometry;
+    const okGeo=okG(g); h.forkCl=fork?h.cl.filter(x=>x.body===f0.body&&x.straight&&okG(x.m.geometry)):null; h.clampM=okGeo?cm:null; for(const x of h.cl) if(x!==h.clampM&&!(h.forkCl&&h.forkCl.includes(x))) free.add(key(x.m,c)); h.key=h.clampM?key(h.clampM.m,c):null; }
   for(const h of H) if(h.clampM&&free.has(h.key)) h.clampM=null; // zelfde gat elders als draaigat gebruikt: niet klemmen
   const done=new Set(), touched=new Set(); let nRing=0; M.rings=[]; const RG=ringGeo(); M.caps=[]; planCaps(H,(x)=>{ const g=x.m.geometry; return (partGeo.has(g)||mirr.has(g)); });
-  for(const h of H){ const first=h.cl[0], last=h.cl[h.cl.length-1], blind=(sg)=>h.blocked.some(b=>!b.off&&Math.sign(b.at)===sg);
+  for(const h of H){ const eb=endBodies(h), first={body:eb.lo,m:eb.loX&&eb.loX.m}, last={body:eb.hi}, blind=(sg)=>h.blocked.some(b=>!b.off&&Math.sign(b.at)===sg);
     const cmB=h.clampM?h.clampM.body:null, needLo=!blind(-1)&&(!cmB||first.body!==cmB), needHi=!blind(1)&&(!cmB||last.body!==cmB);
-    if(h.clampM&&!done.has(h.key)){ done.add(h.key); const m=h.clampM.m, lo=Math.max(h.lo,h.clampM.lo)+0.15, hi=Math.min(h.hi,h.clampM.hi)-0.15;
+    for(const cmx of (h.forkCl&&h.clampM&&h.forkCl.includes(h.clampM)?h.forkCl:(h.clampM?[h.clampM]:[]))) for(const [ilo,ihi] of (cmx.iv&&cmx.iv.length?cmx.iv:[[cmx.lo,cmx.hi]])){ const kk=key(cmx.m,h.P.clone().addScaledVector(h.u,(ilo+ihi)/2)); if(done.has(kk)) continue; done.add(kk); const m=cmx.m, lo=Math.max(h.lo,ilo)+0.15, hi=Math.min(h.hi,ihi)-0.15;
       if(hi-lo>0.6){ const inv=new THREE.Matrix4().copy(m.matrixWorld).invert(), cl=h.P.clone().addScaledVector(h.u,(lo+hi)/2).applyMatrix4(inv), ul=h.u.clone().transformDirection(inv).normalize();
         const T=new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),ul)).setPosition(cl); appendGeo(m.geometry,ribs(hi-lo).map(b=>b.applyMatrix4(T))); touched.add(m.geometry); } }
     h.rings=[]; const host=h.clampM?h.clampM.m:(h.ref?h.ref.m:first.m);
@@ -1933,7 +1978,7 @@ function planCaps(H,canClamp){ M.capFail=[]; M.capFail2=[]; if(D.horse) return; 
         const bs=o.geometry.boundingSphere||(o.geometry.computeBoundingSphere(),o.geometry.boundingSphere), sc=o.matrixWorld.getMaxScaleOnAxis()||1; if(bs.center.clone().applyMatrix4(o.matrixWorld).distanceTo(h.P)>bs.radius*sc+40) continue;
         const inv=new THREE.Matrix4().copy(o.matrixWorld).invert(), pl=h.P.clone().applyMatrix4(inv), rot=/^(cam|pcam|hcam|gg|gp|gc|crank)/.test(o.userData.tag||''), near=rot?samp0(o):samp0(o).filter(q=>q.distanceTo(pl)*sc<28), st=Math.max(1,Math.floor(near.length/(rot?4000:1500))); for(let j=0;j<near.length;j+=st) obs.push({m:o,v:near[j]}); }
       return {h,sg,u,w1,w2,A,Hm,tA,samp,obs,alt,A0:A.matrixWorld.clone(),pts:[],opts:[]}; };
-  for(const h of H){ h.caps=[]; if(!h.clampM) continue; const blind=(sg)=>h.blocked.some(b=>!b.off&&Math.sign(b.at)===sg);
+  for(const h of H){ h.caps=[]; if(!h.clampM) continue; { const eb=endBodies(h); if(eb.lo&&eb.lo===eb.hi) continue; } const blind=(sg)=>h.blocked.some(b=>!b.off&&Math.sign(b.at)===sg);
     for(const sg of [1,-1]){ const end=sg>0?h.cl[h.cl.length-1]:h.cl[0]; if(end.body===h.clampM.body||blind(sg)) continue;
       const other=sg>0?h.cl[0]:h.cl[h.cl.length-1]; if(other.body!==h.clampM.body) continue; // pen klemt aan de andere kant
       const J=mk(h,h.clampM,end.body,sg,null); jobs.push(J);
@@ -2058,7 +2103,7 @@ function pose(theta){ poseGears(theta);
     }
     M.rodR[i].material=M.rodL[i].material=s.lock[i]?MAT.bad:MAT.seg[i];
     if(D.armDrive&&M.armx){ const r=armKin(i,theta), A=armSetup(), o=M.armx[i], z=D.z[i]; M.fol[i].position.set(r.dx,r.yR,z);
-      const yMid=A.yCm[i]-A.Hcr[i]; A.yG[i].forEach((yy,k)=>{ const g0=new THREE.Vector3(-1.5-D.La,yMid+yy,z+6.0), g1=new THREE.Vector3(r.dx-1.5,r.yR+yy,z+6.0); o.g[k].position.copy(g0); o.g[k].rotation.set(0,0,Math.atan2(g1.y-g0.y,g1.x-g0.x)); });
+      const yMid=A.yCm[i]-A.Hcr[i]; A.yG[i].forEach((yy,k)=>{ const zg=D.v6?V6.zM:6.0, g0=new THREE.Vector3(-1.5-D.La,yMid+yy,z+zg), g1=new THREE.Vector3(r.dx-1.5,r.yR+yy,z+zg); o.g[k].position.copy(g0); o.g[k].rotation.set(0,0,Math.atan2(g1.y-g0.y,g1.x-g0.x)); });
       [1,-1].forEach((sg,k)=>{ const a=new THREE.Vector3(sg*(D.xp[i]+sg*r.dx),r.yC,z+D.zLk), b2=new THREE.Vector3(sg*r.px,r.py,z+D.zLk); o.lk[k].position.copy(a); o.lk[k].rotation.set(0,0,Math.atan2(b2.y-a.y,b2.x-a.x)); }); }
     else M.fol[i].position.y=D.yc+D.s(i,theta);
     if(D.leverOn&&M.rk&&M.rk[i]){ const b=s.beta[i]; M.rk[i][0].rotation.z=b; M.rk[i][1].rotation.z=Math.PI-b; }
@@ -2192,7 +2237,7 @@ function pinHw(){ const L=new Map(); for(const h of M.hinges){ if(!h.pinLen) con
   const n=[...L.values()].reduce((a,b)=>a+b,0); return `${n} pennen van 1,75 mm filament, op lengte geknipt: `+[...L.entries()].sort((a,b)=>a[0]-b[0]).map(([k,c])=>`${c}× ${String(k).replace('.',',')} mm`).join(', ')+'. Knip ze 0,5 mm langer en schuur of smelt het uiteinde rond.'; }
 function renderHinges(){ const el=document.getElementById('hingeList'); if(!el) return; if(!D.horse&&M.pinsPending){ el.innerHTML='<div class="status warn"><b>Bezig</b><span>Pennen, klemgaten en vorkkappen berekenen…</span></div>'; return; } if(D.horse||!M.hinges){ el.innerHTML=''; return; }
   const H=M.hinges, lbl=(t)=>tagLabel(t), uniq=(a)=>[...new Set(a)], st=(c,b,t)=>`<div class="status ${c}"><b>${b}</b><span>${t}</span></div>`, out=[];
-  const used=H.filter(h=>h.pinLen), clamp=used.filter(h=>h.clampM).length, caps=(M.caps||[]).filter(c=>!c.mesh.userData.dropped).length, rings=(M.rings||[]).filter(r=>!r.userData.dropped).length, melt=(M.rings||[]).filter(r=>r.userData.dropped).length+(M.caps||[]).filter(c=>c.mesh.userData.dropped).length, forks=used.filter(h=>h.cl.length>=3&&h.cl[0].body===h.cl[h.cl.length-1].body).length, blindBoth=used.filter(h=>!h.rings.length&&!h.clampM).length;
+  const used=H.filter(h=>h.pinLen), clamp=used.filter(h=>h.clampM).length, caps=(M.caps||[]).filter(c=>!c.mesh.userData.dropped).length, rings=(M.rings||[]).filter(r=>!r.userData.dropped).length, melt=(M.rings||[]).filter(r=>r.userData.dropped).length+(M.caps||[]).filter(c=>c.mesh.userData.dropped).length, forks=used.filter(h=>{ const eb=endBodies(h); return h.bodies>=2&&eb.lo&&eb.lo===eb.hi; }).length, blindBoth=used.filter(h=>!h.rings.length&&!h.clampM).length;
   out.push(st('ok','Pennen',`${used.length} scharnieren met een pen van 1,75 mm. ${clamp} pennen klemmen in een gat met drie ribbels (iets te nauw, de pen wordt erin gedrukt). Aan twee kanten gedragen: ${forks} in een vork van het onderdeel zelf en ${caps} met een vorkkap (kapje met pootje op het klemmende onderdeel)${rings?`; ${rings} klemringen houden een vrij eind vast`:''}${melt?`; op ${melt} plekken is geen ruimte voor een klemring: smelt daar het uiteinde met de soldeerbout tot een kopje`:''}${blindBoth?`; ${blindBoth} pennen zitten opgesloten in een blind gat`:''}.`));
   const SIDE=(t)=>/L$/.test(t)?null:t; const issues=[];
   if(D.tlkPerp){ const sl=Math.max(0,...(D.tlkK||[]).filter(k=>k).map(k=>k[1]-k[0])); out.push(st('warn','Schuiven',`In dit ontwerp moeten de draaistangetjes tot ${sl.toFixed(0)} mm langs hun pen schuiven, omdat de segmenten ver doorbuigen ten opzichte van de draaiarm. Buisje en oog staan daarvoor ver uit elkaar, maar deze scharnieren kan de app niet goed nameten en ze slijten sneller. Bij Manta 5.x zit het draaistangetje vast tussen buisje en oog en kantelt het alleen.`)); }
