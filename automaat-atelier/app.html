@@ -900,7 +900,12 @@ function buildSkeleton(i){ const l=D.l, zA=D.zA3, t=D.t, items=[], last=i===D.n-
   for(const h of hangers(i)) if(h.host==='skel'&&fusedH(h)) items.push(hangerGeo(h));
   return merge(items); }
 // tuimelaarsteun (Manta 5.1): los onderdeel, gelijmd onder de vork aan het eind van het laatste segment
-function buildTipPost(){ const T=D.T3, zA=D.zA3, zT=zA+T.cT, items=[]; const sh=shapeFrom(dedupe(strokeOutline([[zT-0.9,-D.t/2-0.2],[zT-0.9,-T.hP+3.0]],[3.2,3.2],10))); /* stijl 0,9 mm naar achter: de tuimelaar strijkt er niet langs */ const g=plateYZ(sh,2); g.translate(T.uP,0,0); items.push(g);
+// 6.0: de steun is zelf een vork: twee wangen buiten de tuimelaarplaten, recht omhoog naar de vleugel; het middenvlak blijft vrij voor koppelstang 1
+function tipGap(){ return v6Gap((D.leanT||0)+2); }
+function buildTipPostV6(){ const T=D.T3, zc=D.zA3+T.zL+V6TZ, y0=-T.hP, ytop=-D.t/2-0.2, gp=tipGap(), zo=gp/2+V6.tw+0.2+V6.tw/2, it=[];
+  const pts=circPts(T.uP,y0,2.0,24).concat([[T.uP-1.6,ytop],[T.uP+1.6,ytop]]); for(const sg of [-1,1]){ const sh=shapeFrom(hullPts(pts)); sh.holes.push(circlePath(T.uP,y0,D.rh)); const g=plateXY(sh,V6.tw); g.translate(0,0,zc+sg*zo); it.push(g); }
+  const pad=new THREE.BoxGeometry(3.2,1.2,2*zo+V6.tw); pad.translate(T.uP,-D.t/2-0.6,zc); it.push(pad); return merge(it); }
+function buildTipPost(){ if(D.v6) return buildTipPostV6(); const T=D.T3, zA=D.zA3, zT=zA+T.cT, items=[]; const sh=shapeFrom(dedupe(strokeOutline([[zT-0.9,-D.t/2-0.2],[zT-0.9,-T.hP+3.0]],[3.2,3.2],10))); /* stijl 0,9 mm naar achter: de tuimelaar strijkt er niet langs */ const g=plateYZ(sh,2); g.translate(T.uP,0,0); items.push(g);
   const tab=new THREE.Shape(); tab.absarc(T.uP,-T.hP,3,0,Math.PI*2,false); tab.holes.push(circlePath(T.uP,-T.hP,D.rh)); const tg=plateXY(tab,2.6); tg.translate(0,0,zT+0.1); items.push(tg);
   const pad=new THREE.BoxGeometry(2.2,1.2,7); pad.translate(T.uP,-D.t/2-0.6,zT); items.push(pad); return merge(items); }
 // Manta 5.0: schubben. Vaste banden (mee met segment 1 en met de rib van elk segment) en losse banden die met een ring op de ronde ligger draaien.
@@ -1099,7 +1104,7 @@ function hangers(i){ const t=D.t, zA=D.zA3, out=[]; if(!D.twist3) return out;
   if(i>=1) H('horn',D.tiles?'band':D.skel?'skel':'plate',D.uH3,zA-D.e3[i],(dw)=>buildEyeX(D.dH3-t/2,dw,tlkXo(i)),[[-2.7,0],[2.7,0]],'hnk'+i,'Draaihoorn segment '+(i+1));
   if(i<D.n-1){ const ap=arm3Pad(i+1), cx=(ap.du0+ap.du1)/2, dw=[]; for(const z of [ap.dz0+1.4,ap.dz1-1.4]) if(Math.abs(z)>=2.6) dw.push([cx,z]);
     H('arm',i===0?'plate':D.tiles?'band':D.skel?'skel':'plate',D.uA3,zA-D.e3[i+1],(dw)=>buildArm3(i+1,dw),dw,'ark'+(i+1),'Draaiarm onder segment '+(i+1)); }
-  if(D.tip3&&i===D.n-2){ const T=D.T3; H('tipA',i===0?'plate':D.tiles?'band':'plate',D.l-T.dA,zA+T.zL+3.6,(dw)=>buildEye(T.hA-t/2,dw),[[0,-2.6],[0,2.6]],'tpa','Oog koppelstang punt'); }
+  if(D.tip3&&i===D.n-2){ const T=D.T3; H('tipA',i===0?'plate':D.tiles?'band':'plate',D.l-T.dA,zA+T.zL+(D.v6?V6TZ:3.6),(dw)=>D.v6?buildEyeV6(T.hA-t/2,dw,v6Gap((D.leanT||0)+2)):buildEye(T.hA-t/2,dw),D.v6?[[-3.6,0],[3.6,0]]:[[0,-2.6],[0,2.6]],'tpa',D.v6?'Oogvork koppelstang punt (kantelvork)':'Oog koppelstang punt'); }
   return out; }
 // vastgeprint (true) of los met paspennen: zonder steun kan dat bij het oogvorkje aan de ligger en alles onder de onderhelft van segment 1; 'Alles vastprinten' doet de rest (met steun)
 function fusedH(h){ if(D.fuseAll) return true; if(D.tiles){ if(h.kind==='fork') return true; if(h.i===0&&D.tileSym) return true; } return false; }
@@ -1108,8 +1113,8 @@ function dowelPts(h){ return (h.dw||[]).map(([x,z])=>[h.pos[0]+x,h.pos[2]+z]); }
 // lijmvlak (1,5 mm) met gaten voor paspennen van 1,75 mm filament; oorsprong = bovenkant midden
 function padGeo(x0,x1,z0,z1,dw){ const sh=shapeFrom([[x0,z0],[x1,z0],[x1,z1],[x0,z1]]); for(const [x,z] of (dw||[])) sh.holes.push(circlePath(x,z,D.rh)); const g=plateXZ(sh,1.5); g.translate(0,-0.75,0); return merge([g]); }
 // 6.0: oogvork — twee wangen van 1,6 mm met de stang ertussen (spleet 2,7); oorsprong = midden van de lijmvlakte
-function buildEyeV6(depth,dw){ const yc=-(depth||5), tab=new THREE.Shape(); tab.moveTo(-3.5,-1); tab.lineTo(3.5,-1); tab.lineTo(3.5,yc); tab.absarc(0,yc,3.5,0,-Math.PI,true); tab.lineTo(-3.5,-1); tab.holes.push(circlePath(0,yc,D.rh));
-  const [a,b]=v6Pair(tab,V6.gap,0), pad=dw?padGeo(-4.75,4.75,-3.75,3.75,dw):(()=>{ const bx=new THREE.BoxGeometry(9.5,1.5,7.5); bx.translate(0,-0.75,0); return bx; })(); return merge([a,b,pad]); }
+function buildEyeV6(depth,dw,gap){ gap=gap||V6.gap; const yc=-(depth||5), tab=new THREE.Shape(); tab.moveTo(-3.5,-1); tab.lineTo(3.5,-1); tab.lineTo(3.5,yc); tab.absarc(0,yc,3.5,0,-Math.PI,true); tab.lineTo(-3.5,-1); tab.holes.push(circlePath(0,yc,D.rh));
+  const [a,b]=v6Pair(tab,gap,0), pad=dw?padGeo(-4.75,4.75,-3.75,3.75,dw):(()=>{ const bx=new THREE.BoxGeometry(9.5,1.5,7.5); bx.translate(0,-0.75,0); return bx; })(); return merge([a,b,pad]); }
 function buildEye(depth,dw){ // los oog, wordt onder de vleugel gelijmd; oorsprong = midden van de lijmvlakte
   const tab=new THREE.Shape(); const yc=-(depth||5);
   tab.moveTo(-3.5,-1); tab.lineTo(3.5,-1); tab.lineTo(3.5,yc); tab.absarc(0,yc,3.5,0,-Math.PI,true); tab.lineTo(-3.5,-1);
@@ -1382,7 +1387,7 @@ function buildPitchFollowerV6(){ const S=D.Sp, Ss=S-3.7, yG=pArmSetup().yG, gx=2
   const a=plateXY(stem(Ss-4.2),V6.tw); a.translate(0,0,V6.zA); const pin=new THREE.CylinderGeometry(1.6,1.6,2.8,20); pin.rotateX(Math.PI/2); pin.translate(0,0,-4.5+1.3);
   const b=plateXY(stem(Ss),V6.tw); b.translate(0,0,V6.zB); const zb0=V6.zA+V6.tw/2, zb1=V6.zB-V6.tw/2, br=(y0,y1)=>{ const g=new THREE.BoxGeometry(5.2,y1-y0,zb1-zb0); g.translate(0,(y0+y1)/2,(zb0+zb1)/2); return g; };
   const bridges=[br(-3.6,yG[0]-3.6),br(yG[1]+3.6,Math.min(yG[1]+12,Ss-4.6))].filter(g=>g.parameters.height>1);
-  const ck=new THREE.Shape(); ck.moveTo(V6.zA-V6.tw/2,Ss-4); ck.lineTo(V6.zB+V6.tw/2,Ss-4); ck.lineTo(V6.zB+V6.tw/2,S); ck.absarc(V6.zM,S,3.5,0,Math.PI,false); ck.lineTo(V6.zA-V6.tw/2,S); ck.closePath(); ck.holes.push(circlePath(V6.zM,S,D.rh));
+  const ck=new THREE.Shape(); ck.moveTo(V6.zA-V6.tw/2,Ss-4); ck.lineTo(V6.zB+V6.tw/2,Ss-4); ck.lineTo(V6.zB+V6.tw/2,S); ck.absarc((V6.zA+V6.zB)/2,S,(V6.zB-V6.zA+V6.tw)/2,0,Math.PI,false); ck.closePath(); /* boog sluit precies aan op de zijkanten: geen omgeslagen randje */ ck.holes.push(circlePath(V6.zM,S,D.rh));
   const cheeks=[1,-1].map(sg=>{ const g=plateYZ(ck,V6.tw); g.translate(sg*(V6.gap/2+V6.tw/2),0,0); return g; }); // vork om de kantelstang (pen langs x)
   return {a:merge([a,pin]),b:merge([b,...bridges,...cheeks])}; }
 function buildPitchBracketV6(){ const A=pArmSetup(), x=-PLA, ys=A.yG.map(y=>A.mid+y), top=Math.max(...ys)+4, sh=shapeFrom([[x-6.5,3],[x+4,3],[x+4,top],[x-6.5,top]]); for(const y of ys) sh.holes.push(circlePath(x,y,D.rh));
@@ -1466,11 +1471,16 @@ function buildParts(){
   G.segMI=[];
   for(let i=0;i<D.n;i++){ const r=buildSegment(i), sk=D.skel&&i>=1; G.seg[i]=wing((sk?'skelet_R':'vleugel_R')+(i+1),(sk?'skelet_L':'vleugel_L')+(i+1),(sk?(D.tiles?'Ligger met oogvorkje (ondersteboven printen) rechts ':'Skelet (ligger + ribben) rechts '):'Vleugel rechts ')+(i+1),(sk?(D.tiles?'Ligger met oogvorkje links ':'Skelet (ligger + ribben) links '):'Vleugel links ')+(i+1),r); G.segMI[i]=massInfo(r.full); }
   if(D.tip3){ const T3=D.T3, zA=D.zA3, t=D.t, Ti=tileLayout(), tb=Ti.bands.find(b=>b.tip), it=[...bandGeo(tb,false)];
-    it.push(tubeZ(D.rh,t/2,zA-2.4,zA+2.4,0,0)); { const eb=buildEye(T3.hB-t/2); eb.translate(T3.dB,-t/2,zA+T3.zL+2.6); it.push(eb); } // oog vast aan de vinpunt (die print toch met steun) { const b=new THREE.BoxGeometry(3.2,t+0.6,4.4); b.translate(1.6+1.6,0.3,zA); items0(it,b); }
+    it.push(tubeZ(D.rh,t/2,zA-2.4,zA+2.4,0,0)); { const eb=D.v6?buildEyeV6(T3.hB-t/2,null,V6.gap):buildEye(T3.hB-t/2); eb.translate(T3.dB,-t/2,zA+T3.zL+(D.v6?V6TZ:2.6)); it.push(eb); } // oog vast aan de vinpunt (die print toch met steun) { const b=new THREE.BoxGeometry(3.2,t+0.6,4.4); b.translate(1.6+1.6,0.3,zA); items0(it,b); }
     G.tip3=add('vinpunt','Vinpunt (scharniert aan het laatste segment)',2,merge(it),I4(),'wing').geo;
     
     { const r=3, pts=[]; for(let q=0;q<=12;q++){ const a=Math.PI-Math.PI*q/12; pts.push([r*Math.cos(a),T3.a1+r*Math.sin(a)]); } for(let q=0;q<=12;q++){ const a=-Math.PI*q/12; pts.push([r*Math.cos(a),-T3.a2+r*Math.sin(a)]); } const sh=shapeFrom(dedupe(pts));
-      sh.holes.push(circlePath(0,0,D.rh)); sh.holes.push(circlePath(0,-T3.a2,D.rh)); sh.holes.push(circlePath(0,T3.a1,D.rh)); const g=plateXY(sh,1.6), bs=tubeZ(D.rh,2.6,0.8,1.75,0,T3.a1); G.rk3=add('tuimelaar_punt','Tuimelaar vinpunt (kraagje aan de kant van koppelstang 1)',2,merge([g,bs]),I4(),'mech').geo; }
+      sh.holes.push(circlePath(0,0,D.rh)); sh.holes.push(circlePath(0,-T3.a2,D.rh)); sh.holes.push(circlePath(0,T3.a1,D.rh)); if(D.v6){ const gp=tipGap(), pts=[]; for(let q=0;q<=12;q++){ const a=Math.PI-Math.PI*q/12; pts.push([3*Math.cos(a),T3.a1+3*Math.sin(a)]); } for(let q=0;q<=12;q++){ const a=-Math.PI*q/12; pts.push([3*Math.cos(a),-T3.a2+3*Math.sin(a)]); }
+        const lug=[[-6.2,-1.8],[-3,-1.8],[-3,1.8],[-6.2,1.8]], sh2=shapeFrom(hullPts(pts.concat(lug))); for(const y of [0,-T3.a2,T3.a1]) sh2.holes.push(circlePath(0,y,D.rh)); sh2.holes.push(circlePath(-4.8,0,D.rh));
+        const [pa,pb]=v6Pair(sh2,gp,0), boss=[]; for(const y of [-T3.a2]) for(const sg of [-1,1]) boss.push(v6Boss(0,y,sg*gp/2,sg*V6.gap/2)); /* kraagjes bij koppelstang 2 (recht); alleen koppelstang 1 kantelt */
+        const bsh=shapeFrom([[-6.2,-1.8],[-3.4,-1.8],[-3.4,1.8],[-6.2,1.8]]); bsh.holes.push(circlePath(-4.8,0,D.rh)); const brg=plateXY(bsh,gp);
+        G.rk3=add('tuimelaar_punt_a','Tuimelaar vinpunt, plaat A (met bruggetje)',2,merge([pa,brg,...boss.filter((_,k)=>k%2===0)]),I4(),'mech').geo; G.rk3B=add('tuimelaar_punt_b','Tuimelaar vinpunt, plaat B (op het bruggetje lijmen, paspen)',2,merge([pb,...boss.filter((_,k)=>k%2===1)]),rotX(Math.PI),'mech').geo; }
+      else { const g=plateXY(sh,1.6), bs=tubeZ(D.rh,2.6,0.8,1.75,0,T3.a1); G.rk3=add('tuimelaar_punt','Tuimelaar vinpunt (kraagje aan de kant van koppelstang 1)',2,merge([g,bs]),I4(),'mech').geo; } }
     G.c31=add('koppel_punt_1',`Koppelstang punt 1 (${T3.L1.toFixed(1).replace('.',',')} mm, kantelpennen)`,2,buildRodHG(T3.L1,[true,true]),rotX(-Math.PI/2),'rod').geo;
     G.c32=add('koppel_punt_2',`Koppelstang punt 2 (${T3.L2.toFixed(1).replace('.',',')} mm)`,2,buildRod(T3.L2),rotX(-Math.PI/2),'rod').geo; }
   if(D.tiles){ const T=tileLayout(); G.tbd=[]; for(const b of T.bands){ if(!b.dr||b.k<1||b.tip) continue; const g=merge(bandGeo(b,false)); add('vaste_schub_R'+(b.k+1),`Vaste schub segment ${b.k+1} rechts (op het zadel lijmen)`,1,g,rotZ(Math.PI/2),'wing'); add('vaste_schub_L'+(b.k+1),`Vaste schub segment ${b.k+1} links`,1,mirrorX(g),rotZ(-Math.PI/2),'wing'); G.tbd[b.k]=g; }
@@ -1835,7 +1845,7 @@ function buildScene(){
   M.cr3={R:[],L:[]}; M.tl3={R:[],L:[]}; M.skin=null; M.tb=null; M.tip3=null;
   if(D.tip3&&G.tip3){ const T3=D.T3, zA=D.zA3; M.tip3={R:{},L:{}}; for(const sd of ['R','L']){ const o=M.tip3[sd], segP=(sd==='R'?M.segR:M.segL)[D.n-2];
       o.body=mk(G.tip3,MAT.tile,inner); o.body.matrixAutoUpdate=false; o.body.userData.tag='tip3'+sd;
-      o.rk=mk(G.rk3,MAT.seg[2],inner); o.rk.matrixAutoUpdate=false; o.rk.userData.tag='rk3'+sd;
+      o.rk=mk(G.rk3,MAT.seg[2],inner); o.rk.matrixAutoUpdate=false; o.rk.userData.tag='rk3'+sd; if(G.rk3B){ const rb=mk(G.rk3B,MAT.seg[2],o.rk); rb.userData.tag='rk3'+sd; }
       o.c1=mk(G.c31,MAT.seg[3],inner); o.c1.userData.tag='c31'+sd; o.c2=mk(G.c32,MAT.seg[3],inner); o.c2.userData.tag='c32'+sd; } }
   if(D.tiles&&G.tb){ M.tb={lay:tileLayout(),R:[],L:[]}; for(const b of M.tb.lay.bands){ if(b.dr) continue; for(const sd of ['R','L']){ const m=mk(G.tb[b.j].R,MAT.tile,inner); m.matrixAutoUpdate=false; m.userData.tag='tb'+b.j+'_'+b.k+sd; M.tb[sd][b.j]=m; } } }
   if(D.skin){ const L=skinLayout(), idx=[]; for(let a=0;a<L.NS;a++) for(let j=0;j<L.NC-1;j++){ const p=a*L.NC+j; idx.push(p,p+1,p+L.NC, p+1,p+L.NC+1,p+L.NC); }
@@ -1901,7 +1911,7 @@ function addPins(inner){ M.pinList=[]; const P=(par,x,y,z,len,axis)=>{ if(!par) 
   if(M.plink){ P(M.plink,0,0,0,9,'z'); P(M.plink,D.Lp,0,0,9,'z'); }
   if(M.headRod&&D.headL){ P(M.headRod,0,0,0,9,'z'); P(M.headRod,D.headL,0,0,9,'z'); }
   if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const c=M.cr3[sd][i]; if(c) P(c,0,0,0,16,'z'); const t=M.tl3[sd][i]; if(t){ P(t,0,0,0,9,'z'); P(t,D.Lh3[i],0,0,9,'z'); } }
-  if(M.tip3) for(const sd of ['R','L']){ const o=M.tip3[sd]; P(o.rk,0,0,-1,7,'z'); P(o.rk,0,D.T3.a1,1,7,'z'); P(o.rk,0,-D.T3.a2,1,7,'z'); P(o.c1,0,0,0,9,'z'); P(o.c1,D.T3.L1,0,0,9,'z'); P(o.c2,0,0,0,9,'z'); P(o.c2,D.T3.L2,0,0,9,'z'); }
+  if(M.tip3) for(const sd of ['R','L']){ const o=M.tip3[sd]; const dz=D.v6?0:1; P(o.rk,0,0,-dz,7,'z'); P(o.rk,0,D.T3.a1,dz,7,'z'); P(o.rk,0,-D.T3.a2,dz,7,'z'); P(o.c1,0,0,0,9,'z'); P(o.c1,D.T3.L1,0,0,9,'z'); P(o.c2,0,0,0,9,'z'); P(o.c2,D.T3.L2,0,0,9,'z'); }
   M.fil=null; if(D.tiles){ M.fil=[]; for(const sd of [1,-1]){ const l=new THREE.Mesh(new THREE.BufferGeometry(),MAT_PIN); l.userData.pin=true; l.userData.own=true; l.frustumCulled=false; inner.add(l); M.fil.push({l,sg:sd}); M.pinList.push(l); } } }
 // per pen: welke onderdelen zitten eromheen (binnen 4 mm van de pen-as) en waar zit een kier tussen twee opeenvolgende onderdelen
 function pinStacks(){ const out=[], v=new THREE.Vector3(); asm.updateMatrixWorld(true); const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&!o.userData.pin&&o.geometry&&o.geometry.attributes.position&&o.visible!==false) meshes.push(o); });
@@ -2126,14 +2136,14 @@ function skinColors(P,L,out){ const base=MAT.wing.vertexColors?new THREE.Color(0
 const P_skinLim=()=>(P.skinMax??25)/100;
 function poseSkin(s){ if(!M.skin||!s.R3) return; const P=skinPoints(s,M.skin.lay);
   for(const sd of ['R','L']){ const g=M.skin[sd].geometry, a=g.attributes.position.array; a.set(P); if(sd==='L') for(let k=0;k<a.length;k+=3) a[k]=-a[k]; g.attributes.position.needsUpdate=true; skinColors(P,M.skin.lay,g.attributes.color.array); g.attributes.color.needsUpdate=true; g.computeVertexNormals(); g.computeBoundingSphere(); } }
-let TIPDZ=[0.9,-0.1];
+let TIPDZ=[0.9,-0.1]; const V6TZ=0.9; /* 6.0: middenvlak tuimelaar vinpunt boven het kinematische vlak, vrij van vleugel 3 */
 function poseTip3(s){ if(!M.tip3||!s.tip3) return; const n=D.n, T3=D.T3, zA=D.zA3, Sx=new THREE.Matrix4().makeScale(-1,1,1), V=(x,y,z)=>new THREE.Vector3(x,y,z);
   const Mt=new THREE.Matrix4().makeTranslation(s.O3[n].x,s.O3[n].y,s.O3[n].z).multiply(s.R3[n]).multiply(new THREE.Matrix4().makeTranslation(0,0,-zA));
-  const Mr=new THREE.Matrix4().makeTranslation(s.O3[n-1].x,s.O3[n-1].y,s.O3[n-1].z).multiply(s.R3[n-1]).multiply(new THREE.Matrix4().makeTranslation(T3.uP,-T3.hP,T3.cT+2.2)).multiply(new THREE.Matrix4().makeRotationZ(s.tip3.beta));
+  const Mr=new THREE.Matrix4().makeTranslation(s.O3[n-1].x,s.O3[n-1].y,s.O3[n-1].z).multiply(s.R3[n-1]).multiply(new THREE.Matrix4().makeTranslation(T3.uP,-T3.hP,D.v6?T3.zL+V6TZ:T3.cT+2.2)).multiply(new THREE.Matrix4().makeRotationZ(s.tip3.beta));
   const zc=V(0,0,1).applyMatrix4(new THREE.Matrix4().extractRotation(s.R3[n-1]));
   for(const sg of [1,-1]){ const o=M.tip3[sg>0?'R':'L'], F=(m)=>sg>0?m:new THREE.Matrix4().copy(Sx).multiply(m);
     o.body.matrix.copy(F(Mt)); o.rk.matrix.copy(F(Mr));
-    for(const [m,a,b,dz] of [[o.c1,s.tip3.A,s.tip3.R1,TIPDZ[0]],[o.c2,s.tip3.R2,s.tip3.B,TIPDZ[1]]]){ const pa=V(sg*a.x,a.y,a.z), pb=V(sg*b.x,b.y,b.z), X=pb.clone().sub(pa).normalize(), zz=V(sg*zc.x,zc.y,zc.z), Z=zz.addScaledVector(X,-zz.dot(X)).normalize(), Y=Z.clone().cross(X);
+    for(const [m,a,b,dz] of [[o.c1,s.tip3.A,s.tip3.R1,D.v6?V6TZ:TIPDZ[0]],[o.c2,s.tip3.R2,s.tip3.B,D.v6?V6TZ:TIPDZ[1]]]){ const pa=V(sg*a.x,a.y,a.z), pb=V(sg*b.x,b.y,b.z), X=pb.clone().sub(pa).normalize(), zz=V(sg*zc.x,zc.y,zc.z), Z=zz.addScaledVector(X,-zz.dot(X)).normalize(), Y=Z.clone().cross(X);
       m.position.copy(pa).addScaledVector(Z,dz); m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); m.material=s.tip3.ok?MAT.seg[3]:MAT.bad; } } }
 function poseTiles(s){ poseTip3(s); if(!M.tb||!s.R3) return; const Sx=new THREE.Matrix4().makeScale(-1,1,1);
   for(const b of M.tb.lay.bands){ if(b.dr) continue; const Mt=tileMat(s,M.tb.lay,b); M.tb.R[b.j].matrix.copy(Mt); M.tb.L[b.j].matrix.copy(Sx).multiply(Mt); } }
