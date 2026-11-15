@@ -35,3 +35,5 @@ Scharnieren (onderzoek, november 2026), en wat de app ermee doet:
 - Olifantenpoot: compensatie in de slicer aanzetten (ongeveer 0,2 mm).
 - Pennen en wrijving: PLA-filament wordt bros; PETG of nylon als pen, en een druppel droog PTFE- of siliconensmeermiddel op elk draaipunt.
 Bronnen: hackaday.com (glue-in hinge, crush ribs), qidi3d.com (losse scharnieren, olifantenpoot), snapmaker.com en hex-3d-gon (toleranties bewegende delen), all3dp.com en pollen.am (gaten), zbotic.in en digikey.com (persfit), sovol3d.com (FDM-toleranties).
+- Etappe A (knop 'Etappe A (.zip)', alleen bij 6.0): sokkel, alle nokken, lijf met kanteling en de aandrijving plus vleugeldelen van segment 1 (links en rechts), met een LEESMIJ met testpunten. Eerst de proefprintset, dan etappe A, dan de rest.
+- Losse schubben (6.0): het dakpanrandje groeit onder 45° uit de onderkant, zodat de schubben op hun zijkant zonder steun printen.
