@@ -1121,7 +1121,7 @@ function hangerGeo(h){ const g=h.geo(); g.translate(...h.pos); return g; }
 function dowelPts(h){ return (h.dw||[]).map(([x,z])=>[h.pos[0]+x,h.pos[2]+z]); }
 // lijmvlak (1,5 mm) met gaten voor paspennen van 1,75 mm filament; oorsprong = bovenkant midden
 function padGeo(x0,x1,z0,z1,dw){ const sh=shapeFrom([[x0,z0],[x1,z0],[x1,z1],[x0,z1]]); for(const [x,z] of (dw||[])) sh.holes.push(circlePath(x,z,D.rh)); const g=plateXZ(sh,1.5); g.translate(0,-0.75,0); return merge([g]); }
-// 6.0: oogvork — twee wangen van 1,6 mm met de stang ertussen (spleet 2,7); oorsprong = midden van de lijmvlakte
+// 6.0: oogvork — twee wangen van 1,6 mm met de stang ertussen (spleet 2,8); oorsprong = midden van de lijmvlakte
 function buildEyeV6(depth,dw,gap){ gap=gap||V6.gap; const yc=-(depth||5), tab=new THREE.Shape(); tab.moveTo(-3.5,-1); tab.lineTo(3.5,-1); tab.lineTo(3.5,yc); tab.absarc(0,yc,3.5,0,-Math.PI,true); tab.lineTo(-3.5,-1); tab.holes.push(circlePath(0,yc,D.rh));
   const [a,b]=v6Pair(tab,gap,0), pad=dw?padGeo(-4.75,4.75,-3.75,3.75,dw):(()=>{ const bx=new THREE.BoxGeometry(9.5,1.5,7.5); bx.translate(0,-0.75,0); return bx; })(); return merge([a,b,pad]); }
 function buildEye(depth,dw){ // los oog, wordt onder de vleugel gelijmd; oorsprong = midden van de lijmvlakte
@@ -1159,8 +1159,8 @@ function buildArm3(i,dw){ if(v6Tl()) return buildArm3V6(i,dw); const ex=(D.l+D.u
   const tube=tubeX(D.rh,2.7,ex-3-sA,ex-sA,ey,0), pad=dw?padGeo(ap.du0,ap.du1,ap.dz0,ap.dz1,dw):(()=>{ const b=new THREE.BoxGeometry(ap.du1-ap.du0,1.5,ap.dz1-ap.dz0); b.translate((ap.du0+ap.du1)/2,-0.75,(ap.dz0+ap.dz1)/2); return b; })();
   return merge([plateXY(shapeFrom(o),3),tube,pad]); }
 const items0=(a,g)=>a.push(g);
-// Manta 6.0: vaste lagen per segment (t.o.v. D.z[i]; de nok ligt op -6,8 … -2,3). Wangen 1,6 in A en B, staven 2,4 in M (spleet 2,7).
-const V6={pitch:13, zA:-1.1, zM:1.05, zB:3.2, tw:1.6, gap:2.7};
+// Manta 6.0: vaste lagen per segment (t.o.v. D.z[i]; de nok ligt op -6,8 … -2,3). Wangen 1,6 in A en B, staven 2,4 in M (spleet 2,8).
+const V6={pitch:13, zA:-1.15, zM:1.05, zB:3.25, tw:1.6, gap:2.8}; /* spleet 2,8 voor een staaf van 2,4: 0,2 mm per kant (laagdikte en eerste laag wijken tot ±0,1 mm af) */
 function v6Gap(phi){ return Math.max(V6.gap,2.4*Math.cos(phi*DEG)+ROD.w*Math.sin(phi*DEG)+0.3); } // spleet van een (kantel)vork voor een staaf die phi graden kantelt
 function v6Pair(shape,gap,zc){ const a=plateXY(shape,V6.tw), b=plateXY(shape,V6.tw); a.translate(0,0,zc-gap/2-V6.tw/2); b.translate(0,0,zc+gap/2+V6.tw/2); return [a,b]; }
 function v6Boss(x,y,from,to){ return tubeZ(D.rh,3.0,Math.min(from,to),Math.max(from,to),x,y); } // kraagje binnen een wijdere vork, zodat een rechte staaf geen speling heeft
@@ -2353,7 +2353,7 @@ function runFitCheck(){ runPins();
 }
 // pennenlijst en scharniercontrole
 function pinHw(){ const L=new Map(); for(const h of M.hinges){ if(!h.pinLen) continue; const k=Math.ceil(h.pinLen*2)/2; L.set(k,(L.get(k)||0)+1); }
-  const n=[...L.values()].reduce((a,b)=>a+b,0); return `${n} pennen van 1,75 mm filament, op lengte geknipt: `+[...L.entries()].sort((a,b)=>a[0]-b[0]).map(([k,c])=>`${c}× ${String(k).replace('.',',')} mm`).join(', ')+'. Knip ze 0,5 mm langer en schuur of smelt het uiteinde rond.'; }
+  const n=[...L.values()].reduce((a,b)=>a+b,0); return `${n} pennen van 1,75 mm filament, op lengte geknipt: `+[...L.entries()].sort((a,b)=>a[0]-b[0]).map(([k,c])=>`${c}× ${String(k).replace('.',',')} mm`).join(', ')+'. Knip ze 0,5 mm langer en schuur of smelt het uiteinde rond. Gebruik bij voorkeur PETG- of nylonfilament voor de pennen (PLA wordt na verloop van tijd bros), druk ze recht in met een tangetje, en geef elk draaipunt een druppel droog PTFE- of siliconensmeermiddel. Zet in de slicer olifantenpoot-compensatie aan (ongeveer 0,2 mm), anders lopen gaten en vorken aan de bedkant dicht.'; }
 function renderHinges(){ const el=document.getElementById('hingeList'); if(!el) return; if(!D.horse&&M.pinsPending){ el.innerHTML='<div class="status warn"><b>Bezig</b><span>Pennen, klemgaten en vorkkappen berekenen…</span></div>'; return; } if(D.horse||!M.hinges){ el.innerHTML=''; return; }
   const H=M.hinges, lbl=(t)=>tagLabel(t), uniq=(a)=>[...new Set(a)], st=(c,b,t)=>`<div class="status ${c}"><b>${b}</b><span>${t}</span></div>`, out=[];
   const used=H.filter(h=>h.pinLen), clamp=used.filter(h=>h.clampM).length, caps=(M.caps||[]).filter(c=>!c.mesh.userData.dropped).length, rings=(M.rings||[]).filter(r=>!r.userData.dropped).length, melt=(M.rings||[]).filter(r=>r.userData.dropped).length+(M.caps||[]).filter(c=>c.mesh.userData.dropped).length, forks=used.filter(h=>{ const eb=endBodies(h); return h.bodies>=2&&eb.lo&&eb.lo===eb.hi; }).length, blindBoth=used.filter(h=>!h.rings.length&&!h.clampM).length;
@@ -2434,13 +2434,19 @@ function printCheckPart(p){ const g=p.geo.clone(); g.applyMatrix4(p.rot); g.comp
       if(best<0.42) thin++; } }
   const bs=bedSize(), fits=(sz.x<=bs.x&&sz.z<=bs.y&&sz.y<=bs.z)||(sz.z<=bs.x&&sz.x<=bs.y&&sz.y<=bs.z);
   return {id:p.id,name:p.name,sz:[sz.x,sz.y,sz.z],base,over,thin:tot?thin/tot*area:0,area,fits}; }
+// pengaten die in de printstand liggen: die hangen aan de bovenkant iets door, naboren met een boortje van 2 mm
+function horizHoles(){ const out=new Map(); if(!M.hinges) return []; const th0=curTheta; poseAny(0); asm.updateMatrixWorld(true);
+  const partOf=(m)=>PARTS.find(p=>p.geo===m.geometry||(p.geo.userData&&p.geo.userData.mirrorSrc===m.geometry));
+  for(const h of M.hinges){ if(!h.pinLen) continue; for(const x of h.cl){ const p=partOf(x.m); if(!p) continue; const inv=new THREE.Matrix4().copy(x.m.matrixWorld).invert(), ul=h.u.clone().transformDirection(inv), up=new THREE.Vector3(0,1,0).applyMatrix4(new THREE.Matrix4().extractRotation(p.rot).invert()).normalize(); if(Math.abs(ul.dot(up))<0.5) out.set(p.id,p.name.split(' (')[0]); } }
+  poseAny(th0); return [...out.values()]; }
 function runPrintCheck(){ const token=++prcToken; const list=PARTS.filter(p=>p.geo&&p.geo.attributes&&p.geo.attributes.position); PRC={state:'busy',progress:0}; renderPrc(); const res=[]; let k=0;
-  const step=()=>{ if(token!==prcToken) return; const t0=performance.now(); while(k<list.length&&performance.now()-t0<60){ try{ res.push(printCheckPart(list[k])); }catch(e){} k++; } PRC.progress=k/list.length; renderPrc(); if(k<list.length) setTimeout(step,0); else { PRC={state:'done',res}; renderPrc(); } };
+  const step=()=>{ if(token!==prcToken) return; const t0=performance.now(); while(k<list.length&&performance.now()-t0<60){ try{ res.push(printCheckPart(list[k])); }catch(e){} k++; } PRC.progress=k/list.length; renderPrc(); if(k<list.length) setTimeout(step,0); else { PRC={state:'done',res,hor:horizHoles()}; renderPrc(); } };
   setTimeout(step,0); }
 function renderPrc(){ const el=document.getElementById('printList'); if(!el) return; const nl=(x)=>Math.round(x).toString(); if(PRC.state==='busy'){ el.innerHTML=`<div class="status warn"><b>Bezig</b><span>Printbaarheid nagaan… ${Math.round((PRC.progress||0)*100)}%</span></div>`; return; } if(PRC.state!=='done'){ el.innerHTML=''; return; }
   const out=[]; for(const r of PRC.res){ const iss=[]; if(!r.fits) iss.push('past niet op het printbed'); if(r.base<8) iss.push(`ligt met maar ${nl(r.base)} mm² plat op het bed (brim of andere stand)`); if(r.over>25) iss.push(`${nl(r.over)} mm² overhang steiler dan 45° (steun nodig)`); if(r.thin>40) iss.push(`${nl(r.thin)} mm² wand dunner dan één printlijn (0,42 mm): die stukjes print de slicer niet`); if(iss.length) out.push({r,iss}); }
-  if(!out.length){ el.innerHTML=`<div class="status ok"><b>Printbaar</b><span>Alle ${PRC.res.length} onderdelen passen op het bed, liggen plat, hebben geen grote overhang en geen wanden dunner dan één printlijn.</span></div>`; return; }
-  el.innerHTML=`<div class="status ok"><b>Printbaar</b><span>${PRC.res.length-out.length} van de ${PRC.res.length} onderdelen zonder aandachtspunten.</span></div>`+out.map(({r,iss})=>`<div class="status warn"><b>Let op</b><span>${r.name.split(' (')[0]}: ${iss.join('; ')}.</span></div>`).join(''); }
+  const hz=(PRC.hor&&PRC.hor.length)?`<div class="status warn"><b>Naboren</b><span>Bij deze onderdelen ligt een pengat in de printstand; de bovenkant hangt iets door. Boor die gaten na met een boortje van 2 mm: ${PRC.hor.join(', ')}.</span></div>`:'';
+  if(!out.length){ el.innerHTML=hz+`<div class="status ok"><b>Printbaar</b><span>Alle ${PRC.res.length} onderdelen passen op het bed, liggen plat, hebben geen grote overhang en geen wanden dunner dan één printlijn.</span></div>`; return; }
+  el.innerHTML=hz+`<div class="status ok"><b>Printbaar</b><span>${PRC.res.length-out.length} van de ${PRC.res.length} onderdelen zonder aandachtspunten.</span></div>`+out.map(({r,iss})=>`<div class="status warn"><b>Let op</b><span>${r.name.split(' (')[0]}: ${iss.join('; ')}.</span></div>`).join(''); }
 
 /* Printbed */
 let BEDS=[];

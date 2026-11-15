@@ -26,3 +26,12 @@ Controles voor een geslaagde eerste print (6.0):
 - Printbaarheid: per onderdeel, in de printstand, of het op het bed past, plat ligt, overhang steiler dan 45° heeft en wanden dunner dan één printlijn. Bij 6.0 kiest de app per onderdeel zelf de stand met het grootste vlak op het bed.
 - Proefprintset: pengat-strip, klemgat-strip (1 tot 4 stipjes = 1,40 / 1,48 / 1,56 / 1,64 mm; instelling 'Klemgat'), maatblokje van 10 mm voor de aangroei, en voor 6.0 een gewone vork, een kantelvork en een plaatje van 1,2 mm.
 - Kruisstuk tussen de segmenten (met ligger): de spil heeft een groefje vóór de lagerbus; een borgclip schuif je zijwaarts in dat groefje en lijm je op de voorkant van de bus. Achter de bus is geen ruimte voor een borgring.
+
+Scharnieren (onderzoek, november 2026), en wat de app ermee doet:
+- Pengat voor 1,75 mm filament: in de praktijk 2,0–2,1 mm; staande gaten printen te klein, dus kalibreren met de pengat-strip (instelling 'Pengat').
+- Klemgaten met ribbels: ribbels maken de passing minder gevoelig voor de precieze gatmaat; aanbevolen klem 0,2–0,3 mm op de diameter. De app geeft 0,19 mm (Klemgat 1,56); de klemgat-strip bepaalt de juiste maat (instelling 'Klemgat').
+- Speling langs de pen (in de hoogte van de print): laagdikte en de geplette eerste laag geven ±0,05–0,2 mm afwijking. De vorken van 6.0 hebben daarom 0,2 mm per kant (spleet 2,8 mm voor een staaf van 2,4 mm; was 0,15).
+- Liggende gaten hangen aan de bovenkant door; advies: naboren. Het paneel Printbaarheid noemt de onderdelen met een liggend pengat (boortje van 2 mm).
+- Olifantenpoot: compensatie in de slicer aanzetten (ongeveer 0,2 mm).
+- Pennen en wrijving: PLA-filament wordt bros; PETG of nylon als pen, en een druppel droog PTFE- of siliconensmeermiddel op elk draaipunt.
+Bronnen: hackaday.com (glue-in hinge, crush ribs), qidi3d.com (losse scharnieren, olifantenpoot), snapmaker.com en hex-3d-gon (toleranties bewegende delen), all3dp.com en pollen.am (gaten), zbotic.in en digikey.com (persfit), sovol3d.com (FDM-toleranties).
