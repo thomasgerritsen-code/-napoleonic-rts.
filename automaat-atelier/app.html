@@ -1562,7 +1562,7 @@ function buildParts(){
       const pa=add('volger_a_'+(i+1),'Volger '+(i+1)+', plaat A (met groefpen; pen omhoog printen)',1,f.a,I4(),'mech'), pb=add('volger_b_'+(i+1),'Volger '+(i+1)+', plaat B (met bruggetjes; op plaat A lijmen, paspennen)',1,f.b,rotX(Math.PI),'mech'); G.folParts[i]=[pa.geo,pb.geo]; G.fol[i]=f.all;
       G.arm['br'+i]=add('geleidesteun_'+(i+1),'Geleidesteun '+(i+1)+' (vork; op de bodem lijmen)',1,buildGuideBracketV6(i),rotZ(Math.PI/2),'mech').geo; }
     G.arm.roller=null; G.arm.guide=add('geleidearm','Geleidearmpje ('+D.La.toFixed(0)+' mm)',2*D.n,buildRod(D.La),rotX(-Math.PI/2),'rod').geo;
-    G.arm.link=add('volgerstangetje','Volgerstangetje ('+D.Lk.toFixed(0)+' mm)',2*D.n,buildRod(D.Lk,5.2),rotX(-Math.PI/2),'rod').geo; }
+    G.arm.link=add('volgerstangetje','Volgerstangetje ('+D.Lk.toFixed(0)+' mm)',2*D.n,buildRod(D.Lk,4.8),rotX(-Math.PI/2),'rod').geo; }
   else if(D.armDrive){ G.fol=[]; G.arm={}; for(let i=0;i<D.n;i++){ const f=buildArmFollower(i); G.folParts=G.folParts||[]; const pf=add('volgervork_'+(i+1),'Volgervork '+(i+1)+(D.forced?' (met pen voor de groef; pen omhoog printen)':' (rolletje + geleidearmpjes)'),1,f.fork,D.forced?rotX(Math.PI/2):rotX(-Math.PI/2),'mech'); const pu=add('volgerstang_'+(i+1),'Volgerstang '+(i+1)+' (dwarsbalk; met 2 paspennen op de vork lijmen)',1,f.upper,rotX(-Math.PI/2),'mech'); G.folParts[i]=[pf.geo,pu.geo]; G.fol[i]=f.all;
       G.arm['br'+i]=add('geleidesteun_'+(i+1),'Steun geleidearmpjes '+(i+1)+' (op de bodem lijmen)',1,buildGuideBracket(i),I4(),'mech').geo; }
     G.arm.roller=D.forced?null:add('rolletje','Rolletje volger (draait los op een pen van 1,75 mm)',D.n,buildRoller(),I4(),'mech').geo;
@@ -1893,8 +1893,8 @@ function buildScene(){
     M.rodL[i]=mk(G.rodS[i]||G.rod[i],MAT.seg[i]); M.rodL[i].position.z=D.zRod[i]; M.rodL[i].userData.tag='rod'+i+'L';
     if(D.armDrive&&G.folParts&&G.folParts[i]){ M.fol[i]=mk(G.folParts[i][0],MAT.seg[i]); const up=mk(G.folParts[i][1],MAT.seg[i],M.fol[i]); up.userData.tag='fol'+i; } else M.fol[i]=mk(G.fol[i],MAT.seg[i]); M.fol[i].position.z=D.z[i]; M.fol[i].userData.tag='fol'+i;
     if(D.leverOn){ M.rk=M.rk||[]; M.rk[i]=[];
-      for(const sg of [1,-1]){ const r=mk(G.rk[i],MAT.seg[i]); r.position.set(sg*D.xr[i],D.yr[i],D.zRk[i]); r.userData.tag='rk'+i+(sg>0?'R':'L'); M.rk[i].push(r); if(G.rkB&&G.rkB[i]){ const rb=mk(G.rkB[i],MAT.seg[i],r); rb.userData.tag=r.userData.tag; }
-        const p=mk(G.rkPost[i],MAT.motor); p.position.set(sg*D.xr[i],D.Hb,D.zRod[i]); p.userData.tag='pp'+i+(sg>0?'R':'L'); } }
+      for(const sg of [1,-1]){ const r=mk(G.rk[i],MAT.seg[i]); r.position.set(sg*D.xr[i],D.yr[i],D.zRk[i]); if(D.v6&&sg<0) r.scale.x=-1; /* 6.0: links gespiegeld (zelfde onderdelen, plaat A en B van kant gewisseld): bruggetje boven de pen, net als rechts */ r.userData.tag='rk'+i+(sg>0?'R':'L'); M.rk[i].push(r); if(G.rkB&&G.rkB[i]){ const rb=mk(G.rkB[i],MAT.seg[i],r); rb.userData.tag=r.userData.tag; }
+        const p=mk(G.rkPost[i],MAT.motor); p.position.set(sg*D.xr[i],D.Hb,D.zRod[i]); if(D.v6&&sg<0) p.scale.x=-1; /* voetje links ook naar buiten */ p.userData.tag='pp'+i+(sg>0?'R':'L'); } }
     M.cam[i]=mk(G.cam[i],MAT.seg[i]); M.cam[i].position.set(0,D.yc,D.z[i]); M.cam[i].userData.tag='cam'+i;
     if(D.armDrive){ M.armx=M.armx||[]; const o={}; M.armx[i]=o; if(G.arm.roller){ const ro=mk(G.arm.roller,MAT.steel,M.fol[i]); ro.position.set(0,0,0); }
       o.br=mk(G.arm['br'+i],MAT.motor); o.br.position.set(0,0,D.z[i]); o.br.userData.tag='gbr'+i;
@@ -2206,7 +2206,7 @@ function poseTip3(s){ if(!M.tip3||!s.tip3) return; const n=D.n, T3=D.T3, zA=D.zA
     o.body.matrix.copy(F(Mt)); o.rk.matrix.copy(F(Mr));
     const zc2=V(0,0,1).applyMatrix4(new THREE.Matrix4().extractRotation(s.R3[n-2])), zb=D.v6?zc.clone().add(zc2).normalize():zc; /* 6.0: koppelstang 1 in het middenvlak tussen beide penassen: hij kantelt aan beide uiteinden de helft */
     for(const [m,a,b,dz,zr] of [[o.c1,s.tip3.A,s.tip3.R1,D.v6?V6TZ:TIPDZ[0],zb],[o.c2,s.tip3.R2,s.tip3.B,D.v6?V6TZ:TIPDZ[1],zc]]){ const pa=V(sg*a.x,a.y,a.z), pb=V(sg*b.x,b.y,b.z), X=pb.clone().sub(pa).normalize(), zz=V(sg*zr.x,zr.y,zr.z), Z=zz.addScaledVector(X,-zz.dot(X)).normalize(), Y=Z.clone().cross(X);
-      m.position.copy(pa).addScaledVector(Z,dz); m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); m.material=s.tip3.ok?MAT.seg[3]:MAT.bad; } } }
+      m.position.copy(pa).addScaledVector(Z,dz); m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z)); if(D.v6&&m===o.c1) m.scale.y=sg<0?-1:1; /* links gespiegeld: de uitsparing naast het eindoog zit dan aan de kant van het draaipunt (zelfde stang, omgedraaid) */ m.material=s.tip3.ok?MAT.seg[3]:MAT.bad; } } }
 function poseTiles(s){ poseTip3(s); if(!M.tb||!s.R3) return; const Sx=new THREE.Matrix4().makeScale(-1,1,1);
   for(const b of M.tb.lay.bands){ if(b.dr) continue; const Mt=tileMat(s,M.tb.lay,b); M.tb.R[b.j].matrix.copy(Mt); M.tb.L[b.j].matrix.copy(Sx).multiply(Mt); } }
 function poseGears(theta){ if(!M.gb) return; const ang=[theta]; D.gst.forEach(([Ng,Np])=>ang.push(-ang[ang.length-1]*Np/Ng));
@@ -2250,7 +2250,7 @@ function pose(theta){ poseGears(theta);
       const yMid=A.yCm[i]-A.Hcr[i]; A.yG[i].forEach((yy,k)=>{ const zg=D.v6?V6.zM:6.0, g0=new THREE.Vector3(-1.5-D.La,yMid+yy,z+zg), g1=new THREE.Vector3(r.dx-1.5,r.yR+yy,z+zg); o.g[k].position.copy(g0); o.g[k].rotation.set(0,0,Math.atan2(g1.y-g0.y,g1.x-g0.x)); });
       [1,-1].forEach((sg,k)=>{ const a=new THREE.Vector3(sg*(D.xp[i]+sg*r.dx),r.yC,z+D.zLk), b2=new THREE.Vector3(sg*r.px,r.py,z+D.zLk); o.lk[k].position.copy(a); o.lk[k].rotation.set(0,0,Math.atan2(b2.y-a.y,b2.x-a.x)); }); }
     else M.fol[i].position.y=D.yc+D.s(i,theta);
-    if(D.leverOn&&M.rk&&M.rk[i]){ const b=s.beta[i]; M.rk[i][0].rotation.z=b; M.rk[i][1].rotation.z=Math.PI-b; }
+    if(D.leverOn&&M.rk&&M.rk[i]){ const b=s.beta[i]; M.rk[i][0].rotation.z=b; M.rk[i][1].rotation.z=D.v6?-b:Math.PI-b; }
     M.cam[i].rotation.z=theta;
   }
   M.tilt.rotation.x=s.phi; M.tilt.position.y=D.frame.y+s.h;
@@ -2420,7 +2420,7 @@ function clrDist(G,p,md,tri,q){ const i=Math.floor((p.x-G.mn.x)/G.c), j=Math.flo
   for(const t of l){ tri.a.set(a[t],a[t+1],a[t+2]); tri.b.set(a[t+3],a[t+4],a[t+5]); tri.c.set(a[t+6],a[t+7],a[t+8]); tri.closestPointToPoint(p,q); const e=q.distanceTo(p); if(e<d-1e-6){ d=e; tri.getNormal(CLR_N); CLR_Q.copy(p).sub(q); sg=CLR_Q.dot(CLR_N)<-1e-4?-1:1; } else if(Math.abs(e-d)<=1e-6&&sg<0){ tri.getNormal(CLR_N); CLR_Q.copy(p).sub(q); if(CLR_Q.dot(CLR_N)>=0) sg=1; } }
   return d*sg; } /* negatief = binnen het andere deel (volgens de buitennormaal van het dichtstbijzijnde vlak; bij twijfel buiten) */
 function runClearance(){ const token=++clrToken; const thr=clrThr()-0.005, md=Math.max(0.8,thr+0.2), steps=24;
-  const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&o.userData.tag&&o.visible!==false&&!o.userData.dropped&&!/L$/.test(o.userData.tag)&&o.geometry&&o.geometry.attributes.position) meshes.push(o); });
+  const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&o.userData.tag&&o.visible!==false&&!o.userData.dropped&&o.geometry&&o.geometry.attributes.position) meshes.push(o); }); /* links en rechts: een verschil tussen de kanten moet ook opvallen */
   const zones=(M.hinges||[]).filter(h=>h.pinLen&&h.pin).map(h=>({pin:h.pin,tags:new Set(h.cl.map(x=>x.tag).concat([h.pin.userData.tag])),lo:h.lo,hi:h.hi}));
   const rel=(a,b)=>new THREE.Matrix4().copy(b.matrixWorld).invert().multiply(a.matrixWorld).elements;
   const poses=[0,1.3,2.9,4.4]; const R0=[]; for(const th of poses){ poseAny(th); asm.updateMatrixWorld(true); R0.push(meshes.map(m=>m.matrixWorld.clone())); }
@@ -2451,7 +2451,7 @@ function renderClr(){ const el=document.getElementById('clrList'); if(!el) retur
 /* Bewegingscontrole: draaien alle onderdelen op een pen in elke stand echt om dezelfde as? Verschuiving t.o.v. het gat, scheefstand bij gewone gaten, kanteling bij zandlopergaten */
 let MOT={state:'idle'}, motToken=0;
 function runMotionCheck(){ if(D.horse||!M.hinges){ MOT={state:'idle'}; renderMot(); return; } const th0=curTheta; poseAny(0); asm.updateMatrixWorld(true); const T=THREE;
-  const H=M.hinges.filter(h=>h.pinLen&&h.cl.length>=2&&!h.cl.every(x=>/L$/.test(x.tag)));
+  const H=M.hinges.filter(h=>h.pinLen&&h.cl.length>=2); /* beide kanten */
   const rec=H.map(h=>{ const c=h.P.clone().addScaledVector(h.u,(h.lo+h.hi)/2), ref=h.cl.find(x=>!x.hg)||h.cl[0], inv=new T.Matrix4().copy(ref.m.matrixWorld).invert(); return {h,ref,cr:c.clone().applyMatrix4(inv),ur:h.u.clone().transformDirection(inv),mem:h.cl.filter(x=>x!==ref).map(x=>{ const iv=new T.Matrix4().copy(x.m.matrixWorld).invert(); return {x,c:c.clone().applyMatrix4(iv),u:h.u.clone().transformDirection(iv)}; }),off:0,skew:0,tilt:0,at:0}; });
   const tok=++motToken; let k=0; const stepM=()=>{ if(tok!==motToken) return; const t0=performance.now(); for(;k<24&&performance.now()-t0<25;k++){ poseAny(k/24*2*Math.PI); asm.updateMatrixWorld(true); for(const r of rec){ const u0=r.ur.clone().transformDirection(r.ref.m.matrixWorld).normalize(), c0=r.cr.clone().applyMatrix4(r.ref.m.matrixWorld);
     for(const m of r.mem){ const c=m.c.clone().applyMatrix4(m.x.m.matrixWorld), d=c.sub(c0), off=d.addScaledVector(u0,-d.dot(u0)).length(); if(off>r.off){ r.off=off; r.at=k*15; }
