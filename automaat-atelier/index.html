@@ -1614,10 +1614,14 @@ function buildParts(){
 // gewicht zoals geprint: 3 wanden/boven-onderlagen (~1,2 mm) massief, de rest met de gekozen vulling
 const WALL=1.2; let INFILL=0.15;
 // vlak op het bed (onderkant op y=0) en overhang steiler dan ~45°, met normalen naar buiten (omgekeerde vormen worden gecorrigeerd)
-function orientStats(geo,rot){ const a=geo.attributes.position.array, m=rot.elements, T=(i)=>[m[0]*a[i]+m[4]*a[i+1]+m[8]*a[i+2],m[1]*a[i]+m[5]*a[i+1]+m[9]*a[i+2],m[2]*a[i]+m[6]*a[i+1]+m[10]*a[i+2]]; let ymin=1e9; const P=new Float32Array(a.length);
-  for(let i=0;i<a.length;i+=3){ const v=T(i); P[i]=v[0]; P[i+1]=v[1]; P[i+2]=v[2]; if(v[1]<ymin) ymin=v[1]; } const sg=signedVol(P)<0?-1:1; let base=0, over=0; const vq=voxelize(geo), dn=[-m[1],-m[5],-m[9]], inside=(x,y,z)=>{ const i=Math.floor((x-vq.mn.x)/VOX), j=Math.floor((y-vq.mn.y)/VOX), k=Math.floor((z-vq.mn.z)/VOX); return i>=0&&j>=0&&k>=0&&i<vq.nx&&j<vq.ny&&k<vq.nz&&!!vq.occ[(i*vq.ny+j)*vq.nz+k]; };
-  for(let t=0;t<P.length;t+=9){ const ux=P[t+3]-P[t],uy=P[t+4]-P[t+1],uz=P[t+5]-P[t+2],wx=P[t+6]-P[t],wy=P[t+7]-P[t+1],wz=P[t+8]-P[t+2]; let nx=uy*wz-uz*wy, ny=uz*wx-ux*wz, nz=ux*wy-uy*wx; const L=Math.hypot(nx,ny,nz); if(L<1e-9) continue; ny=ny/L*sg; const ar=L/2, ymax=Math.max(P[t+1],P[t+4],P[t+7])-ymin;
-    if(ymax<0.05&&ny<-0.9) base+=ar; else if(ny<-0.72&&ymax>0.3){ const cx=(a[t]+a[t+3]+a[t+6])/3+dn[0]*1.2, cy=(a[t+1]+a[t+4]+a[t+7])/3+dn[1]*1.2, cz=(a[t+2]+a[t+5]+a[t+8])/3+dn[2]*1.2; if(!inside(cx,cy,cz)) over+=ar; } } return {base,over}; } /* vlak met materiaal eronder = binnenvlak van een overlappende deelvorm, geen overhang */
+function orientStats(geo,rot){ const a=geo.attributes.position.array, m=rot.elements; let C=geo.userData._os;
+  if(!C||C.n!==a.length){ const T=a.length/9, st=Math.max(1,Math.ceil(T/25000)), tr=[]; for(let t=0;t<a.length;t+=9*st){ const ux=a[t+3]-a[t],uy=a[t+4]-a[t+1],uz=a[t+5]-a[t+2],wx=a[t+6]-a[t],wy=a[t+7]-a[t+1],wz=a[t+8]-a[t+2]; const nx=uy*wz-uz*wy, ny=uz*wx-ux*wz, nz=ux*wy-uy*wx, L=Math.hypot(nx,ny,nz); if(L<1e-9) continue; tr.push(t,nx/L,ny/L,nz/L,L/2*st); }
+    C=geo.userData._os={n:a.length,tr,sg:signedVol(a)<0?-1:1}; } /* normalen en binnen/buiten één keer per vorm; grote vormen via een gelijkmatige steekproef */
+  const Y=(i)=>m[1]*a[i]+m[5]*a[i+1]+m[9]*a[i+2]; let ymin=1e9; for(let i=0;i<a.length;i+=3){ const y=Y(i); if(y<ymin) ymin=y; }
+  let vq=null; const dn=[-m[1],-m[5],-m[9]], inside=(x,y,z)=>{ if(!vq) vq=voxelize(geo); const i=Math.floor((x-vq.mn.x)/VOX), j=Math.floor((y-vq.mn.y)/VOX), k=Math.floor((z-vq.mn.z)/VOX); return i>=0&&j>=0&&k>=0&&i<vq.nx&&j<vq.ny&&k<vq.nz&&!!vq.occ[(i*vq.ny+j)*vq.nz+k]; }; let base=0, over=0; const tr=C.tr;
+  for(let q=0;q<tr.length;q+=5){ const t=tr[q], ny=(m[1]*tr[q+1]+m[5]*tr[q+2]+m[9]*tr[q+3])*C.sg, ar=tr[q+4], ymax=Math.max(Y(t),Y(t+3),Y(t+6))-ymin;
+    if(ymax<0.05&&ny<-0.9) base+=ar; else if(ny<-0.72&&ymax>0.3){ const cx=(a[t]+a[t+3]+a[t+6])/3+dn[0]*1.2, cy=(a[t+1]+a[t+4]+a[t+7])/3+dn[1]*1.2, cz=(a[t+2]+a[t+5]+a[t+8])/3+dn[2]*1.2; if(!inside(cx,cy,cz)) over+=ar; } }
+  return {base,over}; } /* vlak met materiaal eronder = binnenvlak van een overlappende deelvorm, geen overhang */
 const ORIENTS=[()=>I4(),()=>rotX(-Math.PI/2),()=>rotX(Math.PI/2),()=>rotX(Math.PI),()=>rotZ(Math.PI/2),()=>rotZ(-Math.PI/2)];
 function autoOrient(p){ const sc=(r)=>{ const o=orientStats(p.geo,r); return {r,o,v:o.base-1.5*o.over}; }; let cur=sc(p.rot), best=cur; for(const f of ORIENTS){ const c=sc(new THREE.Matrix4().multiplyMatrices(f(),p.rot)); if(c.v>best.v+1e-6) best=c; } if(best!==cur&&best.v>cur.v+3&&best.o.base>cur.o.base*1.2+1){ p.rot=best.r; p.autoRot=true; } } /* 6.0: kies de stand met het grootste vlak op het bed en de minste overhang */
 // vaste onderdeelnummers: letter per groep, nummer op alfabetische volgorde binnen de groep (blijft gelijk zolang de groep niet verandert)
@@ -2055,13 +2059,14 @@ function placePin(pin,h,parent,lo,hi){ const len=Math.max(2,hi-lo), c=h.P.clone(
   const inv=new THREE.Matrix4().copy(parent.matrixWorld).invert(), cl=c.clone().applyMatrix4(inv), ul=h.u.clone().transformDirection(inv).normalize();
   pin.geometry.dispose(); pin.geometry=new THREE.CylinderGeometry(0.875,0.875,len,12); if(pin.parent!==parent){ pin.parent.remove(pin); parent.add(pin); }
   pin.position.copy(cl); pin.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),ul); pin.scale.set(1,1,1); pin.userData.len=len; pin.userData.axL=ul; pin.updateMatrixWorld(true); }
-function fitPins(){ if(D.horse||!M.pinList) return; const th0=curTheta; poseAny(0); asm.updateMatrixWorld(true); const meshes=hingeMeshes(); M.hinges=[];
-  for(const pin of M.pinList){ if(!pin.userData.axis) continue; if(!pin.userData.len0){ pin.userData.len0=pin.userData.len; // naar de y-as van het eigen frame omzetten
+function fitOnePin(pin,meshes){ if(!pin.userData.axis) return; if(!pin.userData.len0){ pin.userData.len0=pin.userData.len; // naar de y-as van het eigen frame omzetten
       if(pin.userData.axis!=='y'){ const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),pin.userData.axis==='x'?new THREE.Vector3(1,0,0):new THREE.Vector3(0,0,1)); pin.geometry.dispose(); pin.geometry=new THREE.CylinderGeometry(0.875,0.875,pin.userData.len,12); pin.quaternion.copy(q); pin.userData.axis='y'; pin.updateMatrixWorld(true); } }
     const h=hingeOne(pin,meshes); const c=h.P.clone().addScaledVector(h.u,(h.lo+h.hi)/2);
-    if(M.hinges.some(o=>o.cl.length&&Math.abs(o.u.dot(h.u))>0.99&&o.P.clone().addScaledVector(o.u,(o.lo+o.hi)/2).distanceTo(c)<1.2)){ pin.visible=false; pin.userData.dup=true; continue; } // zelfde pen twee keer
+    if(M.hinges.some(o=>o.cl.length&&Math.abs(o.u.dot(h.u))>0.99&&o.P.clone().addScaledVector(o.u,(o.lo+o.hi)/2).distanceTo(c)<1.2)){ pin.visible=false; pin.userData.dup=true; return; } // zelfde pen twee keer
     M.hinges.push(h); if(h.cl.length) placePin(pin,h,h.ref?h.ref.m:pin.parent,h.lo,h.hi); }
-  planRetention(); poseAny(th0); }
+function fitPins(){ if(D.horse||!M.pinList) return; pinTok++; M.pinsAsync=false; const th0=curTheta; poseAny(0); asm.updateMatrixWorld(true); const meshes=hingeMeshes(); M.hinges=[];
+  for(const pin of M.pinList) fitOnePin(pin,meshes);
+  const _pr=performance.now(); planRetention(); window.__prMs=Math.round(performance.now()-_pr); poseAny(th0); }
 // borging: de pen klemt in één onderdeel (gat met 3 ribbels); waar een ander onderdeel aan het vrije eind zit komt een klemring
 const RING={ro:2.2,t:1.6};
 function ribs(len){ const out=[], r0=(P.klem||1.56)/2, r1=D.rh+0.15, h=r1-r0; for(let k=0;k<3;k++){ const b=new THREE.BoxGeometry(0.5,len,h); b.translate(0,0,r0+h/2); b.rotateY(k*2*Math.PI/3); out.push(b); } return out; }
@@ -2340,17 +2345,17 @@ function tagLabel(t){ if(D.horse) return hTagLabel(t); { const pr=/^(pen|ring)(\
   const m={body:'Lijf',belly:'Buik',head:D.split?({kop:'Kop',staart:'Staart',achterlijf:'Achterlijf'}[D.split.kind]):'Kop',bracket:'Draaibeugel',lug:'Kanteloog',plink:'Kantelstang',pfol:'Kantelvolger',pcam:'Kantelnok',post:'Paal',hcam:'Deinnok',bush:'Geleidebus',box:'Sokkel',guide:'Geleideblok',spacer:'Afstandsbus',motorh:'Motorhouder',headrod:'Kopstang',headeye:'Kopoog',tipR:'Vleugelpunt rechts',tipL:'Vleugelpunt links',tiprodR:'Koppelstang punt rechts',tiprodL:'Koppelstang punt links',tipeyeR:'Puntoog rechts',tipeyeL:'Puntoog links',tipAR:'Koppeloog rechts',tipAL:'Koppeloog links'};
   return m[t]||t; }
 let FIT={state:'idle',res:null}, fitToken=0;
-function runFitCheck(){ runPins();
+function runFitCheck(){ if(M.pinsAsync&&M.pinsPending){ clearTimeout(fitTimer); fitTimer=setTimeout(runFitCheck,300); return; } runPins();
   const token=++fitToken; FIT={state:'busy',res:null}; renderFit();
   const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&o.userData.tag&&o.visible!==false&&!o.userData.dropped) meshes.push(o); });
   const isStatic=(m)=>STATIC_TAGS.has(m.userData.tag)||m.userData.tag==='hpost'||isPost(m.userData.tag)||(m.userData.tag==='post'&&!D.heaveOn);
   const pairs=[]; for(let i=0;i<meshes.length;i++) for(let j=i+1;j<meshes.length;j++){ const a=meshes[i], b=meshes[j]; if(isStatic(a)&&isStatic(b)) continue; if(allowedPair(a,b)) continue; pairs.push([a,b]); }
-  const steps=24, hits=new Map(); let k=0;
+  const steps=24, hits=new Map(); let k=0, pi=0;
   const inv=new THREE.Matrix4(), mAB=new THREE.Matrix4(), v=new THREE.Vector3(), ba=new THREE.Box3(), bb=new THREE.Box3();
   const step=()=>{
     if(token!==fitToken) return;
-    const th=k/steps*2*Math.PI; poseAny(th); asm.updateMatrixWorld(true);
-    for(const [a,b] of pairs){
+    const th=k/steps*2*Math.PI; poseAny(th); asm.updateMatrixWorld(true); const t0=performance.now(); /* in stukjes van ~25 ms: het beeld blijft lopen */
+    for(;pi<pairs.length&&performance.now()-t0<25;pi++){ const [a,b]=pairs[pi];
       ba.copy(a.geometry.boundingBox||(a.geometry.computeBoundingBox(),a.geometry.boundingBox)).applyMatrix4(a.matrixWorld);
       bb.copy(b.geometry.boundingBox||(b.geometry.computeBoundingBox(),b.geometry.boundingBox)).applyMatrix4(b.matrixWorld);
       if(!ba.intersectsBox(bb)) continue;
@@ -2362,6 +2367,7 @@ function runFitCheck(){ runPins();
         if(i<0||j<0||kk<0||i>=vq.nx||j>=vq.ny||kk>=vq.nz) continue; if(vq.occ[(i*vq.ny+j)*vq.nz+kk]) c+=stride; }
       if(c>=4){ const key=a.userData.tag+'|'+b.userData.tag; const h=hits.get(key)||{a:a.userData.tag,b:b.userData.tag,max:0,angles:[]}; h.max=Math.max(h.max,c); h.angles.push(Math.round(th/DEG)); hits.set(key,h); }
     }
+    poseAny(curTheta); asm.updateMatrixWorld(true); if(pi<pairs.length){ setTimeout(step,0); return; } pi=0;
     k++; FIT.progress=k/steps; renderFit();
     if(k<steps) setTimeout(step,0); else { poseAny(curTheta); let res=[...hits.values()]; const drop=new Set();
       for(const h of res) for(const t of [h.a,h.b]) if(/^(ring|kap)\d+$/.test(t)) drop.add(t);
@@ -2421,17 +2427,19 @@ function runClearance(){ const token=++clrToken; const thr=clrThr()-0.005, md=Ma
   const poses=[0,1.3,2.9,4.4]; const R0=[]; for(const th of poses){ poseAny(th); asm.updateMatrixWorld(true); R0.push(meshes.map(m=>m.matrixWorld.clone())); }
   const pairs=[]; for(let i=0;i<meshes.length;i++) for(let j=i+1;j<meshes.length;j++){ let fixed=true; for(let k=1;k<poses.length&&fixed;k++){ const ea=new THREE.Matrix4().copy(R0[0][j]).invert().multiply(R0[0][i]).elements, eb=new THREE.Matrix4().copy(R0[k][j]).invert().multiply(R0[k][i]).elements; for(let q=0;q<16;q++) if(Math.abs(ea[q]-eb[q])>1e-3){ fixed=false; break; } } if(!fixed) pairs.push([meshes[i],meshes[j]]); }
   CLR={state:'busy',progress:0}; renderClr(); const best=new Map(); let k=0; const p=new THREE.Vector3(), w=new THREE.Vector3(), q=new THREE.Vector3(), tri=new THREE.Triangle(), ba=new THREE.Box3(), bb=new THREE.Box3(), inv=new THREE.Matrix4(), mAB=new THREE.Matrix4();
-  const step=()=>{ if(token!==clrToken) return; const th=k/steps*2*Math.PI; poseAny(th); asm.updateMatrixWorld(true);
-    for(const [a0,b0] of pairs){ ba.setFromObject(a0).expandByScalar(md); bb.setFromObject(b0); if(!ba.intersectsBox(bb)) continue;
+  let pi=0, cur=null; const step=()=>{ if(token!==clrToken) return; const th=k/steps*2*Math.PI; poseAny(th); asm.updateMatrixWorld(true); const t0=performance.now(); /* in stukjes van ~25 ms */
+    for(;pi<pairs.length&&performance.now()-t0<25;pi++){ const [a0,b0]=pairs[pi]; if(!cur||cur.pi!==pi) cur={pi,t:0,dmin:null,at:null,atA:null}; ba.copy(a0.geometry.boundingBox||(a0.geometry.computeBoundingBox(),a0.geometry.boundingBox)).applyMatrix4(a0.matrixWorld).expandByScalar(md); bb.copy(b0.geometry.boundingBox||(b0.geometry.computeBoundingBox(),b0.geometry.boundingBox)).applyMatrix4(b0.matrixWorld); if(!ba.intersectsBox(bb)) continue;
       let A=a0, B=b0, sa=clrSamples(a0.geometry), sb=clrSamples(b0.geometry); if(sa.length>sb.length){ A=b0; B=a0; sa=sb; }
       const ta=A.userData.tag, tb=B.userData.tag, zAll=zones.filter(z=>z.tags.has(ta)&&z.tags.has(tb)), touch=zAll.length>0||allowedPair(A,B), lim=touch?-0.25:thr, zs=zAll.map(z=>{ const c=new THREE.Vector3().setFromMatrixPosition(z.pin.matrixWorld), u=new THREE.Vector3(0,1,0).transformDirection(z.pin.matrixWorld); return {c,u}; });
-      const G=clrGrid(B.geometry,md), vq=voxelize(B.geometry); inv.copy(B.matrixWorld).invert(); mAB.multiplyMatrices(inv,A.matrixWorld); let dmin=md, at=null, atA=null;
-      for(let t=0;t<sa.length;t+=3){ p.set(sa[t],sa[t+1],sa[t+2]).applyMatrix4(mAB); if(!G.bb.containsPoint(p)) continue;
+      const G=clrGrid(B.geometry,md), vq=voxelize(B.geometry); inv.copy(B.matrixWorld).invert(); mAB.multiplyMatrices(inv,A.matrixWorld); let dmin=cur.dmin??md, at=cur.at, atA=cur.atA, t=cur.t; /* lange paren in stukjes: verder waar we waren */
+      for(;t<sa.length;t+=3){ if(((t/3)&1023)===0&&performance.now()-t0>25) break; p.set(sa[t],sa[t+1],sa[t+2]).applyMatrix4(mAB); if(!G.bb.containsPoint(p)) continue;
         if(zs.length){ w.copy(p).applyMatrix4(B.matrixWorld); let inZ=false; for(const z of zs){ q.copy(w).sub(z.c); const ax=q.dot(z.u); if(q.addScaledVector(z.u,-ax).length()<2.0){ inZ=true; break; } /* alleen de pen en de gatwand overslaan: een kantelende staaf tegen een vorkwang moet wel gemeld worden */ } if(inZ) continue; }
         let d=clrDist(G,p,md,tri,q); const i=Math.floor((p.x-vq.mn.x)/VOX), j=Math.floor((p.y-vq.mn.y)/VOX), kk=Math.floor((p.z-vq.mn.z)/VOX);
         const occ=i>=0&&j>=0&&kk>=0&&i<vq.nx&&j<vq.ny&&kk<vq.nz&&vq.occ[(i*vq.ny+j)*vq.nz+kk]; if(d>=md-1e-6&&occ) d=-md; else if(d<0&&!occ&&d<-0.5) d=-d; /* ver binnen: blokjes bevestigen het; normaal zegt binnen maar blokje leeg: buiten */
         if(d<dmin){ dmin=d; at=p.clone(); atA=[sa[t],sa[t+1],sa[t+2]].map(v=>+v.toFixed(1)); } }
+      if(t<sa.length){ cur.t=t; cur.dmin=dmin; cur.at=at; cur.atA=atA; break; } cur=null;
       if(dmin<lim){ const key=[ta,tb].sort().join('|'), o=best.get(key); if(!o||dmin<o.d) best.set(key,{a:ta,b:tb,d:dmin,ang:Math.round(th/DEG),touch,atB:at&&[at.x,at.y,at.z].map(v=>+v.toFixed(1)),bTag:B.userData.tag,aTag:A.userData.tag,atA}); } }
+    poseAny(curTheta); asm.updateMatrixWorld(true); if(pi<pairs.length){ setTimeout(step,0); return; } pi=0;
     k++; CLR.progress=k/steps; renderClr(); if(k<steps) setTimeout(step,0); else { poseAny(curTheta); let res=[...best.values()].sort((x,y)=>x.d-y.d); const isR=(t)=>/^(ring|kap)\d+$/.test(t), drop=new Set(); for(const h of res) if(h.d<-0.05) for(const t of [h.a,h.b]) if(isR(t)) drop.add(t);
       if(drop.size){ for(const c of (M.caps||[])) if(drop.has(c.mesh.userData.tag)){ c.mesh.visible=false; c.mesh.userData.dropped=true; } if(M.caps) capParts(); for(const r of (M.rings||[])) if(drop.has(r.userData.tag)){ r.visible=false; r.userData.dropped=true; } const kp=PARTS.find(p=>p.id==='klemring'); if(kp){ const n=(M.rings||[]).filter(r=>!r.userData.dropped).length; kp.qty=n+Math.max(2,Math.ceil(n*0.15)); if(!n) PARTS=PARTS.filter(p=>p!==kp); renderParts(); } renderHinges(); res=res.filter(h=>!(drop.has(h.a)||drop.has(h.b))); } /* klemring die ergens in steekt: vervalt, daar wordt het penuiteinde tot een kopje gesmolten */
       CLR={state:'done',res,pairs:pairs.length,thr,melt:drop.size}; renderClr(); runMotionCheck(); runPrintCheck(); } };
@@ -2442,31 +2450,31 @@ function renderClr(){ const el=document.getElementById('clrList'); if(!el) retur
   el.innerHTML=r.map(h=>{ const bad=h.d<0.05; return `<div class="status ${bad?'bad':'warn'}"><b>${bad?'Raakt':'Speling'}</b><span>${tagLabelC(h.a)} en ${tagLabelC(h.b)}: ${h.d<0?'overlappen':(bad?'raken elkaar':'komen tot '+nl(h.d)+' mm bij elkaar')} rond ${h.ang}° (grens ${nl(CLR.thr)} mm).</span></div>`; }).join(''); }
 
 /* Bewegingscontrole: draaien alle onderdelen op een pen in elke stand echt om dezelfde as? Verschuiving t.o.v. het gat, scheefstand bij gewone gaten, kanteling bij zandlopergaten */
-let MOT={state:'idle'};
+let MOT={state:'idle'}, motToken=0;
 function runMotionCheck(){ if(D.horse||!M.hinges){ MOT={state:'idle'}; renderMot(); return; } const th0=curTheta; poseAny(0); asm.updateMatrixWorld(true); const T=THREE;
   const H=M.hinges.filter(h=>h.pinLen&&h.cl.length>=2&&!h.cl.every(x=>/L$/.test(x.tag)));
   const rec=H.map(h=>{ const c=h.P.clone().addScaledVector(h.u,(h.lo+h.hi)/2), ref=h.cl.find(x=>!x.hg)||h.cl[0], inv=new T.Matrix4().copy(ref.m.matrixWorld).invert(); return {h,ref,cr:c.clone().applyMatrix4(inv),ur:h.u.clone().transformDirection(inv),mem:h.cl.filter(x=>x!==ref).map(x=>{ const iv=new T.Matrix4().copy(x.m.matrixWorld).invert(); return {x,c:c.clone().applyMatrix4(iv),u:h.u.clone().transformDirection(iv)}; }),off:0,skew:0,tilt:0,at:0}; });
-  for(let k=0;k<24;k++){ poseAny(k/24*2*Math.PI); asm.updateMatrixWorld(true); for(const r of rec){ const u0=r.ur.clone().transformDirection(r.ref.m.matrixWorld).normalize(), c0=r.cr.clone().applyMatrix4(r.ref.m.matrixWorld);
+  const tok=++motToken; let k=0; const stepM=()=>{ if(tok!==motToken) return; const t0=performance.now(); for(;k<24&&performance.now()-t0<25;k++){ poseAny(k/24*2*Math.PI); asm.updateMatrixWorld(true); for(const r of rec){ const u0=r.ur.clone().transformDirection(r.ref.m.matrixWorld).normalize(), c0=r.cr.clone().applyMatrix4(r.ref.m.matrixWorld);
     for(const m of r.mem){ const c=m.c.clone().applyMatrix4(m.x.m.matrixWorld), d=c.sub(c0), off=d.addScaledVector(u0,-d.dot(u0)).length(); if(off>r.off){ r.off=off; r.at=k*15; }
       if(m.x.hg){ const z=new T.Vector3(0,0,1).transformDirection(m.x.m.matrixWorld).normalize(), a=Math.acos(Math.min(1,Math.abs(z.dot(u0))))/DEG; if(a>r.tilt) r.tilt=a; }
       else { const u=m.u.clone().transformDirection(m.x.m.matrixWorld).normalize(), a=Math.acos(Math.min(1,Math.abs(u.dot(u0))))/DEG; if(a>r.skew) r.skew=a; } } } }
-  poseAny(th0); const cl=Math.max(0.05,((P.hole||2)-1.75)/2);
-  MOT={state:'done',n:rec.length,cl,res:rec.filter(r=>r.off>cl||r.skew>3||r.tilt>33).map(r=>({tags:r.h.cl.map(x=>x.tag),off:r.off,skew:r.skew,tilt:r.tilt,at:r.at})),maxTilt:Math.max(0,...rec.map(r=>r.tilt))}; renderMot(); }
+    poseAny(curTheta); if(k<24){ setTimeout(stepM,0); return; } finishM(); }; const finishM=()=>{ const cl=Math.max(0.05,((P.hole||2)-1.75)/2);
+  MOT={state:'done',n:rec.length,cl,res:rec.filter(r=>r.off>cl||r.skew>3||r.tilt>33).map(r=>({tags:r.h.cl.map(x=>x.tag),off:r.off,skew:r.skew,tilt:r.tilt,at:r.at})),maxTilt:Math.max(0,...rec.map(r=>r.tilt))}; renderMot(); }; setTimeout(stepM,0); }
 function renderMot(){ const el=document.getElementById('motList'); if(!el) return; if(MOT.state!=='done'){ el.innerHTML=''; return; } const nl=(x,d)=>x.toFixed(d).replace('.',',');
   if(!MOT.res.length){ el.innerHTML=`<div class="status ok"><b>Beweging</b><span>Bij alle ${MOT.n} pennen draaien de onderdelen in elke stand om dezelfde as: verschuiving hooguit ${nl(MOT.cl,2)} mm (de speling in het gat), gewone gaten hooguit 3° scheef, kantelgaten hooguit ${nl(MOT.maxTilt,0)}° (toegestaan 35°).</span></div>`; return; }
   el.innerHTML=MOT.res.map(r=>{ const w=[]; if(r.off>MOT.cl) w.push(`de pen verschuift ${nl(r.off,2)} mm (meer dan de speling)`); if(r.skew>3) w.push(`een gewoon gat staat ${nl(r.skew,1)}° scheef (klemt)`); if(r.tilt>33) w.push(`een kantelgat kantelt ${nl(r.tilt,0)}° (grens 35°)`); return `<div class="status warn"><b>Beweging</b><span>${[...new Set(r.tags.map(tagLabelC))].join(' / ')}: ${w.join('; ')} rond ${r.at}°.</span></div>`; }).join(''); }
 
 /* Printbaarheid per onderdeel, in de printstand (y omhoog, onderkant op y=0): bed, plat vlak, overhang zonder steun, dunne wanden */
 let PRC={state:'idle'}, prcToken=0;
-function printCheckPart(p){ const g=p.geo.clone(); g.applyMatrix4(p.rot); g.computeBoundingBox(); const bb=g.boundingBox; g.translate(-bb.min.x,-bb.min.y,-bb.min.z); g.computeBoundingBox(); const sz=g.boundingBox.max;
+function printCheckPart(p){ const g=p.geo; g.computeBoundingBox(); const sz=g.boundingBox.clone().applyMatrix4(p.rot).getSize(new THREE.Vector3()); /* wanddikte hangt niet van de stand af: meten op het origineel (raster en blokjes blijven bewaard) */
   const a=g.attributes.position.array, A=new THREE.Vector3(), B=new THREE.Vector3(), C=new THREE.Vector3(), n=new THREE.Vector3(), e1=new THREE.Vector3(), e2=new THREE.Vector3(); let base=0, over=0, area=0; const tris=[];
   for(let t=0;t<a.length;t+=9){ A.set(a[t],a[t+1],a[t+2]); B.set(a[t+3],a[t+4],a[t+5]); C.set(a[t+6],a[t+7],a[t+8]); e1.subVectors(B,A); e2.subVectors(C,A); n.crossVectors(e1,e2); const ar=n.length()/2; if(ar<1e-9) continue; n.normalize(); area+=ar; tris.push([t,ar]);
   } { const o=orientStats(p.geo,p.rot); base=o.base; over=o.over; } /* overhang: steiler dan ~45° naar beneden en niet op het bed */
   const vq=voxelize(g), insidePrint=(x,y,z)=>{ const i=Math.floor((x-vq.mn.x)/VOX), j=Math.floor((y-vq.mn.y)/VOX), k=Math.floor((z-vq.mn.z)/VOX); return i>=0&&j>=0&&k>=0&&i<vq.nx&&j<vq.ny&&k<vq.nz&&!!vq.occ[(i*vq.ny+j)*vq.nz+k]; };
-  const G=clrGrid(g,1.2), tri=new THREE.Triangle(), q=new THREE.Vector3(), ray=new THREE.Ray(), N=Math.min(2500,Math.max(200,Math.round(area/2))); let thin=0, tot=0; let acc=0; const step=area/N; let next=Math.random()*step;
+  const G=clrGrid(g,1.2), tri=new THREE.Triangle(), q=new THREE.Vector3(), ray=new THREE.Ray(), N=Math.min(1500,Math.max(200,Math.round(area/2))); let thin=0, tot=0; let acc=0; const step=area/N; let next=Math.random()*step;
   for(const [t,ar] of tris){ acc+=ar; while(next<acc){ next+=step; A.set(a[t],a[t+1],a[t+2]); B.set(a[t+3],a[t+4],a[t+5]); C.set(a[t+6],a[t+7],a[t+8]); let u=Math.random(), v=Math.random(); if(u+v>1){ u=1-u; v=1-v; } const P0=A.clone().multiplyScalar(1-u-v).addScaledVector(B,u).addScaledVector(C,v); tri.set(A,B,C); tri.getNormal(n); n.negate(); ray.set(P0.clone().addScaledVector(n,0.02),n); tot++;
       const i0=Math.floor((P0.x-G.mn.x)/G.c), j0=Math.floor((P0.y-G.mn.y)/G.c), k0=Math.floor((P0.z-G.mn.z)/G.c), seen=new Set(); let best=1e9;
-      for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++) for(let dk=-1;dk<=1;dk++){ const l=G.cells.get(((i0+di)*4096+(j0+dj))*4096+(k0+dk)); if(!l) continue; for(const s of l){ if(s===t||seen.has(s)) continue; seen.add(s); const hit=ray.intersectTriangle(new THREE.Vector3(a[s],a[s+1],a[s+2]),new THREE.Vector3(a[s+3],a[s+4],a[s+5]),new THREE.Vector3(a[s+6],a[s+7],a[s+8]),false,q); if(hit){ const d=q.distanceTo(P0); if(d<best){ const bx=q.x+n.x*0.7-g.boundingBox.min.x, by=q.y+n.y*0.7, bz=q.z+n.z*0.7; if(!insidePrint(bx,by,bz)) best=d; } } } }
+      for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++) for(let dk=-1;dk<=1;dk++){ const l=G.cells.get(((i0+di)*4096+(j0+dj))*4096+(k0+dk)); if(!l) continue; for(const s of l){ if(s===t||seen.has(s)) continue; seen.add(s); const hit=ray.intersectTriangle(new THREE.Vector3(a[s],a[s+1],a[s+2]),new THREE.Vector3(a[s+3],a[s+4],a[s+5]),new THREE.Vector3(a[s+6],a[s+7],a[s+8]),false,q); if(hit){ const d=q.distanceTo(P0); if(d<best){ const bx=q.x+n.x*0.7, by=q.y+n.y*0.7, bz=q.z+n.z*0.7; if(!insidePrint(bx,by,bz)) best=d; } } } }
       if(best<0.42) thin++; } }
   const bs=bedSize(), fits=(sz.x<=bs.x&&sz.z<=bs.y&&sz.y<=bs.z)||(sz.z<=bs.x&&sz.x<=bs.y&&sz.y<=bs.z);
   return {id:p.id,code:p.code,name:p.name,sz:[sz.x,sz.y,sz.z],base,over,thin:tot?thin/tot*area:0,area,fits}; }
@@ -2616,16 +2624,23 @@ function syncControls(){
 }
 let rbTimer=null, fitTimer=null;
 let pinTimer=null;
+let pinTok=0;
+// pennen na een wijziging in stukjes van ~25 ms uitrekenen, zodat het beeld blijft lopen
+function runPinsAsync(){ if(!M.pinsPending||D.horse||!M.pinList) return runPins(); const tok=++pinTok, MM=M, pins=M.pinList.slice(), t00=performance.now(); let meshes=null, idx=0; M.hinges=[]; M.pinsAsync=true;
+  const step=()=>{ if(tok!==pinTok||MM!==M||!M.pinsPending) return; poseAny(0); asm.updateMatrixWorld(true); if(!meshes) meshes=hingeMeshes(); const t0=performance.now(); while(idx<pins.length&&performance.now()-t0<25) fitOnePin(pins[idx++],meshes);
+    if(idx<pins.length){ poseAny(curTheta); asm.updateMatrixWorld(true); setTimeout(step,0); return; }
+    planRetention(); poseAny(curTheta); M.pinsAsync=false; M.pinsPending=false; window.__pinMs=Math.round(performance.now()-t00); renderParts(); renderHinges(); if(viewMode==='bed') buildBedScene(); };
+  setTimeout(step,0); }
 function runPins(){ if(!M.pinsPending) return; M.pinsPending=false; const t0=performance.now(); fitPins(); window.__pinMs=Math.round(performance.now()-t0); renderParts(); renderHinges(); if(viewMode==='bed') buildBedScene(); }
 function scheduleRebuild(){ clearTimeout(rbTimer); rbTimer=setTimeout(()=>rebuild(false),90); }
 function analyzeOnly(){ if(D.horse){ hAnalyze(); renderStatus(); hRenderForces(); hRenderReal(); return; } analyze(); renderStatus(); renderForces(); renderReal(); }
 function rebuild(reframe){
   if(isH()) return hRebuild(reframe);
   const _t0=performance.now(); saveParams(); D=derive(null); const _t1=performance.now(); lastA=null; buildParts(); const _t2=performance.now(); analyze(); const _t3=performance.now();
-  if(typeof selectPart==='function') selectPart(null); buildScene(); { const sb=document.getElementById('stageBtn'); if(sb) sb.hidden=!D.v6; } M.pinsPending=!D.horse; clearTimeout(pinTimer); pinTimer=setTimeout(()=>runPins(),300); // pennen en vorkkappen pas uitrekenen als het schuiven stopt
+  window.__rb={derive:Math.round(_t1-_t0),parts:Math.round(_t2-_t1),analyze:Math.round(_t3-_t2)}; const _t4=performance.now(); if(typeof selectPart==='function') selectPart(null); buildScene(); { const sb=document.getElementById('stageBtn'); if(sb) sb.hidden=!D.v6; } window.__rb.scene=Math.round(performance.now()-_t4); M.pinsPending=!D.horse; clearTimeout(pinTimer); pinTok++; M.pinsAsync=false; pinTimer=setTimeout(()=>runPinsAsync(),300); // pennen en vorkkappen pas uitrekenen als het schuiven stopt
   if(viewMode==='bed') buildBedScene();
   renderStatus(); renderMech(); renderForces(); renderReal(); renderParts(); renderHinges(); drawGraph();
-  VCACHE.clear(); fitToken++; FIT={state:'idle'}; renderFit(); clearTimeout(fitTimer); fitTimer=setTimeout(runFitCheck,900);
+  VCACHE.clear(); fitToken++; FIT={state:'idle'}; renderFit(); if(typeof clrToken!=='undefined'){ clrToken++; prcToken++; CLR={state:'idle'}; PRC={state:'idle'}; MOT={state:'idle'}; renderClr(); renderPrc(); renderMot(); CLR_CACHE.clear(); } clearTimeout(fitTimer); fitTimer=setTimeout(runFitCheck,1500); /* controles pas starten als er even niets verandert; lopende controles afbreken */
   if(reframe) frameCamera();
 }
 function renderStatus(){
@@ -3501,7 +3516,7 @@ function hRebuild(reframe){
   saveParams(); D=hDerive(); hPrev=null; hBuildParts(); hBuildScene(); hAnalyze();
   if(viewMode==='bed') buildBedScene();
   renderStatus(); hRenderMech(); hRenderForces(); hRenderReal(); renderParts(); drawGraph();
-  VCACHE.clear(); fitToken++; FIT={state:'idle'}; renderFit(); clearTimeout(fitTimer); fitTimer=setTimeout(runFitCheck,900);
+  VCACHE.clear(); fitToken++; FIT={state:'idle'}; renderFit(); if(typeof clrToken!=='undefined'){ clrToken++; prcToken++; CLR={state:'idle'}; PRC={state:'idle'}; MOT={state:'idle'}; renderClr(); renderPrc(); renderMot(); CLR_CACHE.clear(); } clearTimeout(fitTimer); fitTimer=setTimeout(runFitCheck,1500); /* controles pas starten als er even niets verandert; lopende controles afbreken */
   if(reframe) frameCamera();
 }
 const HORDER=['LH','RH','LF','RF'];
@@ -3642,7 +3657,7 @@ function loop(now){
   if(playing&&viewMode==='asm'){ curTheta=(curTheta+P.rpm/60*2*Math.PI*dt)%(2*Math.PI); }
   if(viewMode==='asm'&&D){ poseAny(curTheta); const d=Math.round(curTheta/DEG)%360; thetaIn.value=d; thetaOut.textContent=String(d).padStart(3,' ')+'°'; if(++graphTick%3===0) drawGraph(); }
   if(SEL) for(const hb of SEL.helpers) hb.update();
-  controls.update(); renderer.render(scene,camera); requestAnimationFrame(loop);
+  controls.update(); if(!window.__noRender) renderer.render(scene,camera); requestAnimationFrame(loop);
 }
 setPlaying(playing);
 
@@ -3662,7 +3677,7 @@ tabA.onclick=()=>setTab(true); tabP.onclick=()=>setTab(false);
 
 buildControls();
 resize(); applyTheme();
-rebuild(true); updateHud();
+{ const ld=document.getElementById('pickLabel'); ld.textContent='Model wordt opgebouwd…'; ld.style.left='12px'; ld.style.top='52px'; ld.hidden=false; requestAnimationFrame(()=>setTimeout(()=>{ rebuild(true); updateHud(); if(ld.textContent==='Model wordt opgebouwd…') ld.hidden=true; },0)); } /* eerst de pagina tekenen, dan het model opbouwen */
 setInterval(updateHud,1000);
 requestAnimationFrame(loop);
 window.__AA={codes:()=>PARTS.map(p=>p.code+' '+p.id),sel:(c,x,y)=>selectPart(PARTS.find(p=>p.code===c),x,y),mot:()=>MOT,runMot:()=>runMotionCheck(),stage:()=>stageParts().map(({p,qty})=>p.id+'×'+qty),stageReadme:()=>stageReadme(),prc:()=>PRC,runPrc:()=>runPrintCheck(),clr:()=>CLR,runClr:()=>runClearance(),hg:(i)=>hangers(i),hgeo:(h)=>hangerGeo(h),allowed:(a,b)=>allowedPair(a,b),pose:(th)=>{ poseAny(th); asm.updateMatrixWorld(true); },lap:(j)=>lapGeo(tileLayout().bands[j]),tiles:{lay:()=>tileLayout(),mat:(s,T,b)=>tileMat(s,T,b),top:(s,z)=>tileTop(s,z)},vox:(g)=>voxelize(g),h1:(k)=>{ poseAny(0); asm.updateMatrixWorld(true); const h=hingeOne(M.pinList[k],hingeMeshes()); return JSON.stringify({dbg:h.dbg,P:h.P,u:h.u,ref:h.ref&&h.ref.tag,cl:h.cl.map(x=>x.tag)}); },exp:(o)=>{ if('ub' in o) UB_FORCE=o.ub; if('perp' in o) TLK_PERP=o.perp; if('xo' in o) TLK_XO=o.xo; if('sa' in o) TLK_SA=o.sa; rebuild(true); },dbg:(k)=>{ poseAny(0); asm.updateMatrixWorld(true); const pin=M.pinList[k], ms=hingeMeshes(), P0=new THREE.Vector3().setFromMatrixPosition(pin.matrixWorld), u0=new THREE.Vector3(0,1,0).transformDirection(pin.matrixWorld).normalize(); const m1=hingeMembers(P0,u0,ms,D.rh+1.6,8); const r=m1[0]; if(!r) return 'none'; const u=r.axis.clone(), P=r.cen.clone(); const d=P.clone().sub(P0); P.addScaledVector(u,-d.dot(u)); const m2=hingeMembers(P,u,ms,D.rh+0.35,11,D.rh-0.2); return JSON.stringify({m1:m1.map(x=>x.tag+x.cnt),P0,P,u0,u,cen:r.cen,m2:m2.map(x=>x.tag)}); },hm:(...a)=>hingeMembers(...a),hmesh:()=>hingeMeshes(),eig:(C)=>eigMin3(C),tlk:(a,b)=>{TLK_SA=a;TLK_SH=b;},hinges:()=>hingeAnalysis().map(h=>({par:h.pin.parent.userData.tag||'?',ref:h.ref?h.ref.tag:'-',len:+(h.hi-h.lo).toFixed(1),len0:h.pin.userData.len0,bodies:h.bodies,cl:h.cl.map(x=>x.tag+(x.straight?'':'~')+'['+x.lo.toFixed(1)+','+x.hi.toFixed(1)+']').join(' '),gaps:h.gaps.map(g=>g.tag+':'+g.gap.toFixed(1)).join(' '),skew:h.skew.map(g=>g.tag+':'+g.ang.toFixed(0)).join(' '),blocked:h.blocked.map(b=>b.tag+'@'+b.at.toFixed(1)+(b.off?'r':'c')).join(' '),kier:(h.kier||[]).map(k=>k.a+'|'+k.b+':'+k.gap.toFixed(1)).join(' '),over:(h.over||[]).map(k=>k.a+'|'+k.b+':'+k.ov.toFixed(1)).join(' ')})).filter(x=>x),tipdz:(a,b)=>{TIPDZ=[a,b];},pinStacks:()=>pinStacks().map(p=>({par:p.pin.parent.userData.tag||'?',n:p.iv.length,tags:p.iv.map(x=>x.tag+'['+x.lo.toFixed(1)+','+x.hi.toFixed(1)+']').join(' '),gaps:p.gaps.map(g=>g.a+'|'+g.b+':'+g.gap.toFixed(1))})),arm:()=>armSetup(),camLoc:(i)=>camPitchArm(i),get M(){return M;},testParts:()=>testParts(),toWorld:(...a)=>toWorld(...a),fcorr:(a,b)=>featherCorr(a,b),tw3:{chain:(...a)=>tw3Chain(...a),clear:(...a)=>tw3Clear(...a),lay:()=>skinLayout(),pts:(a,b)=>skinPoints(a,b),phi:(...a)=>skinPhi(...a),strain:(a,b)=>skinStrain(a,b),corr:(a,b)=>featherCorr(a,b)},solve:(t,p)=>solve(t,p),wingPoses:(N)=>{ const o=[]; let pv=null; for(let k=0;k<N;k++){ const s=solve(k/N*2*Math.PI,pv); pv=s.a; o.push({J:s.J.map(j=>[j.x,j.y]),a:s.a.slice(0,D.n),B:s.B.map(b=>[b.x,b.y])}); } return {poses:o,L:D.L.slice(),zRod:D.zRod.slice(),att:D.att.slice(),leAtt:D.tAtt.map(t=>D.plan(t).le),teAtt:D.tAtt.map(t=>D.plan(t).te),hTab:D.hTab,l:D.l,n:D.n,t:D.t,Sw:D.Sw,w0:D.w0,zq:Array.from({length:D.n+1},(_,i)=>{ const pf=D.plan(Math.min(1,(i+0.5)*D.l/D.Sw)); return pf.le-0.25*(pf.le-pf.te); })}; },mbk:(a,b)=>{MB_K=a;MV_K=b;},twk:(v)=>{TWK=v;},kin:()=>{const o=[];let p=null;for(let k=0;k<72;k+=6){p=hKin(k/72*2*Math.PI,p);o.push([p.h,p.phi/DEG,p.rho/DEG].map(v=>+v.toFixed(2)));}return o;},hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
