@@ -331,6 +331,7 @@ const CONTROLS = [
   {id:'smooth',type:'check',label:'Gladde vleugels (geen tegelpatroon)',hint:'Manta 6.0: de schubben krijgen een glad oppervlak zoals een echte manta. Alleen dunne naadlijntjes blijven zichtbaar; tijdens de slag zie je aan voor- en achterrand kleine trapjes van 1 à 4 mm.'},
   {id:'fuse',type:'check',label:'Alles vastprinten (met steun)',hint:'Manta 3.x–5.x: draaihoorns, draaiarmen en ogen worden aan de vleugel of schub vastgeprint in plaats van los gelijmd. Die onderdelen hebben dan steunmateriaal nodig.'},
   {id:'hole',label:'Pengat (voor 1,75 mm filament)',min:1.85,max:2.4,step:0.05,unit:'mm',hint:'Print eerst de testset. Klemt de pen, maak het gat groter; rammelt hij, kleiner.'},
+  {id:'klem',label:'Klemgat (binnenmaat ribbels)',min:1.40,max:1.70,step:0.02,unit:'mm',def:1.56,hint:'Maat tussen de drie ribbels van een klemgat. Kies met de klemgat-strip uit de proefprintset de maat waarin de pen met duimkracht in gaat en vast blijft zitten.'},
   {g:'Aandrijving'},
   {id:'crank',type:'check',label:'Handzwengel in plaats van motor',hint:'Een zwengel achter op de sokkel met een tandwielkast die de nokas sneller laat draaien dan je zwengelt.'},
   {id:'ratio',label:'Versnelling zwengel → nokas',min:1,max:4,step:1,unit:'×',hint:'2× en 3×: één tandwielpaar (24:12 of 36:12). 4×: twee paren 24:12. Hoe hoger, hoe langzamer je zwengelt maar hoe zwaarder het draait.'},
@@ -2033,7 +2034,7 @@ function fitPins(){ if(D.horse||!M.pinList) return; const th0=curTheta; poseAny(
   planRetention(); poseAny(th0); }
 // borging: de pen klemt in één onderdeel (gat met 3 ribbels); waar een ander onderdeel aan het vrije eind zit komt een klemring
 const RING={ro:2.2,t:1.6};
-function ribs(len){ const out=[], r0=0.78, r1=D.rh+0.15, h=r1-r0; for(let k=0;k<3;k++){ const b=new THREE.BoxGeometry(0.5,len,h); b.translate(0,0,r0+h/2); b.rotateY(k*2*Math.PI/3); out.push(b); } return out; }
+function ribs(len){ const out=[], r0=(P.klem||1.56)/2, r1=D.rh+0.15, h=r1-r0; for(let k=0;k<3;k++){ const b=new THREE.BoxGeometry(0.5,len,h); b.translate(0,0,r0+h/2); b.rotateY(k*2*Math.PI/3); out.push(b); } return out; }
 function ringGeo(){ const sh=shapeFrom(circPts(0,0,RING.ro,28)); sh.holes.push(circlePath(0,0,D.rh)); const g=plateXY(sh,RING.t), rb=ribs(RING.t); rb.forEach(b=>b.rotateX(Math.PI/2)); return merge([g,...rb]); }
 function appendGeo(g,items){ const m=merge([g,...items]); for(const k of Object.keys(m.attributes)) g.setAttribute(k,m.attributes[k]); g.setIndex(null); g.boundingBox=null; g.boundingSphere=null; }
 // welk onderdeel zit aan de onderkant en welk aan de bovenkant van de stapel (per wang, niet per onderdeel: een vork uit één stuk heeft twee wangen)
@@ -2819,9 +2820,9 @@ function testParts(){ const out=[], A=(id,name,geo,rot)=>out.push({id,name,geo,r
   { const L=64, sh=shapeFrom([[0,0],[L,0],[L,9],[0,9]]), ds=[1.85,1.95,2.05,2.15,2.25,2.35]; ds.forEach((d,k)=>sh.holes.push(circlePath(6+k*10.4,4.5,d/2))); const g=plateXY(sh,3), dot=new THREE.CylinderGeometry(0.9,0.9,0.8,10); dot.rotateX(Math.PI/2); dot.translate(2.2,7.5,1.9);
     A('pengat_strip','Pengat-strip: gaten 1,85 – 2,35 mm (stip = 1,85), voor pennen van 1,75 mm filament',merge([g,dot]),I4()); }
   if(!D.horse) A('stang_proef','Stangstukje 30 mm met gewone pengaten',buildRod(30),rotX(-Math.PI/2));
-  if(!D.horse){ const L=44, sh=shapeFrom([[0,0],[L,0],[L,9],[0,9]]), rr=[0.70,0.74,0.78,0.82], it=[];
+  if(!D.horse){ const L=44, sh=shapeFrom([[0,0],[L,0],[L,9],[0,9]]), rr=[0.70,0.74,0.78,0.82], it=[]; rr.forEach((r,k)=>{ for(let q=0;q<=k;q++){ const dt=new THREE.CylinderGeometry(0.6,0.6,0.8,10); dt.rotateX(Math.PI/2); dt.translate(6+k*10.6-1.6+q*1.6,8.0,1.9); it.push(dt); } }); /* stipjes: 1 = 1,40 mm, 2 = 1,48, 3 = 1,56, 4 = 1,64 */
     rr.forEach((r,k)=>{ const x=6+k*10.6; sh.holes.push(circlePath(x,4.5,D.rh)); for(let q=0;q<3;q++){ const h=D.rh+0.15-r, b=new THREE.BoxGeometry(0.5,h,3); b.translate(0,r+h/2,0); b.rotateZ(q*2*Math.PI/3); b.translate(x,4.5,0); it.push(b); } });
-    A('klemgat_strip','Klemgat-strip: vier gaten met ribbels, van strak (links) naar los; kies de klemring- en klemgatmaat die de pen met duimkracht vasthoudt',merge([plateXY(sh,3),...it]),I4());
+    A('klemgat_strip','Klemgat-strip: vier gaten met ribbels, binnenmaat 1,40 / 1,48 / 1,56 / 1,64 mm (1 tot 4 stipjes); kies de maat die de pen met duimkracht vasthoudt en zet die bij Klemgat',merge([plateXY(sh,3),...it]),I4());
     for(let k=0;k<3;k++){ const g=ringGeo(); g.translate(k*6,0,0); out.length; A('klemring_proef_'+(k+1),'Klemring (proef '+(k+1)+')',g,I4()); } }
   if(D.twist3){ const l=D.l, zA=D.zA3, rh2=1.05;
     const a=[profX(rectPts(zA-7.5,zA+7.5,-t/2,t/2),l-6.4,l-4.2,rh2),profX(circPts(zA,0,t/2),l-16,l-6.4,rh2)]; for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ a.push(tubeZ(D.rh,t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); a.push(br); }
@@ -2833,6 +2834,12 @@ function testParts(){ const out=[], A=(id,name,geo,rot)=>out.push({id,name,geo,r
     if(D.tiles){ const T=tileLayout(), ps=T.bands.filter(b=>!b.dr&&b.k===1).slice(0,2); ps.forEach((b,q)=>A('schub_proef_'+(q+1),`Losse schub ${q+1} (echt formaat, met ring en filamentoogje)`,merge(bandGeo(b,true)),rotZ(Math.PI/2)));
       const c=T.clips.find(c=>c.k===1); if(c){ const L=Math.round((c.u1-c.u0)*10)/10, g=profX(circPts(zA,0,3.0,28),0,L,2.45); g.translate(-L/2,0,-zA); A('afstandsbus_proef','Afstandsbusje '+String(L).replace('.',',')+' mm',g,rotZ(Math.PI/2)); }
       A('borgring_schub','Borgring lagerbus',buildCollar(2.45,3.0,0.6),I4()); } }
+  { const b=new THREE.BoxGeometry(10,5,10); A('maatblokje','Maatblokje 10 × 10 mm: meet de breedte met een schuifmaat; aangroei per kant = (gemeten − 10) / 2',b,I4()); }
+  if(D.v6){ const plate=(tw,withB)=>{ const sh=shapeFrom([[0,0],[24,0],[24,8],[0,8]]); sh.holes.push(circlePath(5,4,D.rh)); const g=plateXY(sh,tw), T=new THREE.Matrix4().makeRotationX(Math.PI/2).setPosition(5,4,0); return merge([g,...ribs(tw).map(r=>r.applyMatrix4(T))]); };
+    const fork=(gap,id,name)=>{ const a=plate(V6.tw), br=new THREE.BoxGeometry(8,8,gap); br.translate(20,4,V6.tw/2+gap/2); A(id+'_a',name+', plaat A met bruggetje (spleet '+String(gap.toFixed(1)).replace('.',',')+' mm)',merge([a,br]),rotX(-Math.PI/2)); A(id+'_b',name+', plaat B (op het bruggetje lijmen)',plate(V6.tw),rotX(-Math.PI/2)); };
+    fork(V6.gap,'vork_v','Vorkproef gewone vork'); A('vork_v_staaf','Staafje voor de gewone vork (2,4 mm dik, gewoon gat)',buildRod(14),rotX(-Math.PI/2));
+    fork(v6Gap((D.leanT||0)+2),'vork_vk','Vorkproef kantelvork'); A('vork_vk_staaf','Staafje voor de kantelvork (zandlopergat)',buildRodHG(14,[true,false]),rotX(-Math.PI/2));
+    { const sh=shapeFrom([[0,0],[24,0],[24,8],[0,8]]); sh.holes.push(circlePath(5,4,D.rh)); A('plaatje_1_2','Plaatje 1,2 mm (zo dik als het tuimelaartje van de vinpunt): moet heel van het bed komen en niet kromtrekken',plateXY(sh,1.2),rotX(-Math.PI/2)); } }
   for(const p of out){ const g=p.geo.clone(); g.applyMatrix4(p.rot); g.computeBoundingBox(); const bb=g.boundingBox; g.translate(-(bb.min.x+bb.max.x)/2,-bb.min.y,-(bb.min.z+bb.max.z)/2); p.printGeo=g; p.qty=1; }
   return out; }
 function testReadme(){ const L=['PROEFPRINTSET – '+(PRESETS[P.preset]?PRESETS[P.preset].name:P.preset),'',
@@ -2843,6 +2850,10 @@ function testReadme(){ const L=['PROEFPRINTSET – '+(PRESETS[P.preset]?PRESETS[
     '4. Stangkruisje: leg de asjes in het oogvorkje, lijm de klemlip ertegen en steek een pen door het kruisje en het stangstukje met de gewone gat-kant. Het stangetje moet alle kanten op kunnen kantelen. Aan de andere kant (zandlopergat) moet een pen ±35° kunnen kantelen.',
     '5. Staafje: een staafje van 2 mm moet stroef in de buisligger schuiven (eventueel nabewerken met een boortje van 2 mm).');
   if(D.tiles) L.push('6. Schubben: schuif borgring (lijmen op de lagerbus), schub 1, afstandsbusje en schub 2 over de ligger. Ze moeten licht om de ligger draaien zonder te wiebelen. Steek een stuk filament door beide oogjes: het moet glijden.');
+  L.push('','Klemgat-strip: druk een pen in elk gat (1 tot 4 stipjes = 1,40 / 1,48 / 1,56 / 1,64 mm). Kies het gat waarin de pen met duimkracht in gaat en niet meer los wil, en zet "Klemgat" in de app op die maat.',
+    'Maatblokje: meet de breedte met een schuifmaat. Aangroei per kant = (gemeten maat - 10) / 2. Zet dat bij "Printer: aangroei per kant"; de spelingcontrole rekent er dan mee.');
+  if(D.v6) L.push('Vorkproeven (6.0): lijm plaat B op het bruggetje van plaat A (gat recht boven gat, een pen helpt uitlijnen). Steek het staafje ertussen en druk een pen door. De pen moet in beide platen klemmen, het staafje moet zonder speling vrij draaien. Bij de kantelvork moet het staafje ook een paar graden kunnen kantelen.',
+    'Plaatje 1,2 mm: moet heel en vlak van het bed komen. Lukt dat niet, print dan met een kleinere laagdikte (0,12 - 0,16 mm) of een brim.');
   L.push('','Klemt iets: maak het gat in de app groter (Pengat) of schuur licht. Rammelt het: kleiner.'); return L.join('\r\n'); }
 async function doTestExport(){ runPins(); const msg=document.getElementById('exportMsg'), tp=testParts(); const files=tp.map((p,i)=>({name:`proef_${String(i+1).padStart(2,'0')}_${p.id}.stl`,data:stlBinary(p.printGeo,p.name)}));
   files.push({name:'LEESMIJ_PROEF.txt',data:new TextEncoder().encode(testReadme())}); const blob=zip(files), fname=`proefprintset-${P.preset}.zip`;
