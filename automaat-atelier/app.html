@@ -1192,10 +1192,10 @@ function buildArmFollowerV6(i){ const A=armSetup(), H=A.Hcr[i], xp=D.xp[i], cw=x
   const bridges=[br(-4.2,2.7,dw[0][1]-2.8,dw[0][1]+2.8,dw[0][0],dw[0][1]),br(-1.2,1.2,H-3.6,H+3.6,0,H)]; // bruggetjes: tussen de geleidegaten en midden in de dwarsbalk
   return {a:merge(it),b:merge([b,...bridges]),all:merge([...it.map(g=>g.clone()),b.clone(),...bridges.map(g=>g.clone())])}; }
 // geleidesteun: twee wangen (A en B) op een voet, met een rug aan de kant van de achterwand
-function buildGuideBracketV6(i){ const A=armSetup(), yMid=A.yCm[i]-A.Hcr[i], x=-1.5-D.La, ys=A.yG[i].map(y=>yMid+y), top=Math.max(...ys)+4;
-  const sh=shapeFrom([[x-6.5,3],[x+4,3],[x+4,top],[x-6.5,top]]); for(const y of ys) sh.holes.push(circlePath(x,y,D.rh));
+function buildGuideBracketV6(i){ const A=armSetup(), yMid=A.yCm[i]-A.Hcr[i], x=-1.5-D.La, ys=A.yG[i].map(y=>yMid+y), top=Math.max(...ys)+4, xL=Math.max(x-6.5,-D.Wh+2.45); /* niet door de zijwand: de steun staat ertegen */
+  const sh=shapeFrom([[xL,3],[x+4,3],[x+4,top],[xL,top]]); for(const y of ys) sh.holes.push(circlePath(x,y,D.rh));
   const it=[]; for(const zc of [V6.zA,V6.zB]){ const g=plateXY(sh,V6.tw); g.translate(0,0,zc); it.push(g); }
-  const z0=V6.zA-V6.tw/2, z1=V6.zB+V6.tw/2, ft=new THREE.BoxGeometry(10.5,3,z1-z0); ft.translate(x-1.25,1.5,(z0+z1)/2); const rug=new THREE.BoxGeometry(2.6,top-3,z1-z0); rug.translate(x-5.2,3+(top-3)/2,(z0+z1)/2);
+  const z0=V6.zA-V6.tw/2, z1=V6.zB+V6.tw/2, ft=new THREE.BoxGeometry(x+4-xL,2,z1-z0); ft.translate((xL+x+4)/2,2,(z0+z1)/2); /* voetje 2 mm: valt in een uitsparing van 2 mm in de bodem */ const rx=Math.max(x-5.2,xL+1.3), rug=new THREE.BoxGeometry(2.6,top-3,z1-z0); rug.translate(rx,3+(top-3)/2,(z0+z1)/2);
   return merge([...it,ft,rug]); }
 // tuimelaar: twee platen (A en B) met een bruggetje vlak boven het draaipunt; kraagjes binnen de vork waar de spleet wijder is dan de staaf
 function buildRockerV6(i){ const r=4, L=D.aLi[i], phi=(D.leanB&&D.leanB[i])||0, g=v6Gap(phi>4?phi:0), pts=[];
@@ -1436,7 +1436,7 @@ function buildPitchFollowerV6(){ const S=D.Sp, Ss=S-3.7, yG=pArmSetup().yG, gx=2
   const cheeks=[1,-1].map(sg=>{ const g=plateYZ(ck,V6.tw); g.translate(sg*(V6.gap/2+V6.tw/2),0,0); return g; }); // vork om de kantelstang (pen langs x)
   return {a:merge([a,pin]),b:merge([b,...bridges,...cheeks])}; }
 function buildPitchBracketV6(){ const A=pArmSetup(), x=-PLA, ys=A.yG.map(y=>A.mid+y), top=Math.max(...ys)+4, sh=shapeFrom([[x-6.5,3],[x+4,3],[x+4,top],[x-6.5,top]]); for(const y of ys) sh.holes.push(circlePath(x,y,D.rh));
-  const it=[]; for(const zc of [V6.zA,V6.zB]){ const g=plateXY(sh,V6.tw); g.translate(0,0,zc); it.push(g); } const z0=V6.zA-V6.tw/2, z1=V6.zB+V6.tw/2, ft=new THREE.BoxGeometry(10.5,3,z1-z0); ft.translate(x-1.25,1.5,(z0+z1)/2); const rug=new THREE.BoxGeometry(2.6,top-3,z1-z0); rug.translate(x-5.2,3+(top-3)/2,(z0+z1)/2); return merge([...it,ft,rug]); }
+  const it=[]; for(const zc of [V6.zA,V6.zB]){ const g=plateXY(sh,V6.tw); g.translate(0,0,zc); it.push(g); } const z0=V6.zA-V6.tw/2, z1=V6.zB+V6.tw/2, ft=new THREE.BoxGeometry(10.5,2,z1-z0); ft.translate(x-1.25,2,(z0+z1)/2); /* voetje 2 mm: valt in een uitsparing van 2 mm in de bodem */ const rug=new THREE.BoxGeometry(2.6,top-3,z1-z0); rug.translate(x-5.2,3+(top-3)/2,(z0+z1)/2); return merge([...it,ft,rug]); }
 // oogvork met het gat langs x (kanteloog onder de buik): twee staande wangen met de kantelstang ertussen
 function buildEyeXV6(depth){ const tab=new THREE.Shape(), yc=-depth; tab.moveTo(-3.5,-1); tab.lineTo(3.5,-1); tab.lineTo(3.5,yc); tab.absarc(0,yc,3.5,0,-Math.PI,true); tab.lineTo(-3.5,-1); tab.holes.push(circlePath(0,yc,D.rh));
   const cheeks=[1,-1].map(sg=>{ const g=plateYZ(tab,V6.tw); g.translate(sg*(V6.gap/2+V6.tw/2),0,0); return g; }), pad=new THREE.BoxGeometry(8,1.5,11); pad.translate(0,-0.75,0); return merge([...cheeks,pad]); }
@@ -1446,6 +1446,23 @@ function buildPitchFollower(){ // pen onderaan (in de groef), oog bovenaan voor 
   const pin=new THREE.CylinderGeometry(1.6,1.6,2.6,20); pin.rotateX(Math.PI/2); pin.translate(0,0,-3.2);
   const ey=new THREE.Shape(); ey.moveTo(-2,S-7); ey.lineTo(5,S-7); ey.lineTo(5,S); ey.absarc(1.5,S,3.5,0,Math.PI,false); ey.lineTo(-2,S); ey.closePath(); ey.holes.push(circlePath(1.5,S,D.rh));
   return merge([plateXY(st,4),plateXY(boss,4),pin,plateYZ(ey,3)]); }
+// uitsparingen voor vastgelijmde voetjes (6.0): de plek is dan niet te missen. Voetjes die op een plaat staan krijgen een nokje van 0,6 mm dat in een even diepe uitsparing valt (de hoogte blijft gelijk); de voetjes van de geleidesteunen zitten 2 mm diep in de bodem
+function plateWithPockets(shape,pockets){ const T=3, ds=[...new Set(pockets.map(q=>q.d))].sort((a,b)=>b-a), out=[]; /* plaat van 3 mm (y -1,5..1,5) in lagen: onderaan dicht, daarboven per diepte de uitsparingen als gaten */
+  const slab=(y0,y1,minD)=>{ if(y1-y0<1e-3) return; const sh=new THREE.Shape(shape.getPoints()); sh.holes=shape.holes.slice(); for(const q of pockets) if(q.d>=minD-1e-6){ const h=new THREE.Path(); h.moveTo(q.x0,q.z0); h.lineTo(q.x1,q.z0); h.lineTo(q.x1,q.z1); h.lineTo(q.x0,q.z1); h.closePath(); sh.holes.push(h); } const g=plateXZ(sh,y1-y0); g.translate(0,(y0+y1)/2,0); out.push(g); };
+  slab(-T/2,T/2-ds[0],99); for(let k=0;k<ds.length;k++) slab(T/2-ds[k],T/2-(ds[k+1]??0),ds[k]);
+  return merge(out); }
+function applyPockets(){ if(!D.v6||!G.box) return; const hosts={top:{geo:G.box.top,shape:G.box.topShape,y:D.Hb,pk:[]},bottom:{geo:G.box.bottom,shape:G.box.bottomShape,y:3,pk:[]}}, plugged=new Set(), v=new THREE.Vector3();
+  asm.updateMatrixWorld(true); const glued=[]; asm.traverse(o=>{ if(o.isMesh&&/^(gbr\d+|gpb|pp\d+[RL]|motorh)$/.test(o.userData.tag||'')) glued.push(o); });
+  const info=glued.map(o=>{ const a=o.geometry.attributes.position.array; let ymin=1e9; const W=[]; for(let i=0;i<a.length;i+=3){ v.set(a[i],a[i+1],a[i+2]).applyMatrix4(o.matrixWorld); W.push(v.x,v.y,v.z); if(v.y<ymin) ymin=v.y; } return {o,W,ymin}; }); /* eerst alles meten, dan pas nokjes toevoegen (links en rechts delen dezelfde vorm) */
+  for(const {o,W,ymin} of info){
+    let host=null, d=0.6, cy=0; if(Math.abs(ymin-1)<0.1){ host=hosts.bottom; d=2.0; cy=3-0.05; } else if(Math.abs(ymin-3)<0.1){ host=hosts.bottom; cy=ymin+0.05; } else if(Math.abs(ymin-D.Hb)<0.1){ host=hosts.top; cy=ymin+0.05; } if(!host) continue;
+    let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9; for(let i=0;i<W.length;i+=3) if(W[i+1]<cy){ x0=Math.min(x0,W[i]); x1=Math.max(x1,W[i]); z0=Math.min(z0,W[i+2]); z1=Math.max(z1,W[i+2]); } if(x0>x1) continue;
+    let q={x0:x0-0.2,x1:x1+0.2,z0:z0-0.2,z1:z1+0.2,d}; const obst=host.shape.holes.map(h=>{ const pts=h.getPoints(); return {x0:Math.min(...pts.map(t=>t.x))-0.6,x1:Math.max(...pts.map(t=>t.x))+0.6,z0:Math.min(...pts.map(t=>t.y))-0.6,z1:Math.max(...pts.map(t=>t.y))+0.6}; }).concat(host.pk.map(r=>({x0:r.x0-0.6,x1:r.x1+0.6,z0:r.z0-0.6,z1:r.z1+0.6})));
+    for(const h of obst){ if(q.x0>=h.x1||q.x1<=h.x0||q.z0>=h.z1||q.z1<=h.z0) continue; const c=[{...q,x0:h.x1},{...q,x1:h.x0},{...q,z0:h.z1},{...q,z1:h.z0}].filter(r=>r.x1-r.x0>2&&r.z1-r.z0>1.5); if(!c.length){ q=null; break; } q=c.sort((a,b)=>(b.x1-b.x0)*(b.z1-b.z0)-(a.x1-a.x0)*(a.z1-a.z0))[0]; } /* niet overlappen met gaten of andere uitsparingen */
+    if(!q) continue; host.pk.push(q);
+    if(d<1&&!plugged.has(o.geometry)){ plugged.add(o.geometry); const px0=q.x0+0.2, px1=q.x1-0.2, pz0=q.z0+0.2, pz1=q.z1-0.2, bx=new THREE.BoxGeometry(px1-px0,d,pz1-pz0); bx.translate((px0+px1)/2,ymin-d/2,(pz0+pz1)/2); bx.applyMatrix4(new THREE.Matrix4().copy(o.matrixWorld).invert()); appendGeo(o.geometry,[bx.toNonIndexed()]); const pp=PARTS.find(r=>r.geo===o.geometry); if(pp) finalizePart(pp); } }
+  window.__pk={top:hosts.top.pk.length,bottom:hosts.bottom.pk.map(q=>[q.x0,q.x1,q.z0,q.z1,q.d].map(v=>+v.toFixed(1))),W:D.Wh,zb:D.zBack,zf:D.zFront};
+  for(const k of ['top','bottom']){ const h=hosts[k]; if(!h.pk.length||!h.shape) continue; const ng=plateWithPockets(h.shape,h.pk); const p=PARTS.find(q=>q.geo===h.geo); asm.traverse(o=>{ if(o.isMesh&&o.geometry===h.geo) o.geometry=ng; }); if(p){ p.geo=ng; finalizePart(p); CODE_GEO.set(ng,p); } if(k==='top') G.box.top=ng; else G.box.bottom=ng; } }
 function buildBox(){
   const W=D.Wh, zb=D.zBack, zf=D.zFront, H=D.Hb;
   const rect=(x0,y0,x1,y1)=>shapeFrom([[x0,y0],[x1,y0],[x1,y1],[x0,y1]]);
@@ -1458,6 +1475,7 @@ function buildBox(){
   const back=rect(-W,3,W,H-3); if(D.crank){ for(const c of gearCenters()) back.holes.push(circlePath(c.x,c.y,1.8)); } else if(H>40) back.holes.push(win(-W+7,9,W-7,H-10,4));
   const sideS=rect(zb+WT,3,zf-WT,H-3); if(zf-zb>40&&H>40) sideS.holes.push(win(zb+10,9,zf-10,H-10,5));
   return {
+    topShape:top, bottomShape:rect(-W,zb,W,zf),
     top: merge([plateXZ(top,3)]), bottom: merge([plateXZ(rect(-W,zb,W,zf),3)]),
     front: merge([plateXY(front,WT)]), back: merge([plateXY(back,WT)]), side: merge([plateYZ(sideS,WT)]),
     pos:{top:[0,H-1.5,0],bottom:[0,1.5,0],front:[0,0,zf-WT/2],back:[0,0,zb+WT/2],sideR:[W-WT/2,0,0],sideL:[-W+WT/2,0,0]}
@@ -2643,7 +2661,7 @@ function analyzeOnly(){ if(D.horse){ hAnalyze(); renderStatus(); hRenderForces()
 function rebuild(reframe){
   if(isH()) return hRebuild(reframe);
   const _t0=performance.now(); saveParams(); D=derive(null); const _t1=performance.now(); lastA=null; buildParts(); const _t2=performance.now(); analyze(); const _t3=performance.now();
-  window.__rb={derive:Math.round(_t1-_t0),parts:Math.round(_t2-_t1),analyze:Math.round(_t3-_t2)}; const _t4=performance.now(); if(typeof selectPart==='function') selectPart(null); buildScene(); { const sb=document.getElementById('stageBtn'); if(sb) sb.hidden=!D.v6; } window.__rb.scene=Math.round(performance.now()-_t4); M.pinsPending=!D.horse; clearTimeout(pinTimer); pinTok++; M.pinsAsync=false; pinTimer=setTimeout(()=>runPinsAsync(),300); // pennen en vorkkappen pas uitrekenen als het schuiven stopt
+  window.__rb={derive:Math.round(_t1-_t0),parts:Math.round(_t2-_t1),analyze:Math.round(_t3-_t2)}; const _t4=performance.now(); if(typeof selectPart==='function') selectPart(null); buildScene(); applyPockets(); { const sb=document.getElementById('stageBtn'); if(sb) sb.hidden=!D.v6; } window.__rb.scene=Math.round(performance.now()-_t4); M.pinsPending=!D.horse; clearTimeout(pinTimer); pinTok++; M.pinsAsync=false; pinTimer=setTimeout(()=>runPinsAsync(),300); // pennen en vorkkappen pas uitrekenen als het schuiven stopt
   if(viewMode==='bed') buildBedScene();
   renderStatus(); renderMech(); renderForces(); renderReal(); renderParts(); renderHinges(); drawGraph();
   VCACHE.clear(); fitToken++; FIT={state:'idle'}; renderFit(); if(typeof clrToken!=='undefined'){ clrToken++; prcToken++; CLR={state:'idle'}; PRC={state:'idle'}; MOT={state:'idle'}; renderClr(); renderPrc(); renderMot(); CLR_CACHE.clear(); } clearTimeout(fitTimer); fitTimer=setTimeout(runFitCheck,1500); /* controles pas starten als er even niets verandert; lopende controles afbreken */
