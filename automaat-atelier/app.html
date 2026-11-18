@@ -309,7 +309,7 @@ const PRESETS = {
       {x:0,z:le-0.62*L,rx:w0*1.05,rz:0.55*L,h:hm*0.78},
       ...b.slice(1),
       {x:0,z:te-3,rx:1.1,rz:6,h:B*0.8*k+4,p:1}]; }, /* rugvinnetje */
-  def:Object.assign({},PRESETS.manta52.def,{attach:75,smooth:1})}); /* stangvork naar buiten: ruimte voor smalle losse schubben */ } } }
+  def:Object.assign({},PRESETS.manta52.def,{attach:75,smooth:1,e:5.3,rpm:19}) /* echte manta: ±0,31 slagen/s (19/min) en een vinpuntuitslag van ±0,74 × de lichaamslengte (83 mm) */}); /* stangvork naar buiten: ruimte voor smalle losse schubben */ } } }
 const CONTROLS = [
   {g:'Vorm'},
   {id:'span',label:'Spanwijdte',min:120,max:400,step:5,unit:'mm'},
@@ -355,6 +355,7 @@ const STORE='automaat-atelier-v14';
 const VISIBLE_PRESETS=['manta60'], SHOW_ALL=/alle/.test(location.hash||'');
 let P = loadParams() || Object.assign({preset:'manta60'}, PRESETS.manta60.def);
 if(!SHOW_ALL&&!VISIBLE_PRESETS.includes(P.preset)) P=Object.assign({preset:'manta60'},PRESETS.manta60.def);
+if(P.preset==='manta60'&&!P.m60v2){ if(P.e===6.5) P.e=5.3; if(P.rpm===16) P.rpm=19; P.m60v2=1; } /* eenmalig: nieuwe standaard voor slag en snelheid, behalve als je ze zelf had aangepast */
 function loadParams(){ try{ const s=localStorage.getItem(STORE); if(!s) return null; const o=JSON.parse(s); if(!PRESETS[o.preset]) return null; return Object.assign({},PRESETS[o.preset].def,o);}catch(e){return null;} }
 function saveParams(){ try{ localStorage.setItem(STORE,JSON.stringify(P)); }catch(e){} }
 
