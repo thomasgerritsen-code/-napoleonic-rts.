@@ -352,7 +352,10 @@ const CONTROLS = [
 ];
 
 const STORE='automaat-atelier-v14';
-let P = loadParams() || Object.assign({preset:'manta'}, PRESETS.manta.def);
+/* alleen Manta 6.0 in de app; de andere modellen blijven in de code (zichtbaar met #alle achter de adresregel) */
+const VISIBLE_PRESETS=['manta60'], SHOW_ALL=/alle/.test(location.hash||'');
+let P = loadParams() || Object.assign({preset:'manta60'}, PRESETS.manta60.def);
+if(!SHOW_ALL&&!VISIBLE_PRESETS.includes(P.preset)) P=Object.assign({preset:'manta60'},PRESETS.manta60.def);
 function loadParams(){ try{ const s=localStorage.getItem(STORE); if(!s) return null; const o=JSON.parse(s); if(!PRESETS[o.preset]) return null; return Object.assign({},PRESETS[o.preset].def,o);}catch(e){return null;} }
 function saveParams(){ try{ localStorage.setItem(STORE,JSON.stringify(P)); }catch(e){} }
 
@@ -2589,7 +2592,7 @@ function setView(mode){
 /* ------------------------------------------------------------------ */
 function buildControls(){
   const pr=document.getElementById('presets');
-  for(const k of Object.keys(PRESETS)){ const b=document.createElement('button'); b.type='button'; b.textContent=PRESETS[k].name; b.dataset.k=k; b.onclick=()=>{ P=Object.assign({preset:k},PRESETS[k].def); buildCtlGroups(); syncControls(); rebuild(true); }; pr.appendChild(b); }
+  for(const k of Object.keys(PRESETS)){ if(!SHOW_ALL&&!VISIBLE_PRESETS.includes(k)) continue; const b=document.createElement('button'); b.type='button'; b.textContent=PRESETS[k].name; b.dataset.k=k; b.onclick=()=>{ P=Object.assign({preset:k},PRESETS[k].def); buildCtlGroups(); syncControls(); rebuild(true); }; pr.appendChild(b); }
   buildCtlGroups(); syncControls();
 }
 function buildCtlGroups(){
