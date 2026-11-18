@@ -1203,10 +1203,11 @@ function buildGuideBracketV6(i){ const A=armSetup(), yMid=A.yCm[i]-A.Hcr[i], x=-
   const z0=V6.zA-V6.tw/2, z1=V6.zB+V6.tw/2, ft=new THREE.BoxGeometry(x+4-xL,2,z1-z0); ft.translate((xL+x+4)/2,2,(z0+z1)/2); /* voetje 2 mm: valt in een uitsparing van 2 mm in de bodem */ const rug=new THREE.BoxGeometry(2.6,top-3,z1-z0); rug.translate(x-5.2,3+(top-3)/2,(z0+z1)/2);
   return merge(xL>x-6.5+0.01?[...it,ft]:[...it,ft,rug]); } /* ingekort tegen de zijwand: de wand is de rug, de ribbel zou over de draaipunten van de armpjes komen */
 // tuimelaar: twee platen (A en B) met een bruggetje vlak boven het draaipunt; kraagjes binnen de vork waar de spleet wijder is dan de staaf
-function buildRockerV6(i){ const r=4, L=D.aLi[i], phi=(D.leanB&&D.leanB[i])||0, g=v6Gap(phi>4?phi:0), pts=[];
+function buildRockerV6(i){ const r=4, L=D.aLi[i], phi=(D.leanB&&D.leanB[i])||0, f=(phi+2)*DEG, g=useBall3(i)?Math.max(V6.gap,2*BALL.hz*Math.cos(f)+2*BALL.ro*Math.sin(f)+0.3):v6Gap(phi>4?phi:0), pts=[];
   for(let k=0;k<=12;k++){ const a=-Math.PI/2+Math.PI*k/12; pts.push([L+r*Math.cos(a),r*Math.sin(a)]); } for(let k=0;k<=12;k++){ const a=Math.PI/2+Math.PI*k/12; pts.push([r*Math.cos(a),r*Math.sin(a)]); }
   const lug=[[-1.9,3],[1.9,3],[1.9,7.6],[-1.9,7.6]]; const sh=shapeFrom(hullPts(pts.concat(lug))); for(const x of [0,D.d0,L]) sh.holes.push(circlePath(x,0,D.rh)); sh.holes.push(circlePath(0,5.6,D.rh));
   const [a,b]=v6Pair(sh,g,0), it=[]; if(g>V6.gap+0.05) for(const x of [0,D.d0]) for(const sg of [-1,1]) it.push(v6Boss(x,0,sg*g/2,sg*V6.gap/2)); // kraagjes bij draaipunt en volgerstangetje
+  if(useBall3(i)) for(const sg of [-1,1]) it.push(tubeZ(D.rh,1.6,Math.min(sg*g/2,sg*(BALL.h+0.05)),Math.max(sg*g/2,sg*(BALL.h+0.05)),L,0)); // kraagjes die het kogeltje op de pen houden
   const bsh=shapeFrom([[-1.6,3.6],[1.6,3.6],[1.6,7.4],[-1.6,7.4]]); bsh.holes.push(circlePath(0,5.6,D.rh)); const brg=plateXY(bsh,g); // bruggetje (op plaat A geprint)
   return {a:merge([a,brg,...it.filter((_,k)=>k%2===0)]),b:merge([b,...it.filter((_,k)=>k%2===1)]),gap:g}; }
 // draaipuntsteun: één lip in laag M, op het deksel gelijmd
@@ -1232,6 +1233,17 @@ function buildRodHG(L,ends){ const r=ROD.w/2, pts=[]; for(let k=0;k<=12;k++){ co
   for(let k=0;k<=12;k++){ const a=Math.PI/2+Math.PI*k/12; pts.push([r*Math.cos(a),r*Math.sin(a)]); } const s=shapeFrom(dedupe(pts)), it=[];
   for(const [x,hg] of [[0,ends[0]],[L,ends[1]]]){ s.holes.push(circlePath(x,0,hg?1.75:D.rh)); if(hg) it.push(hgLip(x)); }
   const g=merge([plateXY(s,ROD.t),...it]); g.userData.hg=true; return g; }
+// 6.0 stang 3 onderaan: klik-kogelgewricht. Een afgeplat kogeltje (Ø5, vlak op ±1,2) zit op de pen tussen de platen van tuimelaar 3; de stang heeft een bolle kom (R2,6) die het kogeltje voor ±1,4 omsluit.
+// Monteren: kogeltje op zijn kant in de kom schuiven (2,4 dik < opening Ø4,4), kwartslag draaien, dan de pen erdoor.
+const BALL={r:2.5,h:1.2,rs:2.6,ro:4.0,hz:1.4}; // hz: bovenrand van de kom; de onderrand ligt gelijk met de stang (−1,2)
+const useBall3=(i)=>D.v6&&D.twist3&&i===2;
+function buildBall3(){ const rf=Math.sqrt(BALL.r*BALL.r-BALL.h*BALL.h), a0=Math.asin(-BALL.h/BALL.r), pts=[[D.rh,-BALL.h]]; for(let k=0;k<=14;k++){ const a=a0+(-2*a0)*k/14; pts.push([BALL.r*Math.cos(a),BALL.r*Math.sin(a)]); } pts.push([D.rh,BALL.h],[D.rh,-BALL.h]);
+  const g=new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(p[0],p[1])),28); g.rotateX(Math.PI/2); return g; }
+function buildRodBall(L){ const r=ROD.w/2, rc=BALL.ro-0.1, pts=[]; for(let k=0;k<=12;k++){ const a=-Math.PI/2+Math.PI*k/12; pts.push([L+r*Math.cos(a),r*Math.sin(a)]); }
+  const am=Math.asin(r/rc); for(let k=0;k<=10;k++){ const a=am-2*am*k/10; pts.push([rc*Math.cos(a),rc*Math.sin(a)]); } const s=shapeFrom(dedupe(pts)); s.holes.push(circlePath(L,0,D.rh));
+  const zb=-ROD.t/2, a0=Math.asin(zb/BALL.rs), a1=Math.asin(BALL.hz/BALL.rs), sp=[[Math.sqrt(BALL.rs*BALL.rs-zb*zb),zb],[BALL.ro,zb],[BALL.ro,BALL.hz]]; /* onderkant gelijk met de stang (plat op het bed), bovenkant 0,2 hoger */ for(let k=14;k>=0;k--){ const a=a0+(a1-a0)*k/14; sp.push([BALL.rs*Math.cos(a),BALL.rs*Math.sin(a)]); }
+  const ring=new THREE.LatheGeometry(dedupe(sp).map(p=>new THREE.Vector2(p[0],p[1])),36); ring.rotateX(Math.PI/2);
+  const g=merge([plateXY(s,ROD.t),ring]); g.userData.hg=true; /* zoals de kantelstang: de bovenpen klemt in het stangkruisje, niet in de stang */ return g; }
 // stangkruisje (mini-cardan) bovenaan de vleugelstangen: pen langs z voor de stang, twee asjes langs de span in het oogvorkje
 function buildUBlock(){ const sh=shapeFrom([[-2,-2],[2,-2],[2,2],[-2,2]]); sh.holes.push(circlePath(0,0,D.rh)); return merge([plateXY(sh,5.4),tubeX(0.01,1.2,2,4.6,0,0),tubeX(0.01,1.2,-4.6,-2,0,0)]); }
 function buildForkTab(x,depth){ const w=D.v6?2.15:2.6, wt=D.v6?1.0:w, yt=-depth+w*0.6, pts=[[-wt,0],[-wt,Math.min(-0.5,yt+1.2)],[-w,yt]]; for(let k=0;k<=16;k++){ const a=Math.PI+Math.PI*k/16; pts.push([w*Math.cos(a),-depth+w*Math.sin(a)]); } pts.push([w,yt],[wt,Math.min(-0.5,yt+1.2)],[wt,0]); /* 6.0: tand boven het asje smaller (3 mm), het stangoog naast het kruisje zwaait er langs */ /* 6.0: smallere tand, het stangoog naast het kruisje schuurt er anders langs */
@@ -1586,7 +1598,8 @@ function buildParts(){
     G.ublock=add('stangkruisje','Stangkruisje (pen 1,75 mm naar de stang, asjes in het oogvorkje)',2*(D.n-1),buildUBlock(),I4(),'mech').geo;
     G.cross3=add('kruisstuk','Kruisstuk (cardan) tussen segmenten: pen van 1,75 mm door het blokje, spil in de lagerbus',2*(D.n-1),buildCross3(),rotZ(Math.PI/2),'mech').geo; G.collarX=D.tiles?add('borgclip_kruis','Borgclip kruisstuk: in het groefje van de spil schuiven en op de voorkant van de lagerbus lijmen',2*(D.n-1),buildSpindleClip(),rotZ(Math.PI/2),'mech').geo:add('borgring_kruis','Borgring op de spil van het kruisstuk (lijmen)',2*(D.n-1),buildCollar(1.35,2.3,0.8),I4(),'mech').geo; G.collarT=D.tiles?add('borgring_schub','Borgring op de lagerbus (houdt de eerste losse schub op zijn plaats; lijmen)',2*(D.n-1),buildCollar(2.45,3.0,0.6),I4(),'mech').geo:null; G.arm3=[];  G.link3=[];
     for(let i=1;i<D.n;i++){ G.link3[i]=add('draaistang_'+i,`Draaistangetje ${i}→${i+1} (${D.Lh3[i].toFixed(1).replace('.',',')} mm, kantelpennen)`,2,buildRodHG(D.Lh3[i],[true,true]),rotX(-Math.PI/2),'rod').geo; } }
-  G.rodS=[]; for(let i=0;i<D.n;i++){ if(D.twist3&&i>=1) G.rod[i]=add('stang_'+(i+1),`Stang ${i+1} (kantelpen onderaan)`,2,buildRodHG(D.L3[i],[true,false]),rotX(-Math.PI/2),'rod').geo;
+  G.rodS=[]; for(let i=0;i<D.n;i++){ if(useBall3(i)) G.rod[i]=add('stang_'+(i+1),`Stang ${i+1} (bolle kom onderaan)`,2,buildRodBall(D.L3[i]),rotX(-Math.PI/2),'rod').geo;
+    else if(D.twist3&&i>=1) G.rod[i]=add('stang_'+(i+1),`Stang ${i+1} (kantelpen onderaan)`,2,buildRodHG(D.L3[i],[true,false]),rotX(-Math.PI/2),'rod').geo;
     else G.rod[i]=add('stang_'+(i+1),'Stang '+(i+1),2,buildRod(D.L[i]),rotX(-Math.PI/2),'rod').geo; }
   if(D.v6){ G.fol=[]; G.arm={}; G.folParts=[]; for(let i=0;i<D.n;i++){ const f=buildArmFollowerV6(i);
       const pa=add('volger_a_'+(i+1),'Volger '+(i+1)+', plaat A (met groefpen; pen omhoog printen)',1,f.a,I4(),'mech'), pb=add('volger_b_'+(i+1),'Volger '+(i+1)+', plaat B (met bruggetjes; op plaat A lijmen, paspennen)',1,f.b,rotX(Math.PI),'mech'); G.folParts[i]=[pa.geo,pb.geo]; G.fol[i]=f.all;
@@ -1601,7 +1614,7 @@ function buildParts(){
   else for(let i=0;i<D.n;i++) G.fol[i]=add('volger_'+(i+1),'Volger '+(i+1),1,buildFollower(i),rotX(-Math.PI/2),'mech').geo;
   G.rk=null; G.rkPost=[];
   if(D.leverOn&&D.v6){ G.rk=[]; G.rkB=[]; for(let i=0;i<D.n;i++){ const r=buildRockerV6(i); G.rk[i]=add('tuimelaar_a_'+(i+1),'Tuimelaar '+(i+1)+', plaat A (met bruggetje)',2,r.a,I4(),'mech').geo; G.rkB[i]=add('tuimelaar_b_'+(i+1),'Tuimelaar '+(i+1)+', plaat B (op het bruggetje lijmen, paspen)',2,r.b,rotX(Math.PI),'mech').geo;
-    G.rkPost[i]=add('draaipunt_'+(i+1),'Draaipuntlip '+(i+1)+' (op het deksel lijmen)',2,buildRockerPostV6(i),rotX(-Math.PI/2),'mech').geo; } }
+    G.rkPost[i]=add('draaipunt_'+(i+1),'Draaipuntlip '+(i+1)+' (op het deksel lijmen)',2,buildRockerPostV6(i),rotX(-Math.PI/2),'mech').geo; }  G.ball3=null; if(useBall3(2)) G.ball3=add('kogel_3','Kogeltje 3 (op de pen in tuimelaar 3; op zijn kant in de kom van stang 3 schuiven, kwartslag draaien)',2,buildBall3(),I4(),'mech').geo; }
   else if(D.leverOn){ G.rk=[]; for(let i=0;i<D.n;i++){ G.rk[i]=add('tuimelaar_'+(i+1),'Tuimelaar '+(i+1)+' ('+(D.aLi[i]/D.d0).toFixed(1).replace('.',',')+'×)',2,buildRocker(i),rotX(-Math.PI/2),'mech').geo;
     G.rkPost[i]=add('draaipunt_'+(i+1),'Draaipuntsteun '+(i+1),2,buildRockerPost(i),rotX(-Math.PI/2),'mech').geo; } }
   for(let i=0;i<D.n;i++) G.cam[i]=add('nok_'+(i+1),'Nok '+(i+1)+' ('+Math.round(-D.phi[i]/DEG)+'°)',1,buildCam(i),rotX(-Math.PI/2),'mech').geo;
@@ -1923,7 +1936,7 @@ function buildScene(){
     M.rodL[i]=mk(G.rodS[i]||G.rod[i],MAT.seg[i]); M.rodL[i].position.z=D.zRod[i]; M.rodL[i].userData.tag='rod'+i+'L';
     if(D.armDrive&&G.folParts&&G.folParts[i]){ M.fol[i]=mk(G.folParts[i][0],MAT.seg[i]); const up=mk(G.folParts[i][1],MAT.seg[i],M.fol[i]); up.userData.tag='fol'+i; } else M.fol[i]=mk(G.fol[i],MAT.seg[i]); M.fol[i].position.z=D.z[i]; M.fol[i].userData.tag='fol'+i;
     if(D.leverOn){ M.rk=M.rk||[]; M.rk[i]=[];
-      for(const sg of [1,-1]){ const r=mk(G.rk[i],MAT.seg[i]); r.position.set(sg*D.xr[i],D.yr[i],D.zRk[i]); if(D.v6&&sg<0) r.scale.x=-1; /* 6.0: links gespiegeld (zelfde onderdelen, plaat A en B van kant gewisseld): bruggetje boven de pen, net als rechts */ r.userData.tag='rk'+i+(sg>0?'R':'L'); M.rk[i].push(r); if(G.rkB&&G.rkB[i]){ const rb=mk(G.rkB[i],MAT.seg[i],r); rb.userData.tag=r.userData.tag; }
+      for(const sg of [1,-1]){ const r=mk(G.rk[i],MAT.seg[i]); r.position.set(sg*D.xr[i],D.yr[i],D.zRk[i]); if(D.v6&&sg<0) r.scale.x=-1; /* 6.0: links gespiegeld (zelfde onderdelen, plaat A en B van kant gewisseld): bruggetje boven de pen, net als rechts */ r.userData.tag='rk'+i+(sg>0?'R':'L'); M.rk[i].push(r); if(G.rkB&&G.rkB[i]){ const rb=mk(G.rkB[i],MAT.seg[i],r); rb.userData.tag=r.userData.tag; } if(G.ball3&&useBall3(i)){ const kb=mk(G.ball3,MAT.steel,r); kb.position.set(D.aLi[i],0,0); kb.userData.tag='kb'+i+(sg>0?'R':'L'); kb.userData.ownBody=true; }
         const p=mk(G.rkPost[i],MAT.motor); p.position.set(sg*D.xr[i],D.Hb,D.zRod[i]); if(D.v6&&sg<0) p.scale.x=-1; /* voetje links ook naar buiten */ p.userData.tag='pp'+i+(sg>0?'R':'L'); } }
     M.cam[i]=mk(G.cam[i],MAT.seg[i]); M.cam[i].position.set(0,D.yc,D.z[i]); M.cam[i].userData.tag='cam'+i;
     if(D.armDrive){ M.armx=M.armx||[]; const o={}; M.armx[i]=o; if(G.arm.roller){ const ro=mk(G.arm.roller,MAT.steel,M.fol[i]); ro.position.set(0,0,0); }
@@ -1993,8 +2006,8 @@ function addPins(inner){ M.pinList=[]; const P=(par,x,y,z,len,axis)=>{ if(!par) 
   for(let i=0;i<D.n;i++) for(const sd of ['R','L']){ const m=(sd==='R'?M.segR:M.segL)[i]; if(!m) continue;
     if(!(D.twist3&&i>=1)){ const hb=hingeBands(i); P(m,0,0,(hb.le+hb.te)/2,hb.le-hb.te+2,'z'); }
     if(D.tip3&&i===D.n-1) P(m,D.l,0,D.zA3,16,'z'); }
-  for(let i=0;i<D.n;i++) for(const r of [M.rodR[i],M.rodL[i]]){ if(!r) continue; const L=D.twist3&&i>=1?D.L3[i]:D.L[i]; P(r,0,0,0,10,'z'); P(r,L,0,0,10,'z'); }
-  if(D.leverOn&&M.rk) for(let i=0;i<D.n;i++) for(const r of (M.rk[i]||[])){ P(r,0,0,0,10,'z'); if(D.armDrive) P(r,D.d0,0,0,10,'z'); }
+  for(let i=0;i<D.n;i++) for(const r of [M.rodR[i],M.rodL[i]]){ if(!r) continue; const L=D.twist3&&i>=1?D.L3[i]:D.L[i]; if(!useBall3(i)) P(r,0,0,0,10,'z'); P(r,L,0,0,10,'z'); }
+  if(D.leverOn&&M.rk) for(let i=0;i<D.n;i++) for(const r of (M.rk[i]||[])){ P(r,0,0,0,10,'z'); if(useBall3(i)) P(r,D.aLi[i],0,0,10,'z'); if(D.armDrive) P(r,D.d0,0,0,10,'z'); }
   if(D.armDrive&&M.armx) for(let i=0;i<D.n;i++){ const o=M.armx[i]; if(!D.forced) P(M.fol[i],0,0,0,12,'z'); for(const g of o.g){ P(g,0,0,0,9,'z'); P(g,D.La,0,0,9,'z'); } for(const l of o.lk){ P(l,0,0,0,9,'z'); P(l,D.Lk,0,0,9,'z'); } }
   if(M.parm) for(const g of M.parm){ P(g,0,0,0,9,'z'); P(g,PLA,0,0,9,'z'); }
   if(M.plink){ P(M.plink,0,0,0,9,'z'); P(M.plink,D.Lp,0,0,9,'z'); }
@@ -2013,7 +2026,7 @@ function pinStacks(){ const out=[], v=new THREE.Vector3(); asm.updateMatrixWorld
   return out; }
 // scharniercontrole: per pen zoeken welke onderdelen een gat op de pen-as hebben, de as van het rechte gat bepalen (een kantelgat volgt),
 // de pen daarop leggen, en nagaan of de onderdelen vlak tegen elkaar liggen en het gat over de hele stapel vrij is
-const bodyOf=(m)=>{ while(m.parent&&m.parent.isMesh&&!m.parent.userData.pin) m=m.parent; return m; };
+const bodyOf=(m)=>{ while(!m.userData.ownBody&&m.parent&&m.parent.isMesh&&!m.parent.userData.pin) m=m.parent; return m; }; /* ownBody: los onderdeel dat alleen voor de pose aan een ander hangt (kogeltje) */
 function eigMin3(C){ // kleinste eigenvector van een symmetrische 3x3 (Jacobi)
   const a=[[C[0],C[1],C[2]],[C[1],C[3],C[4]],[C[2],C[4],C[5]]], V=[[1,0,0],[0,1,0],[0,0,1]];
   for(let sw=0;sw<30;sw++){ let p=0,q=1; if(Math.abs(a[0][2])>Math.abs(a[p][q])){p=0;q=2;} if(Math.abs(a[1][2])>Math.abs(a[p][q])){p=1;q=2;} if(Math.abs(a[p][q])<1e-12) break;
@@ -2451,7 +2464,7 @@ function clrDist(G,p,md,tri,q){ const i=Math.floor((p.x-G.mn.x)/G.c), j=Math.flo
   return d*sg; } /* negatief = binnen het andere deel (volgens de buitennormaal van het dichtstbijzijnde vlak; bij twijfel buiten) */
 function runClearance(){ const token=++clrToken; const thr=clrThr()-0.005, md=Math.max(0.8,thr+0.2), steps=24;
   const meshes=[]; asm.traverse(o=>{ if(o.isMesh&&o.userData.tag&&o.visible!==false&&!o.userData.dropped&&o.geometry&&o.geometry.attributes.position) meshes.push(o); }); /* links en rechts: een verschil tussen de kanten moet ook opvallen */
-  const zones=(M.hinges||[]).filter(h=>h.pinLen&&h.pin).map(h=>({pin:h.pin,tags:new Set(h.cl.map(x=>x.tag).concat([h.pin.userData.tag])),lo:h.lo,hi:h.hi}));
+  const zones=(M.hinges||[]).filter(h=>h.pinLen&&h.pin).map(h=>({pin:h.pin,tags:new Set(h.cl.map(x=>x.tag).concat([h.pin.userData.tag],h.cl.map(x=>x.tag).filter(t=>/^kb\d+[RL]$/.test(t)).map(t=>'rod'+t.slice(2)))),lo:h.lo,hi:h.hi})); /* kogeltje: de stangkom eromheen hoort bij hetzelfde scharnier (binnen r 2,0 alleen pen, gat en kogelopening) */
   const rel=(a,b)=>new THREE.Matrix4().copy(b.matrixWorld).invert().multiply(a.matrixWorld).elements;
   const poses=[0,1.3,2.9,4.4]; const R0=[]; for(const th of poses){ poseAny(th); asm.updateMatrixWorld(true); R0.push(meshes.map(m=>m.matrixWorld.clone())); }
   const pairs=[]; for(let i=0;i<meshes.length;i++) for(let j=i+1;j<meshes.length;j++){ let fixed=true; for(let k=1;k<poses.length&&fixed;k++){ const ea=new THREE.Matrix4().copy(R0[0][j]).invert().multiply(R0[0][i]).elements, eb=new THREE.Matrix4().copy(R0[k][j]).invert().multiply(R0[k][i]).elements; for(let q=0;q<16;q++) if(Math.abs(ea[q]-eb[q])>1e-3){ fixed=false; break; } } if(!fixed) pairs.push([meshes[i],meshes[j]]); }
@@ -2930,7 +2943,7 @@ function readme(){
   if(D.headOn&&D.headCutHB){ L.push(`     ${D.split.kind[0].toUpperCase()+D.split.kind.slice(1)}: scharnier hem met een filament-pen dwars aan het lijf. Lijm het oog ${Math.abs(D.hdz).toFixed(1)} mm voorbij het scharnier,`);
     L.push(`     ${D.xHead} mm naast het midden, onder de ${D.split.kind}. Verbind het met de stang (${D.Lh.toFixed(1)} mm) met het oog aan de paal.`); }
   if(D.leverOn){ L.push(`  7. Hefbomen: lijm per vleugelstang een draaipuntsteun op het deksel, ${D.xr[0].toFixed(0)} mm (en verder per segment) links en rechts van het midden.`);
-    L.push(`     Zet de tuimelaar met een pen op de steun. De pen in de dwarsbalk van de volger steekt door de sleuf van de tuimelaar; de vleugelstang hangt aan het eind (versterking ${String(D.kLev).replace('.',',')}×).`); }
+    L.push(`     Zet de tuimelaar met een pen op de steun. De pen in de dwarsbalk van de volger steekt door de sleuf van de tuimelaar; de vleugelstang hangt aan het eind (versterking ${String(D.kLev).replace('.',',')}×).`);  if(useBall3(2)) L.push(`     Stang 3 (6.0) hangt met een kogelgewricht aan tuimelaar 3: zet het kogeltje op zijn kant, schuif het in de bolle kom onderaan stang 3 en draai het een kwartslag. Zet dan stang en kogeltje tussen de platen van tuimelaar 3 en steek de pen door plaat A, het kogeltje en plaat B. Doe dit vóór je plaat B op het bruggetje lijmt.`); }
   else L.push('  7. Verbind elke stang met een pen aan de dwarsbalk van de volger en aan het stangoog.');
   D.L.forEach((l,i)=>L.push(`     Stang ${i+1}: ${l.toFixed(1)} mm hart-op-hart, verbindt volger ${i+1} met vleugelsegment ${i+1}.`));
   if(D.heaveOn) L.push(`     Lijm de geleidebus over het ronde gat in het deksel. Het lijf deint ${(2*D.eh).toFixed(1)} mm op en neer.`);
@@ -2968,6 +2981,7 @@ function testParts(){ const out=[], A=(id,name,geo,rot)=>out.push({id,name,geo,r
     const fork=(gap,id,name)=>{ const a=plate(V6.tw), br=new THREE.BoxGeometry(8,8,gap); br.translate(20,4,V6.tw/2+gap/2); A(id+'_a',name+', plaat A met bruggetje (spleet '+String(gap.toFixed(1)).replace('.',',')+' mm)',merge([a,br]),rotX(-Math.PI/2)); A(id+'_b',name+', plaat B (op het bruggetje lijmen)',plate(V6.tw),rotX(-Math.PI/2)); };
     fork(V6.gap,'vork_v','Vorkproef gewone vork'); A('vork_v_staaf','Staafje voor de gewone vork (2,4 mm dik, gewoon gat)',buildRod(14),rotX(-Math.PI/2));
     fork(v6Gap((D.leanT||0)+2),'vork_vk','Vorkproef kantelvork'); A('vork_vk_staaf','Staafje voor de kantelvork (zandlopergat)',buildRodHG(14,[true,false]),rotX(-Math.PI/2));
+    if(useBall3(2)){ A('kogel_proef','Kogeltje (kogelgewricht stang 3)',buildBall3(),I4()); A('stang_kogel','Stangstukje 20 mm met bolle kom (kogelgewricht stang 3)',buildRodBall(20),rotX(-Math.PI/2)); }
     { const sh=shapeFrom([[0,0],[24,0],[24,8],[0,8]]); sh.holes.push(circlePath(5,4,D.rh)); A('plaatje_1_2','Plaatje 1,2 mm (zo dik als het tuimelaartje van de vinpunt): moet heel van het bed komen en niet kromtrekken',plateXY(sh,1.2),rotX(-Math.PI/2)); } }
   for(const p of out){ const g=p.geo.clone(); g.applyMatrix4(p.rot); g.computeBoundingBox(); const bb=g.boundingBox; g.translate(-(bb.min.x+bb.max.x)/2,-bb.min.y,-(bb.min.z+bb.max.z)/2); p.printGeo=g; p.qty=1; }
   return out; }
@@ -2982,6 +2996,7 @@ function testReadme(){ const L=['PROEFPRINTSET – '+(PRESETS[P.preset]?PRESETS[
   L.push('','Klemgat-strip: druk een pen in elk gat (1 tot 4 stipjes = 1,40 / 1,48 / 1,56 / 1,64 mm). Kies het gat waarin de pen met duimkracht in gaat en niet meer los wil, en zet "Klemgat" in de app op die maat.',
     'Maatblokje: meet de breedte met een schuifmaat. Aangroei per kant = (gemeten maat - 10) / 2. Zet dat bij "Printer: aangroei per kant"; de spelingcontrole rekent er dan mee.');
   if(D.v6) L.push('Vorkproeven (6.0): lijm plaat B op het bruggetje van plaat A (gat recht boven gat, een pen helpt uitlijnen). Steek het staafje ertussen en druk een pen door. De pen moet in beide platen klemmen, het staafje moet zonder speling vrij draaien. Bij de kantelvork moet het staafje ook een paar graden kunnen kantelen.',
+    ...(useBall3(2)?['Kogelgewricht (stang 3): zet het kogeltje op zijn kant, schuif het in de kom van het stangstukje en draai het een kwartslag; het zit dan gevangen. Steek een pen door het kogeltje: het stangstukje moet alle kanten op kunnen kantelen (zeker 15°) en vrij om de pen draaien. Klemt het, schuur de kom licht.']:[]),
     'Plaatje 1,2 mm: moet heel en vlak van het bed komen. Lukt dat niet, print dan met een kleinere laagdikte (0,12 - 0,16 mm) of een brim.');
   L.push('','Klemt iets: maak het gat in de app groter (Pengat) of schuur licht. Rammelt het: kleiner.'); return L.join('\r\n'); }
 // Etappe A (6.0): sokkel, lijf met kanteling en de aandrijving van segment 1 (beide kanten). Daarmee test je nok, volger, geleidearmpjes, tuimelaar en stang voordat de rest geprint wordt.
