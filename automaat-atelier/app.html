@@ -1199,8 +1199,8 @@ function buildArmFollowerV6(i){ const A=armSetup(), H=A.Hcr[i], xp=D.xp[i], cw=x
 function buildGuideBracketV6(i){ const A=armSetup(), yMid=A.yCm[i]-A.Hcr[i], x=-1.5-D.La, ys=A.yG[i].map(y=>yMid+y), top=Math.max(...ys)+4, xL=Math.max(x-6.5,-D.Wh+2.45); /* niet door de zijwand: de steun staat ertegen */
   const sh=shapeFrom([[xL,3],[x+4,3],[x+4,top],[xL,top]]); for(const y of ys) sh.holes.push(circlePath(x,y,D.rh));
   const it=[]; for(const zc of [V6.zA,V6.zB]){ const g=plateXY(sh,V6.tw); g.translate(0,0,zc); it.push(g); }
-  const z0=V6.zA-V6.tw/2, z1=V6.zB+V6.tw/2, ft=new THREE.BoxGeometry(x+4-xL,2,z1-z0); ft.translate((xL+x+4)/2,2,(z0+z1)/2); /* voetje 2 mm: valt in een uitsparing van 2 mm in de bodem */ const rx=Math.max(x-5.2,xL+1.3), rug=new THREE.BoxGeometry(2.6,top-3,z1-z0); rug.translate(rx,3+(top-3)/2,(z0+z1)/2);
-  return merge([...it,ft,rug]); }
+  const z0=V6.zA-V6.tw/2, z1=V6.zB+V6.tw/2, ft=new THREE.BoxGeometry(x+4-xL,2,z1-z0); ft.translate((xL+x+4)/2,2,(z0+z1)/2); /* voetje 2 mm: valt in een uitsparing van 2 mm in de bodem */ const rug=new THREE.BoxGeometry(2.6,top-3,z1-z0); rug.translate(x-5.2,3+(top-3)/2,(z0+z1)/2);
+  return merge(xL>x-6.5+0.01?[...it,ft]:[...it,ft,rug]); } /* ingekort tegen de zijwand: de wand is de rug, de ribbel zou over de draaipunten van de armpjes komen */
 // tuimelaar: twee platen (A en B) met een bruggetje vlak boven het draaipunt; kraagjes binnen de vork waar de spleet wijder is dan de staaf
 function buildRockerV6(i){ const r=4, L=D.aLi[i], phi=(D.leanB&&D.leanB[i])||0, g=v6Gap(phi>4?phi:0), pts=[];
   for(let k=0;k<=12;k++){ const a=-Math.PI/2+Math.PI*k/12; pts.push([L+r*Math.cos(a),r*Math.sin(a)]); } for(let k=0;k<=12;k++){ const a=Math.PI/2+Math.PI*k/12; pts.push([r*Math.cos(a),r*Math.sin(a)]); }
@@ -1477,7 +1477,7 @@ function buildBox(){
   const WT=2.4, front=rect(-W,3,W,H-3); front.holes.push(circlePath(0,D.yc,1.8));
   if(W-8>12){ front.holes.push(win(-W+7,9,-7,H-10,4)); front.holes.push(win(7,9,W-7,H-10,4)); }
   const back=rect(-W,3,W,H-3); if(D.crank){ for(const c of gearCenters()) back.holes.push(circlePath(c.x,c.y,1.8)); } else if(H>40) back.holes.push(win(-W+7,9,W-7,H-10,4));
-  const sideS=rect(zb+WT,3,zf-WT,H-3); if(zf-zb>40&&H>40) sideS.holes.push(win(zb+10,9,zf-10,H-10,5));
+  const sideS=rect(zb+WT,3,zf-WT,H-3); if(zf-zb>40&&H>40) sideS.holes.push(win(zb+10,9,zf-10,H-(D.v6?7:10),5)); /* 6.0: hogere opening, de geleidearmpjes zwaaien erdoor */
   return {
     topShape:top, bottomShape:rect(-W,zb,W,zf),
     top: merge([plateXZ(top,3)]), bottom: merge([plateXZ(rect(-W,zb,W,zf),3)]),
@@ -1497,7 +1497,7 @@ function shaftItems(){ const it=[]; D.z.forEach(z=>it.push(D.forced?[z-6.8,z-2.3
 function spacerList(){ const it=shaftItems(), zMot=D.zBack+2.4+(D.crank?0:24), zWall=D.zFront-2.4, out=[]; let prev=zMot;
   for(const [a,b] of it){ const g=a-prev; if(g>0.8) out.push({z0:prev+0.2,len:Math.round((g-0.4)*10)/10}); prev=Math.max(prev,b); }
   const g=zWall-prev; if(g>0.8) out.push({z0:prev+0.2,len:Math.round((g-0.4)*10)/10}); return out; }
-function buildSpacer(len){ const pts=[[1.7,0],[SPACER_OD/2,0],[SPACER_OD/2,len],[1.7,len],[1.7,0]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,28); return merge([g]); }
+function buildSpacer(len){ const od=D.v6?5.6:SPACER_OD; /* 6.0: dunner, het geleidearmpje zwaait er vlak langs */ const pts=[[1.7,0],[od/2,0],[od/2,len],[1.7,len],[1.7,0]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,28); return merge([g]); }
 // handzwengel: tandwielkast achter op de sokkel. Assen: nokas (0,yc), eventueel een tussenas, en de zwengelas.
 function gearCenters(){ if(D._gc) return D._gc; const m=D.gm, st=D.gst, W=D.Wh, H=D.Hb, c0={x:0,y:D.yc};
   if(!st.length) return (D._gc=[c0]);
