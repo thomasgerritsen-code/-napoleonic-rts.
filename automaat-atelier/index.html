@@ -178,6 +178,7 @@ ul.hw li{margin:3px 0}
         <div><span>PLA (geprint)</span><strong id="tGram">–</strong></div>
         <div><span>Printbedden</span><strong id="tBeds">–</strong></div>
       </div>
+      <div id="bedList"></div>
       <div class="tablewrap"><table id="partsTable"></table></div>
       <div class="row" style="margin-top:12px"><button class="btn primary" id="exportBtn" type="button">Download STL-bestanden (.zip)</button><button class="btn" id="testBtn" type="button">Proefprintset (.zip)</button><button class="btn" id="stageBtn" type="button" hidden>Etappe A (.zip)</button></div>
       <div id="exportMsg" class="note"></div>
@@ -1698,7 +1699,7 @@ let CODE_GEO=new Map();
 function partOfMesh(m){ if(!m||!m.geometry) return null; return CODE_GEO.get(m.geometry)||null; }
 function tagCodes(t){ const cs=new Set(); asm.traverse(o=>{ if(o.isMesh&&o.userData.tag===t){ const p=partOfMesh(o); if(p&&p.code) cs.add(p.code); } }); return [...cs].sort(); }
 function tagLabelC(t){ const cs=tagCodes(t), l=tagLabel(t); return cs.length&&cs.length<=3?cs.join('/')+' '+l:l; }
-function finalizePart(p){ if(p.printGeo) p.printGeo.dispose(); if(D&&D.v6&&p.kind!=='box') autoOrient(p);
+function finalizePart(p){ if(p.printGeo) p.printGeo.dispose(); if(!p.rot0) p.rot0=p.rot.clone(); const ko=P.orient&&P.orient[p.id]; if(ko!=null&&ORIENTS[ko]){ p.rot=new THREE.Matrix4().multiplyMatrices(ORIENTS[ko](),p.rot0); p.userRot=true; } else if(D&&D.v6&&p.kind!=='box') autoOrient(p); /* stand door de gebruiker gekozen (printbedcontrole) gaat voor */
   const g=p.geo.clone(); g.applyMatrix4(p.rot); g.computeBoundingBox();
   const bb=g.boundingBox; g.translate(-(bb.min.x+bb.max.x)/2,-bb.min.y,-(bb.min.z+bb.max.z)/2); g.computeBoundingBox();
   p.printGeo=g; const s=g.boundingBox.getSize(new THREE.Vector3()); p.size=[s.x,s.z,s.y];
@@ -1918,7 +1919,9 @@ const MAT={
   seg:SEGC.map(c=>new THREE.MeshStandardMaterial({color:new THREE.Color(c),metalness:0.1,roughness:0.55})),
   bad:new THREE.MeshStandardMaterial({color:0xd8402f,metalness:0.1,roughness:0.5,emissive:0x400000}),
   print:new THREE.MeshStandardMaterial({color:0xc9a15f,metalness:0.05,roughness:0.6}),
-  printBad:new THREE.MeshStandardMaterial({color:0xd8402f,metalness:0.1,roughness:0.6})
+  printBad:new THREE.MeshStandardMaterial({color:0xd8402f,metalness:0.1,roughness:0.6}),
+  printWarn:new THREE.MeshStandardMaterial({color:0xe39a2b,metalness:0.05,roughness:0.6}), printOk:new THREE.MeshStandardMaterial({color:0x6fa86a,metalness:0.05,roughness:0.6}),
+  printOv:new THREE.MeshBasicMaterial({color:0xff2a10,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2})
 };
 function applyFinish(){
   const f=FINISH[document.getElementById('finish').value](PRESETS[P.preset]);
@@ -2548,21 +2551,136 @@ function printCheckPart(p){ const g=p.geo; g.computeBoundingBox(); const sz=g.bo
       for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++) for(let dk=-1;dk<=1;dk++){ const l=G.cells.get(((i0+di)*4096+(j0+dj))*4096+(k0+dk)); if(!l) continue; for(const s of l){ if(s===t||seen.has(s)) continue; seen.add(s); const hit=ray.intersectTriangle(new THREE.Vector3(a[s],a[s+1],a[s+2]),new THREE.Vector3(a[s+3],a[s+4],a[s+5]),new THREE.Vector3(a[s+6],a[s+7],a[s+8]),false,q); if(hit){ const d=q.distanceTo(P0); if(d<best){ const bx=q.x+n.x*0.7, by=q.y+n.y*0.7, bz=q.z+n.z*0.7; if(!insidePrint(bx,by,bz)) best=d; } } } }
       if(best<0.42) thin++; } }
   const bs=bedSize(), fits=(sz.x<=bs.x&&sz.z<=bs.y&&sz.y<=bs.z)||(sz.z<=bs.x&&sz.x<=bs.y&&sz.y<=bs.z);
-  return {id:p.id,code:p.code,name:p.name,sz:[sz.x,sz.y,sz.z],base,over,thin:tot?thin/tot*area:0,area,fits}; }
+  const an=analyzePrint(p,p.rot,true), iss=printIssues(an); let alt=null;
+  { const pa=p.printGeo.attributes.position.array, sv=(dx)=>{ let v=0; for(let t=0;t<pa.length;t+=9){ const X=(i)=>pa[i]+dx, Zz=(i)=>pa[i+2]+dx; v+=(X(t)*(pa[t+4]*Zz(t+6)-Zz(t+3)*pa[t+7])-pa[t+1]*(X(t+3)*Zz(t+6)-Zz(t+3)*X(t+6))+Zz(t)*(X(t+3)*pa[t+7]-pa[t+4]*X(t+6)))/6; } return v; }, v0=sv(0), v1=sv(100);
+    if(Math.abs(v1-v0)>Math.max(1,0.02*Math.abs(v0))) iss.push(['warn','een deel van de driehoeken staat verkeerd om (de slicer repareert dat meestal vanzelf)']); } /* dicht en goed gericht: het volume hangt dan niet af van de plek */
+  if(iss.some(x=>x[0]!=='ok')&&p.rot0){ const cur=analyzePrint(p,p.rot,false); for(let k=0;k<ORIENTS.length;k++){ const r=new THREE.Matrix4().multiplyMatrices(ORIENTS[k](),p.rot0); if(r.equals(p.rot)) continue; const c=analyzePrint(p,r,false); if(c.cost<cur.cost*0.6-10&&!printIssues(c).some(x=>x[0]==='bad')&&(!alt||c.cost<alt.c.cost)) alt={k,c,cur}; } }
+  return {id:p.id,code:p.code,name:p.name,sz:[sz.x,sz.y,sz.z],base,over,thin:tot?thin/tot*area:0,area,fits,an,iss,alt,user:!!p.userRot}; }
 // pengaten die in de printstand liggen: die hangen aan de bovenkant iets door, naboren met een boortje van 2 mm
 function horizHoles(){ const out=new Map(); if(!M.hinges) return []; const th0=curTheta; poseAny(0); asm.updateMatrixWorld(true);
   const partOf=(m)=>PARTS.find(p=>p.geo===m.geometry||(p.geo.userData&&p.geo.userData.mirrorSrc===m.geometry));
   for(const h of M.hinges){ if(!h.pinLen) continue; for(const x of h.cl){ const p=partOf(x.m); if(!p) continue; const inv=new THREE.Matrix4().copy(x.m.matrixWorld).invert(), ul=h.u.clone().transformDirection(inv), up=new THREE.Vector3(0,1,0).applyMatrix4(new THREE.Matrix4().extractRotation(p.rot).invert()).normalize(); if(Math.abs(ul.dot(up))<0.5) out.set(p.id,(p.code?p.code+' ':'')+p.name.split(' (')[0]); } }
   poseAny(th0); return [...out.values()]; }
-function runPrintCheck(){ const token=++prcToken; const list=PARTS.filter(p=>p.geo&&p.geo.attributes&&p.geo.attributes.position); PRC={state:'busy',progress:0}; renderPrc(); const res=[]; let k=0;
+document.addEventListener('click',e=>{ const b=e.target.closest('#printList button'); if(!b) return; let o=Object.assign({},P.orient||{});
+  if(b.dataset.orientReset) o={}; else if(b.dataset.orientAll){ for(const r of PRC.res) if(r.alt) o[r.id]=r.alt.k; } else if(b.dataset.orient){ const [id,k]=b.dataset.orient.split(':'); o[id]=+k; } P.orient=o; saveParams(); rebuild(false); });
+function runPrintCheck(){ const token=++prcToken; const list=PARTS.filter(p=>p.geo&&p.geo.attributes&&p.geo.attributes.position); { const th0=curTheta; poseAny(0); asm.updateMatrixWorld(true); for(const p of list){ p._holes=null; partHoles(p); } poseAny(th0); } /* pengaten in stand 0 opzoeken */ PRC={state:'busy',progress:0}; renderPrc(); const res=[]; let k=0;
   const step=()=>{ if(token!==prcToken) return; const t0=performance.now(); while(k<list.length&&performance.now()-t0<60){ try{ res.push(printCheckPart(list[k])); }catch(e){} k++; } PRC.progress=k/list.length; renderPrc(); if(k<list.length) setTimeout(step,0); else { PRC={state:'done',res,hor:horizHoles()}; renderPrc(); } };
   setTimeout(step,0); }
 function renderPrc(){ const el=document.getElementById('printList'); if(!el) return; const nl=(x)=>Math.round(x).toString(); if(PRC.state==='busy'){ el.innerHTML=`<div class="status warn"><b>Bezig</b><span>Printbaarheid nagaan… ${Math.round((PRC.progress||0)*100)}%</span></div>`; return; } if(PRC.state!=='done'){ el.innerHTML=''; return; }
-  const out=[]; for(const r of PRC.res){ const iss=[]; if(!r.fits) iss.push('past niet op het printbed'); if(r.base<8) iss.push(`ligt met maar ${nl(r.base)} mm² plat op het bed (brim of andere stand)`); if(r.over>25) iss.push(`${nl(r.over)} mm² overhang steiler dan 45° (steun nodig)`); if(r.thin>40) iss.push(`${nl(r.thin)} mm² wand dunner dan één printlijn (0,42 mm): die stukjes print de slicer niet`); if(iss.length) out.push({r,iss}); }
-  const hz=(PRC.hor&&PRC.hor.length)?`<div class="status warn"><b>Naboren</b><span>Bij deze onderdelen ligt een pengat in de printstand; de bovenkant hangt iets door. Boor die gaten na met een boortje van 2 mm: ${PRC.hor.join(', ')}.</span></div>`:'';
-  if(!out.length){ el.innerHTML=hz+`<div class="status ok"><b>Printbaar</b><span>Alle ${PRC.res.length} onderdelen passen op het bed, liggen plat, hebben geen grote overhang en geen wanden dunner dan één printlijn.</span></div>`; return; }
-  el.innerHTML=hz+`<div class="status ok"><b>Printbaar</b><span>${PRC.res.length-out.length} van de ${PRC.res.length} onderdelen zonder aandachtspunten.</span></div>`+out.map(({r,iss})=>`<div class="status warn"><b>Let op</b><span>${r.code?r.code+' ':''}${r.name.split(' (')[0]}: ${iss.join('; ')}.</span></div>`).join(''); }
+  const out=[]; let nH=0; const kinds={staand:0,liggend:0,schuin:0}, hor=[];
+  for(const r of PRC.res){ const iss=(r.iss||[]).map(x=>x.slice()); if(!r.fits) iss.unshift(['bad','past niet op het printbed']); if(r.thin>40) iss.push(['warn',`${nl(r.thin)} mm² wand dunner dan één printlijn (0,42 mm): die stukjes print de slicer niet`]);
+    if(r.an){ nH+=r.an.holes.length; for(const h of r.an.holes) kinds[h.kind]++; if(r.an.holes.some(h=>h.kind==='liggend')) hor.push((r.code?r.code+' ':'')+r.name.split(' (')[0]); }
+    if(iss.length||r.alt) out.push({r,iss}); }
+  PRC.lvl=new Map(PRC.res.map(r=>{ const o=out.find(x=>x.r===r); return [r.id,!o||!o.iss.length?'ok':o.iss.some(x=>x[0]==='bad')?'bad':'warn']; }));
+  const hz=hor.length?`<div class="status warn"><b>Naboren</b><span>Liggende pengaten (bovenkant hangt iets door; boor ze na met 2 mm): ${hor.join(', ')}.</span></div>`:'';
+  const gh=`<div class="status ok"><b>Gaten</b><span>${nH} pengaten nagelopen in de printstand: ${kinds.staand} staand, ${kinds.liggend} liggend, ${kinds.schuin} schuin. Daken van liggende gaten en bruggen tot ${PB.bridge} mm tellen niet als overhang.</span></div>`;
+  const alts=out.filter(o=>o.r.alt), nUser=Object.keys(P.orient||{}).length;
+  const top=(alts.length?`<div class="row"><button class="btn" type="button" data-orient-all="1">Alle ${alts.length} betere standen gebruiken</button></div>`:'')+(nUser?`<div class="status ok"><b>Eigen standen</b><span>${nUser} onderdeel${nUser>1?'en liggen':' ligt'} in een stand die je hier gekozen hebt. <button class="btn" type="button" data-orient-reset="1">Terugzetten</button></span></div>`:'');
+  const body=out.map(({r,iss})=>{ const bad=iss.some(x=>x[0]==='bad'), a=r.alt; const alt=a?` <br><b style="font-weight:600">Betere stand:</b> ${orientName(a.k)} (echte overhang ${nl(a.cur.ov)} → ${nl(a.c.ov)} mm², vlak op het bed ${nl(a.cur.base)} → ${nl(a.c.base)} mm²) <button class="btn" type="button" data-orient="${r.id}:${a.k}">Gebruik</button>`:'';
+    return `<div class="status ${bad?'bad':'warn'}"><b>${bad?'Probleem':'Let op'}</b><span>${r.code?r.code+' ':''}${r.name.split(' (')[0]}${r.user?' (eigen stand)':''}: ${iss.length?iss.map(x=>x[1]).join('; '):'in orde, maar het kan beter'}.${alt}</span></div>`; }).join('');
+  const okN=PRC.res.length-out.filter(o=>o.iss.length).length;
+  el.innerHTML=gh+hz+top+`<div class="status ok"><b>Printbaar</b><span>${okN} van de ${PRC.res.length} onderdelen zonder aandachtspunten.</span></div>`+body; renderBedList(); if(viewMode==='bed') buildBedScene(); }
 
+/* Printbedcontrole: per onderdeel in de printstand (gaten, overhang of brug, stabiliteit, betere stand) en per bed (echte voetafdruk, rand, afstand, hoogte) */
+const PB={margin:3,gapMin:3,bridge:10,crumb:4,wallWarn:0.8,wallBad:0.45,tall:3,nS:700};
+function hull2(pts){ pts=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]); if(pts.length<3) return pts; const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]), lo=[], up=[];
+  for(const p of pts){ while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); } for(let i=pts.length-1;i>=0;i--){ const p=pts[i]; while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0) up.pop(); up.push(p); } up.pop(); lo.pop(); return lo.concat(up); }
+function inPoly2(poly,x,y){ let c=false; for(let a=0,b=poly.length-1;a<poly.length;b=a++){ const [xa,ya]=poly[a],[xb,yb]=poly[b]; if((ya>y)!==(yb>y)&&x<(xb-xa)*(y-ya)/(yb-ya)+xa) c=!c; } return c; }
+function segD2(px,py,ax,ay,bx,by){ const dx=bx-ax, dy=by-ay, t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy||1))); return Math.hypot(px-ax-t*dx,py-ay-t*dy); }
+function segX2(a,b,c,d){ const o=(p,q,r)=>Math.sign((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0])); return o(a,b,c)*o(a,b,d)<0&&o(c,d,a)*o(c,d,b)<0; }
+function polyDist2(A,B){ if(A.some(([x,y])=>inPoly2(B,x,y))||B.some(([x,y])=>inPoly2(A,x,y))) return -1; for(let i=0,j=A.length-1;i<A.length;j=i++) for(let k=0,l=B.length-1;k<B.length;l=k++) if(segX2(A[j],A[i],B[l],B[k])) return -1;
+  let d=1e9; for(const [P,Q] of [[A,B],[B,A]]) for(const [x,y] of P) for(let i=0,j=Q.length-1;i<Q.length;j=i++) d=Math.min(d,segD2(x,y,Q[j][0],Q[j][1],Q[i][0],Q[i][1])); return d; }
+function polyArea2(P){ let s=0; for(let i=0,j=P.length-1;i<P.length;j=i++) s+=(P[j][0]+P[i][0])*(P[j][1]-P[i][1]); return Math.abs(s)/2; }
+// pengaten van een onderdeel, in zijn eigen assen (uit de scharnieranalyse, stand 0); linkse spiegeldelen via hun bron
+function partHoles(p){ if(p._holes) return p._holes; const out=[], seen=new Set(); if(!M.hinges) return out; const src=p.geo.userData&&p.geo.userData.mirrorSrc;
+  for(const h of M.hinges){ if(!h.pinLen) continue; for(const x of h.cl){ const g=x.m.geometry, mir=g!==p.geo&&src&&g===src; if(g!==p.geo&&!mir) continue;
+      const inv=new THREE.Matrix4().copy(x.m.matrixWorld).invert(), a=h.P.clone().addScaledVector(h.u,x.lo).applyMatrix4(inv), b=h.P.clone().addScaledVector(h.u,x.hi).applyMatrix4(inv); if(mir){ a.x=-a.x; b.x=-b.x; }
+      const c=a.clone().add(b).multiplyScalar(0.5), k=[c.x,c.y,c.z].map(v=>Math.round(v*2)).join(','); if(seen.has(k)) continue; seen.add(k); const L=a.distanceTo(b); if(L<0.3) continue; out.push({c,u:b.clone().sub(a).normalize(),half:L/2,r:D.rh}); } }
+  p._holes=out; return out; }
+function orientedGeo(p,rot){ const g=p.geo.clone(); g.applyMatrix4(rot); g.computeBoundingBox(); const bb=g.boundingBox, off=new THREE.Vector3(-(bb.min.x+bb.max.x)/2,-bb.min.y,-(bb.min.z+bb.max.z)/2); g.translate(off.x,off.y,off.z); return {g,off}; }
+// alle snijpunten langs een straal; diepte tellen (in/uit) zodat overlappende deelvormen niet als wand tellen
+function triGrid(a,c){ const cells=new Map(); let mn=[1e9,1e9,1e9]; for(let i=0;i<a.length;i+=3) for(let q=0;q<3;q++) mn[q]=Math.min(mn[q],a[i+q]); mn=mn.map(v=>v-c);
+  for(let t=0;t<a.length;t+=9){ const lo=[1e9,1e9,1e9], hi=[-1e9,-1e9,-1e9]; for(let q=0;q<9;q+=3) for(let d=0;d<3;d++){ lo[d]=Math.min(lo[d],a[t+q+d]); hi[d]=Math.max(hi[d],a[t+q+d]); }
+    const i0=Math.floor((lo[0]-mn[0])/c), i1=Math.floor((hi[0]-mn[0])/c), j0=Math.floor((lo[1]-mn[1])/c), j1=Math.floor((hi[1]-mn[1])/c), k0=Math.floor((lo[2]-mn[2])/c), k1=Math.floor((hi[2]-mn[2])/c);
+    for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++) for(let k=k0;k<=k1;k++){ const key=(i*4096+j)*4096+k; let l=cells.get(key); if(!l) cells.set(key,l=[]); l.push(t); } }
+  return {a,c,mn,cells}; }
+const _rA=new THREE.Vector3(), _rB=new THREE.Vector3(), _rC=new THREE.Vector3(), _rP=new THREE.Vector3(), _rN=new THREE.Vector3(), _rE=new THREE.Vector3(), _rF=new THREE.Vector3(), _ray=new THREE.Ray();
+function rayHits(G,sg,o0,dir,far){ const {a,c,mn,cells}=G, seen=new Set(), out=[], o=o0.clone().add(new THREE.Vector3(0.0137,0.0071,-0.0093)); _ray.set(o,dir); /* klein beetje verschoven: niet precies over een ribbe tussen twee driehoeken */ const n=Math.ceil(far/(c/3));
+  for(let s=0;s<=n;s++){ const d=far*s/n, i=Math.floor((o.x+dir.x*d-mn[0])/c), j=Math.floor((o.y+dir.y*d-mn[1])/c), k=Math.floor((o.z+dir.z*d-mn[2])/c), l=cells.get((i*4096+j)*4096+k); if(!l) continue;
+    for(const t of l){ if(seen.has(t)) continue; seen.add(t); _rA.set(a[t],a[t+1],a[t+2]); _rB.set(a[t+3],a[t+4],a[t+5]); _rC.set(a[t+6],a[t+7],a[t+8]); if(!_ray.intersectTriangle(_rA,_rB,_rC,false,_rP)) continue; const dd=_rP.distanceTo(o); if(dd>far) continue;
+      _rE.subVectors(_rB,_rA); _rF.subVectors(_rC,_rA); _rN.crossVectors(_rE,_rF); out.push({d:dd,ent:_rN.dot(dir)*sg<0}); } }
+  out.sort((x,y)=>x.d-y.d); return out.filter((h,i)=>!i||Math.abs(h.d-out[i-1].d)>1e-5||h.ent!==out[i-1].ent); }
+function holeWall(hits,r){ const seg=[]; let dep=0, s0=0; for(const h of hits){ if(h.ent){ if(dep===0) s0=h.d; dep++; } else if(dep>0){ dep--; if(dep===0) seg.push([s0,h.d]); } } /* stukken materiaal; aansluitende stukken (ribbels in het gat) samenvoegen */
+  const m=[]; for(const g of seg){ const l=m[m.length-1]; if(l&&g[0]-l[1]<0.08) l[1]=Math.max(l[1],g[1]); else m.push(g.slice()); } const w=m.find(g=>g[1]>r+0.25); if(!w||w[0]>r+0.6) return null; return w[1]-Math.max(w[0],r); }
+function wallFrom(hits,first){ let dep=0, d1=null; for(const h of hits){ if(h.ent){ if(dep===0&&d1==null) d1=h.d; dep++; } else if(dep>0){ dep--; if(dep===0&&d1!=null) return {d1,d2:h.d}; } } return d1!=null?{d1,d2:null}:null; }
+function analyzePrint(p,rot,full){ const {g,off}=orientedGeo(p,rot), a=g.attributes.position.array, sg=signedVol(a)<0?-1:1, mesh=triGrid(a,3);
+  const R=new THREE.Matrix4().extractRotation(rot), holes=partHoles(p).map(h=>({c:h.c.clone().applyMatrix4(rot).add(off),u:h.u.clone().applyMatrix4(R).normalize(),half:h.half,r:h.r}));
+  g.computeBoundingBox(); const H=g.boundingBox.max.y; let vq=null; const inside=(x,y,z)=>{ if(!vq) vq=voxelize(g); const i=Math.floor((x-vq.mn.x)/VOX), j=Math.floor((y-vq.mn.y)/VOX), k=Math.floor((z-vq.mn.z)/VOX); return i>=0&&j>=0&&k>=0&&i<vq.nx&&j<vq.ny&&k<vq.nz&&!!vq.occ[(i*vq.ny+j)*vq.nz+k]; };
+  let base=0; const bp=[], cand=[]; let candA=0, V=0, cx=0, cy=0, cz=0;
+  for(let t=0;t<a.length;t+=9){ const ux=a[t+3]-a[t],uy=a[t+4]-a[t+1],uz=a[t+5]-a[t+2],wx=a[t+6]-a[t],wy=a[t+7]-a[t+1],wz=a[t+8]-a[t+2]; let nx=uy*wz-uz*wy, ny=uz*wx-ux*wz, nz=ux*wy-uy*wx; const L=Math.hypot(nx,ny,nz); if(L<1e-9) continue; const ar=L/2; ny=ny/L*sg;
+    const v=(a[t]*(a[t+4]*a[t+8]-a[t+5]*a[t+7])-a[t+1]*(a[t+3]*a[t+8]-a[t+5]*a[t+6])+a[t+2]*(a[t+3]*a[t+7]-a[t+4]*a[t+6]))/6*sg; V+=v; cx+=v*(a[t]+a[t+3]+a[t+6])/4; cy+=v*(a[t+1]+a[t+4]+a[t+7])/4; cz+=v*(a[t+2]+a[t+5]+a[t+8])/4;
+    const ymin=Math.min(a[t+1],a[t+4],a[t+7]), ymax=Math.max(a[t+1],a[t+4],a[t+7]);
+    if(ymax<0.05&&ny<-0.9){ base+=ar; bp.push([a[t],a[t+2]],[a[t+3],a[t+5]],[a[t+6],a[t+8]]); } else if(ny<-0.72&&ymax>0.3){ cand.push(t,ar); candA+=ar; } }
+  if(Math.abs(V)>1e-6){ cx/=V; cy/=V; cz/=V; }
+  // overhang: steekproef op oppervlak; per vlakje: dak van een liggend gat, binnenvlak, brug (aan twee kanten gedragen binnen 10 mm) of echte overhang
+  const nC=cand.length/2, S=Math.min(nC,full?2500:PB.nS), w=candA/Math.max(1,S); let ov=0, br=0, roof=0; const ovT=[]; let acc=0, nxt=(nC<=S?0:Math.random()*w), q=0;
+  const dirs=[new THREE.Vector3(1,0,0),new THREE.Vector3(-1,0,0),new THREE.Vector3(0,0,1),new THREE.Vector3(0,0,-1)], o=new THREE.Vector3();
+  for(let i=0;i<cand.length;i+=2){ const t=cand[i], ar=cand[i+1]; let wt; if(nC<=S) wt=ar; else { acc+=ar; if(acc<nxt) continue; nxt+=w; wt=w; } q++;
+    const c=new THREE.Vector3((a[t]+a[t+3]+a[t+6])/3,(a[t+1]+a[t+4]+a[t+7])/3,(a[t+2]+a[t+5]+a[t+8])/3);
+    if(holes.some(h=>{ const d=c.clone().sub(h.c), ax=d.dot(h.u); return Math.abs(ax)<h.half+0.3&&d.addScaledVector(h.u,-ax).length()<h.r+0.45; })){ roof+=wt; continue; }
+    { let dep=0; for(const h of rayHits(mesh,sg,new THREE.Vector3(c.x,-1,c.z),new THREE.Vector3(0,1,0),c.y+0.9)) dep+=h.ent?1:-1; if(dep>0) continue; } /* vlak met materiaal er vlak onder: binnenvlak tussen twee deelvormen */
+    o.set(c.x,c.y-0.2,c.z); const sp=[0,0]; for(let k=0;k<4;k++){ const hh=rayHits(mesh,sg,o,dirs[k],PB.bridge+1).find(h=>h.ent); sp[k>>1]+=hh?hh.d:1e3; }
+    if(Math.min(sp[0],sp[1])<=PB.bridge){ br+=wt; continue; }
+    ov+=wt; if(nC<=S) ovT.push(t); }
+  if(ov<PB.crumb){ ov=0; ovT.length=0; }
+  // stabiliteit
+  const hull=hull2(bp), hA=hull.length>2?polyArea2(hull):0; let minW=1e9; for(let k=0;k<36&&hull.length>2;k++){ const an=k*Math.PI/36, ca=Math.cos(an), sa=Math.sin(an); let lo=1e9, hi=-1e9; for(const [x,z] of hull){ const s=x*ca+z*sa; lo=Math.min(lo,s); hi=Math.max(hi,s); } minW=Math.min(minW,hi-lo); } if(hull.length<3) minW=0;
+  const comIn=hull.length>2&&inPoly2(hull,cx,cz);
+  // gaten
+  const hk=holes.map(h=>{ const up=Math.abs(h.u.y), kind=up>0.9?'staand':up<0.35?'liggend':'schuin', e1=new THREE.Vector3(Math.abs(h.u.x)<0.9?1:0,Math.abs(h.u.x)<0.9?0:1,0).cross(h.u).normalize(), e2=h.u.clone().cross(e1); let wall=1e9;
+    for(const s of [-0.8,0,0.8]){ const pc=h.c.clone().addScaledVector(h.u,s*Math.max(0,h.half-0.4)); for(let k=0;k<8;k++){ const an=k*Math.PI/4+0.2, dir=e1.clone().multiplyScalar(Math.cos(an)).addScaledVector(e2,Math.sin(an)).normalize(), wv=holeWall(rayHits(mesh,sg,pc,dir,20),h.r); if(wv==null) continue; wall=Math.min(wall,wv); } }
+    const yb=Math.min(h.c.y-h.u.y*h.half,h.c.y+h.u.y*h.half); return {kind,wall,onBed:kind==='staand'&&yb<0.25,dia:2*h.r}; });
+  g.dispose();
+  const r={base,ov,br,roof,H,minW,hA,comIn,holes:hk,ovT:full?ovT:null};
+  r.cost=ov+(base<8?400:0)+(!comIn?300:0)+Math.max(0,(minW>0?H/minW:9)-PB.tall)*15+hk.filter(h=>h.kind==='schuin').length*6+hk.filter(h=>h.kind==='liggend'&&h.dia>3).length*10; return r; }
+function printIssues(r){ const nl=(x,d=0)=>x.toFixed(d).replace('.',','), out=[];
+  if(r.base<8) out.push(['bad',`ligt met maar ${nl(r.base)} mm² plat op het bed`]); else if(!r.comIn) out.push(['bad','het zwaartepunt ligt buiten het vlak op het bed: valt om of komt los']);
+  if(r.ov>25) out.push(['warn',`${nl(r.ov)} mm² echte overhang steiler dan 45° (steun nodig)`]);
+  if(r.minW>0&&r.H>12&&r.H/r.minW>PB.tall) out.push(['warn',`hoog en smal (${nl(r.H)} mm hoog op ${nl(r.minW,1)} mm): gebruik een brim van 5 mm`]);
+  const thin=r.holes.filter(h=>h.wall<PB.wallWarn); if(thin.length){ const m=Math.min(...thin.map(h=>h.wall)); out.push([m<PB.wallBad?'bad':'warn',`${thin.length} pengat${thin.length>1?'en':''} met een wand van maar ${nl(m,2)} mm (minder dan 2 printlijnen)`]); }
+  const sl=r.holes.filter(h=>h.kind==='schuin').length; if(sl) out.push(['warn',`${sl} schuin pengat${sl>1?'en':''}: binnenkant wordt trapjes, naboren met 2 mm`]);
+  const bigH=r.holes.filter(h=>h.kind==='liggend'&&h.dia>3).length; if(bigH) out.push(['warn',`${bigH} liggend gat groter dan 3 mm: bovenkant zakt door`]);
+  return out; }
+function orientName(k){ return ['zoals ontworpen','90° om de lengteas gekanteld','90° de andere kant op gekanteld','ondersteboven','op de rechterzijkant','op de linkerzijkant'][k]; }
+// printbedden: echte voetafdruk (omhullende in bovenaanzicht) per onderdeel op zijn plek; rand, onderlinge afstand, hoogte
+function partHull(p){ if(p._hull&&p._hullG===p.printGeo) return p._hull; const a=p.printGeo.attributes.position.array, pts=[]; for(let i=0;i<a.length;i+=3) pts.push([a[i],a[i+2]]); p._hullG=p.printGeo; return p._hull=hull2(pts); }
+function itemPoly(it){ const th=(it.rot?Math.PI/2:0)+(it.diag?Math.PI/4:0), c=Math.cos(th), s=Math.sin(th), cx=it.x+it.w/2, cz=it.y+it.h/2; return partHull(it.p).map(([x,z])=>[cx+x*c+z*s,cz-x*s+z*c]); }
+let BEDCHK=[];
+function checkBeds(){ const bs=bedSize(); BEDCHK=BEDS.map((b,bi)=>{ const polys=b.items.map(itemPoly), iss=[]; b.items.forEach(it=>{ it.bedIss=[]; });
+    b.items.forEach((it,k)=>{ const P=polys[k], lo=[Math.min(...P.map(q=>q[0])),Math.min(...P.map(q=>q[1]))], hi=[Math.max(...P.map(q=>q[0])),Math.max(...P.map(q=>q[1]))];
+      if(lo[0]<PB.margin-0.01||lo[1]<PB.margin-0.01||hi[0]>bs.x-PB.margin+0.01||hi[1]>bs.y-PB.margin+0.01) it.bedIss.push(['bad',`ligt binnen ${PB.margin} mm van de rand of erbuiten`]);
+      if(it.p.size[2]>bs.z) it.bedIss.push(['bad',`is ${Math.round(it.p.size[2])} mm hoog, de printer haalt ${bs.z} mm`]); });
+    for(let i=0;i<polys.length;i++) for(let j=i+1;j<polys.length;j++){ const d=polyDist2(polys[i],polys[j]); if(d<PB.gapMin){ const t=d<0?['bad','overlapt met']:['warn',`ligt ${d.toFixed(1).replace('.',',')} mm van`]; for(const [a,o] of [[i,j],[j,i]]) b.items[a].bedIss.push([t[0],`${t[1]} ${b.items[o].p.code||''} ${b.items[o].p.name.split(' (')[0]}`]); } }
+    for(const it of b.items) for(const x of it.bedIss) iss.push(x);
+    return {n:b.items.length,H:Math.max(...b.items.map(it=>it.p.size[2])),g:b.items.reduce((s,it)=>s+it.p.mi.m,0),bad:iss.filter(x=>x[0]==='bad').length,warn:iss.filter(x=>x[0]==='warn').length}; }); return BEDCHK; }
+function itemLevel(it){ const l=[...(it.bedIss||[]).map(x=>x[0])]; const pl=PRC.lvl&&PRC.lvl.get(it.p.id); if(pl) l.push(pl); if(it.tooBig) l.push('bad'); return l.includes('bad')?'bad':l.includes('warn')?'warn':'ok'; }
+function renderBedList(){ const el=document.getElementById('bedList'); if(!el) return; checkBeds(); const nl=(x)=>Math.round(x).toString();
+  el.innerHTML=BEDCHK.map((r,i)=>{ const b=BEDS[i], lv=b.items.map(itemLevel), nb=lv.filter(x=>x==='bad').length, nw=lv.filter(x=>x==='warn').length, cls=nb?'bad':nw?'warn':'ok';
+    return `<div class="status ${cls}"><b>Bed ${i+1}</b><span>${r.n} onderdelen · tot ${nl(r.H)} mm hoog · ±${nl(r.g)} g${r.bad||r.warn?` · indeling: ${r.bad?r.bad+' fout':''}${r.bad&&r.warn?', ':''}${r.warn?r.warn+' te dicht bij elkaar':''}`:' · indeling in orde'}${nb||nw?` · ${nb?nb+' rood':''}${nb&&nw?', ':''}${nw?nw+' oranje':''} (klik in de bedweergave voor uitleg)`:''}</span></div>`; }).join('')
+    +(PRC.state==='done'?'':'<p class="note">De printbaarheid per onderdeel wordt nog nagelopen; daarna kleuren de onderdelen in de bedweergave groen, oranje of rood.</p>'); }
+function showBedPick(it,px,py){ const lab=document.getElementById('pickLabel'); if(!it){ lab.hidden=true; return; } const r=PRC.res&&PRC.res.find(q=>q.id===it.p.id), iss=[...(r&&r.iss||[]),...(it.bedIss||[])];
+  lab.innerHTML=`<b>${it.p.code||''}</b>${it.p.name}<br>${iss.length?iss.map(x=>(x[0]==='bad'?'✖ ':'⚠ ')+x[1]).join('<br>'):'✔ geen aandachtspunten'}${r&&r.alt?`<br>Betere stand: ${orientName(r.alt.k)} (zie Analyse → Printbaarheid)`:''}`; lab.hidden=false; const w=canvas.clientWidth; lab.style.left=Math.min(Math.max(8,px+12),Math.max(8,w-290))+'px'; lab.style.top=Math.max(8,py+12)+'px'; }
+// 3MF per bed: alle onderdelen al op hun plek (millimeters, z omhoog, zelfde stand als in de STL's)
+function xmlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function bed3mf(b){ const bs=bedSize(), enc=new TextEncoder(), parts=[], build=[]; let id=0;
+  for(const it of b.items){ id++; const th=(it.rot?Math.PI/2:0)+(it.diag?Math.PI/4:0), c=Math.cos(th), s=Math.sin(th), cx=it.x+it.w/2, cz=it.y+it.h/2, a=it.p.printGeo.attributes.position.array, flip=signedVol(a)<0, map=new Map(), vs=[], ts=[];
+    const vi=(i)=>{ const x=cx+a[i]*c+a[i+2]*s, z=cz-a[i]*s+a[i+2]*c, y=a[i+1], X=x, Y=bs.y-z, Z=y, k=X.toFixed(4)+','+Y.toFixed(4)+','+Z.toFixed(4); let n=map.get(k); if(n==null){ n=vs.length; map.set(k,n); vs.push(`<vertex x="${X.toFixed(4)}" y="${Y.toFixed(4)}" z="${Z.toFixed(4)}"/>`); } return n; };
+    for(let t=0;t<a.length;t+=9){ const v1=vi(t), v2=vi(t+3), v3=vi(t+6); if(v1===v2||v2===v3||v1===v3) continue; ts.push(flip?`<triangle v1="${v1}" v2="${v3}" v3="${v2}"/>`:`<triangle v1="${v1}" v2="${v2}" v3="${v3}"/>`); }
+    parts.push(`<object id="${id}" type="model" name="${xmlEsc((it.p.code?it.p.code+' ':'')+it.p.name.split(' (')[0])}"><mesh><vertices>${vs.join('')}</vertices><triangles>${ts.join('')}</triangles></mesh></object>`); build.push(`<item objectid="${id}"/>`); }
+  const model=`<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="nl-NL" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><metadata name="Application">Automaat Atelier</metadata><resources>${parts.join('')}</resources><build>${build.join('')}</build></model>`;
+  return zipBytes([{name:'[Content_Types].xml',data:enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>')},
+    {name:'_rels/.rels',data:enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>')},
+    {name:'3D/3dmodel.model',data:enc.encode(model)}]); }
 /* Printbed */
 let BEDS=[];
 function bedSize(){ const v=document.getElementById('bed').value.split('x').map(Number); return {x:v[0],y:v[1],z:v[2]}; }
@@ -2592,7 +2710,7 @@ function layoutBeds(){
 }
 let gridColor=new THREE.Color('#999'), viewColor=new THREE.Color('#ddd');
 function buildBedScene(){
-  clearGroup(bedGroup); const bs=bedSize(); const beds=layoutBeds();
+  clearGroup(bedGroup); const bs=bedSize(); const beds=layoutBeds(); checkBeds();
   const cols=Math.ceil(Math.sqrt(beds.length));
   beds.forEach((b,bi)=>{
     const ox=(bi%cols)*(bs.x+40), oz=Math.floor(bi/cols)*(bs.y+40);
@@ -2600,7 +2718,8 @@ function buildBedScene(){
     plate.userData.own=true; plate.receiveShadow=true; plate.position.set(ox+bs.x/2,-0.5,oz+bs.y/2); bedGroup.add(plate);
     const grid=new THREE.GridHelper(Math.max(bs.x,bs.y),Math.round(Math.max(bs.x,bs.y)/20),viewColor,viewColor); grid.userData.own=true; grid.position.set(ox+bs.x/2,0.05,oz+bs.y/2); grid.scale.set(bs.x/Math.max(bs.x,bs.y),1,bs.y/Math.max(bs.x,bs.y)); bedGroup.add(grid);
     for(const it of b.items){
-      const m=new THREE.Mesh(it.p.printGeo,it.tooBig?MAT.printBad:MAT.print); m.castShadow=true;
+      const lv=PRC.state==='done'?itemLevel(it):(it.tooBig?'bad':null), m=new THREE.Mesh(it.p.printGeo,lv==='bad'?MAT.printBad:lv==='warn'?MAT.printWarn:lv==='ok'?MAT.printOk:MAT.print); m.castShadow=true; m.userData.item=it;
+      { const r=PRC.res&&PRC.res.find(q=>q.id===it.p.id), ov=r&&r.an&&r.an.ovT; if(ov&&ov.length){ const a=it.p.printGeo.attributes.position.array, f=new Float32Array(ov.length*9); ov.forEach((t,k)=>{ for(let q=0;q<9;q++) f[k*9+q]=a[t+q]; }); const og=new THREE.BufferGeometry(); og.setAttribute('position',new THREE.BufferAttribute(f,3)); const om=new THREE.Mesh(og,MAT.printOv); om.userData.item=it; m.add(om); } } /* echte overhang rood */
       if(it.rot) m.rotation.y=Math.PI/2; if(it.diag) m.rotation.y=(it.rot?Math.PI/2:0)+Math.PI/4;
       m.position.set(ox+it.x+it.w/2,0,oz+it.y+it.h/2); bedGroup.add(m);
     }
@@ -2737,6 +2856,7 @@ function selectPart(p,px,py){ if(SEL){ for(const hb of SEL.helpers) scene.remove
   lab.innerHTML=`<b>${p.code||''}</b>${p.name}${p.qty>1?` (${p.qty}×)`:''}`; lab.hidden=false; const w=canvas.clientWidth; lab.style.left=Math.min(Math.max(8,(px??12)+12),Math.max(8,w-270))+'px'; lab.style.top=Math.max(8,(py??52)+12)+'px'; }
 { let down=null; canvas.addEventListener('pointerdown',e=>{ down=[e.clientX,e.clientY]; });
   canvas.addEventListener('pointerup',e=>{ if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>5) return; const r=canvas.getBoundingClientRect(), v=new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1), rc=new THREE.Raycaster(); rc.setFromCamera(v,camera);
+    if(viewMode==='bed'){ const bm=[]; bedGroup.traverse(o=>{ if(o.isMesh&&o.userData.item) bm.push(o); }); const h=rc.intersectObjects(bm,false)[0]; showBedPick(h?h.object.userData.item:null,e.clientX-r.left,e.clientY-r.top); return; }
     const ms=[]; asm.traverse(o=>{ if(o.isMesh&&o.visible!==false) ms.push(o); }); let hit=null; for(const h of rc.intersectObjects(ms,false)){ let ok=true; for(let q=h.object;q;q=q.parent) if(q.visible===false){ ok=false; break; } if(!ok) continue; const p=partOfMesh(h.object); if(p){ hit=p; break; } }
     selectPart(hit,e.clientX-r.left,e.clientY-r.top); }); }
 document.getElementById('partsTable').addEventListener('click',e=>{ const tr=e.target.closest('tr[data-code]'); if(!tr) return; const p=PARTS.find(q=>q.code===tr.dataset.code); if(p) selectPart(p); });
@@ -2754,7 +2874,7 @@ function renderParts(){
   document.getElementById('partsTable').innerHTML=h+'</tbody>'+(anyDiag?'<tfoot><tr><td colspan="5" class="note" style="white-space:normal">⤢ = past alleen diagonaal op het bed.</td></tr></tfoot>':'');
   document.getElementById('tParts').textContent=count;
   document.getElementById('tGram').textContent=Math.round(grams)+' g';
-  document.getElementById('tBeds').textContent=BEDS.length;
+  document.getElementById('tBeds').textContent=BEDS.length; renderBedList();
   const pins=[]; if(!D.horse) for(let j=0;j<D.n;j++){ const hb=hingeBands(j); pins.push((hb.le-hb.te).toFixed(0)); }
   const hw=D.horse?hHardware():[
     ...(D.crank?[`As 3 mm met vlakke kant (D-profiel) voor de nokas, lengte ${Math.round(D.zFront-gbCoverZ()+2)} mm`,
@@ -2916,7 +3036,9 @@ function stlBinary(g, name){
 }
 const CRC=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
 function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=CRC[(c^u8[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
-function zip(files){
+function zip(files){ return new Blob(zipChunks(files),{type:'application/zip'}); }
+function zipBytes(files){ const ch=zipChunks(files), n=ch.reduce((s,c)=>s+c.length,0), out=new Uint8Array(n); let o=0; for(const c of ch){ out.set(c,o); o+=c.length; } return out; }
+function zipChunks(files){
   const enc=new TextEncoder(), chunks=[], central=[]; let off=0;
   for(const f of files){
     const name=enc.encode(f.name), data=f.data, crc=crc32(data);
@@ -2929,7 +3051,7 @@ function zip(files){
   }
   const csize=central.reduce((s,c)=>s+c.length,0);
   const end=new DataView(new ArrayBuffer(22)); end.setUint32(0,0x06054b50,true); end.setUint16(8,files.length,true); end.setUint16(10,files.length,true); end.setUint32(12,csize,true); end.setUint32(16,off,true);
-  return new Blob([...chunks,...central,new Uint8Array(end.buffer)],{type:'application/zip'});
+  return [...chunks,...central,new Uint8Array(end.buffer)];
 }
 function stlName(p,i){ return `${p.code||String(i+1).padStart(2,'0')}_${p.id}${p.qty>1?'_x'+p.qty:''}.stl`; }
 function readme(){
@@ -2938,6 +3060,7 @@ function readme(){
   L.push(`AUTOMAAT ATELIER — ${PRESETS[P.preset].name}`,'',`Spanwijdte ${P.span} mm, ${D.n} segment(en) per vleugel, totale hoogte ca. ${Math.round(D.yB+20)} mm.`,'');
   L.push('ONDERDELEN (bestand — aantal)');
   [...PARTS].sort((a,b)=>(a.code||'').localeCompare(b.code||'','nl',{numeric:true})).forEach((p)=>L.push(`  ${p.code||''}  ${p.name.split(' (')[0]} — ${p.qty}x  (${p.size.map(v=>v.toFixed(0)).join(' x ')} mm)  [${stlName(p,PARTS.indexOf(p))}]`));
+  if(BEDS.length) L.push('',`Printbedden: in de zip staat per bed een 3MF (printbed_1.3mf t/m printbed_${BEDS.length}.3mf) met alle onderdelen al op hun plek en in de goede stand. Open die in je slicer (Bambu Studio, PrusaSlicer, Cura); de losse STL-bestanden zitten er ook nog in.`);
   { const bs=bedSize(), dg=BEDS.flatMap(b=>b.items).filter(it=>it.diag).map(it=>it.p.name); if(dg.length) L.push('',`LET OP: leg ${[...new Set(dg)].join(', ')} diagonaal op het bed (${bs.x} × ${bs.y} mm); recht past het niet.`); }
   L.push('','PRINTEN','  - Alle bestanden liggen al in de juiste stand: vlakke kant op het bed, bolle kant omhoog. Geen support nodig.','  - PLA, 0,2 mm laaghoogte (0,12 mm voor mooiere rondingen), 3 wanden, 15-20% vulling.','  - Scharniergaten en stanggaten zijn 2,0 mm: precies ruimte voor een pen van 1,75 mm filament.','');
   L.push('MONTAGE');
@@ -3061,6 +3184,7 @@ async function doTestExport(){ runPins(); const msg=document.getElementById('exp
 async function doExport(){ runPins();
   const msg=document.getElementById('exportMsg'); msg.textContent='Bestanden worden gemaakt…';
   const files=PARTS.map((p,i)=>({name:stlName(p,i), data:stlBinary(p.printGeo,p.name)}));
+  layoutBeds(); BEDS.forEach((b,i)=>files.push({name:`printbed_${i+1}.3mf`,data:bed3mf(b)}));
   files.push({name:'LEESMIJ.txt',data:new TextEncoder().encode(readme())});
   const blob=zip(files), fname=`automaat-${P.preset}-${P.span||P.len}mm.zip`;
   let dl=null; try{ if(window.claude&&window.claude.use) dl=await window.claude.use('downloads'); }catch(e){ dl=null; }
@@ -3069,7 +3193,7 @@ async function doExport(){ runPins();
     catch(err){ const c=err&&err.code; msg.textContent= c==='declined'?'Downloaden geannuleerd.': c==='rate_limited'?'Er staat al een downloadvenster open. Probeer het zo opnieuw.':'Downloaden lukt hier niet. Open de pagina in de browser om de bestanden op te slaan.'; }
   } else {
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-    msg.textContent=`Download gestart: ${fname} (${files.length-1} STL-bestanden + LEESMIJ).`;
+    msg.textContent=`Download gestart: ${fname} (${PARTS.length} STL-bestanden, ${BEDS.length} printbedden als 3MF + LEESMIJ).`;
   }
 }
 
@@ -3759,7 +3883,7 @@ resize(); applyTheme();
 { const ld=document.getElementById('pickLabel'); ld.textContent='Model wordt opgebouwd…'; ld.style.left='12px'; ld.style.top='52px'; ld.hidden=false; requestAnimationFrame(()=>setTimeout(()=>{ rebuild(true); updateHud(); if(ld.textContent==='Model wordt opgebouwd…') ld.hidden=true; },0)); } /* eerst de pagina tekenen, dan het model opbouwen */
 setInterval(updateHud,1000);
 requestAnimationFrame(loop);
-window.__AA={codes:()=>PARTS.map(p=>p.code+' '+p.id),sel:(c,x,y)=>selectPart(PARTS.find(p=>p.code===c),x,y),mot:()=>MOT,runMot:()=>runMotionCheck(),stage:()=>stageParts().map(({p,qty})=>p.id+'×'+qty),stageReadme:()=>stageReadme(),prc:()=>PRC,runPrc:()=>runPrintCheck(),clr:()=>CLR,runClr:()=>runClearance(),hg:(i)=>hangers(i),hgeo:(h)=>hangerGeo(h),allowed:(a,b)=>allowedPair(a,b),pose:(th)=>{ poseAny(th); asm.updateMatrixWorld(true); },lap:(j)=>lapGeo(tileLayout().bands[j]),tiles:{lay:()=>tileLayout(),mat:(s,T,b)=>tileMat(s,T,b),top:(s,z)=>tileTop(s,z)},vox:(g)=>voxelize(g),h1:(k)=>{ poseAny(0); asm.updateMatrixWorld(true); const h=hingeOne(M.pinList[k],hingeMeshes()); return JSON.stringify({dbg:h.dbg,P:h.P,u:h.u,ref:h.ref&&h.ref.tag,cl:h.cl.map(x=>x.tag)}); },exp:(o)=>{ if('ub' in o) UB_FORCE=o.ub; if('perp' in o) TLK_PERP=o.perp; if('xo' in o) TLK_XO=o.xo; if('sa' in o) TLK_SA=o.sa; rebuild(true); },dbg:(k)=>{ poseAny(0); asm.updateMatrixWorld(true); const pin=M.pinList[k], ms=hingeMeshes(), P0=new THREE.Vector3().setFromMatrixPosition(pin.matrixWorld), u0=new THREE.Vector3(0,1,0).transformDirection(pin.matrixWorld).normalize(); const m1=hingeMembers(P0,u0,ms,D.rh+1.6,8); const r=m1[0]; if(!r) return 'none'; const u=r.axis.clone(), P=r.cen.clone(); const d=P.clone().sub(P0); P.addScaledVector(u,-d.dot(u)); const m2=hingeMembers(P,u,ms,D.rh+0.35,11,D.rh-0.2); return JSON.stringify({m1:m1.map(x=>x.tag+x.cnt),P0,P,u0,u,cen:r.cen,m2:m2.map(x=>x.tag)}); },hm:(...a)=>hingeMembers(...a),hmesh:()=>hingeMeshes(),eig:(C)=>eigMin3(C),tlk:(a,b)=>{TLK_SA=a;TLK_SH=b;},hinges:()=>hingeAnalysis().map(h=>({par:h.pin.parent.userData.tag||'?',ref:h.ref?h.ref.tag:'-',len:+(h.hi-h.lo).toFixed(1),len0:h.pin.userData.len0,bodies:h.bodies,cl:h.cl.map(x=>x.tag+(x.straight?'':'~')+'['+x.lo.toFixed(1)+','+x.hi.toFixed(1)+']').join(' '),gaps:h.gaps.map(g=>g.tag+':'+g.gap.toFixed(1)).join(' '),skew:h.skew.map(g=>g.tag+':'+g.ang.toFixed(0)).join(' '),blocked:h.blocked.map(b=>b.tag+'@'+b.at.toFixed(1)+(b.off?'r':'c')).join(' '),kier:(h.kier||[]).map(k=>k.a+'|'+k.b+':'+k.gap.toFixed(1)).join(' '),over:(h.over||[]).map(k=>k.a+'|'+k.b+':'+k.ov.toFixed(1)).join(' ')})).filter(x=>x),tipdz:(a,b)=>{TIPDZ=[a,b];},pinStacks:()=>pinStacks().map(p=>({par:p.pin.parent.userData.tag||'?',n:p.iv.length,tags:p.iv.map(x=>x.tag+'['+x.lo.toFixed(1)+','+x.hi.toFixed(1)+']').join(' '),gaps:p.gaps.map(g=>g.a+'|'+g.b+':'+g.gap.toFixed(1))})),arm:()=>armSetup(),camLoc:(i)=>camPitchArm(i),get M(){return M;},testParts:()=>testParts(),toWorld:(...a)=>toWorld(...a),fcorr:(a,b)=>featherCorr(a,b),tw3:{chain:(...a)=>tw3Chain(...a),clear:(...a)=>tw3Clear(...a),lay:()=>skinLayout(),pts:(a,b)=>skinPoints(a,b),phi:(...a)=>skinPhi(...a),strain:(a,b)=>skinStrain(a,b),corr:(a,b)=>featherCorr(a,b)},solve:(t,p)=>solve(t,p),wingPoses:(N)=>{ const o=[]; let pv=null; for(let k=0;k<N;k++){ const s=solve(k/N*2*Math.PI,pv); pv=s.a; o.push({J:s.J.map(j=>[j.x,j.y]),a:s.a.slice(0,D.n),B:s.B.map(b=>[b.x,b.y])}); } return {poses:o,L:D.L.slice(),zRod:D.zRod.slice(),att:D.att.slice(),leAtt:D.tAtt.map(t=>D.plan(t).le),teAtt:D.tAtt.map(t=>D.plan(t).te),hTab:D.hTab,l:D.l,n:D.n,t:D.t,Sw:D.Sw,w0:D.w0,zq:Array.from({length:D.n+1},(_,i)=>{ const pf=D.plan(Math.min(1,(i+0.5)*D.l/D.Sw)); return pf.le-0.25*(pf.le-pf.te); })}; },mbk:(a,b)=>{MB_K=a;MV_K=b;},twk:(v)=>{TWK=v;},kin:()=>{const o=[];let p=null;for(let k=0;k<72;k+=6){p=hKin(k/72*2*Math.PI,p);o.push([p.h,p.phi/DEG,p.rho/DEG].map(v=>+v.toFixed(2)));}return o;},hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
+window.__AA={pb:{hangers,hangerGeo,fusedH,analyzePrint,partHoles,orientedGeo,triGrid,rayHits,wallFrom},codes:()=>PARTS.map(p=>p.code+' '+p.id),sel:(c,x,y)=>selectPart(PARTS.find(p=>p.code===c),x,y),mot:()=>MOT,runMot:()=>runMotionCheck(),stage:()=>stageParts().map(({p,qty})=>p.id+'×'+qty),stageReadme:()=>stageReadme(),prc:()=>PRC,runPrc:()=>runPrintCheck(),clr:()=>CLR,runClr:()=>runClearance(),hg:(i)=>hangers(i),hgeo:(h)=>hangerGeo(h),allowed:(a,b)=>allowedPair(a,b),pose:(th)=>{ poseAny(th); asm.updateMatrixWorld(true); },lap:(j)=>lapGeo(tileLayout().bands[j]),tiles:{lay:()=>tileLayout(),mat:(s,T,b)=>tileMat(s,T,b),top:(s,z)=>tileTop(s,z)},vox:(g)=>voxelize(g),h1:(k)=>{ poseAny(0); asm.updateMatrixWorld(true); const h=hingeOne(M.pinList[k],hingeMeshes()); return JSON.stringify({dbg:h.dbg,P:h.P,u:h.u,ref:h.ref&&h.ref.tag,cl:h.cl.map(x=>x.tag)}); },exp:(o)=>{ if('ub' in o) UB_FORCE=o.ub; if('perp' in o) TLK_PERP=o.perp; if('xo' in o) TLK_XO=o.xo; if('sa' in o) TLK_SA=o.sa; rebuild(true); },dbg:(k)=>{ poseAny(0); asm.updateMatrixWorld(true); const pin=M.pinList[k], ms=hingeMeshes(), P0=new THREE.Vector3().setFromMatrixPosition(pin.matrixWorld), u0=new THREE.Vector3(0,1,0).transformDirection(pin.matrixWorld).normalize(); const m1=hingeMembers(P0,u0,ms,D.rh+1.6,8); const r=m1[0]; if(!r) return 'none'; const u=r.axis.clone(), P=r.cen.clone(); const d=P.clone().sub(P0); P.addScaledVector(u,-d.dot(u)); const m2=hingeMembers(P,u,ms,D.rh+0.35,11,D.rh-0.2); return JSON.stringify({m1:m1.map(x=>x.tag+x.cnt),P0,P,u0,u,cen:r.cen,m2:m2.map(x=>x.tag)}); },hm:(...a)=>hingeMembers(...a),hmesh:()=>hingeMeshes(),eig:(C)=>eigMin3(C),tlk:(a,b)=>{TLK_SA=a;TLK_SH=b;},hinges:()=>hingeAnalysis().map(h=>({par:h.pin.parent.userData.tag||'?',ref:h.ref?h.ref.tag:'-',len:+(h.hi-h.lo).toFixed(1),len0:h.pin.userData.len0,bodies:h.bodies,cl:h.cl.map(x=>x.tag+(x.straight?'':'~')+'['+x.lo.toFixed(1)+','+x.hi.toFixed(1)+']').join(' '),gaps:h.gaps.map(g=>g.tag+':'+g.gap.toFixed(1)).join(' '),skew:h.skew.map(g=>g.tag+':'+g.ang.toFixed(0)).join(' '),blocked:h.blocked.map(b=>b.tag+'@'+b.at.toFixed(1)+(b.off?'r':'c')).join(' '),kier:(h.kier||[]).map(k=>k.a+'|'+k.b+':'+k.gap.toFixed(1)).join(' '),over:(h.over||[]).map(k=>k.a+'|'+k.b+':'+k.ov.toFixed(1)).join(' ')})).filter(x=>x),tipdz:(a,b)=>{TIPDZ=[a,b];},pinStacks:()=>pinStacks().map(p=>({par:p.pin.parent.userData.tag||'?',n:p.iv.length,tags:p.iv.map(x=>x.tag+'['+x.lo.toFixed(1)+','+x.hi.toFixed(1)+']').join(' '),gaps:p.gaps.map(g=>g.a+'|'+g.b+':'+g.gap.toFixed(1))})),arm:()=>armSetup(),camLoc:(i)=>camPitchArm(i),get M(){return M;},testParts:()=>testParts(),toWorld:(...a)=>toWorld(...a),fcorr:(a,b)=>featherCorr(a,b),tw3:{chain:(...a)=>tw3Chain(...a),clear:(...a)=>tw3Clear(...a),lay:()=>skinLayout(),pts:(a,b)=>skinPoints(a,b),phi:(...a)=>skinPhi(...a),strain:(a,b)=>skinStrain(a,b),corr:(a,b)=>featherCorr(a,b)},solve:(t,p)=>solve(t,p),wingPoses:(N)=>{ const o=[]; let pv=null; for(let k=0;k<N;k++){ const s=solve(k/N*2*Math.PI,pv); pv=s.a; o.push({J:s.J.map(j=>[j.x,j.y]),a:s.a.slice(0,D.n),B:s.B.map(b=>[b.x,b.y])}); } return {poses:o,L:D.L.slice(),zRod:D.zRod.slice(),att:D.att.slice(),leAtt:D.tAtt.map(t=>D.plan(t).le),teAtt:D.tAtt.map(t=>D.plan(t).te),hTab:D.hTab,l:D.l,n:D.n,t:D.t,Sw:D.Sw,w0:D.w0,zq:Array.from({length:D.n+1},(_,i)=>{ const pf=D.plan(Math.min(1,(i+0.5)*D.l/D.Sw)); return pf.le-0.25*(pf.le-pf.te); })}; },mbk:(a,b)=>{MB_K=a;MV_K=b;},twk:(v)=>{TWK=v;},kin:()=>{const o=[];let p=null;for(let k=0;k<72;k+=6){p=hKin(k/72*2*Math.PI,p);o.push([p.h,p.phi/DEG,p.rho/DEG].map(v=>+v.toFixed(2)));}return o;},hset:(a,b,c,d,e)=>{HW_ST=a;HWIN=b;if(c)HSW=c;if(d)HDF=d;if(e)DUTY_T=e;},setSkewDir:(v)=>{SKEW_DIR=v;}, cam:(px,py,pz,tx,ty,tz)=>{ camera.position.set(px,py,pz); controls.target.set(tx,ty,tz); controls.update(); }, setTheta:(d)=>{ curTheta=d*DEG; setPlaying(false); }, get M(){return M}, get P(){return P}, get D(){return D}, get AN(){return AN}, get PARTS(){return PARTS}, rebuild, camProfile, setP:(o)=>{Object.assign(P,o);syncControls();rebuild(true);}, readme};
 })();
 </script>
 
