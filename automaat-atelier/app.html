@@ -2554,6 +2554,7 @@ function printCheckPart(p){ const g=p.geo; g.computeBoundingBox(); const sz=g.bo
       if(best<0.42) thin++; } }
   const bs=bedSize(), fits=(sz.x<=bs.x&&sz.z<=bs.y&&sz.y<=bs.z)||(sz.z<=bs.x&&sz.x<=bs.y&&sz.y<=bs.z);
   const an=analyzePrint(p,p.rot,true), iss=printIssues(an); let alt=null;
+  if(WITH_SUPPORT.test(p.id)&&iss.some(x=>x[0]==='bad'||/overhang|zwaartepunt|hoog en smal/.test(x[1]))){ const keep=iss.filter(x=>!(x[0]==='bad'||/overhang|zwaartepunt|hoog en smal/.test(x[1]))); iss.length=0; iss.push(['warn','print met boomsteun (zo ontworpen: geen stand ligt vanzelf plat)'],...keep); }
   if(badWinding(p.printGeo)) iss.push(['warn','een deel van de driehoeken staat verkeerd om (de slicer repareert dat meestal vanzelf)']);
   if(iss.some(x=>x[0]!=='ok')&&p.rot0){ const cur=analyzePrint(p,p.rot,false); for(let k=0;k<ORIENTS.length;k++){ const r=new THREE.Matrix4().multiplyMatrices(ORIENTS[k](),p.rot0); if(r.equals(p.rot)) continue; const c=analyzePrint(p,r,false); if(c.cost<cur.cost*0.6-10&&!printIssues(c).some(x=>x[0]==='bad')&&(!alt||c.cost<alt.c.cost)) alt={k,c,cur}; } }
   return {id:p.id,code:p.code,name:p.name,sz:[sz.x,sz.y,sz.z],base,over,thin:tot?thin/tot*area:0,area,fits,an,iss,alt,user:!!p.userRot}; }
@@ -2671,6 +2672,7 @@ function analyzePrint(p,rot,full){ const {g,off}=orientedGeo(p,rot), a=g.attribu
   g.dispose();
   const r={base,ov,br,roof,H,minW,hA,comIn,holes:hk,ovT:full?ovT:null};
   r.cost=ov+(base<8?400:0)+(!comIn?300:0)+Math.max(0,(minW>0?H/minW:9)-PB.tall)*15+hk.filter(h=>h.kind==='schuin').length*6+hk.filter(h=>h.kind==='liggend'&&h.dia>3).length*10; return r; }
+const WITH_SUPPORT=/^(vinpunt|los_ark\d)$/; /* onderdelen die bewust met steun geprint worden */
 function printIssues(r){ const nl=(x,d=0)=>x.toFixed(d).replace('.',','), out=[];
   if(r.base<8&&r.base>=4&&r.H<8) out.push(['warn',`klein onderdeel met maar ${nl(r.base)} mm² op het bed: gebruik een brim`]); else if(r.base<8) out.push(['bad',`ligt met maar ${nl(r.base)} mm² plat op het bed`]); else if(!r.comIn) out.push(['bad','het zwaartepunt ligt buiten het vlak op het bed: valt om of komt los']);
   if(r.ov>25) out.push(['warn',`${nl(r.ov)} mm² echte overhang steiler dan 45° (steun nodig)`]);
@@ -3088,6 +3090,7 @@ function readme(){
   L.push(`AUTOMAAT ATELIER — ${PRESETS[P.preset].name}`,'',`Spanwijdte ${P.span} mm, ${D.n} segment(en) per vleugel, totale hoogte ca. ${Math.round(D.yB+20)} mm.`,'');
   L.push('ONDERDELEN (bestand — aantal)');
   [...PARTS].sort((a,b)=>(a.code||'').localeCompare(b.code||'','nl',{numeric:true})).forEach((p)=>L.push(`  ${p.code||''}  ${p.name.split(' (')[0]} — ${p.qty}x  (${p.size.map(v=>v.toFixed(0)).join(' x ')} mm)  [${stlName(p,PARTS.indexOf(p))}]`));
+  { const ws=PARTS.filter(p=>WITH_SUPPORT.test(p.id)).map(p=>(p.code?p.code+' ':'')+p.name.split(' (')[0]); if(ws.length) L.push('',`Met steun printen (boomsteun/tree support, alleen waar nodig): ${ws.join(', ')}. Deze onderdelen hebben geen stand waarin ze vanzelf plat en stabiel liggen.`); }
   if(BEDS.length) L.push('',`Printbedden: in de zip staat per bed een 3MF (printbed_1.3mf t/m printbed_${BEDS.length}.3mf) met alle onderdelen al op hun plek en in de goede stand. Open die in je slicer (Bambu Studio, PrusaSlicer, Cura); de losse STL-bestanden zitten er ook nog in.`);
   { const bs=bedSize(), dg=BEDS.flatMap(b=>b.items).filter(it=>it.diag).map(it=>it.p.name); if(dg.length) L.push('',`LET OP: leg ${[...new Set(dg)].join(', ')} diagonaal op het bed (${bs.x} × ${bs.y} mm); recht past het niet.`); }
   L.push('','PRINTEN','  - Alle bestanden liggen al in de juiste stand: vlakke kant op het bed, bolle kant omhoog. Geen support nodig.','  - PLA, 0,2 mm laaghoogte (0,12 mm voor mooiere rondingen), 3 wanden, 15-20% vulling.','  - Scharniergaten en stanggaten zijn 2,0 mm: precies ruimte voor een pen van 1,75 mm filament.','');
