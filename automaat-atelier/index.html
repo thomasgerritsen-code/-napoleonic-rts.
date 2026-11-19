@@ -353,7 +353,8 @@ const CONTROLS = [
 
 const STORE='automaat-atelier-v14';
 /* alleen Manta 6.0 in de app; de andere modellen blijven in de code (zichtbaar met #alle achter de adresregel) */
-const VISIBLE_PRESETS=['manta60'], SHOW_ALL=/alle/.test(location.hash||'');
+PRESETS.manta61=Object.assign({},PRESETS.manta60,{name:'Manta 6.1 (TPU)',tpu:true}); /* 6.0 met TPU-buigkoppelingen i.p.v. kruisstukjes */
+const VISIBLE_PRESETS=['manta60','manta61'], SHOW_ALL=/alle/.test(location.hash||'');
 let P = loadParams() || Object.assign({preset:'manta60'}, PRESETS.manta60.def);
 if(!SHOW_ALL&&!VISIBLE_PRESETS.includes(P.preset)) P=Object.assign({preset:'manta60'},PRESETS.manta60.def);
 if(P.preset==='manta60'&&!P.m60v2){ if(P.e===6.5) P.e=5.3; if(P.rpm===16) P.rpm=19; P.m60v2=1; } /* eenmalig: nieuwe standaard voor slag en snelheid, behalve als je ze zelf had aangepast */
@@ -386,7 +387,7 @@ function derive(alt){
   d.leverOn=(P.lever||1)>1.01; d.kLev=P.lever||1; d.d0=10; d.aLi=[]; for(let i=0;i<(P.n|0);i++) d.aLi[i]=d.kLev*(1+(P.grow||0)/100*i)*d.d0; d.aL=Math.max(...d.aLi);
   d.armDrive=!!pre.armDrive&&(P.lever||1)>1.01; d.gap=d.leverOn?(d.forced?14:12):(d.forced?11:9); d.oRk=3.8; d.oRod=d.leverOn?6.5:3.8; d.oTab=d.leverOn?9.6:7.1;
   if(d.armDrive){ d.Lk=14; d.La=32; d.rr=P.forced?0:3.5; d.zLk=8.8; d.gap+=3; }
-  d.v6=d.armDrive&&!!pre.v6; if(d.v6){ d.aLi=d.aLi.map(a=>Math.max(a,d.d0+7.8)); d.aL=Math.max(...d.aLi); d.gap=V6.pitch; /* stang en volgerstangetje liggen in dezelfde laag: minstens 7,8 mm uit elkaar op de tuimelaar */ d.oRk=d.oRod=V6.zM; d.zLk=V6.zM; d.oTab=V6.zM+3.1; } // Manta 6.0: lagen nok / A / M / B, alle staven in M // 3 mm extra tussen de segmenten: ruimte voor de vorkkappen naast de geleidearmpjes
+  d.v6=d.armDrive&&!!pre.v6; d.tpu=d.v6&&d.tiles&&!!pre.tpu; if(d.v6){ d.aLi=d.aLi.map(a=>Math.max(a,d.d0+7.8)); d.aL=Math.max(...d.aLi); d.gap=V6.pitch; /* stang en volgerstangetje liggen in dezelfde laag: minstens 7,8 mm uit elkaar op de tuimelaar */ d.oRk=d.oRod=V6.zM; d.zLk=V6.zM; d.oTab=V6.zM+3.1; } // Manta 6.0: lagen nok / A / M / B, alle staven in M // 3 mm extra tussen de segmenten: ruimte voor de vorkkappen naast de geleidearmpjes
   d.w0=Math.max(6,P.span*(P.w0f||pre.w0Frac));
   d.Sw=P.span/2-d.w0;
   d.tipOn=P.tip>0&&!d.twist3; d.kTip=clamp(P.tip/100,0.3,1); d.tip3=!!(pre.tiles&&pre.twist3&&P.tip>0&&(P.n|0)>=2); d.tf=d.tipOn?0.24:d.tip3?0.16:0;
@@ -903,14 +904,34 @@ function profX(pts,u0,u1,holeR){ const sh=shapeFrom(dedupe(pts)); if(holeR) sh.h
 const circPts=(zc,yc,r,n=28,cut=-1e9)=>{ const o=[]; for(let k=0;k<n;k++){ const a=2*Math.PI*k/n; o.push([zc+r*Math.cos(a),Math.max(cut,yc+r*Math.sin(a))]); } return o; };
 const rectPts=(z0,z1,y0,y1)=>[[z0,y0],[z1,y0],[z1,y1],[z0,y1]];
 // lagerbus voor de spil van het kruisstuk (onderkant vlak op -t/2, zodat het skelet zonder steun print)
+// TPU-variant (6.0): buigkoppeling i.p.v. kruisstuk. Assen in het assenstelsel van het volgende segment (draaipunt x=0, z=zA):
+// stekker (in de koker aan het eind van het vorige segment, met een pen vast) – buigstrook 1 × 5 mm rond het draaipunt – D-spil in de lagerbus (borgclip in het groefje)
+const FLEX={h:1.0,w:5.0,a:-2.6,b:2.4,pA:-10.6,pinX:-6.8,k0:-11,k1:-3,slotZ:2.4,slotY:1.1,plugZ:2.3,plugY:1.0,rS:1.3,fS:-1.0,rB:1.45,fB:-1.15,lim:8};
+function flexD(r,yf,n=28){ const a0=Math.asin(yf/r), o=[]; for(let k=0;k<=n;k++){ const a=a0+(Math.PI-2*a0)*k/n; o.push([D.zA3+r*Math.cos(a),r*Math.sin(a)]); } return o; } // cirkel om de as met een vlak onderaan (y = yf)
+function dPath(r,yf){ const q=flexD(r,yf); q.push(q[0]); return new THREE.Path(q.map(([x,y])=>new THREE.Vector2(x,y))); }
+function prismX(sh,u0,u1){ const g=plateYZ(sh,u1-u0); g.translate((u0+u1)/2,0,0); return g; }
+function sleeveGeoD(){ const sh=shapeFrom(dedupe(circPts(D.zA3,0,2.4,28,-D.t/2).map(([z,y])=>[z,Math.min(D.t/2,y)]))); sh.holes.push(dPath(FLEX.rB,FLEX.fB)); return prismX(sh,3.3,7.3); } // lagerbus met een vlak: de spil kan niet draaien, het wringen zit in de strook
+// koker aan het eind van een segment (x1 = eind, assenstelsel van dat segment): sleuf voor de stekker, pengat (y) door boven- en onderwand
+function socketGeo(x1,zh){ const t=D.t, zA=D.zA3, x0=x1-(FLEX.k1-FLEX.k0), xp=x1-(FLEX.k1-FLEX.pinX), out=[], wy=t/2-FLEX.slotY;
+  for(const sg of [-1,1]){ const b=new THREE.BoxGeometry(x1-x0,t,zh-FLEX.slotZ); b.translate((x0+x1)/2,0,zA+sg*(FLEX.slotZ+zh)/2); out.push(b);
+    const sh=shapeFrom([[x0,zA-FLEX.slotZ],[x1,zA-FLEX.slotZ],[x1,zA+FLEX.slotZ],[x0,zA+FLEX.slotZ]]); sh.holes.push(circlePath(xp,zA,D.rh)); const w=plateXZ(sh,wy); w.translate(0,sg*(FLEX.slotY+wy/2),0); out.push(w); }
+  return out; }
+// de koppeling zelf (TPU), in twee helften voor het tekenen: A hangt aan het vorige segment, B aan het volgende
+function buildFlexHalves(){ const zA=D.zA3, F=FLEX, A=[], B=[];
+  { const sh=shapeFrom([[F.pA,zA-F.plugZ],[F.a,zA-F.plugZ],[F.a,zA+F.plugZ],[F.pA,zA+F.plugZ]]); sh.holes.push(circlePath(F.pinX,zA,D.rh-0.05)); const g=plateXZ(sh,2*F.plugY); A.push(g); } /* stekker; gat iets nauwer: de pen klemt in het TPU */
+  const strip=(x0,x1)=>{ const b=new THREE.BoxGeometry(x1-x0,F.h,F.w); b.translate((x0+x1)/2,0,zA); return b; }; A.push(strip(F.a,0)); B.push(strip(0,F.b));
+  const sp=(r,x0,x1)=>prismX(shapeFrom(dedupe(flexD(r,F.fS))),x0,x1); B.push(sp(F.rS,F.b-0.05,2.5)); B.push(prismX(shapeFrom(circPts(zA,0,1.0,24)),2.45,3.35)); B.push(sp(F.rS,3.3,7.2)); /* groefje 2,5–3,3 voor de borgclip */
+  const a=merge(A), b=merge(B); a.translate(D.l,0,0); return {a,b}; }
+function flexFull(h){ const a=h.a.clone(); a.translate(-D.l,0,0); return merge([a,h.b.clone()]); }
 function sleeveGeo(){ return profX(circPts(D.zA3,0,2.4,28,-D.t/2).map(([z,y])=>[z,Math.min(D.t/2,y)]),3.3,7.3,1.45); }
 function buildSkeleton(i){ const l=D.l, zA=D.zA3, t=D.t, items=[], last=i===D.n-1&&!D.tip3, armNext=i<D.n-1, box=(u0,u1,y0,y1,z0,z1)=>{ const b=new THREE.BoxGeometry(u1-u0,y1-y0,z1-z0); b.translate((u0+u1)/2,(y0+y1)/2,(z0+z1)/2); items.push(b); };
-  items.push(sleeveGeo());
-  const uEnd=last?l-3:l-6.4, a=D.att[i];
+  items.push(D.tpu?sleeveGeoD():sleeveGeo());
+  const uEnd=last?l-3:D.tpu?l+FLEX.k0:l-6.4, a=D.att[i];
   if(D.tiles){ // ligger: buis rond een staafje van 2 mm; zadel en vork met doorgang voor het staafje
-    const rh2=1.05, sE=last?a+6.5:Math.min(a+6.5,l-4.2); /* zadel stopt voor het kruisstuk van het gewricht */ items.push(profX(circPts(zA,0,t/2),7.3,a-6.5,rh2)); items.push(profX(rectPts(zA-6,zA+6,-t/2,t/2),a-6.5,sE,rh2));
+    const rh2=1.05, sE=last?a+6.5:Math.min(a+6.5,D.tpu?l+FLEX.k0:l-4.2); /* zadel stopt voor het kruisstuk van het gewricht */ items.push(profX(circPts(zA,0,t/2),7.3,a-6.5,rh2)); items.push(profX(rectPts(zA-6,zA+6,-t/2,t/2),a-6.5,sE,rh2));
     if(uEnd>sE) items.push(profX(circPts(zA,0,t/2),sE,uEnd,rh2));
-    if(!last){ items.push(profX(rectPts(zA-7.5,zA+7.5,-t/2,t/2),l-6.4,l-4.2,rh2));
+    if(!last&&D.tpu) items.push(...socketGeo(l+FLEX.k1,6)); /* TPU: koker voor de buigkoppeling, even breed als het zadel */
+    else if(!last){ items.push(profX(rectPts(zA-7.5,zA+7.5,-t/2,t/2),l-6.4,l-4.2,rh2));
       for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ items.push(tubeZ(D.rh,t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); items.push(br); } }
     for(const h of hangers(i)) if(h.host==='skel'&&fusedH(h)) items.push(hangerGeo(h));
     if(D.tip3&&i===D.n-1) items.push(buildTipPost());
@@ -1071,7 +1092,7 @@ function buildSegment(i){
   const hbR=hingeBandsRaw(D,i,skR,zr), hbT=last?null:hingeBandsRaw(D,i+1,skT,zr);
   const pfA=(u)=>D.plan((s0+u)/D.Sw);
   const root=t3R?[[3,pfA(3).te],[3,pfA(3).le]]:twRoot?[[0.3,pfA(0.3).te],[0.3,pfA(0.3).le]]:hingeEdge(hbR,0,1,1,skR,zr);
-  const tip= t3T?[[l-3,pfA(l-3).te],[l-3,pfA(l-3).le]] : twEnd?[[l-0.3,pfA(l-0.3).te],[l-0.3,pfA(l-0.3).le]] : last ? [[l,D.plan(1).te],[l,D.plan(1).le]] : hingeEdge(hbT,l,-1,0,skT,zr);
+  const nz=3.6, tz=(a,b)=>a<b?[D.zA3-nz,D.zA3+nz]:[D.zA3+nz,D.zA3-nz], tip= t3T&&D.tpu?(()=>{ const te=pfA(l-3).te, le=pfA(l-3).le, [za,zb]=tz(te,le); return [[l-3,te],[l-3,za],[l+FLEX.k0,za],[l+FLEX.k0,zb],[l-3,zb],[l-3,le]]; })() : t3T?[[l-3,pfA(l-3).te],[l-3,pfA(l-3).le]] : twEnd?[[l-0.3,pfA(l-0.3).te],[l-0.3,pfA(l-0.3).le]] : last ? [[l,D.plan(1).te],[l,D.plan(1).le]] : hingeEdge(hbT,l,-1,0,skT,zr);
   const u0=root[root.length-1][0], u1=tip[tip.length-1][0], u0b=root[0][0], u1b=tip[0][0];
   const N=Math.max(12,Math.ceil(l/1.2)), lead=[], trail=[];
   for(let k=1;k<N;k++){ const u=u0+(u1-u0)*k/N; lead.push([u,D.plan((s0+u)/D.Sw).le]); }
@@ -1107,7 +1128,8 @@ function buildSegment(i){
       if(pd.z1>pf.le-1||pd.z0<pf.te+1){ const sh=shapeFrom([[pd.u0,z0],[pd.u1,z0],[pd.u1,z1],[pd.u0,z1]]); for(const h of hangers(i)) if(!fusedH(h)) for(const [x,z] of dowelPts(h)) if(x>pd.u0+D.rh+0.6&&x<pd.u1-D.rh-0.6&&z>z0+D.rh+0.6&&z<z1-D.rh-0.6&&(z>pf.le-0.5||z<pf.te+0.5)) sh.holes.push(circlePath(x,z,D.rh));
         const b=plateXZ(sh,2.4); b.translate(0,-D.t/2+1.2,0); items.push(b); } }
     for(const h of hangers(i)) if(h.host==='plate'&&fusedH(h)) (D.tiles&&D.tileSym&&i===0?lowI:items).push(hangerGeo(h));
-    if(t3T){ const zA=D.zA3; for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ items.push(tubeZ(D.rh,D.t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,D.t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); items.push(br); } }
+    if(t3T&&D.tpu) items.push(...socketGeo(l+FLEX.k1,3.6)); /* TPU: koker in een inkeping van de plaat */
+    else if(t3T){ const zA=D.zA3; for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ items.push(tubeZ(D.rh,D.t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,D.t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); items.push(br); } }
     if(twEnd) items.push(tubeX(D.rh,D.t/2,l-6.5,l-0.3,0,D.zAx)); if(twRoot) items.push(tubeX(D.rh,D.t/2,0.3,6.5,0,D.zAx));
     if(D.tiles&&i===0){ const T=tileLayout(); items.push(...bandGeo(T.bands[0],false,'top')); lowI.push(...bandGeo(T.bands[0],false,'bot')); }
     if(D.skin&&i===0){ const s=l-4.5; for(const z of skinPegZ(s)){ const c=new THREE.CylinderGeometry(0.75,0.75,3.2,10); c.translate(s,skinTop(s,z)+0.6,z); items.push(c); } }
@@ -1238,11 +1260,11 @@ function buildRodHG(L,ends){ const r=ROD.w/2, pts=[]; for(let k=0;k<=12;k++){ co
 const BALL={r:2.5,h:1.2,rs:2.6,ro:4.0,hz:1.4}; // hz: bovenrand van de kom; de onderrand ligt gelijk met de stang (−1,2)
 const useBall3=(i)=>D.v6&&D.twist3&&i===2;
 function buildBall3(){ const rf=Math.sqrt(BALL.r*BALL.r-BALL.h*BALL.h), a0=Math.asin(-BALL.h/BALL.r), pts=[[D.rh,-BALL.h]]; for(let k=0;k<=14;k++){ const a=a0+(-2*a0)*k/14; pts.push([BALL.r*Math.cos(a),BALL.r*Math.sin(a)]); } pts.push([D.rh,BALL.h],[D.rh,-BALL.h]);
-  const g=new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(p[0],p[1])),28); g.rotateX(Math.PI/2); return g; }
+  const g=new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(p[0],p[1])),28); g.rotateX(Math.PI/2); return merge([g]); }
 function buildRodBall(L){ const r=ROD.w/2, rc=BALL.ro-0.1, pts=[]; for(let k=0;k<=12;k++){ const a=-Math.PI/2+Math.PI*k/12; pts.push([L+r*Math.cos(a),r*Math.sin(a)]); }
   const am=Math.asin(r/rc); for(let k=0;k<=10;k++){ const a=am-2*am*k/10; pts.push([rc*Math.cos(a),rc*Math.sin(a)]); } const s=shapeFrom(dedupe(pts)); s.holes.push(circlePath(L,0,D.rh));
   const zb=-ROD.t/2, a0=Math.asin(zb/BALL.rs), a1=Math.asin(BALL.hz/BALL.rs), sp=[[Math.sqrt(BALL.rs*BALL.rs-zb*zb),zb],[BALL.ro,zb],[BALL.ro,BALL.hz]]; /* onderkant gelijk met de stang (plat op het bed), bovenkant 0,2 hoger */ for(let k=14;k>=0;k--){ const a=a0+(a1-a0)*k/14; sp.push([BALL.rs*Math.cos(a),BALL.rs*Math.sin(a)]); }
-  const ring=new THREE.LatheGeometry(dedupe(sp).map(p=>new THREE.Vector2(p[0],p[1])),36); ring.rotateX(Math.PI/2);
+  const spc=dedupe(sp); spc.push(spc[0]); const ring=new THREE.LatheGeometry(spc.map(p=>new THREE.Vector2(p[0],p[1])),36); ring.rotateX(Math.PI/2);
   const g=merge([plateXY(s,ROD.t),ring]); g.userData.hg=true; /* zoals de kantelstang: de bovenpen klemt in het stangkruisje, niet in de stang */ return g; }
 // stangkruisje (mini-cardan) bovenaan de vleugelstangen: pen langs z voor de stang, twee asjes langs de span in het oogvorkje
 function buildUBlock(){ const sh=shapeFrom([[-2,-2],[2,-2],[2,2],[-2,2]]); sh.holes.push(circlePath(0,0,D.rh)); return merge([plateXY(sh,5.4),tubeX(0.01,1.2,2,4.6,0,0),tubeX(0.01,1.2,-4.6,-2,0,0)]); }
@@ -1596,7 +1618,8 @@ function buildParts(){
   if(D.twist3){ const dp=D.hTab-D.t/2;
     G.forkTab=add('klemlip','Klemlip oogvorkje (na het inleggen van het stangkruisje lijmen)',2*(D.n-1),buildForkTab(-3.8,dp),rotZ(Math.PI/2),'mech').geo;
     G.ublock=add('stangkruisje','Stangkruisje (pen 1,75 mm naar de stang, asjes in het oogvorkje)',2*(D.n-1),buildUBlock(),I4(),'mech').geo;
-    G.cross3=add('kruisstuk','Kruisstuk (cardan) tussen segmenten: pen van 1,75 mm door het blokje, spil in de lagerbus',2*(D.n-1),buildCross3(),rotZ(Math.PI/2),'mech').geo; G.collarX=D.tiles?add('borgclip_kruis','Borgclip kruisstuk: in het groefje van de spil schuiven en op de voorkant van de lagerbus lijmen',2*(D.n-1),buildSpindleClip(),rotZ(Math.PI/2),'mech').geo:add('borgring_kruis','Borgring op de spil van het kruisstuk (lijmen)',2*(D.n-1),buildCollar(1.35,2.3,0.8),I4(),'mech').geo; G.collarT=D.tiles?add('borgring_schub','Borgring op de lagerbus (houdt de eerste losse schub op zijn plaats; lijmen)',2*(D.n-1),buildCollar(2.45,3.0,0.6),I4(),'mech').geo:null; G.arm3=[];  G.link3=[];
+    if(D.tpu){ G.flex=buildFlexHalves(); add('buigkoppeling','Buigkoppeling (TPU 95A): stekker in de koker van het vorige segment (pen erdoor), D-spil in de lagerbus van het volgende',2*(D.n-1),flexFull(G.flex),I4(),'mech'); G.cross3=null; } else
+    G.cross3=add('kruisstuk','Kruisstuk (cardan) tussen segmenten: pen van 1,75 mm door het blokje, spil in de lagerbus',2*(D.n-1),buildCross3(),rotZ(Math.PI/2),'mech').geo; G.collarX=D.tiles?add('borgclip_kruis',(D.tpu?'Borgclip buigkoppeling':'Borgclip kruisstuk')+': in het groefje van de spil schuiven en op de voorkant van de lagerbus lijmen',2*(D.n-1),buildSpindleClip(),rotZ(Math.PI/2),'mech').geo:add('borgring_kruis','Borgring op de spil van het kruisstuk (lijmen)',2*(D.n-1),buildCollar(1.35,2.3,0.8),I4(),'mech').geo; G.collarT=D.tiles?add('borgring_schub','Borgring op de lagerbus (houdt de eerste losse schub op zijn plaats; lijmen)',2*(D.n-1),buildCollar(2.45,3.0,0.6),I4(),'mech').geo:null; G.arm3=[];  G.link3=[];
     for(let i=1;i<D.n;i++){ G.link3[i]=add('draaistang_'+i,`Draaistangetje ${i}→${i+1} (${D.Lh3[i].toFixed(1).replace('.',',')} mm, kantelpennen)`,2,buildRodHG(D.Lh3[i],[true,true]),rotX(-Math.PI/2),'rod').geo; } }
   G.rodS=[]; for(let i=0;i<D.n;i++){ if(useBall3(i)) G.rod[i]=add('stang_'+(i+1),`Stang ${i+1} (bolle kom onderaan)`,2,buildRodBall(D.L3[i]),rotX(-Math.PI/2),'rod').geo;
     else if(D.twist3&&i>=1) G.rod[i]=add('stang_'+(i+1),`Stang ${i+1} (kantelpen onderaan)`,2,buildRodHG(D.L3[i],[true,false]),rotX(-Math.PI/2),'rod').geo;
@@ -1667,7 +1690,7 @@ function orientStats(geo,rot){ const a=geo.attributes.position.array, m=rot.elem
 const ORIENTS=[()=>I4(),()=>rotX(-Math.PI/2),()=>rotX(Math.PI/2),()=>rotX(Math.PI),()=>rotZ(Math.PI/2),()=>rotZ(-Math.PI/2)];
 function autoOrient(p){ const sc=(r)=>{ const o=orientStats(p.geo,r); return {r,o,v:o.base-1.5*o.over}; }; let cur=sc(p.rot), best=cur; for(const f of ORIENTS){ const c=sc(new THREE.Matrix4().multiplyMatrices(f(),p.rot)); if(c.v>best.v+1e-6) best=c; } if(best!==cur&&best.v>cur.v+3&&best.o.base>cur.o.base*1.2+1){ p.rot=best.r; p.autoRot=true; } } /* 6.0: kies de stand met het grootste vlak op het bed en de minste overhang */
 // vaste onderdeelnummers: letter per groep, nummer op alfabetische volgorde binnen de groep (blijft gelijk zolang de groep niet verandert)
-const CODE_GROUPS=[['S',/^(sokkel_|motorhouder|afstandsbus_|zwengel|handvat|tandwiel)/],['P',/^(vinpunt|tuimelaar_punt|koppel_punt|puntoog|punt)/],['L',/^(lijf_|paal|draaibeugel|kanteloog|kop|staart|achterlijf|buik)/],['A',/^(nok|volger|geleide|tuimelaar|draaipunt|stang_\d|volgerstangetje|kantel)/],['V',/^(vleugel|skelet|schub|vaste_schub|los_|draaistang|kruisstuk|stangkruisje|klemlip|borgclip|borgring|oog)/],['K',/./]];
+const CODE_GROUPS=[['S',/^(sokkel_|motorhouder|afstandsbus_|zwengel|handvat|tandwiel)/],['P',/^(vinpunt|tuimelaar_punt|koppel_punt|puntoog|punt)/],['L',/^(lijf_|paal|draaibeugel|kanteloog|kop|staart|achterlijf|buik)/],['A',/^(nok|volger|geleide|tuimelaar|draaipunt|stang_\d|volgerstangetje|kantel)/],['V',/^(vleugel|skelet|schub|vaste_schub|los_|draaistang|kruisstuk|buigkoppeling|stangkruisje|klemlip|borgclip|borgring|oog)/],['K',/./]];
 function codeGroup(id){ for(const [c,re] of CODE_GROUPS) if(re.test(id)) return c; return 'K'; }
 function assignCodes(){ const by={}; for(const p of PARTS){ const g=codeGroup(p.id); (by[g]=by[g]||[]).push(p); } const nat=(a,b)=>a.id.localeCompare(b.id,'nl',{numeric:true});
   for(const g in by) by[g].sort(nat).forEach((p,k)=>{ p.code=g+String(k+1).padStart(2,'0'); }); CODE_GEO=new Map(); for(const p of PARTS){ CODE_GEO.set(p.geo,p); } }
@@ -1781,6 +1804,7 @@ function analyze(){
     if(k<N){ const F=camForces(s), r=driveRate(th); let tq=0; F.w.forEach((f,i)=>{ tq+=f*r.w[i]; A.Fw[i]=Math.min(A.Fw[i],f); A.FwAbs[i]=Math.max(A.FwAbs[i],Math.abs(f)); }); tq+=F.p*r.p+F.h*r.h; A.Fp=Math.min(A.Fp,F.p); A.FpAbs=Math.max(A.FpAbs||0,Math.abs(F.p)); A.Fh=Math.min(A.Fh,F.h); A.tau.push(tq/10); }
     A.heave.push(s.h);
     const pd=-s.phi/DEG; A.pitch.push(pd); A.pMin=Math.min(A.pMin,pd); A.pMax=Math.max(A.pMax,pd); if(s.plock) A.plock=true; A.tiltMax=Math.max(A.tiltMax,...s.tilt);
+    if(D.tpu&&s.a&&s.a.d3){ A.flex=A.flex||[]; for(let i=1;i<n;i++){ const f=A.flex[i]=A.flex[i]||{b:0,t:0}; f.b=Math.max(f.b,Math.abs(s.a.d3[2*i])); f.t=Math.max(f.t,Math.abs(s.a.d3[2*i+1])); } }
   }
   // duur neerslag van de vleugelpunt
   let downN=0; for(let k=0;k<N;k++) if(A.tipR[k+1].yb<A.tipR[k].yb) downN++;
@@ -1810,6 +1834,8 @@ function analyze(){
   if(D.pitchOn){
     if(A.plock) msgs.push(['bad','De kantelstang slaat door. Verklein de kanteling.']);
     if(!D.inBelly(D.zPost,6)||!D.inBelly(D.ze,5)) msgs.push(['bad','Draaipunt of kantelstang valt buiten de onderkant van het lijf. Verklein de pijlstelling of maak de vleugel breder.']);
+    if(D.tpu&&A.flex){ const L=FLEX.b-FLEX.a, r=A.flex.slice(1).map((f,k)=>({k:k+1,b:f.b/DEG,t:f.t/DEG,eb:100*FLEX.h*f.b/(2*L),et:100*FLEX.h*f.t/L})), w=Math.max(...r.map(q=>Math.max(q.eb,q.et)));
+      msgs.push([w<=FLEX.lim?'ok':'warn',`Buigkoppelingen (TPU 95A, strook ${String(FLEX.h).replace('.',',')} × ${FLEX.w} × ${L} mm): `+r.map(q=>`segment ${q.k}→${q.k+1} buigt ${q.b.toFixed(0)}° en wringt ${q.t.toFixed(0)}° (rek ${q.eb.toFixed(1).replace('.',',')}%, afschuiving ${q.et.toFixed(1).replace('.',',')}%)`).join('; ')+(w<=FLEX.lim?`. Ruim onder de ${FLEX.lim}% die TPU 95A miljoenen keren aankan.`:`. Boven ${FLEX.lim}%: de strook kan op termijn scheuren; verklein de slag of de draaiing.`)]); }
     if(A.tiltMax>5) msgs.push(['warn',`Door het kantelen staan de vleugelstangen tot ${A.tiltMax.toFixed(1)}° scheef. Boven 5° gaan de pennen wringen; verklein de kanteling.`]);
   }
   if(P.rpm>30) msgs.push(['warn','Boven 30 rpm ziet de beweging er gejaagd uit en slijten de pennen snel.']);
@@ -1888,6 +1914,7 @@ const MAT={
   wood:new THREE.MeshStandardMaterial({color:0x6e4b2e,metalness:0.05,roughness:0.8,transparent:true,opacity:0.28,depthWrite:false}),
   steel:new THREE.MeshStandardMaterial({color:0x8a9096,metalness:0.7,roughness:0.35}),
   motor:new THREE.MeshStandardMaterial({color:0x3c4248,metalness:0.4,roughness:0.5}),
+  tpu:new THREE.MeshStandardMaterial({color:0xe0702a,metalness:0.0,roughness:0.75}),
   seg:SEGC.map(c=>new THREE.MeshStandardMaterial({color:new THREE.Color(c),metalness:0.1,roughness:0.55})),
   bad:new THREE.MeshStandardMaterial({color:0xd8402f,metalness:0.1,roughness:0.5,emissive:0x400000}),
   print:new THREE.MeshStandardMaterial({color:0xc9a15f,metalness:0.05,roughness:0.6}),
@@ -1954,7 +1981,7 @@ function buildScene(){
     M.skin={lay:L}; for(const sd of ['R','L']){ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(new Float32Array((L.NS+1)*L.NC*3),3)); g.setAttribute('color',new THREE.BufferAttribute(new Float32Array((L.NS+1)*L.NC*3),3)); g.setIndex(sd==='R'?idx:idx.map((v,k)=>k%3===1?idx[k+1]:k%3===2?idx[k-1]:v));
       const m=new THREE.Mesh(g,MAT.skin); m.castShadow=true; m.receiveShadow=true; m.frustumCulled=false; inner.add(m); M.skin[sd]=m; } }
   M.ub={R:[],L:[]}; if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const ub=mk(G.ublock,MAT.steel,inner); ub.matrixAutoUpdate=false; ub.userData.tag='ub'+i+sd; M.ub[sd][i]=ub; }
-  if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const c=mk(G.cross3,MAT.steel,inner); c.matrixAutoUpdate=false; c.userData.tag='crk'+i+sd; M.cr3[sd][i]=c; if(D.tiles){ const sg=(sd==='R'?M.segR:M.segL)[i]; if(sg){ const cl=mk(G.collarX,MAT.steel,sg); cl.position.set(2.9,0,D.zA3); cl.userData.tag=sg.userData.tag; } } else { const cl=mk(G.collarX,MAT.steel,c); cl.rotation.y=Math.PI/2; cl.position.x=7.8; }
+  if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const SG=sd==='R'?M.segR:M.segL; let c=null; if(G.flex){ for(const [g,par] of [[G.flex.a,SG[i-1]],[G.flex.b,SG[i]]]){ const f=mk(g,MAT.tpu,par); f.userData.tag='cpl'+i+sd; f.userData.ownBody=true; } } else { c=mk(G.cross3,MAT.steel,inner); c.matrixAutoUpdate=false; c.userData.tag='crk'+i+sd; M.cr3[sd][i]=c; } if(D.tiles){ const sg=(sd==='R'?M.segR:M.segL)[i]; if(sg){ const cl=mk(G.collarX,MAT.steel,sg); cl.position.set(2.9,0,D.zA3); cl.userData.tag=sg.userData.tag; } } else { const cl=mk(G.collarX,MAT.steel,c); cl.rotation.y=Math.PI/2; cl.position.x=7.8; }
     const t=mk(G.link3[i],MAT.seg[3],inner); t.userData.tag='tlk'+i+sd; M.tl3[sd][i]=t; }
   if(D.tipOn){ M.tipR=mk(G.tipSeg,MAT.wing,inner); M.tipL=mk(G.tipSeg,MAT.wing,inner); M.tipL.scale.x=-1; M.tipRodR=mk(G.tipRod,MAT.seg[(D.n)%4],inner); M.tipRodL=mk(G.tipRod,MAT.seg[(D.n)%4],inner);
     M.tipR.userData.tag='tipR'; M.tipL.userData.tag='tipL'; M.tipRodR.userData.tag='tiprodR'; M.tipRodL.userData.tag='tiprodL';
@@ -2012,7 +2039,7 @@ function addPins(inner){ M.pinList=[]; const P=(par,x,y,z,len,axis)=>{ if(!par) 
   if(M.parm) for(const g of M.parm){ P(g,0,0,0,9,'z'); P(g,PLA,0,0,9,'z'); }
   if(M.plink){ P(M.plink,0,0,0,9,'z'); P(M.plink,D.Lp,0,0,9,'z'); }
   if(M.headRod&&D.headL){ P(M.headRod,0,0,0,9,'z'); P(M.headRod,D.headL,0,0,9,'z'); }
-  if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const c=M.cr3[sd][i]; if(c) P(c,0,0,0,16,'z'); const t=M.tl3[sd][i]; if(t){ P(t,0,0,0,9,'z'); P(t,D.Lh3[i],0,0,9,'z'); } }
+  if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const c=M.cr3[sd][i]; if(c) P(c,0,0,0,16,'z'); if(D.tpu) P((sd==='R'?M.segR:M.segL)[i-1],D.l+FLEX.pinX,0,D.zA3,D.t,'y'); const t=M.tl3[sd][i]; if(t){ P(t,0,0,0,9,'z'); P(t,D.Lh3[i],0,0,9,'z'); } }
   if(M.tip3) for(const sd of ['R','L']){ const o=M.tip3[sd]; const dz=D.v6?0:1; P(o.rk,0,0,-dz,7,'z'); P(o.rk,0,D.T3.a1,dz,7,'z'); P(o.rk,0,-D.T3.a2,dz,7,'z'); P(o.c1,0,0,0,9,'z'); P(o.c1,D.T3.L1,0,0,9,'z'); P(o.c2,0,0,0,9,'z'); P(o.c2,D.T3.L2,0,0,9,'z'); }
   M.fil=null; if(D.tiles){ M.fil=[]; for(const sd of [1,-1]){ const l=new THREE.Mesh(new THREE.BufferGeometry(),MAT_PIN); l.userData.pin=true; l.userData.own=true; l.frustumCulled=false; inner.add(l); M.fil.push({l,sg:sd}); M.pinList.push(l); } } }
 // per pen: welke onderdelen zitten eromheen (binnen 4 mm van de pen-as) en waar zit een kier tussen twee opeenvolgende onderdelen
@@ -2265,7 +2292,7 @@ function pose(theta){ poseGears(theta);
     const J=s.J[i], a=s.a[i];
     if(D.twist3&&i>=1&&s.R3){ const Mi=new THREE.Matrix4().makeTranslation(s.O3[i].x,s.O3[i].y,s.O3[i].z).multiply(s.R3[i]).multiply(new THREE.Matrix4().makeTranslation(0,0,-D.zA3)), Sx=new THREE.Matrix4().makeScale(-1,1,1);
       M.segR[i].matrix.copy(Mi); M.segL[i].matrix.copy(Sx).multiply(Mi);
-      const Mc=new THREE.Matrix4().makeTranslation(s.O3[i].x,s.O3[i].y,s.O3[i].z).multiply(s.C3[i]); M.cr3.R[i].matrix.copy(Mc); M.cr3.L[i].matrix.copy(Sx).multiply(Mc);
+      const Mc=new THREE.Matrix4().makeTranslation(s.O3[i].x,s.O3[i].y,s.O3[i].z).multiply(s.C3[i]); if(M.cr3.R[i]){ M.cr3.R[i].matrix.copy(Mc); M.cr3.L[i].matrix.copy(Sx).multiply(Mc); }
       const sp=new THREE.Vector3(1,0,0).applyMatrix4(s.R3[i]);
       for(const sg of [1,-1]){ const m=sg>0?M.tl3.R[i]:M.tl3.L[i], spv=new THREE.Vector3(sg*sp.x,sp.y,sp.z), spE0=new THREE.Vector3(1,0,0).applyMatrix4(new THREE.Matrix4().extractRotation(s.R3[i-1])), kk=s.H3[i].clone().sub(s.E3[i]).dot(sp), kc=(D.tlkKc&&D.tlkKc[i])||0, oL=v6Tl()?0:kc/2-((D.tlkG&&D.tlkG[i])||1.5)-1.5+tlkXo(i), sl=D.tlkPerp?(kk-kc)/2:0, Ew=s.E3[i].clone().addScaledVector(spE0,(oL+kc/2+sl)/Math.max(0.5,spE0.dot(sp))), Hw=s.H3[i].clone().addScaledVector(sp,oL-kc/2-sl), a0=new THREE.Vector3(sg*Ew.x,Ew.y,Ew.z), b0=new THREE.Vector3(sg*Hw.x,Hw.y,Hw.z), X=b0.clone().sub(a0).normalize();
         const spE=new THREE.Vector3(1,0,0).applyMatrix4(new THREE.Matrix4().extractRotation(s.R3[i-1])), mz=D.v6?balAxis(new THREE.Vector3(sg*sp.x,sp.y,sp.z),new THREE.Vector3(sg*spE.x,spE.y,spE.z),X):new THREE.Vector3(sg*(sp.x+spE.x),sp.y+spE.y,sp.z+spE.z); // vlak van het stangetje: midden tussen de twee penassen
@@ -2349,6 +2376,8 @@ function allowedPair(a,b){
   const fixed=[['body','belly'],['body','head'],['belly','head'],['belly','bracket'],['body','bracket'],['belly','lug'],['body','lug'],['bracket','post'],['post','bush'],['post','box'],['post','hcam'],['post','headrod'],
     ['pfol','pcam'],['pfol','box'],['pfol','guide'],['pfol','plink'],['plink','lug'],['headrod','headeye'],['spacer','box'],['spacer','spacer'],['box','box'],['box','guide'],['box','motorh'],['guide','guide'],['motorh','spacer'],['gbox','box'],['gp0','gg0'],['gp0','gc'],['gc','gg1'],['crank','knob']];
   for(const [x,y] of fixed) if(has(x,y)) return true;
+  if(pre('kb','rod')){ const k=A.startsWith('kb')?A:B, r=k===A?B:A; if(k.slice(2)===r.slice(3)) return true; } /* kogeltje in de kom van zijn eigen stang (0,1 mm speling; de exacte spelingcontrole meet dit paar) */
+  if(D.tpu&&pre('cpl','seg')){ const c=A.startsWith('cpl')?A:B, g=c===A?B:A, k=+c[3], j=+g[3]; if(c.slice(-1)===g.slice(-1)&&(j===k||j===k-1)) return true; } /* buigkoppeling in koker en lagerbus */
   if(D.armDrive){ const ix=(t)=>t.replace(/\D/g,'')[0]; const pr=[['gar','fol'],['gar','gbr'],['lnk','fol'],['lnk','rk'],['fol','cam'],['gbr','box']]; if(pre('gpa','pfol')||pre('gpa','gpb')||has('gpb','box')) return true;
     for(const [x,y] of pr) if(pre(x,y)){ const a=A.startsWith(x)?A:B, b=a===A?B:A; if(y==='box'||ix(a)===ix(b)){ if(y==='rk'&&a.slice(-1)!==b.slice(-1)) continue; return true; } } }
   if(pre('fol','box')||pre('fol','guide')||pre('cam','spacer')||has('pcam','spacer')||has('hcam','spacer')) return true;
@@ -2932,9 +2961,9 @@ function readme(){
   if(D.tip3){ const T3=D.T3; L.push(`     Vinpunt (5.x): de punt scharniert met een pen van 1,75 mm door de lipjes aan het eind van segment ${D.n} en het buisje van de punt. Schroef/pin de tuimelaar op het lipje onder segment ${D.n} (${T3.uP} mm na het begin). Koppelstang 1 (${T3.L1.toFixed(1).replace('.',',')} mm) loopt van het kogeloog onder segment ${D.n-1} naar de kogel op de tuimelaar, koppelstang 2 (${T3.L2.toFixed(1).replace('.',',')} mm) van de tuimelaar naar het oog onder de punt. De tuimelaar keert de beweging om, zodat de punt mét de vleugel meebuigt en bij de opslag achterblijft (omlaag buigt).`); }
   if(D.skin) L.push(`     Manta 4.0 (TPU): segment 2 t/m ${D.n} zijn geen vlakke platen maar een skelet: een ligger op de draaias met het kogeloog, één rib bij de draaihoorn en een beugel voor de draaiarm. De draaias ligt achter in de vleugel (binnen de omtrek tot aan de punt), het draaiwerk zit ervoor: zo kantelt de voorrand omlaag bij de neerslag en omhoog bij de opslag, zoals bij een echte vin. Print de twee TPU-huiden in TPU 95A (0,8 mm, ribbels naar boven op het bed, langzaam: ±20 mm/s), druk ze met de gaatjes over de nopjes op de rand van segment 1 en op de flens van elke rib, en klem ze vast met de PLA-klemstrips (gaatjes over dezelfde nopjes; buig de strip mee met het profiel). Zet de strips vast met een druppel secondelijm op elk nopje of smelt de nopkopjes plat met een soldeerbout. Lijm hoeft niet aan de TPU zelf te hechten. Tussen de ribben blijft de huid los, zodat de draaiing daar geleidelijk verloopt en de vleugel één geheel blijft. De ribbels onder de huid zijn vinstralen: ze houden de huid in koorderichting stijf.`);
   if(D.twist3) L.push(`     Losse onderdelen onder de vleugel (draaihoorns, draaiarmen, ogen) hebben twee gaatjes in hun lijmvlak. Steek er stukjes filament van 1,75 mm in (±3 mm) en zet ze in de bijpassende gaatjes in de vleugel, of druk ze op de nokjes onder de vaste schub; dan zitten ze meteen op de goede plek. Lijm daarna vast.${D.tiles?' Het oogvorkje zit al aan de ligger vast (print de ligger ondersteboven, zoals in de export), en bij een bol profiel zitten stangoog en draaiarm al aan de onderhelft van segment 1.':''}`);
-  if(D.twist3) L.push(`     Scharnieren tussen de segmenten (3.x–5.x): elk kruisstuk heeft een gat langs de koorde en een spil langs de span. Steek een pen van 1,75 mm door de lipjes aan het eind van het vorige segment en door het blokje. ${D.tiles?'Schuif de spil in de lagerbus aan het begin van het volgende segment, schuif de borgclip zijwaarts in het groefje van de spil (vlak voor de bus) en lijm de clip op de voorkant van de bus; geen lijm op de spil, die moet vrij draaien.':'Schuif de spil in de lagerbus aan het begin van het volgende segment en lijm de kleine borgring op het uiteinde van de spil (niet aan de bus).'} Bovenaan elke vleugelstang zit een stangkruisje: leg zijn asjes in het oogvorkje onder het zadel, lijm de klemlip ertegen en steek een pen van 1,75 mm door het kruisje en het stangoog. Onderaan hebben de stangen een kantelpen-gat (zandloper): de pen mag daarin ±35° kantelen.`);
+  if(D.twist3) L.push(`     ${D.tpu?FLEX_TXT:`Scharnieren tussen de segmenten (3.x–5.x): elk kruisstuk heeft een gat langs de koorde en een spil langs de span. Steek een pen van 1,75 mm door de lipjes aan het eind van het vorige segment en door het blokje. ${D.tiles?'Schuif de spil in de lagerbus aan het begin van het volgende segment, schuif de borgclip zijwaarts in het groefje van de spil (vlak voor de bus) en lijm de clip op de voorkant van de bus; geen lijm op de spil, die moet vrij draaien.':'Schuif de spil in de lagerbus aan het begin van het volgende segment en lijm de kleine borgring op het uiteinde van de spil (niet aan de bus).'}`} Bovenaan elke vleugelstang zit een stangkruisje: leg zijn asjes in het oogvorkje onder het zadel, lijm de klemlip ertegen en steek een pen van 1,75 mm door het kruisje en het stangoog. Onderaan hebben de stangen een kantelpen-gat (zandloper): de pen mag daarin ±35° kantelen.`);
   if(D.armDrive) L.push(`     Aandrijving met volgarmen (5.2): lijm per nok de steun voor de geleidearmpjes op de bodem (naast de nok, aan de kant van de achterwand van het deksel). Lijm de volgervork met twee paspennen op de volgerstang en steek een pen van 1,75 mm door de vork in de groef van de nok. Verbind vork en steun met de twee geleidearmpjes (pennen van 1,75 mm): de volger hangt dan aan een parallellogram en blijft recht zonder te schuiven. Steek de volgerstang door de sleuf in het deksel en verbind de pennen van de dwarsbalk met de twee korte stangetjes naar de tuimelaars (pen in het gat op 10 mm van het draaipunt).${D.pitchOn?' De kantelvolger van het lijf hangt op dezelfde manier aan twee geleidearmpjes met een eigen steun op de bodem.':''}`);
-  if(D.tiles) L.push(`     Ligger (5.x): steek een staafje van 2 mm (staal of koolstof) door de buisligger van elk segment, van de lagerbus tot de vork, en zet het vast met een druppel lijm. Rijg dan vanaf de lagerbus: borgring (lijmen op de bus), schub 1, afstandsbusje, schub 2, ... tot aan het zadel. Lijm de vaste schub met zijn voet op het zadel. Segment 1 bestaat uit een boven- en onderhelft: lijm ze met de vlakke kanten op elkaar.`);
+  if(D.tiles) L.push(`     Ligger (5.x): steek een staafje van 2 mm (staal of koolstof) door de buisligger van elk segment, van de lagerbus tot de ${D.tpu?'koker':'vork'}, en zet het vast met een druppel lijm. Rijg dan vanaf de lagerbus: borgring (lijmen op de bus), schub 1, afstandsbusje, schub 2, ... tot aan het zadel. Lijm de vaste schub met zijn voet op het zadel. Segment 1 bestaat uit een boven- en onderhelft: lijm ze met de vlakke kanten op elkaar.`);
   if(D.twist3) L.push(`     Manta 3.0: segment 2 t/m ${D.n} hangen elk met een kruisstuk (cardan) aan het vorige segment, op één rechte draaias langs de spanwijdte. Steek een pen van 1,75 mm door de lipjes aan het eind van het vorige segment en het kruisstuk, en een tweede pen door het kruisstuk en het buisje aan het begin van het volgende segment. De vleugelstangen 2 t/m ${D.n} grijpen met een kogeloog op die as aan; druk de kogelkop in het stangoog. Lijm onder elk segment de draaihoorn (${D.uH3.toFixed(0)} mm vanaf het begin, ${D.e3.slice(1).join('/')} mm achter de as) en onder het vorige segment de draaiarm, aan het buitenste eind. Verbind arm en hoorn met het draaistangetje; de pennen lopen langs de spanwijdte. Zo draait elk segment een stukje verder dan het vorige: samen ${D.tw3Range?Math.round(D.tw3Range[0])+'° … +'+Math.round(D.tw3Range[1])+'°':'?'} aan de punt.`);
   if(D.twistOn) L.push(`     Manta 2.0: de vinpunt draait om een pen langs de spanwijdte (door de buisjes aan het eind van segment ${D.n} en het begin van de punt, ${((D.plan(D.n*D.l/D.Sw).le-D.zAx)).toFixed(1).replace('.',',')} mm achter de voorrand). Lijm de pen in het buisje van de punt.`,`     Lijm de draaiarm onder segment ${D.n-1} (${D.dTA} mm vóór zijn buitenste scharnier, ${(D.plan(D.n*D.l/D.Sw).le-D.twZH).toFixed(1).replace('.',',')} mm achter de voorrand) en de draaihoorn onder de punt (${D.twUH} mm voorbij de naad, zelfde afstand).`,`     Verbind arm en hoorn met het draaistangetje (${D.twL.toFixed(1).replace('.',',')} mm) en twee korte pennen langs de spanwijdte.`);
   else if(D.tipOn&&D.skew>0) L.push(`     Het scharnier van de vinpunt staat ${Math.round(D.skew/DEG)}° schuin: daardoor draait de punt mee om zijn lengteas. Steek de pen er schuin in.`);
@@ -2957,6 +2986,7 @@ function readme(){
   L.push('Gecontroleerd in de simulatie:'); AN.msgs.forEach(m=>L.push('  - '+m[1]));
   return L.join('\r\n');
 }
+const FLEX_TXT='Buigkoppelingen tussen de segmenten (Manta 6.1): rijg eerst de schubben op de ligger. Schuif dan de D-spil van een buigkoppeling in de lagerbus aan het begin van het volgende segment (het vlak onderaan: hij past maar op één manier), schuif de borgclip zijwaarts in het groefje vlak voor de bus en lijm de clip op de voorkant van de bus. Steek de stekker aan het andere eind in de koker aan het eind van het vorige segment en druk een pen van 1,75 mm van boven door het gaatje (de pen klemt in het TPU; knip hem gelijk af). Het buigen en wringen tussen de segmenten zit nu in de strook van 1 mm: er draait niets en er komt geen lijm op de strook. Print de koppelingen in TPU 95A, plat zoals in het bestand, zonder steun: 0,2 mm lagen, 20–30 mm/s (bowden: 15 mm/s), 2 wanden, 100% vulling. De strook is een korte brug van 5 mm, 0,5 mm boven het bed.';
 // proefprintset: kleine stukken om eerst de passingen te testen (pengaten, kruisstuk, stangkruisje, kantelpen, ligger met schubben)
 function testParts(){ const out=[], A=(id,name,geo,rot)=>out.push({id,name,geo,rot:rot||I4()}), t=D.t;
   { const L=64, sh=shapeFrom([[0,0],[L,0],[L,9],[0,9]]), ds=[1.85,1.95,2.05,2.15,2.25,2.35]; ds.forEach((d,k)=>sh.holes.push(circlePath(6+k*10.4,4.5,d/2))); const g=plateXY(sh,3), dot=new THREE.CylinderGeometry(0.9,0.9,0.8,10); dot.rotateX(Math.PI/2); dot.translate(2.2,7.5,1.9);
@@ -2968,9 +2998,11 @@ function testParts(){ const out=[], A=(id,name,geo,rot)=>out.push({id,name,geo,r
     for(let k=0;k<3;k++){ const g=ringGeo(); g.translate(k*6,0,0); out.length; A('klemring_proef_'+(k+1),'Klemring (proef '+(k+1)+')',g,I4()); } }
   if(D.twist3){ const l=D.l, zA=D.zA3, rh2=1.05;
     const a=[profX(rectPts(zA-7.5,zA+7.5,-t/2,t/2),l-6.4,l-4.2,rh2),profX(circPts(zA,0,t/2),l-16,l-6.4,rh2)]; for(const [z0,z1] of [[zA+2.6,zA+7.5],[zA-7.5,zA-2.6]]){ a.push(tubeZ(D.rh,t/2,z0,z1,l,0)); const br=new THREE.BoxGeometry(3.6,t,z1-z0); br.translate(l-3.6/2-0.8,0,(z0+z1)/2); a.push(br); }
-    A('proef_vork','Liggerstuk met vork (eind van een segment): lipjes voor de pen van het kruisstuk',merge(a),I4());
+    if(D.tpu){ A('proef_koker','Liggerstuk met koker (eind van een segment) voor de stekker van de buigkoppeling',merge([profX(circPts(zA,0,t/2),l-16,l+FLEX.k0,rh2),...socketGeo(l+FLEX.k1,6)]),I4());
+      A('proef_lagerbus','Liggerstuk met D-lagerbus (begin van het volgende segment)',merge([sleeveGeoD(),profX(circPts(zA,0,t/2),7.3,24,rh2)]),I4()); A('buigkoppeling','Buigkoppeling (TPU 95A)',flexFull(buildFlexHalves()),I4()); }
+    else { A('proef_vork','Liggerstuk met vork (eind van een segment): lipjes voor de pen van het kruisstuk',merge(a),I4());
     A('proef_lagerbus','Liggerstuk met lagerbus (begin van het volgende segment) en buisligger voor een staafje van 2 mm',merge([sleeveGeo(),profX(circPts(zA,0,t/2),7.3,24,rh2)]),I4());
-    A('kruisstuk','Kruisstuk',buildCross3(),rotZ(Math.PI/2)); if(D.tiles) A('borgclip_kruis','Borgclip kruisstuk',buildSpindleClip(),rotZ(Math.PI/2)); else A('borgring_kruis','Borgring kruisstuk',buildCollar(1.35,2.3,0.8),I4());
+    A('kruisstuk','Kruisstuk',buildCross3(),rotZ(Math.PI/2)); } if(D.tiles) A('borgclip_kruis','Borgclip kruisstuk',buildSpindleClip(),rotZ(Math.PI/2)); else A('borgring_kruis','Borgring kruisstuk',buildCollar(1.35,2.3,0.8),I4());
     const dp=D.hTab-t/2; A('oogvork','Oogvorkje',buildEyeFork(dp),rotX(Math.PI)); A('klemlip','Klemlip oogvorkje',buildForkTab(-3.8,dp),rotZ(Math.PI/2)); A('stangkruisje','Stangkruisje',buildUBlock(),I4());
     A('stang_kantel','Stangstukje 30 mm: kantelpen onderaan, gewoon gat bovenaan',buildRodHG(30,[true,false]),rotX(-Math.PI/2));
     if(D.tiles){ const T=tileLayout(), ps=T.bands.filter(b=>!b.dr&&b.k===1).slice(0,2); ps.forEach((b,q)=>A('schub_proef_'+(q+1),`Losse schub ${q+1} (echt formaat, met ring en filamentoogje)`,merge(bandGeo(b,true)),rotZ(Math.PI/2)));
@@ -2989,6 +3021,9 @@ function testReadme(){ const L=['PROEFPRINTSET – '+(PRESETS[P.preset]?PRESETS[
   'Print deze stukjes eerst (PLA, 0,2 mm, zoals ze in de bestanden liggen, zonder steun) en test de passing voordat je het hele model print.','',
   '1. Pengat-strip: steek een stukje 1,75 mm filament in elk gat. Kies het kleinste gat waarin de pen nog draait zonder te rammelen en zet "Pengat" in de app op die maat (stip = 1,85 mm, daarna steeds 0,1 mm groter).',
   '2. Stangstukje: de pen moet soepel draaien in beide gaten.'];
+  if(D.tpu) L.push('3. Buigkoppeling (TPU): schuif de D-spil in de lagerbus, zet hem vast met de borgclip en steek de stekker in de koker met een pen erdoor. Buig en wring de twee liggerstukjes met de hand ±15°: de strook moet soepel veren en terugkomen, de spil mag niet draaien in de bus en de stekker niet los. Daarna stangkruisje (4) en staafje (5) zoals hieronder.',
+    '4. Stangkruisje: leg de asjes in het oogvorkje, lijm de klemlip ertegen en steek een pen door het kruisje en het stangstukje met de gewone gat-kant. Het stangetje moet alle kanten op kunnen kantelen. Aan de andere kant (zandlopergat) moet een pen ±35° kunnen kantelen.',
+    '5. Staafje: een staafje van 2 mm moet stroef in de buisligger schuiven (eventueel nabewerken met een boortje van 2 mm).'); else
   if(D.twist3) L.push((D.tiles?'3. Kruisstuk: steek de spil in de lagerbus van het liggerstuk, schuif de borgclip zijwaarts in het groefje van de spil en lijm hem op de voorkant van de lagerbus (geen lijm op de spil).':'3. Kruisstuk: steek de spil in de lagerbus van het liggerstuk en lijm de borgring op het uiteinde van de spil.')+' Steek een pen door de lipjes van het vorkstuk en het blokje. Het blokje moet om de pen en om de spil vrij kunnen draaien.',
     '4. Stangkruisje: leg de asjes in het oogvorkje, lijm de klemlip ertegen en steek een pen door het kruisje en het stangstukje met de gewone gat-kant. Het stangetje moet alle kanten op kunnen kantelen. Aan de andere kant (zandlopergat) moet een pen ±35° kunnen kantelen.',
     '5. Staafje: een staafje van 2 mm moet stroef in de buisligger schuiven (eventueel nabewerken met een boortje van 2 mm).');
