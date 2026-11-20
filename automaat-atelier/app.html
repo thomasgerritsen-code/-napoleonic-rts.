@@ -490,7 +490,7 @@ function derive(alt){
   d.yB=d.Hb+P.height;
   d.Wh=Math.max(38, rmax+8, Math.max(...d.fw)+8, d.fwp+8);
   d.zFront=Math.max(zmax+8, d.zPost+4.2+7, d.pitchOn? d.ze+10 : -1e9);
-  d.zBack=Math.min(zmin-2-2-28-3, d.zPost-4.2-6-28, d.pitchOn? d.ze-10-28-3 : 1e9, d.zFront-70);
+  d.zBack=Math.min(zmin-2-2-28-3, d.zPost-4.2-6-28, d.pitchOn? d.ze-10-28-3 : 1e9, d.zFront-70); if(pre.v6&&!d.crank) d.zBack-=CPL6+BAY6; /* 6.0: ruimte voor de slipkoppeling en het batterijvak achterin */
   d.pivotY=(i,th)=>d.Hb+7+d.e[i]+d.e[i]*d.W.f(th+d.phi[i]);
   d.barY=(i,q)=>d.Hb+7+d.e[i]+d.lift+(q-d.Rb[i]);   // hoogte dwarsbalk(pen) bij volgerstand q
   d.yr=d.e.map(e=>d.Hb+7+e+d.lift); d.xr=d.xp.map(x=>x-d.d0);
@@ -1494,7 +1494,7 @@ function plateWithPockets(shape,pockets){ const T=3, ds=[...new Set(pockets.map(
   slab(-T/2,T/2-ds[0],99); for(let k=0;k<ds.length;k++) slab(T/2-ds[k],T/2-(ds[k+1]??0),ds[k]);
   return merge(out); }
 function applyPockets(){ if(!D.v6||!G.box) return; const hosts={top:{geo:G.box.top,shape:G.box.topShape,y:D.Hb,pk:[]},bottom:{geo:G.box.bottom,shape:G.box.bottomShape,y:3,pk:[]}}, plugged=new Set(), v=new THREE.Vector3();
-  asm.updateMatrixWorld(true); const glued=[]; asm.traverse(o=>{ if(o.isMesh&&/^(gbr\d+|gpb|pp\d+[RL]|motorh)$/.test(o.userData.tag||'')) glued.push(o); });
+  asm.updateMatrixWorld(true); const glued=[]; asm.traverse(o=>{ if(o.isMesh&&/^(gbr\d+|gpb|pp\d+[RL]|motorh|bayf)$/.test(o.userData.tag||'')) glued.push(o); });
   const info=glued.map(o=>{ const a=o.geometry.attributes.position.array; let ymin=1e9; const W=[]; for(let i=0;i<a.length;i+=3){ v.set(a[i],a[i+1],a[i+2]).applyMatrix4(o.matrixWorld); W.push(v.x,v.y,v.z); if(v.y<ymin) ymin=v.y; } return {o,W,ymin}; }); /* eerst alles meten, dan pas nokjes toevoegen (links en rechts delen dezelfde vorm) */
   for(const {o,W,ymin} of info){
     let host=null, d=0.6, cy=0; if(Math.abs(ymin-1)<0.1){ host=hosts.bottom; d=2.0; cy=3-0.05; } else if(Math.abs(ymin-3)<0.1){ host=hosts.bottom; cy=ymin+0.05; } else if(Math.abs(ymin-D.Hb)<0.1){ host=hosts.top; cy=ymin+0.05; } if(!host) continue;
@@ -1504,8 +1504,8 @@ function applyPockets(){ if(!D.v6||!G.box) return; const hosts={top:{geo:G.box.t
     if(!q) continue; host.pk.push(q);
     if(d<1&&!plugged.has(o.geometry)){ plugged.add(o.geometry); const px0=q.x0+0.2, px1=q.x1-0.2, pz0=q.z0+0.2, pz1=q.z1-0.2, bx=new THREE.BoxGeometry(px1-px0,d,pz1-pz0); bx.translate((px0+px1)/2,ymin-d/2,(pz0+pz1)/2); bx.applyMatrix4(new THREE.Matrix4().copy(o.matrixWorld).invert()); appendGeo(o.geometry,[bx.toNonIndexed()]); const pp=PARTS.find(r=>r.geo===o.geometry); if(pp) finalizePart(pp); } }
   window.__pk={top:hosts.top.pk.length,bottom:hosts.bottom.pk.map(q=>[q.x0,q.x1,q.z0,q.z1,q.d].map(v=>+v.toFixed(1))),W:D.Wh,zb:D.zBack,zf:D.zFront};
-  for(const k of ['top','bottom']){ const h=hosts[k]; if(!h.pk.length||!h.shape) continue; const ng=plateWithPockets(h.shape,h.pk); const p=PARTS.find(q=>q.geo===h.geo); asm.traverse(o=>{ if(o.isMesh&&o.geometry===h.geo) o.geometry=ng; }); if(p){ p.geo=ng; finalizePart(p); CODE_GEO.set(ng,p); } if(k==='top') G.box.top=ng; else G.box.bottom=ng; } }
-function buildBox(){
+  for(const k of ['top','bottom']){ const h=hosts[k]; if(!h.pk.length||!h.shape) continue; let ng=plateWithPockets(h.shape,h.pk); if(k==='top'&&G.box.topExtra&&G.box.topExtra.length) ng=merge([ng,...G.box.topExtra.map(g=>g.clone())]); /* klikrandjes van de deur blijven */ const p=PARTS.find(q=>q.geo===h.geo); asm.traverse(o=>{ if(o.isMesh&&o.geometry===h.geo) o.geometry=ng; }); if(p){ p.geo=ng; finalizePart(p); CODE_GEO.set(ng,p); } if(k==='top') G.box.top=ng; else G.box.bottom=ng; } }
+function buildBox(){ if(D.v6) return buildBoxV6();
   const W=D.Wh, zb=D.zBack, zf=D.zFront, H=D.Hb;
   const rect=(x0,y0,x1,y1)=>shapeFrom([[x0,y0],[x1,y0],[x1,y1],[x0,y1]]);
   const top=rect(-W,zb,W,zf); top.holes.push(circlePath(0,D.zPost,D.heaveOn?4.35:4.2));
@@ -1524,6 +1524,39 @@ function buildBox(){
   };
 }
 
+// 6.0 hufterproef: wanden 3,2 mm (naar buiten dikker, binnenmaten gelijk), afgeronde hoeken, roosters met spleten van 4 mm i.p.v. open ramen;
+// links blijft aan de binnenkant een uitsparing van 2 mm waar de geleidearmpjes doorheen zwaaien, met 1,2 mm dichte wand erachter
+const CPL6=13, BAY6=38; /* 6.0: lengte slipkoppeling en batterijvak (achter de motor) */
+const BOX6={WT:3.2,r:3.2,slot:4,pitch:7,recess:2.0,door:2.2,latch:[[-76,-50],[-6,28]]}; /* klikrandjes niet waar volger 3 vlak langs de wand loopt (z -45..-30) */
+function rrect(x0,y0,x1,y1,r){ const s=new THREE.Shape(); s.moveTo(x0+r,y0); s.lineTo(x1-r,y0); s.absarc(x1-r,y0+r,r,-Math.PI/2,0,false); s.lineTo(x1,y1-r); s.absarc(x1-r,y1-r,r,0,Math.PI/2,false); s.lineTo(x0+r,y1); s.absarc(x0+r,y1-r,r,Math.PI/2,Math.PI,false); s.lineTo(x0,y0+r); s.absarc(x0+r,y0+r,r,Math.PI,1.5*Math.PI,false); return s; }
+function grille(x0,y0,x1,y1){ const out=[], w=BOX6.slot, n=Math.max(1,Math.floor((x1-x0+BOX6.pitch-w)/BOX6.pitch)), used=n*BOX6.pitch-(BOX6.pitch-w), xs=x0+(x1-x0-used)/2; /* spleten van 4 mm: geen vingers bij nokken en volgers */
+  for(let k=0;k<n;k++){ const a=xs+k*BOX6.pitch, r=w/2, pts=[]; for(let q=0;q<=10;q++){ const t=Math.PI+Math.PI*q/10; pts.push(new THREE.Vector2(a+r+r*Math.cos(t),y0+r+r*Math.sin(t))); } for(let q=0;q<=10;q++){ const t=Math.PI*q/10; pts.push(new THREE.Vector2(a+r+r*Math.cos(t),y1-r+r*Math.sin(t))); } out.push(new THREE.Path(pts)); } return out; }
+function buildBoxV6(){ const W0=D.Wh, zb0=D.zBack, zf0=D.zFront, H=D.Hb, T=BOX6.WT, r=BOX6.r, d=T-2.4, W=W0+d, zb=zb0-d, zf=zf0+d;
+  const top=rrect(-W,zb,W,zf,r); top.holes.push(circlePath(0,D.zPost,D.heaveOn?4.35:4.2));
+  const slot=(x0,x1,z0,z1)=>{ const h=new THREE.Path(); h.moveTo(x0,z0); h.lineTo(x1,z0); h.lineTo(x1,z1); h.lineTo(x0,z1); h.closePath(); top.holes.push(h); };
+  if(D.pitchOn){ const z=D.ze; slot(-3.4,3.4,z+V6.zA-V6.tw/2-0.5,z+V6.zB+V6.tw/2+0.5); }
+  for(let i=0;i<D.n;i++){ const z=D.z[i]; slot(-5.4,3.9,z+V6.zA-V6.tw/2-0.5,z+V6.zB+V6.tw/2+0.5); }
+  const xi=W-T, DR=BOX6.door, hy=3+DR, front=shapeFrom([[-xi,3],[W,3],[W,hy+DR+1.8],[xi,hy+DR+1.8],[xi,H-3],[-xi,H-3]]); front.holes.push(circlePath(0,D.yc,1.8)); front.holes.push(circlePath(W-DR,hy,D.rh)); /* rechtsonder: gat voor de scharnierpen van de deur */ if(xi>19) for(const g of [...grille(-xi+4,9,-6,H-10),...grille(6,9,xi-4,H-10)]) front.holes.push(g);
+  const back=shapeFrom([[-xi,3],[W,3],[W,hy+DR+1.8],[xi,hy+DR+1.8],[xi,H-3],[-xi,H-3]]); back.holes.push(circlePath(W-DR,hy,D.rh)); if(H>40) for(const g of grille(2,9,xi-4,H-10)) back.holes.push(g);
+  { const sx=-xi/2, sy=Math.min(H-24,46); back.holes.push(new THREE.Path([[sx-5.1,sy],[sx+5.1,sy],[sx+5.1,sy+15.2],[sx-5.1,sy+15.2],[sx-5.1,sy]].map(([x,y])=>new THREE.Vector2(x,y)))); } /* gat voor een mini-tuimelschakelaar (KCD11, 10 × 15 mm) */
+  const zi0=zb+T, zi1=zf-T, sideShape=(withGrille)=>{ const sh=shapeFrom([[zi0,3],[zi1,3],[zi1,H-3],[zi0,H-3]]); if(withGrille&&zi1-zi0>40&&H>40) for(const g of grille(zi0+7,9,zi1-7,H-(D.v6?7:10))) sh.holes.push(g); return sh; };
+  const corner=(sx,sz,y0=3)=>{ const cx=sx*(W-r), cz=sz>0?zf-r:zb+r, a0=sx>0?(sz>0?0:-Math.PI/2):(sz>0?Math.PI/2:Math.PI), q=new THREE.Shape(); q.moveTo(cx,cz); q.absarc(cx,cz,r,a0,a0+Math.PI/2,false); q.lineTo(cx,cz); const c=plateXZ(q,H-3-y0); c.translate(0,(H-3+y0)/2,0); return c; }; /* afgeronde verticale hoek (kwart cilinder), hoort bij de zijwand */
+  // zijwanden in hun eigen assen (x=0 midden van de wand); hoeken erbij
+  const sideAt=(sx,geoParts)=>{ const g=merge(geoParts); return g; };
+  const plateAtX=(sh,x0,x1)=>{ const g=plateYZ(sh,x1-x0); g.translate((x0+x1)/2,0,0); return g; };
+  const xc=W-T/2, mkCorners=(sx)=>[1,-1].map(sz=>{ const c=corner(sx,sz); c.translate(-sx*xc,0,0); return c; });
+  // deur (rechts): klapt open om een filamentpen door een buisje langs de onderrand (pen loopt door voor- en achterwand); klikt dicht achter een randje onder het deksel
+  const dsh=shapeFrom([[zi0,hy],[zi1,hy],[zi1,H-3],[zi0,H-3]]); if(zi1-zi0>40&&H>40) for(const g of grille(zi0+7,hy+DR+4,zi1-7,H-(D.v6?7:10))) dsh.holes.push(g);
+  const latchZ=BOX6.latch.map(([a,b])=>[Math.max(zi0+3,a),Math.min(zi1-3,b)]).filter(([a,b])=>b-a>6);
+  const bumps=latchZ.map(([a,b])=>{ const g=new THREE.BoxGeometry(0.6,0.6,b-a); g.translate(-T/2-0.3,H-3-1.5,(a+b)/2); return g; }); /* nokje aan de binnenkant: klikt achter het randje onder het deksel */
+  const right=merge([plateAtX(dsh,-T/2,T/2),tubeZ(D.rh,DR,zi0+0.3,zi1-0.3,T/2-DR,hy),...bumps]); /* buisje gelijk met de buitenkant: de deur print plat op zijn buitenkant */
+  const frontC=corner(1,1,hy+DR+1.8), backC=corner(1,-1,hy+DR+1.8); frontC.translate(0,0,-(zf-T/2)); backC.translate(0,0,-(zb+T/2));
+  const lw=shapeFrom([[zi0,3],[zi1,3],[zi1,H-3],[zi0,H-3]]), lwIn=shapeFrom([[zi0,3],[zi1,3],[zi1,H-3],[zi0,H-3]]); if(zi1-zi0>40&&H>40) lwIn.holes.push(((x0,y0,x1,y1,rr)=>{ const p=new THREE.Path(); p.moveTo(x0+rr,y0); p.lineTo(x1-rr,y0); p.absarc(x1-rr,y0+rr,rr,-Math.PI/2,0,false); p.lineTo(x1,y1-rr); p.absarc(x1-rr,y1-rr,rr,0,Math.PI/2,false); p.lineTo(x0+rr,y1); p.absarc(x0+rr,y1-rr,rr,Math.PI/2,Math.PI,false); p.lineTo(x0,y0+rr); p.absarc(x0+rr,y0+rr,rr,Math.PI,1.5*Math.PI,false); return p; })(zi0+7,9,zi1-7,H-7,5));
+  const outT=T-BOX6.recess, left=merge([plateAtX(lw,-T/2,-T/2+outT),plateAtX(lwIn,-T/2+outT,T/2),...mkCorners(-1)]); /* links: buiten dicht (1,2 mm), binnen een uitsparing voor de geleidearmpjes */
+  const ridges=BOX6.latch.map(([a,b])=>[Math.max(zi0+3,a),Math.min(zi1-3,b)]).filter(([a,b])=>b-a>6).map(([a,b])=>{ const g=new THREE.BoxGeometry(1.0,1.0,b-a); g.translate(W-T-0.9,-2.0,(a+b)/2); return g; }); /* randjes onder het deksel waar de deur achter klikt */
+  return { topShape:top, bottomShape:rrect(-W,zb,W,zf,r), top:merge([plateXZ(top,3),...ridges.map(g=>g.clone())]), topExtra:ridges, bottom:merge([plateXZ(rrect(-W,zb,W,zf,r),3)]),
+    front:merge([plateXY(front,T),frontC]), back:merge([plateXY(back,T),backC]), side:right, sideL:left, door:{hy,DR,latchZ},
+    pos:{top:[0,H-1.5,0],bottom:[0,1.5,0],front:[0,0,zf-T/2],back:[0,0,zb+T/2],sideR:[xc,0,0],sideL:[-xc,0,0]} }; }
 // geleideblok(ken) onder het deksel: houden de volgers recht (lange geleiding i.p.v. alleen de 3 mm van het deksel)
 function guideGroups(){ const zs=[...D.z]; if(D.pitchOn) zs.push(D.ze); zs.sort((a,b)=>a-b); const g=[]; for(const z of zs){ const last=g[g.length-1]; if(last&&z-last[last.length-1]<14) last.push(z); else g.push([z]); } return g; }
 function buildGuide(zs){ const z0=zs[0]-4.6, z1=zs[zs.length-1]+4.6, sh=shapeFrom([[-7,z0],[7,z0],[7,z1],[-7,z1]]);
@@ -1532,7 +1565,7 @@ function buildGuide(zs){ const z0=zs[0]-4.6, z1=zs[zs.length-1]+4.6, sh=shapeFro
 // afstandsbusjes op de as tussen de nokken (houden ze op hun plek)
 function shaftItems(){ const it=[]; D.z.forEach(z=>it.push(D.forced?[z-6.8,z-2.3]:[z-2,z+2])); if(D.pitchOn) it.push([D.ze-6.8,D.ze-2.3]); if(D.heaveOn) it.push([D.zPost-2,D.zPost+2]);
   it.sort((a,b)=>a[0]-b[0]); return it; }
-function spacerList(){ const it=shaftItems(), zMot=D.zBack+2.4+(D.crank?0:24), zWall=D.zFront-2.4, out=[]; let prev=zMot;
+function spacerList(){ const it=shaftItems(), zMot=D.zBack+2.4+(D.crank?0:24)+(D.v6&&!D.crank?BAY6+CPL6:0), zWall=D.zFront-2.4, out=[]; let prev=zMot;
   for(const [a,b] of it){ const g=a-prev; if(g>0.8) out.push({z0:prev+0.2,len:Math.round((g-0.4)*10)/10}); prev=Math.max(prev,b); }
   const g=zWall-prev; if(g>0.8) out.push({z0:prev+0.2,len:Math.round((g-0.4)*10)/10}); return out; }
 function buildSpacer(len){ const od=D.v6?5.6:SPACER_OD; /* 6.0: dunner, het geleidearmpje zwaait er vlak langs */ const pts=[[1.7,0],[od/2,0],[od/2,len],[1.7,len],[1.7,0]].map(p=>new THREE.Vector2(p[0],p[1])); const g=new THREE.LatheGeometry(pts,28); return merge([g]); }
@@ -1558,6 +1591,18 @@ function buildGearCover(){ const cs=gearCenters(), R=gearRadii(), x0=Math.min(..
 function buildCrankArm(){ const r=D.crankR, sh=shapeFrom(dedupe(strokeOutline([[0,0],[r,0]],[9,7],12))); sh.holes.push(dHole()); sh.holes.push(circlePath(r,0,1.6));
   return plateXY(sh,4); }
 function buildKnob(){ const pts=[[0.9,0],[4.5,0],[5,2],[5,16],[4,18],[0.9,18],[0.9,0]].map(q=>new THREE.Vector2(q[0],q[1])); return merge([new THREE.LatheGeometry(pts,28)]); }
+// batterijvak (6.0): verhoogde vloer (over het scharnierbuisje van de deur heen) en een lade voor een batterijhouder 2× AA (± 58 × 32 × 16 mm) die door de deur naar buiten schuift
+const BAT6={y0:8,h:14,t:1.6};
+function bayDims(){ const xi=D.Wh-2.4, z0=D.zBack+2.4+0.4, z1=D.zBack+2.4+BAY6-0.4; return {xi,z0,z1}; }
+function buildBayFloor(){ const {xi,z0,z1}=bayDims(), xa=-xi+0.3, xb=D.Wh+(BOX6.WT-2.4)-2*BOX6.door-0.4, b=new THREE.BoxGeometry(xb-xa,BAT6.y0-3,z1-z0); b.translate((xa+xb)/2,(3+BAT6.y0)/2,(z0+z1)/2); return merge([b]); } /* stopt vóór het scharnierbuisje van de deur */
+function buildBatTray(){ const {xi,z0,z1}=bayDims(), t=BAT6.t, x1=xi-0.5, x0=x1-62, za=z0+0.3, zb=z1-0.3, y0=BAT6.y0+0.1, y1=y0+BAT6.h, it=[], box=(a,b,c,d,e,f)=>{ const g=new THREE.BoxGeometry(b-a,d-c,f-e); g.translate((a+b)/2,(c+d)/2,(e+f)/2); it.push(g); };
+  box(x0,x1,y0,y0+t,za,zb); box(x0,x0+t,y0,y1,za,zb); box(x1-t,x1,y0,y1,za,zb); box(x0+t,x1-t,y0,y1,zb-t,zb);
+  box(x0+t,x0+5,y0,y1,za,za+t); box(x0+11,x1-t,y0,y1,za,za+t); box(x0+5,x0+11,y0,y1-7,za,za+t); /* uitsparing voor de draden achterin */ box(x0+7.4,x0+8.6,y1-7,y1,za,za+t); /* het tussenstukje laat een spleet van 1,2 mm: daar klem je de draad in (trekontlasting) */
+  box(x1-t-7,x1-t,y1-t,y1,za+t,zb-t); /* greep: lipje bovenop de kant van de deur */ return merge(it); }
+// slipkoppeling (6.0): naaf op de motoras met een kom, naaf op de nokas met een O-ring (6 × 1,5 mm) die in de kom klemt. Wordt een vleugel vastgehouden, dan slipt de O-ring
+function buildCouplingM(){ const a=shapeFrom(circPts(0,0,6,40)); a.holes.push(dHole()); const g1=plateXY(a,5); g1.translate(0,0,2.5); const b=shapeFrom(circPts(0,0,6,40)); b.holes.push(circlePath(0,0,4.7)); const g2=plateXY(b,4); g2.translate(0,0,7); return merge([g1,g2]); }
+function buildCouplingA(){ const disc=(r,z0,z1)=>{ const sh=shapeFrom(circPts(0,0,r,40)); sh.holes.push(dHole()); const g=plateXY(sh,z1-z0); g.translate(0,0,(z0+z1)/2); return g; };
+  return merge([disc(4.5,5.3,6.2),disc(3.3,6.2,7.9),disc(4.5,7.9,9.2),disc(6,9.2,12.2)]); } /* spil Ø9 in de kom Ø9,4; groef Ø6,6 voor de O-ring (die steekt 0,1 mm uit en klemt) */
 function buildMotorHolder(){ const y0=3, yt=D.yc+3, sh=shapeFrom([[-9,y0],[9,y0],[9,yt],[6.15,yt],[6.15,D.yc-5.15],[-6.15,D.yc-5.15],[-6.15,yt],[-9,yt]]); return merge([plateXY(sh,14)]); }
 const rotX=(a)=>new THREE.Matrix4().makeRotationX(a), rotZ=(a)=>new THREE.Matrix4().makeRotationZ(a), I4=()=>new THREE.Matrix4();
 let PARTS=[], G={};
@@ -1663,6 +1708,8 @@ function buildParts(){
   const sp={}; for(const x of spacerList()){ const k=x.len.toFixed(1); (sp[k]=sp[k]||[]).push(x); }
   G.spacers=Object.keys(sp).map(k=>({list:sp[k],geo:add('afstandsbus_'+k.replace('.','_')+'mm','Afstandsbus '+k.replace('.',',')+' mm',sp[k].length,buildSpacer(+k),I4(),'mech').geo}));
   G.motorH=D.crank?null:add('motorhouder','Motorhouder N20',1,buildMotorHolder(),rotX(-Math.PI/2),'mech').geo;
+  G.bayF=null; if(D.v6&&!D.crank){ G.bayF=add('batterijvak_vloer','Batterijvak: verhoogde vloer (op de bodem lijmen, achterin)',1,buildBayFloor(),I4(),'mech').geo; G.batTray=add('batterijlade','Batterijlade voor een houder 2× AA (schuift door de deur naar buiten)',1,buildBatTray(),I4(),'mech').geo; }
+  G.cplM=null; if(D.v6&&!D.crank){ G.cplM=add('koppeling_motor','Slipkoppeling, naaf op de motoras (met kom)',1,buildCouplingM(),I4(),'mech').geo; G.cplA=add('koppeling_as','Slipkoppeling, naaf op de nokas (O-ring 6 × 1,5 mm in de groef)',1,buildCouplingA(),rotX(Math.PI),'mech').geo; }
   G.gb=null; if(D.crank){ G.gb={gears:[]}; const cs=gearCenters();
     D.gst.forEach(([Ng,Np],k)=>{ // trap k: rondsel Np op as k, tandwiel Ng op as k+1
       const pin=k===0?add('rondsel_'+Np,`Rondsel ${Np} tanden (op de nokas, D-gat)`,1,gearPlate(Np,'D'),I4(),'mech').geo:null;
@@ -1671,9 +1718,9 @@ function buildParts(){
     if(D.gst.length===2){ const [Ng1,Np1]=D.gst[0], [Ng2,Np2]=D.gst[1]; const g=merge([gearPlate(Ng1,'o'),(()=>{ const p=gearPlate(Np2,'o'); p.translate(0,0,-(D.gw+1)); return p; })(),tubeZ(1.75,4,-(D.gw+1)-D.gw/2,D.gw/2,0,0)]); G.gb.comp=add('tandwiel_dubbel',`Dubbel tandwiel ${Ng1}/${Np2} tanden (losdraaiend op de tussenas)`,1,g,I4(),'mech').geo; }
     G.gb.cover=add('tandwielkap','Tandwielkap met 4 afstandspootjes',1,buildGearCover(),I4(),'mech').geo;
     G.gb.arm=add('zwengel','Zwengel (D-gat)',1,buildCrankArm(),I4(),'mech').geo; G.gb.knob=add('handvat','Handvat (draait los op een pen van 1,75 mm)',1,buildKnob(),rotX(-Math.PI/2),'mech').geo; }
-  add('sokkel_deksel','Sokkel deksel',1,box.top,I4(),'box'); add('sokkel_bodem','Sokkel bodem',1,box.bottom,I4(),'box');
+  add('sokkel_deksel','Sokkel deksel',1,box.top,D.v6?rotX(Math.PI):I4(),'box'); /* 6.0: klikrandjes aan de onderkant, dus ondersteboven printen */ add('sokkel_bodem','Sokkel bodem',1,box.bottom,I4(),'box');
   add('sokkel_voor','Sokkel voorwand',1,box.front,rotX(-Math.PI/2),'box'); add('sokkel_achter','Sokkel achterwand',1,box.back,rotX(-Math.PI/2),'box');
-  add('sokkel_zijwand','Sokkel zijwand',2,box.side,rotZ(Math.PI/2),'box');
+  if(box.sideL){ add('sokkel_deur','Sokkel deur rechts (klapt open om een filamentpen langs de onderrand; klikt dicht onder het deksel)',1,box.side,rotZ(-Math.PI/2),'box'); add('sokkel_zijwand_links','Sokkel zijwand links (dicht; uitsparing binnen voor de geleidearmpjes)',1,box.sideL,rotZ(-Math.PI/2),'box'); } else add('sokkel_zijwand','Sokkel zijwand',2,box.side,rotZ(Math.PI/2),'box');
   for(const p of PARTS) finalizePart(p);
   assignCodes();
   setupPhysics();
@@ -1693,7 +1740,7 @@ function orientStats(geo,rot){ const a=geo.attributes.position.array, m=rot.elem
 const ORIENTS=[()=>I4(),()=>rotX(-Math.PI/2),()=>rotX(Math.PI/2),()=>rotX(Math.PI),()=>rotZ(Math.PI/2),()=>rotZ(-Math.PI/2)];
 function autoOrient(p){ const sc=(r)=>{ const o=orientStats(p.geo,r); return {r,o,v:o.base-1.5*o.over}; }; let cur=sc(p.rot), best=cur; for(const f of ORIENTS){ const c=sc(new THREE.Matrix4().multiplyMatrices(f(),p.rot)); if(c.v>best.v+1e-6) best=c; } if(best!==cur&&best.v>cur.v+3&&best.o.base>cur.o.base*1.2+1){ p.rot=best.r; p.autoRot=true; } } /* 6.0: kies de stand met het grootste vlak op het bed en de minste overhang */
 // vaste onderdeelnummers: letter per groep, nummer op alfabetische volgorde binnen de groep (blijft gelijk zolang de groep niet verandert)
-const CODE_GROUPS=[['S',/^(sokkel_|motorhouder|afstandsbus_|zwengel|handvat|tandwiel)/],['P',/^(vinpunt|tuimelaar_punt|koppel_punt|puntoog|punt)/],['L',/^(lijf_|paal|draaibeugel|kanteloog|kop|staart|achterlijf|buik)/],['A',/^(nok|volger|geleide|tuimelaar|draaipunt|stang_\d|volgerstangetje|kantel)/],['V',/^(vleugel|skelet|schub|vaste_schub|los_|draaistang|kruisstuk|buigkoppeling|stangkruisje|klemlip|borgclip|borgring|oog)/],['K',/./]];
+const CODE_GROUPS=[['S',/^(sokkel_|motorhouder|afstandsbus_|zwengel|handvat|tandwiel)/],['P',/^(vinpunt|tuimelaar_punt|koppel_punt|puntoog|punt)/],['L',/^(lijf_|paal|draaibeugel|kanteloog|kop|staart|achterlijf|buik)/],['A',/^(nok|volger|geleide|tuimelaar|draaipunt|stang_\d|volgerstangetje|kantel|koppeling_)/],['V',/^(vleugel|skelet|schub|vaste_schub|los_|draaistang|kruisstuk|buigkoppeling|stangkruisje|klemlip|borgclip|borgring|oog)/],['K',/./]];
 function codeGroup(id){ for(const [c,re] of CODE_GROUPS) if(re.test(id)) return c; return 'K'; }
 function assignCodes(){ const by={}; for(const p of PARTS){ const g=codeGroup(p.id); (by[g]=by[g]||[]).push(p); } const nat=(a,b)=>a.id.localeCompare(b.id,'nl',{numeric:true});
   for(const g in by) by[g].sort(nat).forEach((p,k)=>{ p.code=g+String(k+1).padStart(2,'0'); }); CODE_GEO=new Map(); for(const p of PARTS){ CODE_GEO.set(p.geo,p); } }
@@ -2000,15 +2047,17 @@ function buildScene(){
     M.headRod=mk(G.headRod,MAT.seg[3]); M.headRod.userData.tag='headrod'; }
   if(D.heaveOn){ M.hcam=mk(G.hcam,MAT.motor); M.hcam.position.set(0,D.yc,D.zPost); M.hcam.userData.tag='hcam'; const bu=mk(G.bush,MAT.motor); bu.position.set(0,D.Hb,D.zPost); bu.userData.tag='bush'; }
   const b=G.box, bp=b.pos;
-  M.box=[mk(b.top,MAT.wood),mk(b.bottom,MAT.wood),mk(b.front,MAT.wood),mk(b.back,MAT.wood),mk(b.side,MAT.wood),mk(b.side,MAT.wood)];
+  M.box=[mk(b.top,MAT.wood),mk(b.bottom,MAT.wood),mk(b.front,MAT.wood),mk(b.back,MAT.wood),mk(b.side,MAT.wood),mk(b.sideL||b.side,MAT.wood)];
   M.box[0].position.set(...bp.top); M.box[1].position.set(...bp.bottom); M.box[2].position.set(...bp.front); M.box[3].position.set(...bp.back); M.box[4].position.set(...bp.sideR); M.box[5].position.set(...bp.sideL);
   M.box.forEach(m=>{ m.renderOrder=2; m.userData.tag='box'; });
   for(const gd of G.guides){ const m=mk(gd.geo,MAT.wood); m.position.set(0,D.Hb-3-GUIDE_H/2,0); m.renderOrder=2; M.box.push(m); m.userData.tag='guide'; }
   for(const sg of G.spacers) for(const x of sg.list){ const m=mk(sg.geo,MAT.steel); m.rotation.x=Math.PI/2; m.position.set(0,D.yc,x.z0); m.userData.tag='spacer'; }
   M.gb=null;
-  if(!D.crank){ M.motorH=mk(G.motorH,MAT.motor); M.motorH.position.set(0,0,D.zBack+2.4+12); M.motorH.userData.tag='motorh';
-    const zm=D.zBack+2.4, shaftLen=D.zFront-(zm+26);
-    const sh=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,shaftLen,12),MAT.steel); sh.userData.own=true; sh.rotation.x=Math.PI/2; sh.position.set(0,D.yc,zm+26+shaftLen/2); sh.castShadow=true; asm.add(sh);
+  if(!D.crank){ const bay=D.v6?BAY6:0, cpl=D.v6?CPL6:0; M.motorH=mk(G.motorH,MAT.motor); M.motorH.position.set(0,0,D.zBack+2.4+bay+12); M.motorH.userData.tag='motorh';
+    const zm=D.zBack+2.4+bay, shaftLen=D.zFront-(zm+26+cpl);
+    if(D.v6&&G.bayF){ const f=mk(G.bayF,MAT.motor); f.userData.tag='bayf'; const tr=mk(G.batTray,MAT.motor); tr.userData.tag='bat'; }
+    if(D.v6&&G.cplM){ const hm=mk(G.cplM,MAT.motor); hm.position.set(0,D.yc,zm+24+0.5); hm.userData.tag='cplm'; const ha=mk(G.cplA,MAT.motor); ha.position.set(0,D.yc,zm+24+0.5); ha.userData.tag='cpla'; } /* slipkoppeling */
+    const sh=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,shaftLen,12),MAT.steel); sh.userData.own=true; sh.rotation.x=Math.PI/2; sh.position.set(0,D.yc,zm+26+cpl+shaftLen/2); sh.castShadow=true; asm.add(sh);
     const mo=new THREE.Mesh(new THREE.BoxGeometry(12,10,24),MAT.motor); mo.userData.own=true; mo.position.set(0,D.yc,zm+13); asm.add(mo); }
   else { const cs=gearCenters(), zc=gbCoverZ(), shaft=(x,y,z0,z1)=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,z1-z0,12),MAT.steel); m.userData.own=true; m.rotation.x=Math.PI/2; m.position.set(x,y,(z0+z1)/2); m.castShadow=true; asm.add(m); };
     shaft(0,D.yc,zc-1.2,D.zFront); for(let k=1;k<cs.length;k++) shaft(cs[k].x,cs[k].y,(k===cs.length-1?zc-1.2-8:zc-1.2),D.zBack+2.4);
@@ -2044,6 +2093,7 @@ function addPins(inner){ M.pinList=[]; const P=(par,x,y,z,len,axis)=>{ if(!par) 
   if(M.parm) for(const g of M.parm){ P(g,0,0,0,9,'z'); P(g,PLA,0,0,9,'z'); }
   if(M.plink){ P(M.plink,0,0,0,9,'z'); P(M.plink,D.Lp,0,0,9,'z'); }
   if(M.headRod&&D.headL){ P(M.headRod,0,0,0,9,'z'); P(M.headRod,D.headL,0,0,9,'z'); }
+  if(D.v6&&G.box&&G.box.door&&M.box){ const d=BOX6.WT-2.4, W=D.Wh+d, zf=D.zFront+d, zb=D.zBack-d; P(M.box[2],W-G.box.door.DR,G.box.door.hy,-(zf-zb)/2+BOX6.WT/2,zf-zb,'z'); } /* scharnierpen van de deur: één stuk filament door voorwand, deur en achterwand */
   if(D.twist3) for(let i=1;i<D.n;i++) for(const sd of ['R','L']){ const c=M.cr3[sd][i]; if(c) P(c,0,0,0,16,'z'); if(D.tpu) P((sd==='R'?M.segR:M.segL)[i-1],D.l+FLEX.pinX,0,D.zA3,D.t,'y'); const t=M.tl3[sd][i]; if(t){ P(t,0,0,0,9,'z'); P(t,D.Lh3[i],0,0,9,'z'); } }
   if(M.tip3) for(const sd of ['R','L']){ const o=M.tip3[sd]; const dz=D.v6?0:1; P(o.rk,0,0,-dz,7,'z'); P(o.rk,0,D.T3.a1,dz,7,'z'); P(o.rk,0,-D.T3.a2,dz,7,'z'); P(o.c1,0,0,0,9,'z'); P(o.c1,D.T3.L1,0,0,9,'z'); P(o.c2,0,0,0,9,'z'); P(o.c2,D.T3.L2,0,0,9,'z'); }
   M.fil=null; if(D.tiles){ M.fil=[]; for(const sd of [1,-1]){ const l=new THREE.Mesh(new THREE.BufferGeometry(),MAT_PIN); l.userData.pin=true; l.userData.own=true; l.frustumCulled=false; inner.add(l); M.fil.push({l,sg:sd}); M.pinList.push(l); } } }
@@ -2937,7 +2987,7 @@ function renderParts(){
        `As 3 mm met vlakke kant voor de zwengel, lengte ${Math.round(D.zBack+2.4-gbCoverZ()+10)} mm`,
        `Pen van 1,75 mm filament (± 20 mm) voor het handvat`]:
      [`Gelijkstroom-tandwielmotor N20, 3–6 V, ongeveer ${Math.max(5,Math.round(P.rpm/5)*5)} rpm, nominaal koppel ≥ ${AN.kgcm.toFixed(2)} kg·cm, met 3 mm D-as`,
-      `As 3 mm met vlakke kant (D-profiel), lengte ${Math.round(D.zFront-(D.zBack+3+24))} mm, of een koppeling op de motoras`,
+      ...(D.v6?[`Stalen as 3 mm met vlakke kant (D-profiel) voor de nokken, lengte ${Math.round(D.zFront-(D.zBack+2.4+BAY6+24+0.5+5.3))} mm (van de slipkoppeling tot door de voorwand)`,`O-ring 6 × 1,5 mm (NBR) voor de slipkoppeling, plus een reserve`]:[`As 3 mm met vlakke kant (D-profiel), lengte ${Math.round(D.zFront-(D.zBack+3+24))} mm, of een koppeling op de motoras`]),
       `Batterijhouder 2× AA met schakelaar, en twee stukjes draad`]),
     ...(M.hinges&&M.hinges.length?[pinHw()]:[`Scharnierpennen van 1,75 mm filament: per vleugel ${pins.map(p=>p+' mm').join(', ')} (2 vleugels)`,
     `${4*D.n} korte pennen van 1,75 mm filament (± 12 mm) voor de stangen; uiteinden licht aansmelten`]),
@@ -3120,7 +3170,12 @@ function readme(){
   { const bs=bedSize(), dg=BEDS.flatMap(b=>b.items).filter(it=>it.diag).map(it=>it.p.name); if(dg.length) L.push('',`LET OP: leg ${[...new Set(dg)].join(', ')} diagonaal op het bed (${bs.x} × ${bs.y} mm); recht past het niet.`); }
   L.push('','PRINTEN','  - Alle bestanden liggen al in de juiste stand: vlakke kant op het bed, bolle kant omhoog. Geen support nodig'+(PARTS.some(p=>WITH_SUPPORT.test(p.id))?', behalve voor de onderdelen onder "Met steun printen" hierboven.':'.'),'  - PLA, 0,2 mm laaghoogte (0,12 mm voor mooiere rondingen), 3 wanden, 15-20% vulling.','  - Scharniergaten en stanggaten zijn 2,0 mm: precies ruimte voor een pen van 1,75 mm filament.','');
   L.push('MONTAGE');
-  L.push('  1. Lijm bodem, voor-, achter- en zijwanden. Het deksel nog los laten.');
+  if(D.v6&&!D.crank){ L.push('  1. Lijm bodem, voorwand, achterwand en de linker zijwand (dicht, de uitsparing aan de binnenkant). Lijm de verhoogde batterijvloer achterin op de bodem (nokjes in de uitsparingen). Het deksel nog los laten.',
+    '     Deur (rechts): zet de deur tegen de bodem met het buisje onderaan aan de buitenkant. Steek één stuk filament van 1,75 mm door het gaatje rechtsonder in de voorwand, door het buisje van de deur en in het gaatje van de achterwand; knip het gelijk af en zet de uiteinden vast met een druppel lijm in de wanden (niet in de deur). De deur klapt naar buiten open en klikt aan de bovenkant achter de randjes onder het deksel.',
+    '     Schakelaar: druk een mini-tuimelschakelaar (KCD11, inbouwmaat 10 × 15 mm) van buiten in het rechthoekige gat in de achterwand.',
+    '     Batterij: leg een batterijhouder 2× AA (± 58 × 32 × 16 mm) in de lade, leid de draden door de uitsparing achterin de lade en klem ze in het spleetje ernaast (trekontlasting). Schuif de lade door de deur op de verhoogde vloer.',
+    '     Slipkoppeling: druk de naaf met de kom op de motoras (D-gat). Leg de O-ring (6 × 1,5 mm) in de groef van de andere naaf, schuif die op de nokas en druk hem in de kom. Wordt een vleugel vastgehouden of geblokkeerd, dan slipt de O-ring en blijven motor en stangen heel. Slipt hij te makkelijk: een tweede O-ring of een iets dikkere; te stroef: een druppel siliconenspray.'); }
+  else L.push('  1. Lijm bodem, voor-, achter- en zijwanden. Het deksel nog los laten.');
   L.push(D.crank?`  2. Schuif de nokas van achteren door de achterwand en de nokken naar het gat in de voorwand. Druk achter de achterwand het rondsel op de nokas (D-gat).${D.gst.length===2?' Steek de tussenas door de achterwand en schuif het dubbele tandwiel erop.':''} Steek de zwengelas door de achterwand, druk het grote tandwiel erop en lijm de tandwielkap met zijn pootjes op de achterwand (alle assen door de gaten). Druk de zwengel op de zwengelas en zet het handvat met een pen van 1,75 mm vast; het handvat moet los kunnen draaien.`:'  2. Zet de motor tegen de achterwand en schuif de as door de nokken naar het gat in de voorwand.');
   L.push('     De D-gaten in de nokken bepalen de fase en de vorm van de slag. Nok 1 hoort onder volger 1 (segment 1 bij het lijf); volgorde zoals in de simulatie.');
   D.phi.forEach((ph,i)=>L.push(`     Nok ${i+1}: ${Math.round(-ph/DEG)} graden fase, slag ${(2*D.e[i]).toFixed(1)} mm, neerslag ${P.down}% van de omwenteling.`));
