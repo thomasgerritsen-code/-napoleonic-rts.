@@ -1122,7 +1122,7 @@ function buildSegment(i){
       const segD=(x,z)=>{ let m=1e9; for(let a=0,b=pts.length-1;a<pts.length;b=a++){ const [xa,za]=pts[a],[xb,zb]=pts[b], dx=xb-xa, dz=zb-za, t=clamp(((x-xa)*dx+(z-za)*dz)/(dx*dx+dz*dz||1),0,1); m=Math.min(m,Math.hypot(x-xa-t*dx,z-za-t*dz)); } return m; };
       const holes=[]; for(const h of hs) for(const [x,z] of dowelPts(h)) if(inPoly(x,z)&&segD(x,z)>D.rh+0.8){ const c=[]; for(let k=0;k<12;k++){ const a=-2*Math.PI*k/12; c.push([x+D.rh*Math.cos(a),z+D.rh*Math.sin(a)]); } holes.push(c); }
       items=heightSolid(pts,holes,thick,2.0,-D.t/2,cf); }
-    const lowI=[]; if(D.tileSym&&i===0) lowI.push(...flipDown(heightSolid(pts,[],(u,z,d)=>inPad(u,z)?0.02:Math.max(0.02,symBot(thickRaw(u,z,d))),2.0,-D.t/2,cf),-D.t/2));
+    const lowI=[]; if(D.tileSym&&i===0) lowI.push(...flipDown(heightSolid(pts,[],(u,z,d)=>inPad(u,z)?0.02:Math.max(D.v6?Math.min(1.0,0.2+d*0.8):0.02,symBot(thickRaw(u,z,d))),2.0,-D.t/2,cf),-D.t/2)); /* 6.0: onderhelft minstens 1 mm (loopt aan de rand in 1 mm af naar 0,2): geen vlies dat de slicer weglaat */
     if(!twRoot&&!t3R) items.push(...knucklesSk(hbR,0,1,skR,zr,0)); if(!last&&!t3T) items.push(...knucklesSk(hbT,l,0,skT,zr,0));
     if(t3R) items.push(sleeveGeo());
     if(D.twist3&&!D.skel) for(const pd of pads){ const uc=(pd.u0+pd.u1)/2, pf=pfA(uc); let z0=pd.z0, z1=pd.z1; if(z0>pf.le-3) z0=pf.le-3; if(z1<pf.te+3) z1=pf.te+3; // lijmblok + brug naar de plaat als het lijmvlak naast de vleugel valt
@@ -1160,7 +1160,7 @@ function hangers(i){ const t=D.t, zA=D.zA3, out=[]; if(!D.twist3) return out;
   if(D.tip3&&i===D.n-2){ const T=D.T3; H('tipA',i===0?'plate':D.tiles?'band':'plate',D.l-T.dA,zA+T.zL+(D.v6?V6TZ:3.6),(dw)=>D.v6?buildEyeV6(T.hA-t/2,dw,tipGap()):buildEye(T.hA-t/2,dw),D.v6?[[-3.6,0],[3.6,0]]:[[0,-2.6],[0,2.6]],'tpa',D.v6?'Oogvork koppelstang punt (kantelvork)':'Oog koppelstang punt'); }
   return out; }
 // vastgeprint (true) of los met paspennen: zonder steun kan dat bij het oogvorkje aan de ligger en alles onder de onderhelft van segment 1; 'Alles vastprinten' doet de rest (met steun)
-function fusedH(h){ if(D.fuseAll) return true; if(D.tiles){ if(h.kind==='fork') return true; if(h.i===0&&D.tileSym) return true; } return false; }
+function fusedH(h){ if(D.fuseAll) return true; if(D.v6&&h.kind==='arm') return false; /* 6.0: draaiarm los en met paspennen (stond op het dunne vlies van de onderhelft, dwars op de lagen belast) */ if(D.tiles){ if(h.kind==='fork') return true; if(h.i===0&&D.tileSym) return true; } return false; }
 function hangerGeo(h){ const g=h.geo(); g.translate(...h.pos); return g; }
 function dowelPts(h){ return (h.dw||[]).map(([x,z])=>[h.pos[0]+x,h.pos[2]+z]); }
 // lijmvlak (1,5 mm) met gaten voor paspennen van 1,75 mm filament; oorsprong = bovenkant midden
@@ -2746,7 +2746,7 @@ function layoutBeds(){
     it.tooBig=!fits(it.w,it.h)||it.p.size[2]>bs.z;
   }
   // groepen: kleine onderdelen samen, hoge/riskante samen, de rest; groepen delen geen bed (één mislukt deel verpest dan niet de rest)
-  const grp=(it)=>(typeof WITH_SUPPORT!=='undefined'&&WITH_SUPPORT.test(it.p.id))||it.p.size[2]>40?'risico':Math.max(it.p.size[0],it.p.size[1])<=12?'klein':'normaal';
+  const grp=(it)=>(typeof WITH_SUPPORT!=='undefined'&&WITH_SUPPORT.test(it.p.id))||it.p.size[2]>25?'risico':Math.max(it.p.size[0],it.p.size[1])<=12?'klein':'normaal';
   const beds=[];
   for(const g of ['normaal','klein','risico']){ const its=items.filter(it=>grp(it)===g).sort((a,b)=>b.h-a.h||b.w-a.w); const gb=[];
   for(const it of its){
